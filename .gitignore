@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.venv/
+env/
+venv/
+
+# Node / Frontend
+node_modules/
+dist/
+.build/
+.cache/
+.vite/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Env & secrets
+.env
+*.env
+.env.*
+!.env.example
+
+# Alembic / build artifacts
+alembic/**/__pycache__/
+*.log
+
+# Coverage/test
+.coverage
+htmlcov/
+pytest_cache/
