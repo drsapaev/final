@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clinic-backend"
+version = "0.9.0"
+description = "Clinic Queue Manager backend (FastAPI)"
+requires-python = ">=3.11"
+authors = [{ name = "Clinic Team" }]
+readme = "README.md"
+dependencies = [
+  "fastapi>=0.110,<0.116",
+  "uvicorn[standard]>=0.29,<0.31",
+  "pydantic>=2.7,<2.9",
+  "SQLAlchemy>=2.0,<2.1",
+  "alembic>=1.13,<1.14",
+  "python-jose[cryptography]>=3.3,<4.0",
+  "passlib[bcrypt]>=1.7,<1.8",
+  "reportlab>=4.0,<4.3",
+  "qrcode[pil]>=7.4,<7.5",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools]
+zip-safe = false

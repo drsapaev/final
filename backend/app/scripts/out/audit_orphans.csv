@@ -1,0 +1,15 @@
+child_table,child_column,parent_table,parent_column,orphans
+visits,patient_id,patients,id,n/a
+visits,doctor_id,users,id,n/a
+visit_services,visit_id,visits,id,n/a
+visit_services,service_id,services,id,n/a
+payments,visit_id,visits,id,n/a
+payments,patient_id,patients,id,n/a
+schedules,doctor_id,users,id,n/a
+schedules,patient_id,patients,id,n/a
+queues,patient_id,patients,id,n/a
+queues,service_id,services,id,n/a
+online_appointments,patient_id,patients,id,n/a
+online_appointments,doctor_id,users,id,n/a
+lab_results,visit_id,visits,id,n/a
+audit_trail,user_id,users,id,n/a

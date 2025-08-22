@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: ops/backend.Dockerfile
+      target: runtime
+    container_name: clinic-backend
+    restart: unless-stopped
+    environment:
+      # Core
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/app.db}
+      APP_NAME: ${APP_NAME:-Clinic Queue Manager}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      ENV: ${ENV:-dev}
+      # Auth
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-prod}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-720}
+      # CORS
+      CORS_ALLOW_ALL: ${CORS_ALLOW_ALL:-1}
+      # Printer (optional)
+      PRINTER_TYPE: ${PRINTER_TYPE:-none}
+      PRINTER_NET_HOST: ${PRINTER_NET_HOST:-}
+      PRINTER_NET_PORT: ${PRINTER_NET_PORT:-9100}
+      PRINTER_USB_VID: ${PRINTER_USB_VID:-}
+      PRINTER_USB_PID: ${PRINTER_USB_PID:-}
+      # Admin bootstrap
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Administrator}
+      ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-0}
+      # App bind
+      HOST: 0.0.0.0
+      PORT: 8000
+      RELOAD: ${RELOAD:-0}
+      WORKERS: ${WORKERS:-1}
+      # Licensing / Activation
+      REQUIRE_LICENSE: ${REQUIRE_LICENSE:-1}         # <— NEW (включить проверку)
+      LICENSE_MODE: ${LICENSE_MODE:-activation}      # <— NEW (использовать таблицу activations)
+      LICENSE_ALLOW_HEALTH: ${LICENSE_ALLOW_HEALTH:-1}
+    volumes:
+      - ./backend:/app:rw
+      - backend_data:/data
+    working_dir: /app
+    command: ["/bin/bash", "/entrypoint.sh"]
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ops/frontend.Dockerfile
+    container_name: clinic-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000/api/v1}
+    volumes:
+      - ./frontend:/app:rw
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:

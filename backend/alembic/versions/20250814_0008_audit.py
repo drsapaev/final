@@ -1,0 +1,35 @@
+"""audit table
+
+Revision ID: 20250814_0008_audit
+Revises: 20250814_0007_settings
+Create Date: 2025-08-14 10:08:00.000000
+"""
+from __future__ import annotations
+
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision = "20250814_0008"
+down_revision = "20250814_0007"
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "audit",
+        sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), nullable=True, index=True),
+        sa.Column("action", sa.String(length=64), nullable=False, index=True),
+        sa.Column("entity", sa.String(length=64), nullable=True, index=True),
+        sa.Column("entity_id", sa.Integer(), nullable=True, index=True),
+        sa.Column("meta", sa.Text(), nullable=True),
+        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+    )
+    op.create_index("ix_audit_created_at", "audit", ["created_at"])
+
+
+def downgrade() -> None:
+    op.drop_index("ix_audit_created_at", table_name="audit")
+    op.drop_table("audit")
