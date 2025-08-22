@@ -99,16 +99,16 @@ except Exception as e:
     _HAS_CURRENT_USER = False
 
 if _HAS_CURRENT_USER:
-    @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="Who am I")
-    async def _me(user: Dict[str, Any] = Depends(get_current_user)):
+    @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
+    async def _fallback_me(user: Dict[str, Any] = Depends(get_current_user)):  # <-- правильно
         return {
-            "id": user.get("id"),
-            "username": user.get("username"),
-            "full_name": user.get("full_name"),
-            "email": user.get("email"),
-            "role": user.get("role"),
-            "is_active": user.get("is_active", True),
-        }
+        "id": user.get("id"),
+        "username": user.get("username"),
+        "full_name": user.get("full_name"),
+        "email": user.get("email"),
+        "role": user.get("role"),
+        "is_active": user.get("is_active", True),
+    }
 else:
     @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="Who am I (DEV)")
     async def _me_dev():
