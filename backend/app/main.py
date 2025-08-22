@@ -1,4 +1,4 @@
-# === BEGIN: app/main.py ===
+# --- BEGIN app/main.py ---
 from __future__ import annotations
 
 import logging
@@ -10,13 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 
 # -----------------------------------------------------------------------------
-# Logging
+# Логирование
 # -----------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("clinic.main")
 
 # -----------------------------------------------------------------------------
-# Config
+# Конфиг
 # -----------------------------------------------------------------------------
 API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
 
@@ -31,7 +31,7 @@ CORS_ORIGINS = [
 ]
 
 # -----------------------------------------------------------------------------
-# App
+# Приложение
 # -----------------------------------------------------------------------------
 app = FastAPI(
     title="Clinic Manager API",
@@ -42,12 +42,12 @@ app = FastAPI(
 )
 
 # -----------------------------------------------------------------------------
-# WebSocket router — регистрируем сразу
+# WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
 from app.ws.queue_ws import router as queue_ws_router, ws_queue  # noqa: E402
 
-app.include_router(queue_ws_router)              # /ws/queue и /ws/noauth
-app.add_api_websocket_route("/ws/dev-queue", ws_queue)  # запасной путь
+app.include_router(queue_ws_router)  # /ws/queue
+app.add_api_websocket_route("/ws/dev-queue", ws_queue)
 
 # -----------------------------------------------------------------------------
 # CORS
@@ -60,81 +60,45 @@ if not CORS_DISABLE:
         app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, **cfg)
 
 # -----------------------------------------------------------------------------
-# === BEGIN PATCH: fallback JWT issuer in app/main.py ===
-try:
-    from app.api.deps import create_access_token  # тот же генератор, что и валидатор
-except Exception as e:
-    import os
-    from datetime import datetime, timedelta
-    from jose import jwt
-    import logging
-    log = logging.getLogger("clinic.main")
-    log.error("dev-fallback: cannot import create_access_token (%s) -> using local JWT", e)
-
-    AUTH_SECRET = os.getenv("AUTH_SECRET", "dev-secret")
-    AUTH_ALGORITHM = os.getenv("AUTH_ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
-
-    def create_access_token(subject: str, *, expires_minutes: int | None = None, extra: dict | None = None) -> str:  # type: ignore[override]
-        exp = datetime.utcnow() + timedelta(minutes=int(expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES))
-        payload = {"sub": str(subject), "exp": exp}
-        if extra:
-            payload.update(extra)
-        return jwt.encode(payload, AUTH_SECRET, algorithm=AUTH_ALGORITHM)
-# === END PATCH ===
-
-@app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="Login")
-async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
-    token = create_access_token(form.username)
-    return {"access_token": token, "token_type": "bearer"}
-
+# Попытка импортировать реальную аутентификацию.
+# Если не получилось — включим dev-fallback ниже.
 # -----------------------------------------------------------------------------
-# /auth/me — если есть реальная зависимость, используем её; иначе — dev-заглушка
-# -----------------------------------------------------------------------------
+_USE_DEV_AUTH_FALLBACK = False
 try:
-    from app.api.deps import get_current_user  # noqa: E402
-    _HAS_CURRENT_USER = True
-except Exception as e:
-    log.warning("auth.me: using DEV stub (%s)", e)
-    _HAS_CURRENT_USER = False
-
-if _HAS_CURRENT_USER:
-    @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
-    async def _fallback_me(user: Dict[str, Any] = Depends(get_current_user)):  # <-- правильно
-        return {
-        "id": user.get("id"),
-        "username": user.get("username"),
-        "full_name": user.get("full_name"),
-        "email": user.get("email"),
-        "role": user.get("role"),
-        "is_active": user.get("is_active", True),
-    }
-else:
-    @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="Who am I (DEV)")
-    async def _me_dev():
-        return {"username": "dev", "role": "Admin", "is_active": True}
+    from app.api.deps import create_access_token, get_current_user  # type: ignore  # noqa: E402
+except Exception as e:  # pragma: no cover
+    log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)
+    _USE_DEV_AUTH_FALLBACK = True
 
 # -----------------------------------------------------------------------------
 # Основные API-роутеры проекта
 # -----------------------------------------------------------------------------
-try:
-    from app.api.v1.api import api_router as v1_router  # noqa: E402
-    app.include_router(v1_router, prefix=API_V1_STR)
-    log.info("Included api.v1.api router at %s", API_V1_STR)
-except Exception as e:
-    log.warning("WARN: failed to include api.v1.api (%s). Continuing.", e)
+from app.api.v1.api import api_router as v1_router  # noqa: E402
 
-# Если в проекте есть «родной» auth-роутер — подключим дополнительно
-try:
-    from app.api.v1.endpoints import auth as auth_ep  # noqa: E402
-    app.include_router(auth_ep.router, prefix=f"{API_V1_STR}/auth", tags=["auth"])
-    app.include_router(auth_ep.router, prefix="/auth", tags=["auth"])
-    log.info("Included AUTH router at %s/auth and /auth", API_V1_STR)
-except Exception as e:
-    log.warning("WARN: failed to include AUTH router (%s).", e)
+app.include_router(v1_router, prefix=API_V1_STR)
+log.info("Included api.v1.api router at %s", API_V1_STR)
 
 # -----------------------------------------------------------------------------
-# Health & routes
+# DEV fallback для аутентификации — регистрируем ТОЛЬКО если импорты auth упали
+# -----------------------------------------------------------------------------
+if _USE_DEV_AUTH_FALLBACK:
+    log.warning("Using DEV auth fallback endpoints at %s/auth", API_V1_STR)
+
+    def create_access_token(sub: str) -> str:  # type: ignore[no-redef]
+        # простой dev-токен
+        return f"dev.{sub}"
+
+    @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
+    async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
+        token = create_access_token(form.username)
+        return {"access_token": token, "token_type": "bearer"}
+
+    @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
+    async def _fallback_me():
+        return {"username": "dev", "role": "Admin", "is_active": True}
+
+# -----------------------------------------------------------------------------
+# Health
 # -----------------------------------------------------------------------------
 @app.get("/")
 def root():
@@ -151,6 +115,9 @@ def root():
         "origins": CORS_ORIGINS,
     }
 
+# -----------------------------------------------------------------------------
+# Диагностика подключённых маршрутов
+# -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def _print_routes() -> None:
     try:
@@ -169,6 +136,7 @@ async def _print_routes() -> None:
     except Exception:
         pass
 
+
 @app.get("/_routes")
 def _routes():
     items = []
@@ -182,4 +150,4 @@ def _routes():
             }
         )
     return items
-# === END: app/main.py ===
+# --- END app/main.py ---

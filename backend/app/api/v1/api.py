@@ -1,63 +1,36 @@
-# kept + extended: центральный роутер API v1
+# --- BEGIN app/api/v1/api.py ---
 from __future__ import annotations
 
-import importlib
 import logging
-from typing import Optional, List
 from fastapi import APIRouter
 
 log = logging.getLogger("api.include")
 
-# ВАЖНО: объявляем api_router СНАЧАЛА
 api_router = APIRouter()
 
-
-def _safe_include(
-    module_path: str,
-    *,
-    attr: str = "router",
-    prefix: Optional[str] = None,
-    tags: Optional[List[str]] = None,
-) -> None:
-    """
-    Импортирует модуль и, если в нём есть APIRouter по имени `attr`, подключает его.
-    Ошибки импорта логируем (чтобы видеть причину, если роутер не подключился), но запуск не ломаем.
-    """
+def _safe_include(modpath: str, prefix: str, tag: str) -> None:
+    """Подключает router из указанного модуля, логирует ошибку, если что-то пошло не так."""
     try:
-        mod = importlib.import_module(module_path)
-    except Exception as e:
-        log.exception("Failed to import %s: %s", module_path, e)
-        return
-    router = getattr(mod, attr, None)
-    if router is None:
-        log.warning("Module %s has no attr %r", module_path, attr)
-        return
+        mod = __import__(modpath, fromlist=["router"])
+        router = getattr(mod, "router", None)
+        if router is None:
+            raise RuntimeError(f"{modpath} has no 'router'")
+        api_router.include_router(router, prefix=prefix, tags=[tag])
+        log.info("Included router from %s", modpath)
+    except Exception as e:  # noqa: BLE001
+        log.error("Failed to include %s: %s", modpath, e)
 
-    kw = {}
-    if prefix:
-        kw["prefix"] = prefix
-    if tags:
-        kw["tags"] = tags
-    api_router.include_router(router, **kw)
-    log.info("Included router from %s %s", module_path, kw or "")
-    
+# базовые
+_safe_include("app.api.v1.endpoints.auth",          "/auth",           "auth")
+_safe_include("app.api.v1.endpoints.patients",      "/patients",       "patients")
+_safe_include("app.api.v1.endpoints.visits",        "/visits",         "visits")
+_safe_include("app.api.v1.endpoints.services",      "/services",       "services")
+_safe_include("app.api.v1.endpoints.payments",      "/payments",       "payments")
+_safe_include("app.api.v1.endpoints.settings",      "/settings",       "settings")
+_safe_include("app.api.v1.endpoints.audit",         "/audit",          "audit")
+_safe_include("app.api.v1.endpoints.schedule",      "/appointments",   "appointments")
 
-# -------------------------
-# Роутеры
-# -------------------------
-# /auth/*
-_safe_include("app.api.v1.endpoints.auth", prefix="/auth", tags=["auth"])
-
-# Остальные модули (подключаем, если есть)
-_safe_include("app.api.v1.endpoints.patients")
-_safe_include("app.api.v1.endpoints.visits")
-_safe_include("app.api.v1.endpoints.services")
-_safe_include("app.api.v1.endpoints.payments")
-_safe_include("app.api.v1.endpoints.settings")
-_safe_include("app.api.v1.endpoints.audit")
-_safe_include("app.api.v1.endpoints.schedule")
-
-# Очереди/запись
-_safe_include("app.api.v1.endpoints.queues")
-_safe_include("app.api.v1.endpoints.appointments")
-_safe_include("app.api.v1.endpoints.online_queue")
+# очереди
+_safe_include("app.api.v1.endpoints.queues",        "/queues",         "queues")
+_safe_include("app.api.v1.endpoints.online_queue",  "/online-queue",   "online-queue")
+# --- END app/api/v1/api.py ---

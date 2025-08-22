@@ -1,69 +1,61 @@
+# --- BEGIN app/api/v1/endpoints/online_queue.py ---
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.services.online_queue import DayStats, get_or_create_day, load_stats
+from app.services.online_queue import load_stats, open_day
 
-router = APIRouter(prefix="/online-queue", tags=["online-queue"])
-
-
-class OpenOut(BaseModel):
-    ok: bool
-    department: str
-    date_str: str
-    start_number: Optional[int] = None
-    is_open: bool
+router = APIRouter()
 
 
-@router.post("/open", response_model=OpenOut, summary="Открыть день онлайн-очереди (alias)")
-async def open_online_day(
-    department: str = Query(..., min_length=1, max_length=64),
-    date_str: str = Query(..., min_length=8, max_length=16),
-    start_number: Optional[int] = Query(default=None, ge=1),
+def _stats_to_dict(s) -> dict:
+    # Унифицированный ответ со всеми ключами
+    return {
+        "department": getattr(s, "department", None),
+        "date_str": getattr(s, "date_str", None),
+        "is_open": getattr(s, "is_open", False),
+        "start_number": getattr(s, "start_number", 0),
+        "last_ticket": getattr(s, "last_ticket", 0),
+        "waiting": getattr(s, "waiting", 0),
+        "serving": getattr(s, "serving", 0),
+        "done": getattr(s, "done", 0),
+    }
+
+
+@router.post("/open", name="online_queue_open")
+def open_queue(
+    department: str = Query(..., min_length=1),
+    date_str: str = Query(..., min_length=8),
+    start_number: int = Query(1, ge=0),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar")),
+    _=Depends(require_roles("Admin", "Registrar")),
 ):
-    row = get_or_create_day(db, department=department.strip(), date_str=date_str.strip(), start_number=start_number, open_flag=True)
-    return OpenOut(
-        ok=True,
-        department=row.department,
-        date_str=row.date_str,
-        start_number=row.start_number,
-        is_open=row.is_open,
-    )
+    """
+    Открыть онлайн-очередь на день. Все параметры — в query string.
+    """
+    s = open_day(db, department=department, date_str=date_str, start_number=start_number)
+    # Ответ в формате, как ты уже видел в консоли
+    return {
+        "ok": True,
+        "department": department,
+        "date_str": date_str,
+        "start_number": start_number,
+        "is_open": getattr(s, "is_open", True),
+    }
 
 
-class StatsOut(BaseModel):
-    department: str
-    date_str: str
-    is_open: bool
-    start_number: Optional[int] = None
-    last_ticket: int
-    waiting: int
-    serving: int
-    done: int
-
-
-@router.get("/stats", response_model=StatsOut, summary="Статус онлайн-очереди (alias /appointments/stats)")
-async def online_stats(
-    department: str = Query(..., min_length=1, max_length=64),
-    date_str: str = Query(..., min_length=8, max_length=16),
+@router.get("/stats", name="online_queue_stats")
+def stats(
+    department: str = Query(..., min_length=1),
+    date_str: str = Query(..., min_length=8),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "User")),
+    _=Depends(require_roles("Admin", "Registrar")),
 ):
-    s: DayStats = load_stats(db, department=department.strip(), date_str=date_str.strip())
-    return StatsOut(
-        department=s.department,
-        date_str=s.date_str,
-        is_open=s.is_open,
-        start_number=s.start_number,
-        last_ticket=s.last_ticket,
-        waiting=s.waiting,
-        serving=s.serving,
-        done=s.done,
-    )
+    """
+    Статистика онлайн-очереди (вариант с параметром date_str).
+    """
+    s = load_stats(db, department=department, date_str=date_str)
+    return _stats_to_dict(s)
+# --- END app/api/v1/endpoints/online_queue.py ---
