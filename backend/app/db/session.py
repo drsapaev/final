@@ -5,14 +5,16 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
+# SQLAlchemy 2.0 engine
+engine = create_engine(
+    settings.DATABASE_URL,
+    future=True,
+    pool_pre_ping=True,
+)
 
-def _engine_from_url(url: str):
-    connect_args = {}
-    if url.startswith("sqlite:"):
-        # SQLite в контейнере/локально — разрешаем работу из разных потоков
-        connect_args = {"check_same_thread": False}
-    return create_engine(url, pool_pre_ping=True, future=True, connect_args=connect_args)
-
-
-engine = _engine_from_url(settings.DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    autocommit=False,
+    future=True,
+)
