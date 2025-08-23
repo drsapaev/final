@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 import qrcode
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, get_current_user, require_roles
 from app.services.online_queue import DayStats, get_or_create_day, load_stats
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
@@ -28,27 +28,23 @@ class OpenOut(BaseModel):
     is_open: bool
 
 
-@router.post("/open", response_model=OpenOut, summary="Открыть день онлайн-очереди")
-async def open_day(
-    payload: OpenIn,
+@router.post("/open", dependencies=[Depends(require_roles("Admin"))])
+def open_day(
+    department: str = Query(...),
+    date_str: str = Query(...),
+    start_number: int = Query(...),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar")),
+    current_user=Depends(get_current_user),
 ):
-    row = get_or_create_day(
-        db,
-        department=payload.department.strip(),
-        date_str=payload.date.strip(),
-        start_number=payload.start_number,
-        open_flag=True,
-    )
+    # create or open the day using the existing service and return a typed response
+    day = get_or_create_day(db=db, department=department.strip(), date_str=date_str.strip(), start_number=start_number)
     return OpenOut(
         ok=True,
-        department=row.department,
-        date_str=row.date_str,
-        start_number=row.start_number,
-        is_open=row.is_open,
+        department=day.department,
+        date_str=day.date_str,
+        start_number=getattr(day, "start_number", None),
+        is_open=bool(getattr(day, "is_open", False)),
     )
-
 
 class StatsOut(BaseModel):
     department: str

@@ -10,6 +10,49 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+# app/api/deps.py
+from __future__ import annotations
+
+from enum import Enum
+from typing import TYPE_CHECKING, Union
+from fastapi import Depends, HTTPException, status
+
+# только для тайпчека — чтобы не плодить циклические импорты в рантайме
+if TYPE_CHECKING:
+    from app.models.user import User  # noqa: F401
+
+
+def _role_to_str(val: Union[str, Enum, None]) -> str:
+    """Приводим роль к строке ('Admin', 'User', ...), чтобы честно сравнивать."""
+    if val is None:
+        return ""
+    if isinstance(val, Enum):
+        # если Enum наследуется от str — вернётся value, иначе — имя члена
+        return val.value if isinstance(val.value, str) else val.name
+    return str(val)
+
+
+def require_roles(*allowed: Union[str, Enum]):
+    """
+    Использование:
+      @router.post("/open", dependencies=[Depends(require_roles("Admin", "Registrar"))])
+      или
+      def handler(..., _=Depends(require_roles("Admin"))): ...
+    """
+    allowed_norm = { _role_to_str(x) for x in allowed }
+
+    def _dep(current_user=Depends(get_current_user)):  # type: ignore[name-defined]
+        role_now = _role_to_str(getattr(current_user, "role", None))
+        if role_now not in allowed_norm:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: role not allowed",
+            )
+        return current_user  # удобно, если хэндлеру нужен сам пользователь
+
+    return _dep
+
+
 # --- Конфиг (мягкий импорт settings + безопасные дефолты из ENV) ---
 try:
     # Если у вас есть app.core.config.settings — используем его

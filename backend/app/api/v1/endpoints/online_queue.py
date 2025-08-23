@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, require_roles
 from app.services.online_queue import load_stats  # есть в services
+import app.api.v1.endpoints.appointments as impl
 
 router = APIRouter(prefix="/online-queue", tags=["online-queue"])
 
@@ -22,67 +23,36 @@ def _get_setting_model():
 Setting = _get_setting_model()
 
 
-@router.post("/open", name="online_queue_open")
-def online_queue_open(
-    department: str = Query(..., description="Напр. ENT"),
-    date_str: str = Query(..., description="YYYY-MM-DD"),
-    start_number: int = Query(..., ge=0),
+@router.post("/open", dependencies=[Depends(require_roles("Admin"))])
+def open_day_alias(
+    department: str = Query(...),
+    date_str: str = Query(...),
+    start_number: int = Query(...),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles(["Admin"])),
+    current_user=Depends(get_current_user),
 ):
-    """
-    Алиас открытия дня для онлайн-очереди.
-    Просто апсертит настройки:
-      queue::{dep}::{date}::is_open = 1
-      queue::{dep}::{date}::start_number = <start_number>
-    """
-    prefix = f"{department}::{date_str}"
-    now = datetime.utcnow()
+    # проксируем на appointments.open с теми же именами параметров
+    return impl.open_day(
+        department=department,
+        date_str=date_str,
+        start_number=start_number,
+        db=db,
+        current_user=current_user,
+    )
 
-    def upsert(key: str, value: str | int):
-        rec = db.query(Setting).filter_by(category="queue", key=key).first()
-        if rec:
-            rec.value = str(value)
-            rec.updated_at = now
-        else:
-            rec = Setting(
-                category="queue",
-                key=key,
-                value=str(value),
-                created_at=now,
-                updated_at=now,
-            )
-            db.add(rec)
-
-    upsert(f"{prefix}::is_open", "1")
-    upsert(f"{prefix}::start_number", start_number)
-
-    db.commit()
-    return {
-        "ok": True,
-        "department": department,
-        "date_str": date_str,
-        "start_number": start_number,
-        "is_open": True,
-    }
-
-
-@router.get("/stats", name="online_queue_stats")
-def online_queue_stats(
+@router.get("/stats")
+def stats_alias(
     department: str = Query(...),
     date_str: str = Query(...),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Алиас статистики для онлайн-очереди, использует services.online_queue.load_stats()."""
-    s = load_stats(db, department=department, date_str=date_str)
-    # Поддержим разные типы (pydantic v2 / v1 / dataclass)
-    for attr in ("model_dump", "dict"):
-        fn = getattr(s, attr, None)
-        if callable(fn):
-            return fn()
-    return s  # на крайний случай
-
+    return impl.stats(
+        department=department,
+        d=date_str,          # ВНИМАНИЕ: если stats ожидает параметр 'd', передаём его так
+        db=db,
+        current_user=current_user,
+    )
 
 @router.get("/qrcode", name="online_queue_qrcode")
 def online_queue_qrcode(
