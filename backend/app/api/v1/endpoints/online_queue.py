@@ -1,61 +1,76 @@
-# --- BEGIN app/api/v1/endpoints/online_queue.py ---
-from __future__ import annotations
-
-from fastapi import APIRouter, Depends, Query
+import logging
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.services.online_queue import load_stats, open_day
 
-router = APIRouter()
+log = logging.getLogger("api.online_queue")
 
-
-def _stats_to_dict(s) -> dict:
-    # Унифицированный ответ со всеми ключами
-    return {
-        "department": getattr(s, "department", None),
-        "date_str": getattr(s, "date_str", None),
-        "is_open": getattr(s, "is_open", False),
-        "start_number": getattr(s, "start_number", 0),
-        "last_ticket": getattr(s, "last_ticket", 0),
-        "waiting": getattr(s, "waiting", 0),
-        "serving": getattr(s, "serving", 0),
-        "done": getattr(s, "done", 0),
-    }
+# Делаем алиасы под /api/v1/online-queue/*
+router = APIRouter(prefix="/online-queue", tags=["online-queue"])
 
 
 @router.post("/open", name="online_queue_open")
-def open_queue(
-    department: str = Query(..., min_length=1),
-    date_str: str = Query(..., min_length=8),
-    start_number: int = Query(1, ge=0),
+def open_day_alias(
+    department: str = Query(..., description="Код отделения, напр. ENT"),
+    date_str: str = Query(..., description="Дата в формате YYYY-MM-DD"),
+    start_number: int = Query(1, ge=0, description="Стартовый номер талона"),
     db: Session = Depends(get_db),
-    _=Depends(require_roles("Admin", "Registrar")),
+    current_user=Depends(require_roles("Admin", "Reception")),
 ):
     """
-    Открыть онлайн-очередь на день. Все параметры — в query string.
+    Алиас для /api/v1/appointments/open — принимает параметры в query.
     """
-    s = open_day(db, department=department, date_str=date_str, start_number=start_number)
-    # Ответ в формате, как ты уже видел в консоли
-    return {
-        "ok": True,
-        "department": department,
-        "date_str": date_str,
-        "start_number": start_number,
-        "is_open": getattr(s, "is_open", True),
-    }
+    from app.api.v1.endpoints.appointments import open_day as impl_open_day
+
+    return impl_open_day(
+        department=department,
+        date_str=date_str,
+        start_number=start_number,
+        db=db,
+        current_user=current_user,
+    )
 
 
 @router.get("/stats", name="online_queue_stats")
-def stats(
-    department: str = Query(..., min_length=1),
-    date_str: str = Query(..., min_length=8),
+def stats_alias(
+    department: str = Query(..., description="Код отделения, напр. ENT"),
+    date_str: str = Query(..., description="Дата в формате YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    _=Depends(require_roles("Admin", "Registrar")),
+    current_user=Depends(require_roles("Admin", "Reception", "Doctor")),
 ):
     """
-    Статистика онлайн-очереди (вариант с параметром date_str).
+    Алиас для /api/v1/appointments/stats — параметры тоже в query.
     """
-    s = load_stats(db, department=department, date_str=date_str)
-    return _stats_to_dict(s)
-# --- END app/api/v1/endpoints/online_queue.py ---
+    from app.api.v1.endpoints.appointments import stats as impl_stats
+
+    return impl_stats(
+        department=department,
+        date_str=date_str,
+        db=db,
+        current_user=current_user,
+    )
+
+
+@router.get("/qrcode", name="online_queue_qrcode")
+def qrcode_alias(
+    department: str = Query(..., description="Код отделения, напр. ENT"),
+    date_str: str = Query(..., description="Дата в формате YYYY-MM-DD"),
+    size: int = Query(512, ge=64, le=1024, description="Размер PNG"),
+    margin: int = Query(1, ge=0, le=10, description="Отступ от края"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Admin", "Reception")),
+) -> Response:
+    """
+    Алиас для /api/v1/appointments/qrcode — возвращает PNG.
+    """
+    from app.api.v1.endpoints.appointments import qrcode_png as impl_qrcode
+
+    return impl_qrcode(
+        department=department,
+        date_str=date_str,
+        size=size,
+        margin=margin,
+        db=db,
+        current_user=current_user,
+    )
