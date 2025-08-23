@@ -1,38 +1,36 @@
-import importlib
-import logging
+# app/api/v1/api.py
+from __future__ import annotations
+
 from fastapi import APIRouter
 
-log = logging.getLogger("api.include")
+# важно: подключаем именно router из каждого модуля
+from app.api.v1.endpoints import (
+    auth,
+    patients,
+    visits,
+    services,
+    payments,
+    settings as settings_ep,
+    audit,
+    appointments,
+    queues,
+    online_queue,  # <-- наш алиас онлайн-очереди
+)
 
 api_router = APIRouter()
 
+# Auth
+api_router.include_router(auth.router)  # дает /api/v1/auth/...
 
-def _safe_include(module_path: str, prefix: str = "", tags: list[str] | None = None):
-    try:
-        mod = importlib.import_module(module_path)
-        router = getattr(mod, "router")
-        api_router.include_router(router, prefix=prefix, tags=tags)
-        log.info("Mounted %s at %s", module_path, prefix or "/")
-    except Exception as e:
-        log.error("Failed to import %s: %s", module_path, e)
+# Основные сущности
+api_router.include_router(patients.router)     # /api/v1/patients/...
+api_router.include_router(visits.router)       # /api/v1/visits/...
+api_router.include_router(services.router)     # /api/v1/services/...
+api_router.include_router(payments.router)     # /api/v1/payments/...
+api_router.include_router(settings_ep.router)  # /api/v1/settings/...
+api_router.include_router(audit.router)        # /api/v1/audit/...
 
-
-# ---- AUTH
-_safe_include("app.api.v1.endpoints.auth", prefix="/auth", tags=["auth"])
-
-# ---- CRUD
-_safe_include("app.api.v1.endpoints.patients", prefix="/patients", tags=["patients"])
-_safe_include("app.api.v1.endpoints.visits", prefix="/visits", tags=["visits"])
-_safe_include("app.api.v1.endpoints.services", prefix="/services", tags=["services"])
-_safe_include("app.api.v1.endpoints.payments", prefix="/payments", tags=["payments"])
-_safe_include("app.api.v1.endpoints.settings", prefix="/settings", tags=["settings"])
-_safe_include("app.api.v1.endpoints.audit", prefix="/audit", tags=["audit"])
-
-# ---- QUEUE core
-_safe_include("app.api.v1.endpoints.queues", prefix="/queues", tags=["queues"])
-
-# ---- APPOINTMENTS: внутри файла уже prefix="/appointments", поэтому без доп. префикса
-_safe_include("app.api.v1.endpoints.appointments", prefix="", tags=["appointments"])
-
-# ---- ONLINE-QUEUE алиасы (prefix задан внутри файла как "/online-queue")
-_safe_include("app.api.v1.endpoints.online_queue", prefix="", tags=["online-queue"])
+# Очередь / запись
+api_router.include_router(queues.router)        # /api/v1/queues/...
+api_router.include_router(appointments.router)  # /api/v1/appointments/...
+api_router.include_router(online_queue.router)  # /api/v1/online-queue/...

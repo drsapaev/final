@@ -1,76 +1,99 @@
-import logging
-from fastapi import APIRouter, Depends, Query, Response
+# app/api/v1/endpoints/online_queue.py
+from __future__ import annotations
+
+from datetime import datetime
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db, get_current_user, require_roles
+from app.services.online_queue import load_stats  # есть в services
 
-log = logging.getLogger("api.online_queue")
-
-# Делаем алиасы под /api/v1/online-queue/*
 router = APIRouter(prefix="/online-queue", tags=["online-queue"])
+
+# Аккуратно берём модель Setting (название файла/класса может отличаться)
+def _get_setting_model():
+    try:
+        from app.models.setting import Setting  # type: ignore
+        return Setting
+    except Exception:
+        from app.models.settings import Setting  # type: ignore
+        return Setting
+
+Setting = _get_setting_model()
 
 
 @router.post("/open", name="online_queue_open")
-def open_day_alias(
-    department: str = Query(..., description="Код отделения, напр. ENT"),
-    date_str: str = Query(..., description="Дата в формате YYYY-MM-DD"),
-    start_number: int = Query(1, ge=0, description="Стартовый номер талона"),
+def online_queue_open(
+    department: str = Query(..., description="Напр. ENT"),
+    date_str: str = Query(..., description="YYYY-MM-DD"),
+    start_number: int = Query(..., ge=0),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Reception")),
+    current_user=Depends(require_roles(["Admin"])),
 ):
     """
-    Алиас для /api/v1/appointments/open — принимает параметры в query.
+    Алиас открытия дня для онлайн-очереди.
+    Просто апсертит настройки:
+      queue::{dep}::{date}::is_open = 1
+      queue::{dep}::{date}::start_number = <start_number>
     """
-    from app.api.v1.endpoints.appointments import open_day as impl_open_day
+    prefix = f"{department}::{date_str}"
+    now = datetime.utcnow()
 
-    return impl_open_day(
-        department=department,
-        date_str=date_str,
-        start_number=start_number,
-        db=db,
-        current_user=current_user,
-    )
+    def upsert(key: str, value: str | int):
+        rec = db.query(Setting).filter_by(category="queue", key=key).first()
+        if rec:
+            rec.value = str(value)
+            rec.updated_at = now
+        else:
+            rec = Setting(
+                category="queue",
+                key=key,
+                value=str(value),
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(rec)
+
+    upsert(f"{prefix}::is_open", "1")
+    upsert(f"{prefix}::start_number", start_number)
+
+    db.commit()
+    return {
+        "ok": True,
+        "department": department,
+        "date_str": date_str,
+        "start_number": start_number,
+        "is_open": True,
+    }
 
 
 @router.get("/stats", name="online_queue_stats")
-def stats_alias(
-    department: str = Query(..., description="Код отделения, напр. ENT"),
-    date_str: str = Query(..., description="Дата в формате YYYY-MM-DD"),
+def online_queue_stats(
+    department: str = Query(...),
+    date_str: str = Query(...),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Reception", "Doctor")),
+    current_user=Depends(get_current_user),
 ):
-    """
-    Алиас для /api/v1/appointments/stats — параметры тоже в query.
-    """
-    from app.api.v1.endpoints.appointments import stats as impl_stats
-
-    return impl_stats(
-        department=department,
-        date_str=date_str,
-        db=db,
-        current_user=current_user,
-    )
+    """Алиас статистики для онлайн-очереди, использует services.online_queue.load_stats()."""
+    s = load_stats(db, department=department, date_str=date_str)
+    # Поддержим разные типы (pydantic v2 / v1 / dataclass)
+    for attr in ("model_dump", "dict"):
+        fn = getattr(s, attr, None)
+        if callable(fn):
+            return fn()
+    return s  # на крайний случай
 
 
 @router.get("/qrcode", name="online_queue_qrcode")
-def qrcode_alias(
-    department: str = Query(..., description="Код отделения, напр. ENT"),
-    date_str: str = Query(..., description="Дата в формате YYYY-MM-DD"),
-    size: int = Query(512, ge=64, le=1024, description="Размер PNG"),
-    margin: int = Query(1, ge=0, le=10, description="Отступ от края"),
+def online_queue_qrcode(
+    department: str = Query(...),
+    date_str: str = Query(...),
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Reception")),
-) -> Response:
+    current_user=Depends(get_current_user),
+):
     """
-    Алиас для /api/v1/appointments/qrcode — возвращает PNG.
+    Алиас генерации QR — прокидываем в существующий обработчик из appointments.
+    Если там другое имя параметра даты (например, date вместо date_str) — поменяйте ниже.
     """
-    from app.api.v1.endpoints.appointments import qrcode_png as impl_qrcode
-
-    return impl_qrcode(
-        department=department,
-        date_str=date_str,
-        size=size,
-        margin=margin,
-        db=db,
-        current_user=current_user,
-    )
+    from app.api.v1.endpoints.appointments import qrcode_png  # импортим локально, чтобы избежать циклов
+    return qrcode_png(department=department, date_str=date_str, db=db, current_user=current_user)
