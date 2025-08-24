@@ -1,12 +1,12 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 
-class ServiceCreate(BaseModel):
+class ServiceCreate(ORMModel):
     code: Optional[str] = Field(default=None, max_length=32)
     name: str = Field(max_length=255)
     department: Optional[str] = Field(default=None, max_length=64)
@@ -15,7 +15,7 @@ class ServiceCreate(BaseModel):
     active: bool = True
 
 
-class ServiceUpdate(BaseModel):
+class ServiceUpdate(ORMModel):
     code: Optional[str] = Field(default=None, max_length=32)
     name: Optional[str] = Field(default=None, max_length=255)
     department: Optional[str] = Field(default=None, max_length=64)
@@ -24,7 +24,7 @@ class ServiceUpdate(BaseModel):
     active: Optional[bool] = None
 
 
-class ServiceItem(BaseModel):
+class ServiceItem(ORMModel):
     id: int
     code: Optional[str] = Field(default=None, max_length=32)
     name: str = Field(max_length=255)

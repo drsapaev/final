@@ -1,12 +1,12 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
-class AuditCreate(BaseModel):
+class AuditCreate(ORMModel):
     action: str = Field(max_length=64)
     entity_type: Optional[str] = Field(default=None, max_length=64)
     entity_id: Optional[int] = None

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from app.schemas.user import UserOut
 
 # Зависимости проекта
 from app.api.deps import create_access_token, get_db, get_current_user
@@ -50,15 +51,6 @@ async def login(
     token = create_access_token(subject)
     return TokenOut(access_token=token)
 
-
-@router.get("/me", summary="Текущий пользователь")
-async def me(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    """Возвращает публичные поля текущего пользователя (по токену)."""
-    return {
-        "id": current_user.get("id"),
-        "username": current_user.get("username"),
-        "full_name": current_user.get("full_name"),
-        "email": current_user.get("email"),
-        "role": current_user.get("role"),
-        "is_active": current_user.get("is_active", True),
-    }
+@router.get("/me", response_model=UserOut)
+def me(current_user: User = Depends(get_current_user)):
+    return current_user

@@ -1,11 +1,11 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 
-class PaymentIn(BaseModel):
+class PaymentIn(ORMModel):
     visit_id: int = Field(ge=1)
     amount: float = Field(ge=0)
     currency: str = Field(default="UZS", max_length=8)
@@ -15,7 +15,7 @@ class PaymentIn(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
 
 
-class PaymentOut(BaseModel):
+class PaymentOut(ORMModel):
     id: int
     visit_id: int
     amount: float

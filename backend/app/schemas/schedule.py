@@ -1,15 +1,15 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 
-class ScheduleRowOut(BaseModel):
+class ScheduleRowOut(ORMModel):
     id: int
     department: Optional[str] = None
     doctor_id: Optional[int] = None
-    weekday: int = Field(ge=0, le=6, description="0=Пн … 6=Вс")
+    weekday: int = Field(ge=0, le=6, description="0=РџРЅ вЂ¦ 6=Р’СЃ")
     start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
     end_time: str = Field(pattern=r"^\d{2}:\d{2}$")
     room: Optional[str] = None
@@ -17,7 +17,7 @@ class ScheduleRowOut(BaseModel):
     active: bool = True
 
 
-class ScheduleCreateIn(BaseModel):
+class ScheduleCreateIn(ORMModel):
     department: Optional[str] = None
     doctor_id: Optional[int] = Field(default=None, ge=1)
     weekday: int = Field(ge=0, le=6)

@@ -1,12 +1,12 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 
-class OnlineJoinRequest(BaseModel):
+class OnlineJoinRequest(ORMModel):
     department: str = Field(max_length=64)
     date: date
     phone: Optional[str] = Field(default=None, max_length=32)
@@ -14,14 +14,14 @@ class OnlineJoinRequest(BaseModel):
     name: Optional[str] = Field(default=None, max_length=255)
 
 
-class OnlineJoinResponse(BaseModel):
+class OnlineJoinResponse(ORMModel):
     queue_entry_id: int
     ticket_number: int
     department: str
     date: date
 
 
-class OnlineOpenRequest(BaseModel):
+class OnlineOpenRequest(ORMModel):
     department: str = Field(max_length=64)
     date: date
     start_number: Optional[int] = None

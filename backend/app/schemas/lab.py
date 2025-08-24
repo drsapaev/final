@@ -1,19 +1,19 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 
 # --- Orders ---
-class LabOrderCreate(BaseModel):
+class LabOrderCreate(ORMModel):
     visit_id: Optional[int] = None
     patient_id: Optional[int] = None
     notes: Optional[str] = Field(default=None, max_length=1000)
 
 
-class LabOrderOut(BaseModel):
+class LabOrderOut(ORMModel):
     id: int
     visit_id: Optional[int] = None
     patient_id: Optional[int] = None
@@ -24,7 +24,7 @@ class LabOrderOut(BaseModel):
 
 
 # --- Results ---
-class LabResultIn(BaseModel):
+class LabResultIn(ORMModel):
     test_code: Optional[str] = Field(default=None, max_length=64)
     test_name: str = Field(max_length=255)
     value: Optional[str] = Field(default=None, max_length=128)

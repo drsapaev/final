@@ -1,17 +1,17 @@
-from __future__ import annotations
-
+﻿from __future__ import annotations
+from app.schemas.base import ORMModel
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 
-class SettingRowOut(BaseModel):
+class SettingRowOut(ORMModel):
     category: str = Field(min_length=1, max_length=64)
     key: str = Field(min_length=1, max_length=128)
     value: Optional[str] = None
 
 
-class SettingUpsertIn(BaseModel):
+class SettingUpsertIn(ORMModel):
     category: str = Field(min_length=1, max_length=64)
     key: str = Field(min_length=1, max_length=128)
     value: Optional[str] = None
