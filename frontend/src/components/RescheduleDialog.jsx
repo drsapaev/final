@@ -1,103 +1,145 @@
-﻿import React, { useState, useEffect } from "react";
-import PropTypes from "prop-types";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { apiRequest } from "../api/client";
+import React, { useEffect, useState } from "react";
+import { rescheduleVisit, rescheduleTomorrow } from "../api";
 
-function RescheduleDialog({ open, onClose, visit, onRescheduled }) {
-  const [newDate, setNewDate] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+/**
+ * Диалог переноса визита.
+ * Props:
+ *  - open: boolean
+ *  - onClose: () => void
+ *  - visit: { id, scheduled_at, ... }
+ *  - onRescheduled?: (updated) => void
+ */
+export default function RescheduleDialog({ open, onClose, visit, onRescheduled }) {
+  const [dt, setDt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (open && visit && visit.scheduled_at) {
-      setNewDate(new Date(visit.scheduled_at));
-    } else if (!open) {
-      setNewDate(null);
-      setError("");
+    if (!open) return;
+    setErr("");
+    // Проставим текущее время визита, если есть
+    if (visit?.scheduled_at) {
+      try {
+        const d = new Date(visit.scheduled_at);
+        // datetime-local => yyyy-MM-ddThh:mm
+        const pad = (n) => String(n).padStart(2, "0");
+        const value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+          d.getMinutes()
+        )}`;
+        setDt(value);
+      } catch {
+        setDt("");
+      }
+    } else {
+      setDt("");
     }
   }, [open, visit]);
 
-  const handleSave = async () => {
-    if (!newDate) {
-      setError("Выберите дату и время");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const payload = {
-        scheduled_at: newDate.toISOString()
-      };
-      // Используем apiRequest(method, path, options) из frontend/src/api/client
-      // Клиент добавляет базовый префикс (например /api/v1), поэтому path оставляем относительным.
-      await apiRequest("POST", `/visits/${visit.id}/reschedule`, { json: payload });
-      setLoading(false);
-      onRescheduled && onRescheduled({ ...visit, scheduled_at: payload.scheduled_at });
-      onClose && onClose();
-    } catch (err) {
-      console.error("Reschedule error:", err);
-      // Клиент может кидать объекты с .data или Error с .message
-      const msg =
-        (err && err.data && (err.data.detail || err.data.message)) ||
-        (err && err.message) ||
-        "Ошибка при изменении времени";
-      setError(msg);
-      setLoading(false);
-    }
-  };
-
   if (!open) return null;
 
+  async function doReschedule() {
+    if (!visit?.id) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const iso = dt ? new Date(dt).toISOString() : null;
+      if (!iso) throw new Error("Укажите дату и время");
+      const updated = await rescheduleVisit(visit.id, iso);
+      onRescheduled?.(updated || null);
+      onClose?.();
+    } catch (e) {
+      setErr(e?.data?.detail || e?.message || "Не удалось перенести визит");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function doTomorrow() {
+    if (!visit?.id) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const updated = await rescheduleTomorrow(visit.id);
+      onRescheduled?.(updated || null);
+      onClose?.();
+    } catch (e) {
+      setErr(e?.data?.detail || e?.message || "Не удалось перенести на завтра");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded shadow-lg w-full max-w-md">
-        <div className="px-4 py-3 border-b">
-          <h3 className="text-lg font-semibold">Перенести приём</h3>
-        </div>
-        <div className="p-4">
-          <label className="block text-sm font-medium text-gray-700">Новое время</label>
-          <div className="mt-2">
-            <DatePicker
-              selected={newDate}
-              onChange={(date) => setNewDate(date)}
-              showTimeSelect
-              timeFormat="HH:mm"
-              timeIntervals={15}
-              dateFormat="yyyy-MM-dd HH:mm"
-              className="border rounded p-2 w-full"
+    <div style={backdrop} onClick={(e) => e.target === e.currentTarget && !busy && onClose?.()}>
+      <div style={modal}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Перенос визита</h3>
+
+        <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span>Новая дата и время</span>
+            <input
+              type="datetime-local"
+              value={dt}
+              onChange={(e) => setDt(e.target.value)}
+              style={input}
+              disabled={busy}
             />
-          </div>
+          </label>
 
-          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+          {err ? (
+            <div style={errBox}>{err}</div>
+          ) : (
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
+              Визит: <b>#{visit?.id ?? "—"}</b>
+            </div>
+          )}
+        </div>
 
-          <div className="mt-4 flex justify-end space-x-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded border bg-white hover:bg-gray-50"
-              disabled={loading}
-            >
-              Отмена
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-              disabled={loading}
-            >
-              {loading ? "Сохранение..." : "Сохранить"}
-            </button>
-          </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
+          <button onClick={onClose} disabled={busy} style={btn}>
+            Отмена
+          </button>
+          <button onClick={doTomorrow} disabled={busy} style={{ ...btn, borderColor: "#16a34a" }}>
+            На завтра
+          </button>
+          <button onClick={doReschedule} disabled={busy} style={{ ...btn, background: "#111", color: "#fff" }}>
+            Перенести
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-RescheduleDialog.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func,
-  visit: PropTypes.object,
-  onRescheduled: PropTypes.func
+/* styles */
+const backdrop = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,.3)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1000,
+};
+const modal = {
+  width: "min(560px, 92vw)",
+  background: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  boxShadow: "0 10px 30px rgba(0,0,0,.08)",
+  padding: 16,
+};
+const input = {
+  padding: "8px 10px",
+  border: "1px solid #e5e7eb",
+  borderRadius: 8,
+  outline: "none",
+};
+const btn = {
+  padding: "8px 12px",
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  cursor: "pointer",
 };
 
-export default RescheduleDialog;

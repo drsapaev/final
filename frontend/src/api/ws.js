@@ -1,32 +1,36 @@
-// Helper for opening Queue WS with correct base and protocol.
-// Falls back gracefully if WS not available or activation guard closes the socket.
+// Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
+function wsEnabled() {
+  const v = (import.meta?.env?.VITE_ENABLE_WS ?? "0").toString().trim();
+  return v === "1" || v.toLowerCase() === "true";
+}
 
-import { getApiBase } from "./client.js";
+function buildWsBase() {
+  const raw = (import.meta?.env?.VITE_WS_BASE ?? "/ws").toString().trim();
+  if (/^wss?:\/\//i.test(raw)) return raw.replace(/\/+$/, "");
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  const host = location.host;
+  const suffix = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${proto}//${host}${suffix}`.replace(/\/+$/, "");
+}
 
 /**
- * Open queue websocket.
- * @param {string} department
- * @param {string} dateStr YYYY-MM-DD
- * @param {(msg: any) => void} onMessage
- * @returns {() => void} unsubscribe/close function
+ * Открыть WS очереди. onMessage получает уже распарсенный объект.
+ * Возвращает функцию close().
  */
 export function openQueueWS(department, dateStr, onMessage) {
+  if (!wsEnabled()) return () => {};
   let ws = null;
-  try {
-    const base = new URL(getApiBase());
-    const proto = base.protocol === "https:" ? "wss:" : "ws:";
-    const host = base.host; // includes port
-    const url = `${proto}//${host}/ws/queue?department=${encodeURIComponent(
-      department
-    )}&date_str=${encodeURIComponent(dateStr)}`;
 
+  try {
+    const base = buildWsBase();
+    const url = `${base}/queue?department=${encodeURIComponent(department)}&date_str=${encodeURIComponent(dateStr)}`;
     ws = new WebSocket(url);
     ws.onmessage = (ev) => {
       try {
-        const msg = JSON.parse(ev.data);
-        onMessage && onMessage(msg);
+        const obj = JSON.parse(ev.data);
+        onMessage && onMessage(obj);
       } catch {
-        // ignore malformed
+        // ignore
       }
     };
     ws.onerror = () => {};
@@ -36,7 +40,10 @@ export function openQueueWS(department, dateStr, onMessage) {
   }
 
   return function close() {
-    try { ws && ws.close(1000, "bye"); } catch {}
+    try {
+      ws && ws.close(1000, "bye");
+    } catch {}
     ws = null;
   };
 }
+

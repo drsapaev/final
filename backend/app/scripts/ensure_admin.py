@@ -33,7 +33,7 @@ def ensure_admin() -> dict:
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
 
-    with SessionLocal() as db:  # type: Session
+    with SessionLocal() as db:  # type: ignore # type: Session
         row = db.execute(select(User).where(User.username == username)).scalars().first()
         if row:
             changed = False

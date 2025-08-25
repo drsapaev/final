@@ -130,3 +130,4 @@ const errBox = {
   padding: 8,
   borderRadius: 12,
 };
+

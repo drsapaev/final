@@ -1,11 +1,16 @@
+# CRUD для settings (Sync Session). Если у тебя Async CRUD — скажи, выдам async-версию.
 from __future__ import annotations
-
-from datetime import datetime
-from typing import Optional
-
+from typing import List, Optional
 from sqlalchemy.orm import Session
-
 from app.models.setting import Setting
+
+def list_settings(db: Session, category: str, limit: int = 100, offset: int = 0) -> List[Setting]:
+    q = db.query(Setting).filter(Setting.category == category)
+    if offset:
+        q = q.offset(offset)
+    if limit:
+        q = q.limit(limit)
+    return q.all()
 
 def get_setting(db: Session, category: str, key: str) -> Optional[Setting]:
     return (
@@ -15,24 +20,20 @@ def get_setting(db: Session, category: str, key: str) -> Optional[Setting]:
     )
 
 def upsert_setting(db: Session, category: str, key: str, value: str) -> Setting:
-    """
-    Безопасный upsert: всегда заполняем timestamps, чтобы не ловить NOT NULL.
-    """
     obj = get_setting(db, category, key)
-    now = datetime.utcnow()
     if obj:
         obj.value = value
-        obj.updated_at = now
     else:
-        obj = Setting(
-            category=category,
-            key=key,
-            value=value,
-            created_at=now,
-            updated_at=now,
-        )
+        obj = Setting(category=category, key=key, value=value)
         db.add(obj)
-
     db.commit()
     db.refresh(obj)
     return obj
+
+def delete_setting(db: Session, category: str, key: str) -> bool:
+    obj = get_setting(db, category, key)
+    if not obj:
+        return False
+    db.delete(obj)
+    db.commit()
+    return True

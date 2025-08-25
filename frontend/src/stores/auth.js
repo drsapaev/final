@@ -1,103 +1,169 @@
-// Auth store, совместимый и с простыми экспортами (setToken/setProfile),
-// и с объектом auth для подписки и выхода.
-// Основан на frontend/src/api/client.js (TOKEN_KEY="auth_token").
+// Auth store с совместимостью под ожидаемый API (zustand-like):
+// - state: { token, profile }
+// - methods: getState(), setState(partial), subscribe(listener)
+// - helpers: getToken(), setToken(), clearToken(), getProfile(), setProfile()
+// - default export: auth (объект со всеми методами)
+//
+// Хранение: localStorage (ключи TOKEN_KEY/PROFILE_KEY) + in-memory state.
+// Подписчики получают ПОЛНЫЙ state { token, profile } при каждом изменении.
 
-import {
-  getToken as getTokenFromClient,
-  setToken as setTokenInClient,
-  clearToken as clearTokenInClient,
-  login as apiLogin,
-  me as apiMe,
-} from "../api/client.js";
+import { me } from "../api/client.js";
 
-const listeners = new Set();
+const TOKEN_KEY = "auth_token";
+const PROFILE_KEY = "auth_profile";
 
-let state = {
-  token: getTokenFromClient() || null,
-  user: null,
-  ready: false, // станет true после первичной попытки me()
-};
-
-function notify() {
-  const snapshot = { ...state };
-  for (const fn of listeners) {
-    try { fn(snapshot); } catch {}
+// ---------- utils: storage ----------
+function readTokenFromStorage() {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
   }
 }
 
-// --- Примитивные операции (совместимые с твоим Login.jsx) ---
-
-export function setToken(token) {
+function writeTokenToStorage(token) {
   try {
-    setTokenInClient(token || null);
-    state.token = token || null;
-    notify();
-  } catch {}
+    if (token == null) localStorage.removeItem(TOKEN_KEY);
+    else localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* ignore */
+  }
 }
 
-export function setProfile(profile) {
-  state.user = profile || null;
+function readProfileFromStorage() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileToStorage(profile) {
+  try {
+    if (profile == null) localStorage.removeItem(PROFILE_KEY);
+    else localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---------- in-memory state + pub/sub ----------
+let state = {
+  token: readTokenFromStorage(),
+  profile: readProfileFromStorage(),
+};
+
+const subscribers = new Set();
+
+/** Возвращает ТЕКУЩЕЕ состояние (копию) */
+export function getState() {
+  return { ...state };
+}
+
+/** Мержит частичное состояние, синхронизирует storage и уведомляет подписчиков */
+export function setState(partial) {
+  const next = { ...state, ...(partial || {}) };
+
+  // синхронизируем хранилище, если ключи присутствуют в partial
+  if (Object.prototype.hasOwnProperty.call(partial || {}, "token")) {
+    writeTokenToStorage(next.token);
+  }
+  if (Object.prototype.hasOwnProperty.call(partial || {}, "profile")) {
+    writeProfileToStorage(next.profile);
+  }
+
+  state = next;
   notify();
 }
 
-export function clearToken() {
-  try {
-    clearTokenInClient();
-    state.token = null;
-    notify();
-  } catch {}
+/** Подписка: listener(state) -> unsubscribe */
+export function subscribe(listener) {
+  if (typeof listener !== "function") return () => {};
+  subscribers.add(listener);
+  // можно сразу отправить снапшот, если нужно:
+  // try { listener(getState()); } catch {}
+  return () => subscribers.delete(listener);
 }
 
-export function getProfile() {
-  return state.user || null;
-}
-
-// --- Расширенный API (для остальных страниц) ---
-
-export const auth = {
-  getState() {
-    return { ...state };
-  },
-  subscribe(fn) {
-    listeners.add(fn);
-    try { fn({ ...state }); } catch {}
-    return () => listeners.delete(fn);
-  },
-  async login(username, password) {
-    const token = await apiLogin(username, password);
-    setToken(token);
+function notify() {
+  const snapshot = getState();
+  for (const cb of subscribers) {
     try {
-      const u = await apiMe();
-      setProfile(u || null);
+      cb(snapshot);
     } catch {
-      setProfile(null);
+      /* ignore subscriber errors */
     }
-    return token;
-  },
-  logout() {
-    clearToken();
-    state = { token: null, user: null, ready: true };
-    notify();
-  },
+  }
+}
+
+// ---------- public helpers (совместимые с текущим кодом) ----------
+export function getToken() {
+  return getState().token;
+}
+
+export function setToken(tokenOrObj) {
+  // принимаем либо строку токена, либо объект { access_token }
+  let token = null;
+  if (typeof tokenOrObj === "string") token = tokenOrObj;
+  else if (tokenOrObj && tokenOrObj.access_token) token = tokenOrObj.access_token;
+
+  setState({ token });
+}
+
+export function clearToken() {
+  setState({ token: null, profile: null });
+}
+
+/** Сохраняет профиль (и уведомляет подписчиков) */
+export function setProfile(profile) {
+  setState({ profile: profile ?? null });
+}
+
+/**
+ * getProfile(force = false)
+ * - Если токена нет — НЕ дергаем /me (избегаем 401-спама) и возвращаем null.
+ * - Если есть кэш и force=false — используем кэш.
+ * - Иначе зовём /me, сохраняем профиль и возвращаем его.
+ * - При 401/403 или сетевых ошибках возвращает null, чтобы UI не падал.
+ */
+export async function getProfile(force = false) {
+  try {
+    // NEW: без токена не запрашиваем /me, чтобы не получать 401 в консоли
+    const token = getToken();
+    if (!token) return null;
+
+    if (!force) {
+      const cached = getState().profile;
+      if (cached) return cached;
+    }
+    const profile = await me();
+    setProfile(profile || null);
+    return profile || null;
+  } catch (err) {
+    if (err && (err.status === 401 || err.status === 403)) {
+      return null;
+    }
+    console.warn("getProfile failed:", err?.status || err?.message || err);
+    return null;
+  }
+}
+
+// ---------- default export (удобный объект, как раньше) ----------
+export const auth = {
+  // zustand-like
+  getState,
+  setState,
+  subscribe,
+
+  // helpers
+  getToken,
+  setToken,
+  clearToken,
+  getProfile,
+  setProfile,
 };
 
-// --- Инициализация профиля по имеющемуся токену ---
-(async function init() {
-  const t = getTokenFromClient();
-  if (!t) {
-    state.ready = true;
-    notify();
-    return;
-  }
-  try {
-    const u = await apiMe();
-    state.user = u || null;
-  } catch {
-    clearTokenInClient();
-    state.token = null;
-    state.user = null;
-  } finally {
-    state.ready = true;
-    notify();
-  }
-})();
+export default auth;
+

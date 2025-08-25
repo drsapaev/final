@@ -1,0 +1,171 @@
+﻿// Minimal, dependency-free API client for Clinic App
+// - Keeps token in localStorage
+// - Handles JSON + FormData
+// - Throws rich errors { status, data } on non-2xx
+// - Exports: getApiBase, getToken, setToken, clearToken, apiRequest, api, login, me
+
+const TOKEN_KEY = "auth_token";
+
+export function getApiBase() {
+  // Р’ .env.local РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ VITE_API_BASE=http://localhost:8000/api/v1
+  const base = import.meta?.env?.VITE_API_BASE || "http://localhost:8000/api/v1";
+  return String(base).replace(/\/+$/, "");
+}
+
+export function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setToken(token) {
+  try {
+    if (typeof token === "string") {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else if (token && token.access_token) {
+      localStorage.setItem(TOKEN_KEY, token.access_token);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function clearToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function buildUrl(path, params) {
+  const base = getApiBase();
+  const p = String(path || "").replace(/^\/+/, "");
+  let url = `${base}/${p}`;
+  if (params && typeof params === "object") {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === null) return;
+      if (Array.isArray(v)) v.forEach((item) => q.append(k, item));
+      else q.append(k, String(v));
+    });
+    const qs = q.toString();
+    if (qs) url += `?${qs}`;
+  }
+  return url;
+}
+
+function normalizeHeaders(headers = {}) {
+  const h = new Headers();
+  if (headers instanceof Headers) {
+    for (const [k, v] of headers.entries()) h.set(k, v);
+  } else if (typeof headers === "object") {
+    Object.entries(headers).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) h.set(k, String(v));
+    });
+  }
+  if (!h.has("Accept")) h.set("Accept", "application/json");
+  return h;
+}
+
+/**
+ * apiRequest
+ * @param {"GET"|"POST"|"PATCH"|"PUT"|"DELETE"} method
+ * @param {string} path relative path like "/login" or "visits/123"
+ * @param {object} options { params, json, body, headers }
+ * @returns {Promise<any>} parsed JSON or text
+ * @throws Error with { status, data } on non-2xx
+ */
+export async function apiRequest(method, path, { params, json, body, headers } = {}) {
+  const url = buildUrl(path, params);
+  const token = getToken();
+  const hdrs = normalizeHeaders(headers);
+
+  let fetchBody = null;
+  if (json !== undefined) {
+    hdrs.set("Content-Type", "application/json");
+    fetchBody = JSON.stringify(json);
+  } else if (body instanceof FormData) {
+    fetchBody = body; // let browser set multipart boundary
+  } else if (body !== undefined) {
+    fetchBody = body;
+  }
+
+  if (token && !hdrs.has("Authorization")) {
+    hdrs.set("Authorization", `Bearer ${token}`);
+  }
+
+  const res = await fetch(url, {
+    method,
+    headers: hdrs,
+    body: fetchBody,
+    credentials: "same-origin",
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  let data = null;
+  try {
+    data = contentType.includes("application/json") ? await res.json() : await res.text();
+  } catch {
+    data = null;
+  }
+
+  if (res.ok) {
+    return data;
+  } else {
+    const err = new Error("API request failed");
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+}
+
+/**
+ * Convenience wrapper object to satisfy imports:
+ *   import { api, getApiBase } from "../api/client.js";
+ */
+export const api = {
+  request: apiRequest,
+  get: (path, opts) => apiRequest("GET", path, opts || {}),
+  post: (path, opts) => apiRequest("POST", path, opts || {}),
+  patch: (path, opts) => apiRequest("PATCH", path, opts || {}),
+  put: (path, opts) => apiRequest("PUT", path, opts || {}),
+  del: (path, opts) => apiRequest("DELETE", path, opts || {}),
+};
+
+/**
+ * Login endpoint вЂ” РІР°С€ backend РѕС‚РґР°С‘С‚ /api/v1/login (Р±РµР· /auth)
+ */
+export async function login({
+  username,
+  password,
+  grant_type = "password",
+  client_id = "",
+  client_secret = "",
+} = {}) {
+  const form = new FormData();
+  if (username !== undefined) form.set("username", String(username));
+  form.set("password", String(password || ""));
+  form.set("grant_type", grant_type);
+  form.set("client_id", client_id);
+  form.set("client_secret", client_secret);
+
+  const res = await apiRequest("POST", "/login", { body: form });
+  const token = res?.access_token || res?.token || null;
+  if (!token) {
+    const e = new Error("No access_token in response");
+    e.data = res;
+    throw e;
+  }
+  setToken(typeof token === "string" ? token : res);
+  return res;
+}
+
+/**
+ * Profile endpoint вЂ” РІР°С€ backend РѕС‚РґР°С‘С‚ /api/v1/me (Р±РµР· /auth)
+ */
+export async function me() {
+  return apiRequest("GET", "/me");
+}

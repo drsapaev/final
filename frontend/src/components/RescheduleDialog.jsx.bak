@@ -1,0 +1,106 @@
+﻿import React, { useState, useEffect } from "react";
+import PropTypes from "prop-types";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { rescheduleVisit } from "../api";
+
+function RescheduleDialog({ open, onClose, visit, onRescheduled }) {
+  const [newDate, setNewDate] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open && visit && visit.scheduled_at) {
+      setNewDate(new Date(visit.scheduled_at));
+    } else if (!open) {
+      setNewDate(null);
+      setError("");
+    }
+  }, [open, visit]);
+
+  const handleSave = async () => {
+    if (!newDate) {
+      setError("Выберите дату и время");
+      return;
+    }
+    if (!visit || !visit.id) {
+      setError("Невозможно определить приём (нет id)");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const iso = newDate.toISOString();
+
+    try {
+      const res = await rescheduleVisit(visit.id, iso);
+      setLoading(false);
+      const updated = Object.assign({}, visit, { scheduled_at: iso, ...(res || {}) });
+      onRescheduled && onRescheduled(updated);
+      onClose && onClose();
+    } catch (err) {
+      console.error("Reschedule failed:", err);
+      const msg =
+        (err && err.data && (err.data.detail || err.data.message)) ||
+        (err && err.message) ||
+        "Ошибка при изменении времени";
+      setError(msg);
+      setLoading(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded shadow-lg w-full max-w-md">
+        <div className="px-4 py-3 border-b">
+          <h3 className="text-lg font-semibold">Перенести приём</h3>
+        </div>
+        <div className="p-4">
+          <label className="block text-sm font-medium text-gray-700">Новое время</label>
+          <div className="mt-2">
+            <DatePicker
+              selected={newDate}
+              onChange={(date) => setNewDate(date)}
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              dateFormat="yyyy-MM-dd HH:mm"
+              className="border rounded p-2 w-full"
+            />
+          </div>
+
+          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+
+          <div className="mt-4 flex justify-end space-x-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded border bg-white hover:bg-gray-50"
+              disabled={loading}
+            >
+              Отмена
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+              disabled={loading}
+            >
+              {loading ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+RescheduleDialog.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  visit: PropTypes.object,
+  onRescheduled: PropTypes.func
+};
+
+export default RescheduleDialog;

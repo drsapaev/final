@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import Nav from "./components/Nav.jsx";
-import RoleGate from "./components/RoleGate.jsx";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 
-// Pages
+import Nav from "./components/Nav.jsx";
+
 import Health from "./pages/Health.jsx";
 import Login from "./pages/Login.jsx";
 import Registrar from "./pages/Registrar.jsx";
@@ -13,125 +13,81 @@ import Settings from "./pages/Settings.jsx";
 import Audit from "./pages/Audit.jsx";
 import Scheduler from "./pages/Scheduler.jsx";
 import Appointments from "./pages/Appointments.jsx";
+import VisitDetails from "./pages/VisitDetails.jsx";
 
-import { subscribe, getToken, clearToken, getProfile } from "./stores/auth";
+import { auth } from "./stores/auth.js";
 
-const PAGES = [
-  "Health",
-  "Registrar",
-  "Doctor",
-  "Lab",
-  "Cashier",
-  "Settings",
-  "Audit",
-  "Scheduler",
-  "Appointments",
-];
+// ===== мягкая проверка ролей (как раньше) =====
+function hasRole(profile, roles) {
+  if (!roles || roles.length === 0) return true;
+  if (!profile) return true;
+  const need = new Set(roles.map((r) => String(r).toLowerCase()));
+  const have = new Set();
+  if (profile?.role) have.add(String(profile.role).toLowerCase());
+  if (profile?.role_name) have.add(String(profile.role_name).toLowerCase());
+  if (Array.isArray(profile?.roles)) profile.roles.forEach((r) => have.add(String(r).toLowerCase()));
+  if (profile?.is_superuser || profile?.is_admin || profile?.admin) have.add("admin");
+  for (const n of need) if (have.has(n)) return true;
+  if (have.size === 0) return true;
+  return false;
+}
 
-export default function App() {
-  const [auth, setAuth] = useState({ token: getToken(), profile: getProfile() });
-  const [active, setActive] = useState("Health");
+function RequireAuth({ roles, children }) {
+  const [st, setSt] = useState(auth.getState());
+  const loc = useLocation();
+  useEffect(() => auth.subscribe(setSt), []);
+  if (!st.token) return <Navigate to="/login" replace state={{ from: loc }} />;
+  if (!hasRole(st.profile, roles)) return <Navigate to="/" replace />;
+  return children || <Outlet />;
+}
 
-  useEffect(() => {
-    const unsub = subscribe((st) => setAuth({ token: st.token, profile: st.profile }));
-    return () => unsub();
-  }, []);
-
-  if (!auth.token) {
-    return wrap(<Login />);
-  }
-
-  const page = (() => {
-    switch (active) {
-      case "Health":
-        return <Health />;
-      case "Registrar":
-        return (
-          <RoleGate allow={["Admin", "Registrar"]}>
-            <Registrar />
-          </RoleGate>
-        );
-      case "Doctor":
-        return (
-          <RoleGate allow={["Admin", "Doctor"]}>
-            <Doctor />
-          </RoleGate>
-        );
-      case "Lab":
-        return (
-          <RoleGate allow={["Admin", "Lab"]}>
-            <Lab />
-          </RoleGate>
-        );
-      case "Cashier":
-        return (
-          <RoleGate allow={["Admin", "Cashier"]}>
-            <Cashier />
-          </RoleGate>
-        );
-      case "Settings":
-        return (
-          <RoleGate allow={["Admin"]}>
-            <Settings />
-          </RoleGate>
-        );
-      case "Audit":
-        return (
-          <RoleGate allow={["Admin"]}>
-            <Audit />
-          </RoleGate>
-        );
-      case "Scheduler":
-        return (
-          <RoleGate allow={["Admin", "Doctor", "Registrar"]}>
-            <Scheduler />
-          </RoleGate>
-        );
-      case "Appointments":
-        return (
-          <RoleGate allow={["Admin", "Registrar"]}>
-            <Appointments />
-          </RoleGate>
-        );
-      default:
-        return <Health />;
-    }
-  })();
-
-  const profile = auth.profile || {};
-
-  return wrap(
-    <>
+/** Каркас: только Nav, без дублирующего заголовка */
+function AppShell() {
+  return (
+    <div style={wrapStyle}>
       <header style={hdr}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div style={brand}>Clinic Queue Manager</div>
-          <Nav pages={PAGES} active={active} onSelect={setActive} />
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <div style={{ fontSize: 13, opacity: 0.8 }}>
-            {profile.full_name || profile.username || "—"} • {profile.role || "User"}
-          </div>
-          <button onClick={clearToken} style={btn}>Выйти</button>
-        </div>
+        <Nav />
       </header>
-      <main style={main}>{page}</main>
-    </>
+      <main style={main}>
+        <Outlet />
+      </main>
+    </div>
   );
 }
 
-function wrap(children) {
-  return <div style={wrapStyle}>{children}</div>;
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<AppShell />}>
+          <Route index element={<Health />} />
+          <Route path="registrar"     element={<RequireAuth roles={["Admin","Registrar"]}><Registrar /></RequireAuth>} />
+          <Route path="doctor"        element={<RequireAuth roles={["Admin","Doctor"]}><Doctor /></RequireAuth>} />
+          <Route path="lab"           element={<RequireAuth roles={["Admin","Lab"]}><Lab /></RequireAuth>} />
+          <Route path="cashier"       element={<RequireAuth roles={["Admin","Cashier"]}><Cashier /></RequireAuth>} />
+          <Route path="settings"      element={<RequireAuth roles={["Admin"]}><Settings /></RequireAuth>} />
+          <Route path="audit"         element={<RequireAuth roles={["Admin"]}><Audit /></RequireAuth>} />
+          <Route path="scheduler"     element={<RequireAuth roles={["Admin","Doctor","Registrar"]}><Scheduler /></RequireAuth>} />
+          <Route path="appointments"  element={<RequireAuth roles={["Admin","Registrar"]}><Appointments /></RequireAuth>} />
+          <Route path="visits/:id"    element={<VisitDetails />} />
+          <Route path="*"             element={<Navigate to="/" replace />} />
+        </Route>
+      </Route>
+    </Routes>
+  );
 }
 
 const wrapStyle = {
-  fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"',
+  fontFamily:
+    'system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"',
   color: "#0f172a",
   minHeight: "100vh",
   background: "#f8fafc",
 };
-
 const hdr = {
   display: "flex",
+  alignItems: "center",
   justifyContent: "space-between",
   gap: 12,
   padding: "10px 12px",
@@ -139,10 +95,7 @@ const hdr = {
   position: "sticky",
   top: 0,
   background: "white",
+  zIndex: 10,
 };
-
-const brand = { fontWeight: 800, fontSize: 18, marginRight: 8 };
-
 const main = { padding: 16, maxWidth: 1100, margin: "0 auto" };
 
-const btn = { padding: "6px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "white", cursor: "pointer" };

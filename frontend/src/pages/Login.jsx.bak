@@ -1,0 +1,90 @@
+﻿import React, { useState } from "react";
+import { getApiBase } from "../api/client";
+import { setToken, setProfile } from "../stores/auth";
+import * as api from "../api/client";
+
+/**
+ * Р›РѕРіРёРЅ РїРѕ OAuth2 Password (FastAPI):
+ * POST /login c form-url-encoded:
+ *   username, password, grant_type, scope, client_id, client_secret
+ */
+export default function Login() {
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("admin");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function login(e) {
+    e.preventDefault();
+    setBusy(true);
+    setErr("");
+    try {
+      const base = new URL(getApiBase());
+      base.pathname = `${base.pathname.replace(/\/+$/, "")}/login`;
+      const url = base.toString();
+
+      const body = new URLSearchParams();
+      body.set("username", username);
+      body.set("password", password);
+      body.set("grant_type", "");
+      body.set("scope", "");
+      body.set("client_id", "");
+      body.set("client_secret", "");
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(`${res.status} ${res.statusText} ${txt}`);
+      }
+      const data = await res.json();
+      const token = data?.access_token;
+      if (!token) throw new Error("Token missing");
+      setToken(token);
+
+      // Р·Р°РіСЂСѓР·РёРј РїСЂРѕС„РёР»СЊ
+      try {
+        const me = await api.get("/me");
+        setProfile(me || null);
+      } catch {
+        setProfile(null);
+      }
+    } catch (e) {
+      setErr(e?.message || "РћС€РёР±РєР° Р»РѕРіРёРЅР°");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 12, maxWidth: 360 }}>
+      <h2 style={{ margin: 0 }}>Р’С…РѕРґ</h2>
+
+      {err ? <div style={errBox}>{err}</div> : null}
+
+      <form onSubmit={login} style={{ display: "grid", gap: 8 }}>
+        <label style={lbl}>
+          <span>Р›РѕРіРёРЅ</span>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} style={inp} autoComplete="username" />
+        </label>
+        <label style={lbl}>
+          <span>РџР°СЂРѕР»СЊ</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={inp} autoComplete="current-password" />
+        </label>
+        <button type="submit" disabled={busy} style={btnPrimary}>Р’РѕР№С‚Рё</button>
+      </form>
+
+      <small style={{ opacity: 0.7 }}>
+        РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ Р°РґРјРёРЅ СЃРѕР·РґР°С‘С‚СЃСЏ СЃРєСЂРёРїС‚РѕРј <code>ensure_admin.py</code> (admin/admin). РќР°СЃС‚СЂР°РёРІР°РµС‚СЃСЏ РїРµСЂРµРјРµРЅРЅС‹РјРё РѕРєСЂСѓР¶РµРЅРёСЏ.
+      </small>
+    </div>
+  );
+}
+
+const lbl = { display: "grid", gap: 6 };
+const inp = { padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, outline: "none" };
+const btnPrimary = { padding: "6px 10px", borderRadius: 8, border: "1px solid #0284c7", background: "#0ea5e9", color: "white", cursor: "pointer" };
+const errBox = { color: "#7f1d1d", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: 8 };

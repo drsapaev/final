@@ -216,3 +216,4 @@ const inp  = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, b
 const btn  = { padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer" };
 const btnPrimary = { ...btn, borderColor: "#0284c7", background: "#0ea5e9", color: "#fff" };
 const errBox = { color: "#7f1d1d", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: 8 };
+

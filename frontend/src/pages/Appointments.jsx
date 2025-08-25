@@ -115,3 +115,4 @@ const btn = { padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", ba
 const th = { textAlign: "left", padding: 10, borderBottom: "1px solid #eee", fontWeight: 700, whiteSpace: "nowrap" };
 const td = { padding: 10, borderBottom: "1px solid #f3f4f6", verticalAlign: "top" };
 const errBox = { color: "#7f1d1d", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: 8 };
+

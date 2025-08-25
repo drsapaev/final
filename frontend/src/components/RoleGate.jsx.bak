@@ -1,0 +1,43 @@
+﻿import React from "react";
+import { getProfile } from "../stores/auth.js";
+
+/**
+ * РћРіСЂР°РЅРёС‡РёРІР°РµС‚ РґРѕСЃС‚СѓРї РїРѕ СЂРѕР»СЏРј.
+ * РџРѕРґРґРµСЂР¶РёРІР°РµС‚ РѕР±Р° РїСЂРѕРїСЃР°: `allow` Рё `roles` (Р°Р»РёР°СЃС‹).
+ *
+ * Props:
+ *  - allow?: string[]
+ *  - roles?: string[]        // Р°Р»РёР°СЃ allow
+ *  - fallback?: ReactNode    // С‡С‚Рѕ РїРѕРєР°Р·Р°С‚СЊ РїСЂРё Р·Р°РїСЂРµС‚Рµ (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ вЂ” РїСЂРµРґСѓРїСЂРµР¶РґР°СЋС‰РёР№ Р±РѕРєСЃ)
+ *  - children
+ */
+export default function RoleGate({ allow = [], roles, fallback, children }) {
+  const profile = getProfile() || {};
+  const role = (profile.role || "").trim();
+
+  const need = Array.isArray(roles) ? roles : allow;
+  const ok = !need || need.length === 0 || need.includes(role);
+
+  if (ok) return children;
+
+  if (fallback !== undefined) return fallback;
+
+  return (
+    <div style={box}>
+      <div style={cap}>Р”РѕСЃС‚СѓРї РѕРіСЂР°РЅРёС‡РµРЅ</div>
+      <div>
+        Р’Р°С€Р° СЂРѕР»СЊ: <b>{role || "вЂ”"}</b>. РўСЂРµР±СѓРµС‚СЃСЏ РѕРґРЅР° РёР·:{" "}
+        <code>{(need || []).join(", ")}</code>
+      </div>
+    </div>
+  );
+}
+
+const box = {
+  border: "1px solid #fecaca",
+  background: "#fef2f2",
+  color: "#7f1d1d",
+  borderRadius: 8,
+  padding: 12,
+};
+const cap = { fontWeight: 700, marginBottom: 6, fontSize: 14 };

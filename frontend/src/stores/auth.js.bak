@@ -1,0 +1,123 @@
+﻿// Simple auth store compatible with existing imports in App.jsx and other components
+// Provides: subscribe, getToken, setToken, clearToken, getProfile, setProfile
+// Also exports default `auth` object for code that imports { auth }.
+
+import { me } from "../api/client.js";
+
+const TOKEN_KEY = "auth_token";
+const PROFILE_KEY = "auth_profile";
+const subscribers = new Set();
+
+export function subscribe(cb) {
+  if (typeof cb !== "function") return () => {};
+  subscribers.add(cb);
+  // return unsubscribe
+  return () => subscribers.delete(cb);
+}
+
+function notify(payload) {
+  for (const cb of subscribers) {
+    try {
+      cb(payload);
+    } catch (e) {
+      /* ignore subscriber errors */
+    }
+  }
+}
+
+export function getToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setToken(token) {
+  try {
+    if (typeof token === "string") {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else if (token && token.access_token) {
+      localStorage.setItem(TOKEN_KEY, token.access_token);
+    }
+    notify({ token: getToken(), profile: getCachedProfile() });
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+export function clearToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(PROFILE_KEY);
+    notify({ token: null, profile: null });
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function getCachedProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * setProfile - store a profile object in localStorage and notify subscribers
+ */
+export function setProfile(profile) {
+  try {
+    if (profile === null) {
+      localStorage.removeItem(PROFILE_KEY);
+    } else {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    }
+    notify({ token: getToken(), profile: getCachedProfile() });
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+/**
+ * getProfile - tries to load cached profile, otherwise calls /me via API client
+ * Returns a Promise resolving to profile object or null (on 401/403 or fetch errors)
+ */
+export async function getProfile(force = false) {
+  try {
+    if (!force) {
+      const cached = getCachedProfile();
+      if (cached) return cached;
+    }
+    const profile = await me();
+    try {
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    } catch (e) {
+      /* ignore */
+    }
+    notify({ token: getToken(), profile });
+    return profile;
+  } catch (err) {
+    // Do not crash UI when unauthenticated or backend is down
+    if (err && (err.status === 401 || err.status === 403)) {
+      return null;
+    }
+    console.warn("getProfile failed:", err?.status || err?.message || err);
+    return null;
+  }
+}
+
+// Export a convenience object `auth` to satisfy imports like `import { auth } from "../stores/auth.js"`
+export const auth = {
+  subscribe,
+  getToken,
+  setToken,
+  clearToken,
+  getProfile,
+  setProfile,
+};
+
+export default auth;

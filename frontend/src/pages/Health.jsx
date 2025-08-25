@@ -1,79 +1,84 @@
 import React, { useEffect, useState } from "react";
 import Nav from "../components/Nav.jsx";
 import RoleGate from "../components/RoleGate.jsx";
-import { api, getApiBase } from "../api/client.js";
+import { getApiBase } from "../api/client.js";
+import { getHealth, getActivationStatus } from "../api/index.js";
 
 export default function Health() {
-  const [page, setPage] = useState("Health");
+  const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState(null);
   const [act, setAct] = useState(null);
   const [err, setErr] = useState("");
 
-  async function load() {
-    setErr("");
-    try {
-      const [h, a] = await Promise.all([
-        api.get("/health").catch(() => null),
-        api.get("/activation/status").catch(() => null),
-      ]);
-      setHealth(h);
-      setAct(a);
-    } catch (e) {
-      setErr(e?.data?.detail || e?.message || "Ошибка загрузки");
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setErr("");
+      setLoading(true);
+      try {
+        const [h, a] = await Promise.all([getHealth(), getActivationStatus()]);
+        if (!mounted) return;
+        setHealth(h);
+        setAct(a);
+      } catch (e) {
+        if (!mounted) return;
+        setErr(e?.data?.detail || e?.message || "Ошибка загрузки");
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
-  }
-
-  useEffect(() => { load(); }, []);
-
-  const base = getApiBase();
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div>
-      <Nav active={page} onNavigate={setPage} />
-      <div style={{ padding: 16, display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0 }}>Health</h2>
+      <Nav />
+      <main className="p-4 max-w-5xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-2">Состояние приложения</h1>
+        <div className="text-sm text-gray-600 mb-4">
+          API base: <code>{getApiBase()}</code>
+        </div>
 
-        {err && <div style={errBox}>{String(err)}</div>}
-
-        <div style={card}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Backend</div>
-          <div>API base: <code>{base}</code></div>
-          <div>Состояние:{" "}
-            <b style={{ color: (health?.status === "ok" ? "#065f46" : "#7f1d1d") }}>
-              {health?.status || "unknown"}
-            </b>
+        {err && (
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-4">
+            {err}
           </div>
-          {health?.version && <div>Версия: <code>{health.version}</code></div>}
-          {health?.time && <div>Время сервера: <code>{health.time}</code></div>}
-          {health?.db && <div>База данных: <code>{health.db}</code></div>}
-        </div>
+        )}
 
-        <div style={card}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Активация</div>
-          <div>
-            Статус:{" "}
-            <span style={{
-              padding: "2px 8px", borderRadius: 999,
-              background: act?.ok ? "#ecfdf5" : "#fef2f2",
-              color: act?.ok ? "#065f46" : "#7f1d1d",
-              border: `1px solid ${act?.ok ? "#a7f3d0" : "#fecaca"}`,
-              fontSize: 12, whiteSpace: "nowrap",
-            }}>
-              {act?.status || (act?.ok ? "active" : "not_active")}
-            </span>
-          </div>
-          <div>Ключ: <code>{act?.key || "—"}</code></div>
-          <div>Machine hash: <code>{act?.machine_hash || "—"}</code></div>
-          <div>Действует до: <b>{act?.expiry_date || "—"}</b></div>
-        </div>
+        <section className="mb-6">
+          <h2 className="text-lg font-medium mb-2">Health</h2>
+          {loading ? (
+            <div>Проверка состояния сервера…</div>
+          ) : health ? (
+            <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+              {typeof health === "string" ? health : JSON.stringify(health, null, 2)}
+            </pre>
+          ) : (
+            <div className="text-sm text-gray-700">
+              Спец-эндпоинт health не обнаружен в OpenAPI. Это нормально.
+            </div>
+          )}
+        </section>
 
-        <div style={{ fontSize: 12, opacity: .7 }}>
-          Подсказка: если активация требуются — перейдите в <b>Настройки → Лицензия</b> или используйте панель <b>Activation</b> (Admin).
-        </div>
-      </div>
+        <RoleGate roles={["Admin"]}>
+          <section>
+            <h2 className="text-lg font-medium mb-2">Статус активации</h2>
+            {loading ? (
+              <div>Загрузка статуса…</div>
+            ) : act ? (
+              <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+                {typeof act === "string" ? act : JSON.stringify(act, null, 2)}
+              </pre>
+            ) : (
+              <div className="text-sm text-gray-700">
+                Эндпоинт статуса активации отсутствует в OpenAPI. Всё в порядке.
+              </div>
+            )}
+          </section>
+        </RoleGate>
+      </main>
     </div>
   );
 }
 
-const card = { border: "1px solid #eee", borderRadius: 12, padding: 12, background: "#fff" };
-const errBox = { color: "#7f1d1d", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: 8 };

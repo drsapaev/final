@@ -1,137 +1,99 @@
-// Minimal, dependency-free API client for Clinic Queue Manager
-// - Keeps token in localStorage
-// - Handles JSON + x-www-form-urlencoded
-// - Throws rich errors { status, data } on non-2xx
+// Axios-клиент для Clinic App
+// • База берётся из VITE_API_BASE (например, "/api/v1" через Vite proxy или абсолютный URL)
+// • Единая обработка ошибок: detail из response.data.detail (если есть)
+// • Авторизация: по возможности подставляем Bearer из localStorage("auth_token")
+// • Экспорт: api (axios), apiRequest, getApiBase, login, me
 
-const TOKEN_KEY = "auth_token";
+import axios from "axios";
 
 export function getApiBase() {
-  // Example: http://localhost:8000/api/v1
-  const base = import.meta?.env?.VITE_API_BASE || "http://localhost:8000/api/v1";
-  return String(base).replace(/\/+$/, "");
+  const raw = (import.meta?.env?.VITE_API_BASE ?? "/api/v1").toString().trim();
+  return raw; // поддерживает и относительный, и абсолютный URL
 }
 
-export function getToken() {
+export const api = axios.create({
+  baseURL: getApiBase(),
+  withCredentials: true,
+});
+
+// optional Bearer из localStorage (если используешь токен)
+api.interceptors.request.use((config) => {
   try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-export function clearToken() {
-  setToken(null);
-}
-
-function buildUrl(path, params) {
-  const base = getApiBase();
-  const cleanPath = String(path || "").startsWith("/") ? path : `/${path || ""}`;
-  const url = new URL(base + cleanPath);
-  if (params && typeof params === "object") {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v === undefined || v === null) return;
-      url.searchParams.set(k, String(v));
-    });
-  }
-  return url.toString();
-}
-
-function normalizeHeaders(h) {
-  const headers = new Headers(h || {});
-  if (!headers.has("Accept")) headers.set("Accept", "application/json");
-  return headers;
-}
-
-export async function apiRequest(method, path, { params, body, headers } = {}) {
-  const url = buildUrl(path, params);
-  const token = getToken();
-  const hdrs = normalizeHeaders(headers);
-
-  let fetchBody = body;
-  if (body instanceof FormData) {
-    // Let browser set Content-Type with boundary
-  } else if (body && typeof body === "object" && !(body instanceof URLSearchParams)) {
-    if (!hdrs.has("Content-Type")) hdrs.set("Content-Type", "application/json");
-    fetchBody = JSON.stringify(body);
-  } else if (body instanceof URLSearchParams) {
-    if (!hdrs.has("Content-Type")) hdrs.set("Content-Type", "application/x-www-form-urlencoded");
-  }
-
-  if (token && !hdrs.has("Authorization")) {
-    hdrs.set("Authorization", `Bearer ${token}`);
-  }
-
-  const resp = await fetch(url, {
-    method: method.toUpperCase(),
-    headers: hdrs,
-    body: ["GET", "HEAD"].includes(method.toUpperCase()) ? undefined : fetchBody,
-    credentials: "omit",
-  });
-
-  const contentType = resp.headers.get("content-type") || "";
-  let data = null;
-  try {
-    if (contentType.includes("application/json")) {
-      data = await resp.json();
-    } else if (contentType.includes("application/pdf")) {
-      data = await resp.arrayBuffer();
-    } else if (contentType.includes("text/")) {
-      data = await resp.text();
-    } else {
-      // fallback
-      data = await resp.arrayBuffer();
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      config.headers = config.headers || {};
+      if (!config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
-  } catch {
-    data = null;
-  }
+  } catch {}
+  return config;
+});
 
-  if (!resp.ok) {
-    const err = new Error(`HTTP ${resp.status}`);
-    err.status = resp.status;
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error?.response?.status;
+    const data = error?.response?.data;
+    const detail =
+      (typeof data?.detail === "string" && data.detail) ||
+      (Array.isArray(data?.detail) && data.detail.map((d) => d?.msg).filter(Boolean).join("; ")) ||
+      data?.message ||
+      error.message ||
+      "Request failed";
+    const err = new Error(detail);
+    err.status = status;
     err.data = data;
     throw err;
   }
-  return data;
+);
+
+// Унифицированная обёртка (совместима с прежним apiRequest)
+export async function apiRequest(method, path, { params, json, body, headers, signal } = {}) {
+  const config = {
+    url: path,
+    method,
+    params,
+    headers: { ...(headers || {}) },
+    signal,
+  };
+
+  if (json !== undefined) {
+    config.data = json;
+    config.headers["Content-Type"] = "application/json";
+  } else if (body !== undefined) {
+    config.data = body; // FormData/URLSearchParams — без ручного Content-Type
+  }
+
+  const resp = await api.request(config);
+  return resp?.data ?? {};
 }
 
-export const api = {
-  get: (path, opts) => apiRequest("GET", path, opts),
-  post: (path, opts) => apiRequest("POST", path, opts),
-  put: (path, opts) => apiRequest("PUT", path, opts),
-  del: (path, opts) => apiRequest("DELETE", path, opts),
-};
-
-// ---- Auth helpers ----
-
-export async function login(username, password) {
+// Удобные вызовы авторизации (если нужны)
+export async function login({
+  username,
+  password,
+  grant_type = "password",
+  client_id = "",
+  client_secret = "",
+  scope = "",
+} = {}) {
   const form = new URLSearchParams();
-  form.set("username", username);
-  form.set("password", password);
-  // keep OAuth2 fields present but empty for FastAPI form
-  form.set("grant_type", "");
-  form.set("scope", "");
-  form.set("client_id", "");
-  form.set("client_secret", "");
-  const res = await apiRequest("POST", "/auth/login", { body: form });
-  // Expecting { access_token, token_type }
-  const token = res?.access_token;
-  if (!token) {
-    const e = new Error("No access_token in response");
-    e.data = res;
-    throw e;
-  }
-  return token;
+  if (username !== undefined) form.set("username", String(username));
+  form.set("password", String(password || ""));
+  form.set("grant_type", grant_type);
+  form.set("client_id", client_id);
+  form.set("client_secret", client_secret);
+  form.set("scope", scope);
+
+  const resp = await api.post("/login", form, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+  return resp.data; // ожидаем { access_token, ... }
 }
 
 export async function me() {
-  return apiRequest("GET", "/auth/me");
+  const resp = await api.get("/me");
+  return resp.data;
 }
+

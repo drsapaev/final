@@ -64,3 +64,4 @@ export default function Registrar() {
 
 const panel = { display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", border: "1px solid #eee", borderRadius: 12, padding: 12, background: "#fff" };
 const inp = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, background: "#fff" };
+

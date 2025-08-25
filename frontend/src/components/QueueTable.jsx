@@ -1,84 +1,69 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { api, getApiBase } from "../api/client.js";
+import { getQueueStats, openQueue } from "../api/queues";
+import { openQueueWS } from "../api/ws";
 
 /**
- * Таблица дневной очереди + выдача талона.
- * Backend:
- *  - GET  /queues/stats?department=Reg&d=YYYY-MM-DD
- *  - POST /queues/next-ticket?department=Reg&d=YYYY-MM-DD
- *  - WS   /ws/queue?department=Reg&date_str=YYYY-MM-DD (broadcast stats)
- *
- * Props:
- *  - department: string
- *  - date: string (YYYY-MM-DD)
+ * Изменения по задаче:
+ *  • Открытие очереди всегда с start_number=0
+ *  • WS всегда подключается с (department, today)
  */
-export default function QueueTable({ department, date }) {
+export default function QueueTable({ department = "Reg" }) {
   const [stats, setStats] = useState(null);
   const [err, setErr] = useState("");
-  const wsRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const wsCloseRef = useRef(() => {});
 
-  async function load() {
+  // YYYY-MM-DD (today)
+  const today = new Date().toISOString().slice(0, 10);
+
+  async function loadStats() {
     setErr("");
     try {
-      const s = await api.get("/queues/stats", { params: { department, d: date } });
-      setStats(s);
+      const data = await getQueueStats(department, today);
+      setStats(data);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || "Ошибка загрузки");
+      setStats(null);
+      setErr(e?.data?.detail || e?.message || "Ошибка загрузки статистики");
     }
   }
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, 15000); // fallback-пуллинг
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [department, date]);
+    let mounted = true;
+    (async () => {
+      await loadStats();
+      if (!mounted) return;
 
-  useEffect(() => {
-    try {
-      // ws://host/ws/queue?department=...&date_str=YYYY-MM-DD
-      const base = new URL(getApiBase());
-      const proto = base.protocol === "https:" ? "wss:" : "ws:";
-      const url = `${proto}//${base.host}/ws/queue?department=${encodeURIComponent(
-        department
-      )}&date_str=${encodeURIComponent(date)}`;
-
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onmessage = (ev) => {
-        try {
-          const msg = JSON.parse(ev.data);
+      try {
+        wsCloseRef.current = openQueueWS(department, today, (msg) => {
           if (msg?.type === "queue.update" && msg?.payload) {
             setStats((cur) => ({ ...(cur || {}), ...(msg.payload || {}) }));
+          } else if (Array.isArray(msg)) {
+            setStats({ items: msg });
           }
-        } catch {}
-      };
-      ws.onerror = () => {};
-      ws.onclose = () => {};
+        });
+      } catch {
+        wsCloseRef.current = () => {};
+      }
+    })();
 
-      return () => {
-        try {
-          ws.close(1000, "bye");
-        } catch {}
-        wsRef.current = null;
-      };
-    } catch {
-      // ignore
-      return () => {};
-    }
-  }, [department, date]);
+    const t = setInterval(loadStats, 15000);
+    return () => {
+      mounted = false;
+      clearInterval(t);
+      try { wsCloseRef.current(); } catch {}
+      wsCloseRef.current = () => {};
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [department, today]);
 
-  async function nextTicket() {
+  async function handleOpenQueue() {
     setBusy(true);
     setErr("");
     try {
-      const res = await api.post("/queues/next-ticket", { params: { department, d: date } });
-      // res: {ticket, stats}
-      setStats(res?.stats || null);
+      await openQueue(department, today, 0);
+      await loadStats();
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || "Ошибка выдачи талона");
+      setErr(e?.data?.detail || e?.message || "Ошибка открытия очереди");
     } finally {
       setBusy(false);
     }
@@ -96,7 +81,7 @@ export default function QueueTable({ department, date }) {
   }, [stats]);
 
   return (
-    <div style={{ display: "grid", gap: 10 }}>
+    <div style={{ display: "grid", gap: 12 }}>
       {err && <div style={errBox}>{String(err)}</div>}
 
       <div style={statGrid}>
@@ -109,8 +94,8 @@ export default function QueueTable({ department, date }) {
       </div>
 
       <div>
-        <button onClick={nextTicket} disabled={busy} style={btnPrimary}>
-          {busy ? "..." : "Выдать следующий талон"}
+        <button onClick={handleOpenQueue} disabled={busy} style={btnPrimary}>
+          {busy ? "..." : "Открыть очередь (start=0)"}
         </button>
       </div>
     </div>
@@ -119,5 +104,21 @@ export default function QueueTable({ department, date }) {
 
 const statGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 };
 const statCard = { border: "1px solid #eee", borderRadius: 12, padding: 12, background: "#fff" };
-const btnPrimary = { padding: "8px 12px", borderRadius: 10, border: "1px solid #0284c7", background: "#0ea5e9", color: "#fff", cursor: "pointer" };
-const errBox = { color: "#7f1d1d", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8, padding: 8 };
+const btnPrimary = {
+  padding: "8px 12px",
+  borderRadius: 10,
+  border: "1px solid #0284c7",
+  background: "#0ea5e9",
+  color: "#fff",
+  cursor: "pointer",
+};
+const errBox = {
+  color: "#7f1d1d",
+  background: "#fee2e2",
+  border: "1px solid #fecaca",
+  borderRadius: 8,
+  padding: 8,
+};
+
+
+

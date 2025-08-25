@@ -1,50 +1,69 @@
 import React, { useEffect, useState } from "react";
-import { auth } from "../stores/auth.js";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { auth, setProfile } from "../stores/auth.js";
 import RoleGate from "./RoleGate.jsx";
 
-export default function Nav({ active = "Health", onNavigate = () => {} }) {
+export default function Nav() {
   const [st, setSt] = useState(auth.getState());
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   useEffect(() => auth.subscribe(setSt), []);
 
-  const user = st.user;
+  const user = st.profile || st.user || null;
   const role = user?.role || "Guest";
 
-  const items = [
-    { key: "Health", label: "Health", roles: ["Admin","Registrar","Doctor","Lab","Cashier","User"] },
-    { key: "Registrar", label: "Регистратура", roles: ["Admin","Registrar"] },
-    { key: "Doctor", label: "Врач", roles: ["Admin","Doctor"] },
-    { key: "Lab", label: "Лаборатория", roles: ["Admin","Lab"] },
-    { key: "Cashier", label: "Касса", roles: ["Admin","Cashier"] },
-    { key: "Scheduler", label: "Расписание", roles: ["Admin","Registrar","Doctor"] },
-    { key: "Audit", label: "Аудит", roles: ["Admin"] },
-    { key: "Activation", label: "Activation", roles: ["Admin"] }, // NEW
-    { key: "Settings", label: "Настройки", roles: ["Admin"] },
+  // Маршруты приложения (при необходимости поправь под свои реальные пути в App.jsx)
+  const routes = [
+    { key: "Health",     to: "/",            label: "Health",       roles: ["Admin","Registrar","Doctor","Lab","Cashier","User"] },
+    { key: "Registrar",  to: "/registrar",   label: "Регистратура", roles: ["Admin","Registrar"] },
+    { key: "Doctor",     to: "/doctor",      label: "Врач",         roles: ["Admin","Doctor"] },
+    { key: "Lab",        to: "/lab",         label: "Лаборатория",  roles: ["Admin","Lab"] },
+    { key: "Cashier",    to: "/cashier",     label: "Касса",        roles: ["Admin","Cashier"] },
+    { key: "Scheduler",  to: "/scheduler",   label: "Расписание",   roles: ["Admin","Registrar","Doctor"] },
+    { key: "Audit",      to: "/audit",       label: "Аудит",        roles: ["Admin"] },
+    { key: "Activation", to: "/activation",  label: "Activation",   roles: ["Admin"] },
+    { key: "Settings",   to: "/settings",    label: "Настройки",    roles: ["Admin"] },
   ];
 
-  function Button({ item }) {
-    const isActive = active === item.key;
-    const style = {
-      padding: "8px 12px",
-      borderRadius: 10,
-      border: "1px solid #ddd",
-      marginRight: 6,
-      cursor: "pointer",
-      background: isActive ? "#111" : "#fff",
-      color: isActive ? "#fff" : "#111",
-    };
-    return <button style={style} onClick={() => onNavigate(item.key)}>{item.label}</button>;
-  }
+  const barStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderBottom: "1px solid #eee",
+    background: "#fafafa",
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+  };
 
-  const barStyle = { display: "flex", alignItems: "center", gap: 8, padding: 12, borderBottom: "1px solid #eee", background: "#fafafa", position: "sticky", top: 0, zIndex: 10 };
+  const linkBase = {
+    padding: "8px 12px",
+    borderRadius: 10,
+    border: "1px solid #ddd",
+    marginRight: 6,
+    textDecoration: "none",
+  };
 
   return (
     <div style={barStyle}>
       <div style={{ fontWeight: 700, marginRight: 12 }}>Clinic Queue Manager</div>
 
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-        {items.map((it) => (
+        {routes.map((it) => (
           <RoleGate key={it.key} roles={it.roles}>
-            <Button item={it} />
+            <NavLink
+              to={it.to}
+              style={({ isActive }) => ({
+                ...linkBase,
+                background: isActive ? "#111" : "#fff",
+                color: isActive ? "#fff" : "#111",
+              })}
+              // Active fallback: если root "/" и ты на "/health", можно считать активным вручную
+              aria-current={pathname === it.to ? "page" : undefined}
+            >
+              {it.label}
+            </NavLink>
           </RoleGate>
         ))}
       </div>
@@ -52,19 +71,30 @@ export default function Nav({ active = "Health", onNavigate = () => {} }) {
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
         {user ? (
           <>
-            <span style={{ opacity: 0.8 }}>{user.full_name || user.username} · {role}</span>
+            <span style={{ opacity: 0.8 }}>
+              {user.full_name || user.username || "Пользователь"} · {role}
+            </span>
             <button
-              onClick={() => { auth.logout(); onNavigate("Login"); }}
-              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff" }}
-            >Выйти</button>
+              onClick={() => {
+                auth.clearToken();
+                setProfile(null);
+                navigate("/login");
+              }}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}
+            >
+              Выйти
+            </button>
           </>
         ) : (
           <button
-            onClick={() => onNavigate("Login")}
-            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff" }}
-          >Войти</button>
+            onClick={() => navigate("/login")}
+            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer" }}
+          >
+            Войти
+          </button>
         )}
       </div>
     </div>
   );
 }
+
