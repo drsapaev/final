@@ -1,10 +1,9 @@
-﻿from pydantic import BaseModel
+from pydantic import BaseModel
 
-class SettingSchema(BaseModel):
-    id: int
-    category: str
+class Setting(BaseModel):
     key: str
     value: str
+    category: str
 
     class Config:
-        from_attributes = True  # SQLAlchemy ORM compatibility (Pydantic v2)
+        orm_mode = True

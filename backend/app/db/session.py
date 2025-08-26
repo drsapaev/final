@@ -1,20 +1,14 @@
-from __future__ import annotations
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+DATABASE_URL = "sqlite+aiosqlite:///./clinic.db"
 
-from app.core.config import settings
+engine = create_async_engine(DATABASE_URL, echo=False)
+SessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
-# SQLAlchemy 2.0 engine
-engine = create_engine(
-    settings.DATABASE_URL,
-    future=True,
-    pool_pre_ping=True,
-)
+class Base(DeclarativeBase):
+    pass
 
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-    future=True,
-)
+async def get_db():
+    async with SessionLocal() as session:
+        yield session
