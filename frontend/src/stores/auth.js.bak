@@ -1,107 +1,147 @@
-﻿// Simple auth store compatible with existing imports in App.jsx and other components
-// Provides: subscribe, getToken, setToken, clearToken, getProfile, setProfile
-// Also exports default `auth` object for code that imports { auth }.
+// Auth store с совместимостью под ожидаемый API (zustand-like):
+// - state: { token, profile }
+// - methods: getState(), setState(partial), subscribe(listener)
+// - helpers: getToken(), setToken(), clearToken(), getProfile(), setProfile()
+// - default export: auth (объект со всеми методами)
+//
+// Хранение: localStorage (ключи TOKEN_KEY/PROFILE_KEY) + in-memory state.
+// Подписчики получают ПОЛНЫЙ state { token, profile } при каждом изменении.
 
 import { me } from "../api/client.js";
 
 const TOKEN_KEY = "auth_token";
 const PROFILE_KEY = "auth_profile";
-const subscribers = new Set();
 
-export function subscribe(cb) {
-  if (typeof cb !== "function") return () => {};
-  subscribers.add(cb);
-  // return unsubscribe
-  return () => subscribers.delete(cb);
+// ---------- utils: storage ----------
+function readTokenFromStorage() {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
-function notify(payload) {
+function writeTokenToStorage(token) {
+  try {
+    if (token == null) localStorage.removeItem(TOKEN_KEY);
+    else localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* ignore */
+  }
+}
+
+function readProfileFromStorage() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileToStorage(profile) {
+  try {
+    if (profile == null) localStorage.removeItem(PROFILE_KEY);
+    else localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---------- in-memory state + pub/sub ----------
+let state = {
+  token: readTokenFromStorage(),
+  profile: readProfileFromStorage(),
+};
+
+const subscribers = new Set();
+
+/** Возвращает ТЕКУЩЕЕ состояние (копию) */
+export function getState() {
+  return { ...state };
+}
+
+/** Мержит частичное состояние, синхронизирует storage и уведомляет подписчиков */
+export function setState(partial) {
+  const next = { ...state, ...(partial || {}) };
+
+  // синхронизируем хранилище, если ключи присутствуют в partial
+  if (Object.prototype.hasOwnProperty.call(partial || {}, "token")) {
+    writeTokenToStorage(next.token);
+  }
+  if (Object.prototype.hasOwnProperty.call(partial || {}, "profile")) {
+    writeProfileToStorage(next.profile);
+  }
+
+  state = next;
+  notify();
+}
+
+/** Подписка: listener(state) -> unsubscribe */
+export function subscribe(listener) {
+  if (typeof listener !== "function") return () => {};
+  subscribers.add(listener);
+  // можно сразу отправить снапшот, если нужно:
+  // try { listener(getState()); } catch {}
+  return () => subscribers.delete(listener);
+}
+
+function notify() {
+  const snapshot = getState();
   for (const cb of subscribers) {
     try {
-      cb(payload);
-    } catch (e) {
+      cb(snapshot);
+    } catch {
       /* ignore subscriber errors */
     }
   }
 }
 
+// ---------- public helpers (совместимые с текущим кодом) ----------
 export function getToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch (e) {
-    return null;
-  }
+  return getState().token;
 }
 
-export function setToken(token) {
-  try {
-    if (typeof token === "string") {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else if (token && token.access_token) {
-      localStorage.setItem(TOKEN_KEY, token.access_token);
-    }
-    notify({ token: getToken(), profile: getCachedProfile() });
-  } catch (e) {
-    /* ignore */
-  }
+export function setToken(tokenOrObj) {
+  // принимаем либо строку токена, либо объект { access_token }
+  let token = null;
+  if (typeof tokenOrObj === "string") token = tokenOrObj;
+  else if (tokenOrObj && tokenOrObj.access_token) token = tokenOrObj.access_token;
+
+  setState({ token });
 }
 
 export function clearToken() {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(PROFILE_KEY);
-    notify({ token: null, profile: null });
-  } catch (e) {
-    /* ignore */
-  }
+  setState({ token: null, profile: null });
 }
 
-function getCachedProfile() {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
-}
-
-/**
- * setProfile - store a profile object in localStorage and notify subscribers
- */
+/** Сохраняет профиль (и уведомляет подписчиков) */
 export function setProfile(profile) {
-  try {
-    if (profile === null) {
-      localStorage.removeItem(PROFILE_KEY);
-    } else {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    }
-    notify({ token: getToken(), profile: getCachedProfile() });
-  } catch (e) {
-    /* ignore */
-  }
+  setState({ profile: profile ?? null });
 }
 
 /**
- * getProfile - tries to load cached profile, otherwise calls /me via API client
- * Returns a Promise resolving to profile object or null (on 401/403 or fetch errors)
+ * getProfile(force = false)
+ * - Если токена нет — НЕ дергаем /me (избегаем 401-спама) и возвращаем null.
+ * - Если есть кэш и force=false — используем кэш.
+ * - Иначе зовём /me, сохраняем профиль и возвращаем его.
+ * - При 401/403 или сетевых ошибках возвращает null, чтобы UI не падал.
  */
 export async function getProfile(force = false) {
   try {
+    // NEW: без токена не запрашиваем /me, чтобы не получать 401 в консоли
+    const token = getToken();
+    if (!token) return null;
+
     if (!force) {
-      const cached = getCachedProfile();
+      const cached = getState().profile;
       if (cached) return cached;
     }
     const profile = await me();
-    try {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    } catch (e) {
-      /* ignore */
-    }
-    notify({ token: getToken(), profile });
-    return profile;
+    setProfile(profile || null);
+    return profile || null;
   } catch (err) {
-    // Do not crash UI when unauthenticated or backend is down
     if (err && (err.status === 401 || err.status === 403)) {
       return null;
     }
@@ -110,9 +150,14 @@ export async function getProfile(force = false) {
   }
 }
 
-// Export a convenience object `auth` to satisfy imports like `import { auth } from "../stores/auth.js"`
+// ---------- default export (удобный объект, как раньше) ----------
 export const auth = {
+  // zustand-like
+  getState,
+  setState,
   subscribe,
+
+  // helpers
   getToken,
   setToken,
   clearToken,
@@ -121,3 +166,4 @@ export const auth = {
 };
 
 export default auth;
+
