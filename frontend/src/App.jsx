@@ -15,7 +15,7 @@ import Scheduler from "./pages/Scheduler.jsx";
 import Appointments from "./pages/Appointments.jsx";
 import VisitDetails from "./pages/VisitDetails.jsx";
 
-import { auth } from "./stores/auth.js";
+import auth from "./stores/auth.js";
 
 // ===== мягкая проверка ролей (как раньше) =====
 function hasRole(profile, roles) {

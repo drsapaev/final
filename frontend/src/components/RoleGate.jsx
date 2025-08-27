@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { auth } from "../stores/auth";
+import auth from "../stores/auth";
 
 /**
  * Ограничивает доступ по ролям.

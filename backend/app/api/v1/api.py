@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-# важно: подключаем именно router из каждого модуля
+# подключаем router из каждого модуля
 from app.api.v1.endpoints import (
     auth,
     patients,
@@ -14,23 +14,29 @@ from app.api.v1.endpoints import (
     audit,
     appointments,
     queues,
-    online_queue,  # <-- наш алиас онлайн-очереди
+    online_queue,
+    health as health_ep,        # <-- добавлено
+    activation as activation_ep # <-- добавлено
 )
 
 api_router = APIRouter()
 
-# Auth
-api_router.include_router(auth.router)  # дает /api/v1/auth/...
+# Auth (/login, /me и т.д.)
+api_router.include_router(auth.router)
 
-# Основные сущности
-api_router.include_router(patients.router, prefix="/api/v1", tags=["auth"])     # /api/v1/patients/...
-api_router.include_router(visits.router)       # /api/v1/visits/...
-api_router.include_router(services.router)     # /api/v1/services/...
-api_router.include_router(payments.router)     # /api/v1/payments/...
-api_router.include_router(settings_ep.router)  # /api/v1/settings/...
-api_router.include_router(audit.router)        # /api/v1/audit/...
+# Основные сущности (без лишних префиксов!)
+api_router.include_router(patients.router)       # было prefix="/api/v1" -> убрано
+api_router.include_router(visits.router)
+api_router.include_router(services.router)
+api_router.include_router(payments.router)
+api_router.include_router(settings_ep.router)
+api_router.include_router(audit.router)
 
 # Очередь / запись
-api_router.include_router(queues.router)        # /api/v1/queues/...
-api_router.include_router(appointments.router)  # /api/v1/appointments/...
-api_router.include_router(online_queue.router)  # /api/v1/online-queue/...
+api_router.include_router(queues.router)
+api_router.include_router(appointments.router)
+api_router.include_router(online_queue.router)
+
+# Health / Activation
+api_router.include_router(health_ep.router)
+api_router.include_router(activation_ep.router)

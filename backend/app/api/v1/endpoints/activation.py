@@ -1,3 +1,4 @@
+# app/api/v1/endpoints/activation.py
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -28,7 +29,6 @@ from app.schemas.activation import (
 
 router = APIRouter(prefix="/activation", tags=["activation"])
 
-
 @router.post("/issue", response_model=ActivationIssueOut, summary="Выдать новый ключ (Admin)")
 async def activation_issue(
     body: ActivationIssueIn,
@@ -42,7 +42,6 @@ async def activation_issue(
         meta=body.meta,
     )
     return ActivationIssueOut(key=res.key, expiry_date=res.expiry_date, status=res.status)  # type: ignore[arg-type]
-
 
 @router.post("/activate", response_model=ActivationActivateOut, summary="Активировать ключ на этом сервере")
 async def activation_activate(
@@ -61,7 +60,6 @@ async def activation_activate(
         status=res.status,  # type: ignore[arg-type]
     )
 
-
 @router.get("/status", response_model=ActivationStatusOut, summary="Статус активации сервера")
 async def activation_status(
     db: Session = Depends(get_db),
@@ -75,7 +73,6 @@ async def activation_status(
         status=st.status,  # type: ignore[arg-type]
         machine_hash=st.machine_hash,
     )
-
 
 # -------- Admin management: list / revoke / extend --------
 
@@ -114,7 +111,6 @@ async def activation_list(
     ]
     return ActivationListOut(items=items, total=int(total))
 
-
 @router.post("/revoke", summary="Отозвать ключ (Admin)")
 async def activation_revoke(
     body: ActivationRevokeIn,
@@ -129,7 +125,6 @@ async def activation_revoke(
     db.flush()
     db.commit()
     return {"ok": True}
-
 
 @router.post("/extend", summary="Продлить ключ (Admin)")
 async def activation_extend(

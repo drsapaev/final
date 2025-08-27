@@ -1,118 +1,178 @@
+# app/api/deps.py
+"""
+Dependency helpers for the API.
+
+This module provides:
+- oauth2_scheme for extracting Bearer token
+- create_access_token(...) helper
+- get_current_user(...) which works with both async and sync SQLAlchemy sessions
+- require_roles(...) dependency factory
+
+It is intentionally defensive: it supports get_db() returning either
+an AsyncSession or a regular (sync) Session / sessionmaker instance.
+"""
 from __future__ import annotations
 
-from typing import AsyncGenerator, Callable, Iterable, Optional
-from functools import wraps
+import inspect
+import os
+from typing import Optional, Callable, Any
+
+from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.concurrency import run_in_threadpool
 from jose import JWTError, jwt
+
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.core.security import SECRET_KEY, ALGORITHM, create_access_token  # create_access_token — переэкспорт
-from app.models.user import User
+# try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
+try:
+    from app.core.config import settings  # type: ignore
+except Exception:
+    # fallback if settings module is absent
+    class _Fallback:
+        SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
+        ALGORITHM = os.getenv("ALGORITHM", "HS256")
+        ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+    settings = _Fallback()
 
-# OAuth2 password bearer с правильным tokenUrl (включая префикс API если у тебя такой)
+# import get_db lazily -- it may return AsyncSession or sync Session
+try:
+    from app.db.session import get_db  # type: ignore
+except Exception:
+    # get_db should exist in your project; if not, imports will fail later and you need to provide it.
+    get_db = None  # type: ignore
+
+# import User model
+try:
+    from app.models.user import User  # type: ignore
+except Exception:
+    # If import fails the project is misconfigured; leave User unresolved to raise early.
+    User = Any  # type: ignore
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
 
 
-async def _get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Небольшой хелпер: вернуть User объект (или None) по username, используя AsyncSession.
-    Если в проекте у тебя CRUD-обёртки — можно заменить вызовом туда.
+    Create a JWT token with `sub` claim taken from data (if provided).
+    Returns encoded JWT string.
     """
-    res = await db.execute(select(User).where(User.username == username))
-    return res.scalars().first()
+    to_encode = data.copy()
+    if expires_delta is None:
+        expires_delta = timedelta(minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24))
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=getattr(settings, "ALGORITHM", "HS256"))
+    return encoded_jwt
+
+
+def _username_from_token(token: str) -> Optional[str]:
+    """
+    Decode JWT and extract 'sub' (username) claim. Returns None if invalid.
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[getattr(settings, "ALGORITHM", "HS256")])
+        sub = payload.get("sub")
+        if isinstance(sub, str):
+            return sub
+        return None
+    except JWTError:
+        return None
+
+
+async def _get_user_by_username(db, username: str) -> Optional[User]:
+    """
+    Universal helper that supports both AsyncSession and sync Session.
+
+    - If db.execute is a coroutine function (AsyncSession) we `await db.execute(...)`
+    - Otherwise we call db.execute(...) in a threadpool to avoid blocking event loop.
+
+    Attempts to return a mapped User instance or None.
+    """
+    if db is None:
+        return None
+
+    execute_callable = getattr(db, "execute", None)
+    stmt = select(User).where(User.username == username)
+
+    # AsyncSession: await directly
+    if inspect.iscoroutinefunction(execute_callable):
+        result = await db.execute(stmt)
+    else:
+        # Sync Session: run in a threadpool
+        result = await run_in_threadpool(db.execute, stmt)
+
+    # Try common extraction patterns for Result / AsyncResult
+    try:
+        user = result.scalar_one_or_none()
+        return user
+    except Exception:
+        pass
+
+    try:
+        # result.scalars() exists for many versions
+        scalars = result.scalars()
+        try:
+            return scalars.first()
+        except Exception:
+            # as last resort, convert to list
+            items = list(scalars)
+            return items[0] if items else None
+    except Exception:
+        pass
+
+    return None
 
 
 async def get_current_user(
-    db: AsyncSession = Depends(get_db),
     token: str = Depends(oauth2_scheme),
+    db=Depends(get_db),
 ) -> User:
     """
-    Дек dependency: извлекает user из токена (поле sub в payload).
-    Бросает 401 если токен недействителен или пользователь не найден.
+    Dependency that returns the current authenticated User.
+    Works with either async or sync DB sessions returned by get_db().
+    Raises 401 on invalid token or missing user.
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: Optional[str] = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    username = _username_from_token(token)
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     user = await _get_user_by_username(db, username)
-    if user is None:
-        raise credentials_exception
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+def require_roles(*roles: str) -> Callable[..., Any]:
     """
-    Проверка, что пользователь активен (если поле is_active есть).
-    """
-    if hasattr(current_user, "is_active") and not getattr(current_user, "is_active"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
-    return current_user
+    Dependency factory that enforces roles for the current user.
+    Usage:
+        @router.get("/secret")
+        def secret(user=Depends(require_roles("admin"))):
+            ...
 
-
-async def get_current_superuser(current_user: User = Depends(get_current_user)) -> User:
+    If the user's attribute 'role' is not in roles and 'is_superuser' is False -> 403.
     """
-    Проверка, что пользователь — суперюзер (если поле is_superuser есть).
-    """
-    if not (hasattr(current_user, "is_superuser") and getattr(current_user, "is_superuser")):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires superuser privileges")
-    return current_user
-
-
-def require_roles(*roles: str) -> Callable[..., User]:
-    """
-    Фабрика для зависимости: проверяет, что текущий пользователь имеет хотя бы одну из указаных ролей.
-    Поддерживает варианты в моделях:
-      - поле `role` (строка)
-      - поле `roles` (итерируемое / list/tuple)
-      - поле `is_superuser` (автоматический пропуск)
-    Использование: Depends(require_roles("Reg","Doctor"))
-    """
-    def _dependency(current_user: User = Depends(get_current_user)) -> User:
-        # суперюзер пропускается
-        if hasattr(current_user, "is_superuser") and getattr(current_user, "is_superuser"):
+    def _dep(current_user: User = Depends(get_current_user)) -> User:
+        if not roles:
             return current_user
-
-        # проверка по single role
-        user_role = getattr(current_user, "role", None)
-        if user_role and user_role in roles:
+        role = getattr(current_user, "role", None)
+        is_super = bool(getattr(current_user, "is_superuser", False))
+        if is_super:
             return current_user
+        if role not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+        return current_user
 
-        # проверка по множественным ролям
-        user_roles = getattr(current_user, "roles", None)
-        if user_roles:
-            try:
-                # допускаем list/tuple/set или строку с запятыми
-                if isinstance(user_roles, str):
-                    user_roles_iter = [r.strip() for r in user_roles.split(",") if r.strip()]
-                else:
-                    user_roles_iter = list(user_roles)
-                for r in user_roles_iter:
-                    if r in roles:
-                        return current_user
-            except Exception:
-                pass
-
-        # если не прошёл — 403
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role privileges")
-    return _dependency
-
-
-# Переэкспорт — некоторые модули могли делать "from app.api.deps import create_access_token"
-# Мы даём им удобный доступ к функции создания токена (реализована в app.core.security).
-create_access_token = create_access_token  # noqa: F401
-
-# Переэкспорт get_db чтобы другие модули могли импортировать напрямую из deps
-get_db = get_db  # noqa: F401
+    return _dep

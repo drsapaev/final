@@ -1,20 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { auth, setProfile } from "../stores/auth.js";
+import auth, { setProfile } from "../stores/auth.js";
 import RoleGate from "./RoleGate.jsx";
 
 export default function Nav() {
   const [st, setSt] = useState(auth.getState());
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  useEffect(() => auth.subscribe(setSt), []);
+
+  useEffect(() => {
+    const unsub = auth.subscribe(setSt);
+    return () => unsub();
+  }, []);
 
   const user = st.profile || st.user || null;
   const role = user?.role || "Guest";
 
-  // Маршруты приложения (при необходимости поправь под свои реальные пути в App.jsx)
+  // Маршруты приложения — при необходимости синхронизируй с src/App.jsx
   const routes = [
-    { key: "Health",     to: "/",            label: "Health",       roles: ["Admin","Registrar","Doctor","Lab","Cashier","User"] },
+    { key: "Health",     to: "/health",      label: "Health",       roles: ["Admin","Registrar","Doctor","Lab","Cashier","User"] },
     { key: "Registrar",  to: "/registrar",   label: "Регистратура", roles: ["Admin","Registrar"] },
     { key: "Doctor",     to: "/doctor",      label: "Врач",         roles: ["Admin","Doctor"] },
     { key: "Lab",        to: "/lab",         label: "Лаборатория",  roles: ["Admin","Lab"] },
@@ -47,7 +51,8 @@ export default function Nav() {
 
   return (
     <div style={barStyle}>
-      <div style={{ fontWeight: 700, marginRight: 12 }}>Clinic Queue Manager</div>
+      {/* Заголовок приложения вынесён в AppShell — чтобы не дублировать */}
+      <div style={{ fontWeight: 700, marginRight: 12, opacity: 0.85 }} aria-hidden="true"> </div>
 
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
         {routes.map((it) => (
@@ -59,7 +64,6 @@ export default function Nav() {
                 background: isActive ? "#111" : "#fff",
                 color: isActive ? "#fff" : "#111",
               })}
-              // Active fallback: если root "/" и ты на "/health", можно считать активным вручную
               aria-current={pathname === it.to ? "page" : undefined}
             >
               {it.label}
@@ -97,4 +101,3 @@ export default function Nav() {
     </div>
   );
 }
-
