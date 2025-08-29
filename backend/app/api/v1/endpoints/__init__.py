@@ -16,6 +16,11 @@ ENDPOINT_MODULES = [
     "schedule",
     "appointments",
     "online_queue",
+    "users",
+    "queue",
+    "board",
+    "reports",
+    "payment_webhook",
 ]
 
 __all__ = ["ENDPOINT_MODULES"]

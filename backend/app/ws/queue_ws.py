@@ -9,6 +9,17 @@ from typing import Dict, Set
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 log = logging.getLogger("ws.queue")
+log.setLevel(logging.INFO)  # Устанавливаем уровень INFO
+
+# Проверяем, есть ли handlers
+if not log.handlers:
+    # Создаём handler для вывода в консоль
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+    log.info("WS logger initialized with console handler")
 
 router = APIRouter()
 
@@ -16,37 +27,77 @@ router = APIRouter()
 # Менеджер WS-комнат
 # -----------------------------------------------------------------------------
 class WSManager:
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.rooms = defaultdict(set)
+            print(f"🔧 WSManager: создан новый экземпляр")
+        return cls._instance
+    
     def __init__(self) -> None:
-        self.rooms: Dict[str, Set[WebSocket]] = defaultdict(set)
+        # Инициализация уже выполнена в __new__
+        pass
 
     async def connect(self, ws: WebSocket, room: str) -> None:
+        log.info("WSManager: connecting to room %s", room)
         self.rooms[room].add(ws)
+        log.info("WSManager: room %s now has %d connections", room, len(self.rooms[room]))
 
     def disconnect(self, ws: WebSocket, room: str) -> None:
+        log.info("WSManager: disconnecting from room %s", room)
         s = self.rooms.get(room)
         if not s:
             return
         s.discard(ws)
         if not s:
             self.rooms.pop(room, None)
+            log.info("WSManager: room %s removed (empty)", room)
+        else:
+            log.info("WSManager: room %s now has %d connections", room, len(s))
 
     async def _send_one(self, ws: WebSocket, data) -> None:
         try:
             await ws.send_json(data)
-        except Exception:
+            log.info("WSManager: sent message to websocket in room")
+        except Exception as e:
+            log.error("WSManager: error sending to websocket: %s", e)
             # удалить «мертвый» сокет из всех комнат
             for r, set_ws in list(self.rooms.items()):
                 if ws in set_ws:
                     set_ws.discard(ws)
                     if not set_ws:
                         self.rooms.pop(r, None)
+                        log.info("WSManager: removed dead websocket from room %s", r)
 
     def broadcast(self, room: str, data) -> None:
+        log.info("WSManager: broadcasting to room %s, data: %s", room, data)
+        log.info("WSManager: room %s has %d connections", room, len(self.rooms.get(room, set())))
+        log.info("WSManager: all rooms: %s", list(self.rooms.keys()))
+        
         for ws in list(self.rooms.get(room, set())):
-            asyncio.create_task(self._send_one(ws, data))
+            log.info("WSManager: sending to websocket in room %s", room)
+            # Убираем asyncio.create_task для синхронного контекста
+            # asyncio.create_task(self._send_one(ws, data))
+            # Вместо этого просто вызываем _send_one синхронно
+            # Но _send_one - асинхронная функция, поэтому нужно использовать другой подход
+            try:
+                # Создаём новый event loop для этого вызова
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Если loop уже запущен, создаём task
+                    asyncio.create_task(self._send_one(ws, data))
+                except RuntimeError:
+                    # Если loop не запущен, запускаем новый
+                    asyncio.run(self._send_one(ws, data))
+            except Exception as e:
+                log.error("WSManager: error creating task: %s", e)
 
 
 ws_manager = WSManager()
+print(f"🔧 WSManager: создан глобальный экземпляр {id(ws_manager)}")
 
 def _origin_allowed(origin: str | None) -> bool:
     if os.getenv("CORS_DISABLE", "0") == "1":

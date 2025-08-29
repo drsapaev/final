@@ -27,6 +27,9 @@ except Exception:
         doc_type: Optional[str] = Field(default=None, max_length=32)
         doc_number: Optional[str] = Field(default=None, max_length=64)
         address: Optional[str] = Field(default=None, max_length=512)
+        
+        class Config:
+            from_attributes = True
 
     class PatientCreate(PatientBase):
         pass
@@ -39,11 +42,16 @@ except Exception:
 
 
 def _patients_table(db: Session) -> Table:
-    md = MetaData(bind=db.get_bind())
+    md = MetaData()
     return Table("patients", md, autoload_with=db.get_bind())
 
 
 def _row_to_out(row: Dict[str, Any]) -> PatientOut:
+    # Преобразуем объект date в строку для Pydantic
+    if 'birth_date' in row and row['birth_date']:
+        if hasattr(row['birth_date'], 'strftime'):
+            row['birth_date'] = row['birth_date'].strftime('%Y-%m-%d')
+    
     return PatientOut(**row)  # type: ignore[arg-type]
 
 
@@ -98,6 +106,15 @@ def create_patient(
 ):
     t = _patients_table(db)
     values = {k: v for k, v in payload.model_dump().items() if v is not None}
+    
+    # Преобразуем строку birth_date в объект date
+    if 'birth_date' in values and values['birth_date']:
+        try:
+            from datetime import datetime
+            values['birth_date'] = datetime.strptime(values['birth_date'], '%Y-%m-%d').date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid birth_date format. Use YYYY-MM-DD")
+    
     ins = t.insert().values(**values)
     res = db.execute(ins)
     db.flush()

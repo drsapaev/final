@@ -1,9 +1,6 @@
-from pydantic import BaseModel
+from app.schemas.base import ORMModel
 
-class Setting(BaseModel):
+class Setting(ORMModel):
     key: str
     value: str
     category: str
-
-    class Config:
-        orm_mode = True

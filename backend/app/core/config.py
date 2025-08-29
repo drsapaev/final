@@ -4,6 +4,7 @@ from __future__ import annotations
 import secrets
 from functools import lru_cache
 from pydantic import Field
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,36 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
+
+    # --- Queue / Time ---
+    TIMEZONE: str = "Asia/Tashkent"
+    QUEUE_START_HOUR: int = 7  # локальное время, начало утреннего окна
+    ONLINE_MAX_PER_DAY: int = 15  # лимит онлайн-талонов на отделение/день
+
+    # --- App meta ---
+    APP_NAME: str = "Clinic Manager"
+    APP_VERSION: str = "0.9.0"
+    ENV: str = "dev"
+
+    # --- Printing / PDF ---
+    PDF_FOOTER_ENABLED: bool = True
+    CLINIC_LOGO_PATH: str | None = None
+
+    # ESC/POS settings (may be missing in env; safe defaults)
+    PRINTER_TYPE: str | None = None  # none|network|usb
+    PRINTER_NET_HOST: str | None = None
+    PRINTER_NET_PORT: int | None = None
+    PRINTER_USB_VID: int | None = None
+    PRINTER_USB_PID: int | None = None
+
+    @field_validator("PRINTER_USB_VID", "PRINTER_USB_PID", "PRINTER_NET_PORT", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, v):  # type: ignore[no-untyped-def]
+        if v is None:
+            return None
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 
 @lru_cache(1)

@@ -1,0 +1,66 @@
+name: 🔒 Сканирование безопасности
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 3 * * *'  # Каждый день в 3:00 UTC
+
+jobs:
+  security-scan:
+    name: 🔒 Сканирование безопасности
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Установка инструментов безопасности
+      run: |
+        cd backend
+        pip install bandit safety pip-audit
+        
+    - name: 🔍 Сканирование зависимостей (safety)
+      run: |
+        cd backend
+        safety check --json --output safety-report.json || true
+        
+    - name: 🔍 Сканирование зависимостей (pip-audit)
+      run: |
+        cd backend
+        pip-audit --format json --output pip-audit-report.json || true
+        
+    - name: 🔍 Сканирование кода (bandit)
+      run: |
+        cd backend
+        bandit -r . -f json -o bandit-report.json || true
+        
+    - name: 📤 Загрузка отчётов безопасности
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          backend/safety-report.json
+          backend/pip-audit-report.json
+          backend/bandit-report.json
+        
+    - name: 📊 Анализ результатов
+      run: |
+        echo "🔒 Анализ безопасности завершён"
+        echo "📋 Отчёты загружены как артефакты"
+        
+        if [ -f backend/safety-report.json ]; then
+          echo "✅ Отчёт safety создан"
+        fi
+        
+        if [ -f backend/pip-audit-report.json ]; then
+          echo "✅ Отчёт pip-audit создан"
+        fi
+        
+        if [ -f backend/bandit-report.json ]; then
+          echo "✅ Отчёт bandit создан"
+        fi

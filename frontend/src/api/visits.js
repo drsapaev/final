@@ -14,10 +14,11 @@ export async function getVisit(visitId) {
  * POST /api/v1/visits/{visit_id}/reschedule
  * Тело запроса — то, что передаёшь в payload (например { date_str: "YYYY-MM-DD", time_str: "HH:MM" }).
  */
-export async function rescheduleVisit(visitId, payload = {}) {
+export async function rescheduleVisit(visitId, newDate) {
+  const params = new URLSearchParams();
+  if (newDate) params.set("new_date", newDate);
   const { data } = await api.post(
-    `/visits/${encodeURIComponent(visitId)}/reschedule`,
-    payload
+    `/visits/${encodeURIComponent(visitId)}/reschedule?${params.toString()}`
   );
   return data;
 }

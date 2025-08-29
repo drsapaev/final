@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.config import settings
-from app.crud.visit import get_visit_by_id  # type: ignore[attr-defined]
+from app.crud.visit import get_visit as get_visit_by_id  # type: ignore[attr-defined]
+from app.services.escpos import escpos_print_text
 
 router = APIRouter(prefix="/print", tags=["print"])
 
@@ -117,3 +118,50 @@ async def invoice_pdf(
     c.save()
     pdf = buf.getvalue()
     return Response(content=pdf, media_type="application/pdf")
+
+
+# -----------------------------------------------------------------------------
+# ESC/POS печать: талон и чек (текстовый вывод)
+# -----------------------------------------------------------------------------
+
+@router.post("/ticket", summary="Печать талона очереди (ESC/POS)")
+async def ticket_escpos(
+    department: str = Query(..., min_length=1, max_length=64),
+    ticket_number: int = Query(..., ge=1),
+    user=Depends(require_roles("Admin", "Registrar")),
+):
+    lines = []
+    lines.append(settings.APP_NAME)
+    lines.append(f"Отделение: {department}")
+    lines.append("")
+    lines.append(f"№ {ticket_number}")
+    lines.append("")
+    from datetime import datetime as _dt
+    lines.append(_dt.now().strftime("%Y-%m-%d %H:%M:%S"))
+    text = "\n".join(lines) + "\n\n"
+    return escpos_print_text(text)
+
+
+@router.post("/receipt", summary="Печать чека (ESC/POS)")
+async def receipt_escpos(
+    visit_id: int = Query(..., ge=1),
+    amount: float = Query(..., gt=0),
+    currency: str = Query("UZS", min_length=3, max_length=8),
+    user=Depends(require_roles("Admin", "Cashier")),
+    db: Session = Depends(get_db),
+):
+    visit = get_visit_by_id(db, visit_id)
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+    patient = visit.get("patient_full_name") or f"Patient #{visit_id}"
+    lines = []
+    lines.append(settings.APP_NAME)
+    lines.append("ЧЕК ОПЛАТЫ")
+    lines.append(f"Визит: #{visit_id}")
+    lines.append(f"Пациент: {patient}")
+    lines.append("")
+    lines.append(f"Итого: {amount:.2f} {currency}")
+    from datetime import datetime as _dt
+    lines.append(_dt.now().strftime("%Y-%m-%d %H:%M:%S"))
+    text = "\n".join(lines) + "\n\n"
+    return escpos_print_text(text)

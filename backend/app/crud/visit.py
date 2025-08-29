@@ -3,17 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import MetaData, Table, select
+from sqlalchemy import MetaData, Table, select, inspect
 from sqlalchemy.orm import Session
 
 
 def _visits(db: Session) -> Table:
-    md = MetaData(bind=db.get_bind())
+    md = MetaData()
     return Table("visits", md, autoload_with=db.get_bind())
 
 
 def _vservices(db: Session) -> Table:
-    md = MetaData(bind=db.get_bind())
+    md = MetaData()
     return Table("visit_services", md, autoload_with=db.get_bind())
 
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { rescheduleVisit, rescheduleTomorrow } from "../api";
+import { rescheduleVisit, rescheduleTomorrow } from "../api/visits";
 
 /**
  * Диалог переноса визита.
@@ -10,7 +10,7 @@ import { rescheduleVisit, rescheduleTomorrow } from "../api";
  *  - onRescheduled?: (updated) => void
  */
 export default function RescheduleDialog({ open, onClose, visit, onRescheduled }) {
-  const [dt, setDt] = useState("");
+  const [d, setD] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -18,20 +18,17 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
     if (!open) return;
     setErr("");
     // Проставим текущее время визита, если есть
-    if (visit?.scheduled_at) {
+    if (visit?.planned_date) {
       try {
-        const d = new Date(visit.scheduled_at);
-        // datetime-local => yyyy-MM-ddThh:mm
+        const dt = new Date(visit.planned_date);
         const pad = (n) => String(n).padStart(2, "0");
-        const value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
-          d.getMinutes()
-        )}`;
-        setDt(value);
+        const value = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+        setD(value);
       } catch {
-        setDt("");
+        setD("");
       }
     } else {
-      setDt("");
+      setD("");
     }
   }, [open, visit]);
 
@@ -42,9 +39,8 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
     setBusy(true);
     setErr("");
     try {
-      const iso = dt ? new Date(dt).toISOString() : null;
-      if (!iso) throw new Error("Укажите дату и время");
-      const updated = await rescheduleVisit(visit.id, iso);
+      if (!d) throw new Error("Укажите дату");
+      const updated = await rescheduleVisit(visit.id, d);
       onRescheduled?.(updated || null);
       onClose?.();
     } catch (e) {
@@ -76,11 +72,11 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
 
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
           <label style={{ display: "grid", gap: 6 }}>
-            <span>Новая дата и время</span>
+            <span>Новая дата</span>
             <input
-              type="datetime-local"
-              value={dt}
-              onChange={(e) => setDt(e.target.value)}
+              type="date"
+              value={d}
+              onChange={(e) => setD(e.target.value)}
               style={input}
               disabled={busy}
             />

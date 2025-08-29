@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.models.online import OnlineDay  # type: ignore[attr-defined]
 from app.models.setting import Setting  # type: ignore[attr-defined]
+from app.core.config import settings
+import datetime as _dt
 
 
 # ЛЕНИВЫЙ импорт менеджера WS, чтобы избежать циклов импорта при старте приложения
@@ -66,6 +68,32 @@ def _set_int(db: Session, key: str, value: int) -> None:
         row.value = str(int(value))
     else:
         row = Setting(category="queue", key=key, value=str(int(value)))
+        db.add(row)
+
+
+def _get_str(db: Session, key: str) -> Optional[str]:
+    row = (
+        db.execute(
+            select(Setting).where(Setting.category == "queue", Setting.key == key)
+        )
+        .scalars()
+        .first()
+    )
+    return (row.value if row and row.value is not None else None)
+
+
+def _set_str(db: Session, key: str, value: str) -> None:
+    row = (
+        db.execute(
+            select(Setting).where(Setting.category == "queue", Setting.key == key)
+        )
+        .scalars()
+        .first()
+    )
+    if row:
+        row.value = value
+    else:
+        row = Setting(category="queue", key=key, value=value)
         db.add(row)
 
 
@@ -128,13 +156,12 @@ def load_stats(db: Session, *, department: str, date_str: str) -> DayStats:
 
 
 def _broadcast(dep: str, d: str, stats: DayStats) -> None:
+    """Отправляем обновление в WebSocket комнату"""
     payload = {
         "type": "queue.update",
         "room": f"{dep}::{d}",
-        "payload": {
-            "department": stats.department,
-            "date_str": stats.date_str,
-            "is_open": stats.is_open,
+        "timestamp": _dt.datetime.now().isoformat(),
+        "stats": {
             "start_number": stats.start_number,
             "last_ticket": stats.last_ticket,
             "waiting": stats.waiting,
@@ -143,13 +170,27 @@ def _broadcast(dep: str, d: str, stats: DayStats) -> None:
         },
     }
     # room format должен совпадать с ws/queue_ws.py
+    print(f"🔔 Broadcasting to room: {dep}::{d}")
+    print(f"🔔 Payload: {payload}")
+    
     mgr = _ws_manager()
     if mgr:
         try:
-            asyncio.create_task(mgr.broadcast(f"{dep}::{d}", payload))
-        except Exception:
+            print(f"🔔 WSManager получен: {type(mgr)}")
+            print(f"🔔 Комнаты в WSManager: {list(mgr.rooms.keys())}")
+            print(f"🔔 Целевая комната: {dep}::{d}")
+            
+            # broadcast - синхронная функция, не нужно create_task
+            mgr.broadcast(f"{dep}::{d}", payload)
+            print(f"🔔 Broadcast sent successfully")
+        except Exception as e:
+            print(f"❌ Broadcast error: {e}")
+            import traceback
+            traceback.print_exc()
             # не роняем транзакции/запрос, если рассылка не удалась
             pass
+    else:
+        print(f"⚠️ WSManager not available for broadcast")
 
 
 def issue_next_ticket(db: Session, *, department: str, date_str: str) -> tuple[int, DayStats]:
@@ -172,3 +213,66 @@ def issue_next_ticket(db: Session, *, department: str, date_str: str) -> tuple[i
     stats = load_stats(db, department=dep, date_str=d)
     _broadcast(dep, d, stats)
     return next_ticket, stats
+
+
+# --- Business rules for morning online window --------------------------------
+
+def _now_local() -> _dt.datetime:
+    # простая локализация по системному времени; для точной TZ можно подключить zoneinfo
+    return _dt.datetime.now()
+
+
+def is_within_morning_window(*, db: Session, department: str, date_str: str) -> bool:
+    """
+    Окно онлайн-набора: с QUEUE_START_HOUR локального времени и до момента, когда день открыт (opened=accept) в регистратуре.
+    В нашей модели OnlineDay.is_open=True означает «утренний набор открыт». После нажатия «Открыть приём» — is_open=False.
+    """
+    hour_start = int(getattr(settings, "QUEUE_START_HOUR", 7) or 7)
+    now = _now_local()
+    if now.hour < hour_start:
+        return False
+    day = get_or_create_day(db, department=department, date_str=date_str)
+    return bool(day.is_open)
+
+
+def can_issue_more_today(*, db: Session, department: str, date_str: str) -> bool:
+    max_per_day = int(getattr(settings, "ONLINE_MAX_PER_DAY", 15) or 15)
+    stats = load_stats(db, department=department, date_str=date_str)
+    # считаем выданные как last_ticket - start_number + 1 (не меньше 0)
+    issued = max(0, int(stats.last_ticket) - int(stats.start_number or 1) + 1)
+    return issued < max_per_day
+
+
+def get_existing_ticket_for_identity(
+    *, db: Session, department: str, date_str: str, phone: Optional[str], tg_id: Optional[str]
+) -> Optional[int]:
+    dep = department.strip()
+    d = date_str.strip()
+    if phone:
+        k = _k(dep, d, f"phone::{phone.strip()}")
+        v = _get_str(db, k)
+        if v:
+            try:
+                return int(v)
+            except Exception:
+                pass
+    if tg_id:
+        k = _k(dep, d, f"tg::{tg_id.strip()}")
+        v = _get_str(db, k)
+        if v:
+            try:
+                return int(v)
+            except Exception:
+                pass
+    return None
+
+
+def remember_identity_ticket(
+    *, db: Session, department: str, date_str: str, phone: Optional[str], tg_id: Optional[str], ticket: int
+) -> None:
+    dep = department.strip()
+    d = date_str.strip()
+    if phone:
+        _set_str(db, _k(dep, d, f"phone::{phone.strip()}"), str(int(ticket)))
+    if tg_id:
+        _set_str(db, _k(dep, d, f"tg::{tg_id.strip()}"), str(int(ticket)))

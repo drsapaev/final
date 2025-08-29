@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, require_roles
-from app.services.online_queue import load_stats  # issue_next_ticket уже есть в /queues; тут не трогаем
+from app.services.online_queue import load_stats, _broadcast  # Добавляем _broadcast
 from app.models.setting import Setting
+from app.services.online_queue import get_or_create_day
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -67,6 +68,20 @@ def open_day(
 
     # вернём понятный ответ + сводку
     stats = load_stats(db, department=department, date_str=date_str)
+    # Отправляем broadcast в WebSocket
+    try:
+        print(f"🔔 Attempting to import _broadcast...")
+        print(f"🔔 _broadcast imported successfully")
+        print(f"🔔 Calling _broadcast({department}, {date_str}, stats)")
+        print(f"🔔 Stats object: {stats}")
+        print(f"🔔 Stats type: {type(stats)}")
+        _broadcast(department, date_str, stats)
+        print(f"🔔 _broadcast called successfully")
+    except Exception as e:
+        # Не роняем запрос, если broadcast не удался
+        print(f"⚠️ Broadcast error in open_day: {e}")
+        import traceback
+        traceback.print_exc()
     return {
         "ok": True,
         "department": department,
@@ -102,6 +117,33 @@ def stats(
         "waiting": getattr(s, "waiting", 0),
         "serving": getattr(s, "serving", 0),
         "done": getattr(s, "done", 0),
+    }
+
+
+@router.post("/close", name="close_day", dependencies=[Depends(require_roles("Admin"))])
+def close_day(
+    department: str = Query(..., description="Например ENT"),
+    date_str: str = Query(..., description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Закрывает утренний онлайн-набор (кнопка «Открыть приём сейчас»).
+    Фактически выставляет OnlineDay.is_open = False для department+date.
+    """
+    get_or_create_day(db, department=department, date_str=date_str, open_flag=False)
+    db.commit()
+    s = load_stats(db, department=department, date_str=date_str)
+    return {
+        "ok": True,
+        "department": department,
+        "date_str": date_str,
+        "is_open": s.is_open,
+        "start_number": s.start_number,
+        "last_ticket": s.last_ticket,
+        "waiting": s.waiting,
+        "serving": s.serving,
+        "done": s.done,
     }
 
 

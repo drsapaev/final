@@ -23,7 +23,7 @@ def escpos_print_text(text: str, *, cut: bool = True) -> dict:
 
     if ptype == "none":
         # Сухой режим — просто вернуть, что бы было отправлено
-        return {"ok": True, "dry_run": True, "bytes": text.encode("cp866", errors="ignore")}
+        return {"ok": True, "dry_run": True, "text": text, "bytes_count": len(text.encode("cp866", errors="ignore"))}
 
     if ptype == "network":
         if Network is None:
