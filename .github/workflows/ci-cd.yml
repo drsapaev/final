@@ -21,7 +21,7 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     - run: |
@@ -39,13 +39,19 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
-    - run: |
+    - name: 📦 Установка зависимостей
+      run: |
         cd backend
         pip install -r requirements.txt
         pip install pytest pytest-asyncio
+    - name: 🔧 Настройка Python path
+      run: |
+        cd backend
+        echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_PATH
     - run: |
         cd backend
         export DATABASE_URL="${{ env.DATABASE_URL }}"
@@ -66,7 +72,8 @@ jobs:
         export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
         
         # Запускаем сервер в фоне
-        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        export PYTHONPATH="${{ github.workspace }}/backend"
+        python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         echo $! > server.pid
         sleep 10
         
@@ -80,6 +87,7 @@ jobs:
         export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
         
         echo "🧪 Тестируем вебхуки оплат..."
+        export PYTHONPATH="${{ github.workspace }}/backend"
         python test_payment_webhooks.py
         
         echo "🧪 Тестируем систему очередей..."
@@ -118,7 +126,7 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     - run: |
@@ -136,7 +144,7 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     - run: |
@@ -183,7 +191,7 @@ jobs:
         ## 🎯 Общий результат: ВСЕ ТЕСТЫ ПРОШЛИ УСПЕШНО!
         EOF
         
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: test-report
         path: test-report.md
