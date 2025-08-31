@@ -83,12 +83,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get
 
 @router.get("/me", response_model=None)
 async def me(current_user: User = Depends(get_current_user)):
-    """
-    Return current authenticated user profile.
-
-    Uses get_current_user from app.api.deps which already supports sync/async sessions.
-    We set response_model=None to avoid FastAPI trying to automatically
-    convert the SQLAlchemy model into a Pydantic model (which caused errors).
-    If you have a Pydantic schema (e.g. app.schemas.user.User), replace with that.
-    """
-    return current_user
+    """Return current authenticated user profile as plain JSON."""
+    return {
+        "id": getattr(current_user, "id", None),
+        "username": getattr(current_user, "username", None),
+        "full_name": getattr(current_user, "full_name", None),
+        "email": getattr(current_user, "email", None),
+        "role": getattr(current_user, "role", None),
+        "is_active": getattr(current_user, "is_active", True),
+        "is_superuser": getattr(current_user, "is_superuser", False),
+    }

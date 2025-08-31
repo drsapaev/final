@@ -1,193 +1,127 @@
-from __future__ import annotations
-
-from typing import List, Optional, Dict, Any
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
-from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, select, asc, desc
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from app.crud.patient import patient as patient_crud
+from app.schemas import patient as patient_schemas
+from app.api import deps
+from app.models.user import User
 
-from app.api.deps import get_db, require_roles
+router = APIRouter()
 
-router = APIRouter(prefix="/patients", tags=["patients"])
-
-
-# --- Schemas: пробуем использовать проектные, иначе — локальные фолбэки ---
-try:
-    # Если в проекте есть полноценные схемы — используем их
-    from app.schemas.patient import PatientCreate, PatientUpdate, PatientOut  # type: ignore[attr-defined]
-except Exception:
-    class PatientBase(BaseModel):
-        first_name: Optional[str] = Field(default=None, max_length=120)
-        last_name: Optional[str] = Field(default=None, max_length=120)
-        middle_name: Optional[str] = Field(default=None, max_length=120)
-        birth_date: Optional[str] = None  # YYYY-MM-DD
-        gender: Optional[str] = Field(default=None, max_length=8)
-        phone: Optional[str] = Field(default=None, max_length=32)
-        doc_type: Optional[str] = Field(default=None, max_length=32)
-        doc_number: Optional[str] = Field(default=None, max_length=64)
-        address: Optional[str] = Field(default=None, max_length=512)
-        
-        class Config:
-            from_attributes = True
-
-    class PatientCreate(PatientBase):
-        pass
-
-    class PatientUpdate(PatientBase):
-        pass
-
-    class PatientOut(PatientBase):
-        id: int
-
-
-def _patients_table(db: Session) -> Table:
-    md = MetaData()
-    return Table("patients", md, autoload_with=db.get_bind())
-
-
-def _row_to_out(row: Dict[str, Any]) -> PatientOut:
-    # Преобразуем объект date в строку для Pydantic
-    if 'birth_date' in row and row['birth_date']:
-        if hasattr(row['birth_date'], 'strftime'):
-            row['birth_date'] = row['birth_date'].strftime('%Y-%m-%d')
-    
-    return PatientOut(**row)  # type: ignore[arg-type]
-
-
-@router.get(
-    "",
-    response_model=List[PatientOut],
-    summary="Список пациентов",
-)
+@router.get("/", response_model=List[patient_schemas.Patient])
 def list_patients(
-    q: Optional[str] = Query(default=None, description="Поиск: ФИО/телефон/документ"),
-    limit: int = Query(default=50, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
-    sort: str = Query(default="-id", description="id|-id|last_name|first_name"),
-    db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "User")),
+    db: Session = Depends(deps.get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    q: Optional[str] = Query(None, description="Поиск по ФИО, телефону или документу"),
+    current_user: User = Depends(deps.get_current_user)
 ):
-    t = _patients_table(db)
-    stmt = select(t)
+    """
+    Получить список пациентов с возможностью поиска и пагинации
+    """
+    patients = patient_crud.get_patients(db, skip=skip, limit=limit, search_query=q)
+    return patients
 
-    if q:
-        like = f"%{q}%"
-        cond = (
-            (t.c.first_name.ilike(like))
-            | (t.c.last_name.ilike(like))
-            | (t.c.middle_name.ilike(like))
-            | (t.c.phone.ilike(like))
-            | (t.c.doc_number.ilike(like))
-        )
-        stmt = stmt.where(cond)
-
-    # sort
-    direction = desc if sort.startswith("-") else asc
-    col = sort[1:] if sort.startswith("-") else sort
-    if col not in t.c:
-        col = "id"
-    stmt = stmt.order_by(direction(t.c[col])).limit(limit).offset(offset)
-
-    rows = db.execute(stmt).mappings().all()
-    return [_row_to_out(dict(r)) for r in rows]
-
-
-@router.post(
-    "",
-    response_model=PatientOut,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создать пациента",
-)
+@router.post("/", response_model=patient_schemas.Patient)
 def create_patient(
-    payload: PatientCreate,
-    db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar")),
+    *,
+    db: Session = Depends(deps.get_db),
+    patient_in: patient_schemas.PatientCreate,
+    current_user: User = Depends(deps.get_current_user)
 ):
-    t = _patients_table(db)
-    values = {k: v for k, v in payload.model_dump().items() if v is not None}
+    """
+    Создать нового пациента
+    """
+    # Проверяем, не существует ли уже пациент с таким телефоном
+    existing_patient = patient_crud.get_patient_by_phone(db, phone=patient_in.phone)
+    if existing_patient:
+        raise HTTPException(
+            status_code=400,
+            detail="Пациент с таким номером телефона уже существует"
+        )
     
-    # Преобразуем строку birth_date в объект date
-    if 'birth_date' in values and values['birth_date']:
-        try:
-            from datetime import datetime
-            values['birth_date'] = datetime.strptime(values['birth_date'], '%Y-%m-%d').date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid birth_date format. Use YYYY-MM-DD")
-    
-    ins = t.insert().values(**values)
-    res = db.execute(ins)
-    db.flush()
+    patient = patient_crud.create_patient(db=db, patient=patient_in)
+    return patient
 
-    new_id = res.lastrowid
-    if not new_id:
-        # на некоторых БД lastrowid недоступен — подстрахуемся max(id)
-        new_id = db.execute(select(t.c.id).order_by(desc(t.c.id)).limit(1)).scalar_one()
-
-    row = db.execute(select(t).where(t.c.id == new_id)).mappings().first()
-    assert row is not None
-    db.commit()
-    return _row_to_out(dict(row))
-
-
-@router.get(
-    "/{patient_id}",
-    response_model=PatientOut,
-    summary="Получить пациента по id",
-)
+@router.get("/{patient_id}", response_model=patient_schemas.Patient)
 def get_patient(
-    patient_id: int = Path(..., ge=1),
-    db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "User")),
+    *,
+    db: Session = Depends(deps.get_db),
+    patient_id: int,
+    current_user: User = Depends(deps.get_current_user)
 ):
-    t = _patients_table(db)
-    row = db.execute(select(t).where(t.c.id == patient_id)).mappings().first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Patient not found")
-    return _row_to_out(dict(row))
+    """
+    Получить пациента по ID
+    """
+    patient = patient_crud.get_patient(db, id=patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+    return patient
 
-
-@router.put(
-    "/{patient_id}",
-    response_model=PatientOut,
-    summary="Обновить пациента",
-)
+@router.put("/{patient_id}", response_model=patient_schemas.Patient)
 def update_patient(
-    payload: PatientUpdate,
-    patient_id: int = Path(..., ge=1),
-    db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar")),
+    *,
+    db: Session = Depends(deps.get_db),
+    patient_id: int,
+    patient_in: patient_schemas.PatientUpdate,
+    current_user: User = Depends(deps.get_current_user)
 ):
-    t = _patients_table(db)
-    row = db.execute(select(t).where(t.c.id == patient_id)).mappings().first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    """
+    Обновить данные пациента
+    """
+    patient = patient_crud.get_patient(db, id=patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+    
+    # Проверяем, не занят ли телефон другим пациентом
+    if patient_in.phone and patient_in.phone != patient.phone:
+        existing_patient = patient_crud.get_patient_by_phone(db, phone=patient_in.phone)
+        if existing_patient and existing_patient.id != patient_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Пациент с таким номером телефона уже существует"
+            )
+    
+    patient = patient_crud.update_patient(db=db, db_obj=patient, obj_in=patient_in)
+    return patient
 
-    patch = {k: v for k, v in payload.model_dump().items() if v is not None}
-    if patch:
-        db.execute(t.update().where(t.c.id == patient_id).values(**patch))
-        db.flush()
-
-    row2 = db.execute(select(t).where(t.c.id == patient_id)).mappings().first()
-    assert row2 is not None
-    db.commit()
-    return _row_to_out(dict(row2))
-
-
-@router.delete(
-    "/{patient_id}",
-    summary="Удалить пациента",
-)
+@router.delete("/{patient_id}")
 def delete_patient(
-    patient_id: int = Path(..., ge=1),
-    db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin")),
+    *,
+    db: Session = Depends(deps.get_db),
+    patient_id: int,
+    current_user: User = Depends(deps.get_current_user)
 ):
-    t = _patients_table(db)
-    row = db.execute(select(t).where(t.c.id == patient_id)).mappings().first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Patient not found")
+    """
+    Удалить пациента
+    """
+    patient = patient_crud.get_patient(db, id=patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+    
+    # Проверяем, есть ли у пациента активные записи
+    if patient_crud.has_active_appointments(db, patient_id=patient_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя удалить пациента с активными записями"
+        )
+    
+    patient_crud.delete_patient(db=db, id=patient_id)
+    return {"message": "Пациент успешно удален"}
 
-    db.execute(t.delete().where(t.c.id == patient_id))
-    db.commit()
-    return {"ok": True}
+@router.get("/{patient_id}/appointments")
+def get_patient_appointments(
+    *,
+    db: Session = Depends(deps.get_db),
+    patient_id: int,
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    Получить все записи пациента
+    """
+    patient = patient_crud.get_patient(db, id=patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+    
+    appointments = patient_crud.get_patient_appointments(db, patient_id=patient_id)
+    return appointments

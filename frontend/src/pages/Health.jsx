@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import Nav from "../components/Nav.jsx";
 import RoleGate from "../components/RoleGate.jsx";
 import { getApiBase } from "../api/client.js";
 import { getHealth, getActivationStatus } from "../api/index.js";
@@ -33,7 +32,6 @@ export default function Health() {
 
   return (
     <div>
-      <Nav />
       <main className="p-4 max-w-5xl mx-auto">
         <h1 className="text-2xl font-semibold mb-2">Состояние приложения</h1>
         <div className="text-sm text-gray-600 mb-4">

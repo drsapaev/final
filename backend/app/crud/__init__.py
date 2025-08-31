@@ -6,3 +6,4 @@ from .schedule import *
 from .service import *
 from .setting import *
 from .audit import *
+from .appointment import *

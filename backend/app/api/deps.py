@@ -52,7 +52,8 @@ except Exception:
     # If import fails the project is misconfigured; leave User unresolved to raise early.
     User = Any  # type: ignore
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/login")
+# Correct tokenUrl to point to our /auth/login
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

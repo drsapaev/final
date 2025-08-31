@@ -21,6 +21,11 @@ ENDPOINT_MODULES = [
     "board",
     "reports",
     "payment_webhook",
+    "admin_providers",
+    "cardio",
+    "derma",
+    "dental",
+    "lab_specialized",
 ]
 
 __all__ = ["ENDPOINT_MODULES"]

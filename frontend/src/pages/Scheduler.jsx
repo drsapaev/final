@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Nav from "../components/Nav.jsx";
 import RoleGate from "../components/RoleGate.jsx";
 import { api } from "../api/client.js";
 
@@ -55,7 +54,6 @@ export default function Scheduler() {
 
   return (
     <div>
-      <Nav active={page} onNavigate={setPage} />
       <RoleGate roles={["Admin", "Registrar", "Doctor"]}>
         <div style={{ padding: 16, display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Расписание</h2>

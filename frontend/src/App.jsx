@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 
-import Nav from "./components/Nav.jsx";
+import Header from "./components/Header.jsx";
+import Sidebar from "./components/Sidebar.jsx";
 
 import Health from "./pages/Health.jsx";
+import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Registrar from "./pages/Registrar.jsx";
 import Doctor from "./pages/Doctor.jsx";
@@ -14,6 +16,14 @@ import Audit from "./pages/Audit.jsx";
 import Scheduler from "./pages/Scheduler.jsx";
 import Appointments from "./pages/Appointments.jsx";
 import VisitDetails from "./pages/VisitDetails.jsx";
+import AdminPanel from "./pages/AdminPanel.jsx";
+import RegistrarPanel from "./pages/RegistrarPanel.jsx";
+import CardiologistPanel from "./pages/CardiologistPanel.jsx";
+import DermatologistPanel from "./pages/DermatologistPanel.jsx";
+import DentistPanel from "./pages/DentistPanel.jsx";
+import LabPanel from "./pages/LabPanel.jsx";
+import UserSelect from "./pages/UserSelect.jsx";
+import Search from "./pages/Search.jsx";
 
 import auth from "./stores/auth.js";
 
@@ -43,14 +53,22 @@ function RequireAuth({ roles, children }) {
 
 /** Каркас: только Nav, без дублирующего заголовка */
 function AppShell() {
+  const location = useLocation();
+  const isRegistrarPanel = location.pathname === '/registrar-panel';
+  
   return (
     <div style={wrapStyle}>
-      <header style={hdr}>
-        <Nav />
-      </header>
-      <main style={main}>
-        <Outlet />
-      </main>
+      {!isRegistrarPanel && (
+        <header style={hdr}>
+          <Header />
+        </header>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: isRegistrarPanel ? '1fr' : '240px 1fr' }}>
+        {!isRegistrarPanel && <Sidebar />}
+        <main style={{...main, ...(isRegistrarPanel && { maxWidth: 'none', margin: 0, padding: 0 })}}>
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
@@ -59,18 +77,26 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/user-select" element={<RequireAuth roles={["Admin"]}><UserSelect /></RequireAuth>} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route index element={<Health />} />
           <Route path="registrar"     element={<RequireAuth roles={["Admin","Registrar"]}><Registrar /></RequireAuth>} />
           <Route path="doctor"        element={<RequireAuth roles={["Admin","Doctor"]}><Doctor /></RequireAuth>} />
           <Route path="lab"           element={<RequireAuth roles={["Admin","Lab"]}><Lab /></RequireAuth>} />
           <Route path="cashier"       element={<RequireAuth roles={["Admin","Cashier"]}><Cashier /></RequireAuth>} />
+          <Route path="admin"         element={<RequireAuth roles={["Admin"]}><AdminPanel /></RequireAuth>} />
+          <Route path="registrar-panel" element={<RequireAuth roles={["Admin","Registrar"]}><RegistrarPanel /></RequireAuth>} />
+          <Route path="cardiologist"  element={<RequireAuth roles={["Admin","Doctor"]}><CardiologistPanel /></RequireAuth>} />
+          <Route path="dermatologist" element={<RequireAuth roles={["Admin","Doctor"]}><DermatologistPanel /></RequireAuth>} />
+          <Route path="dentist"       element={<RequireAuth roles={["Admin","Doctor"]}><DentistPanel /></RequireAuth>} />
+          <Route path="lab-panel"     element={<RequireAuth roles={["Admin","Lab"]}><LabPanel /></RequireAuth>} />
           <Route path="settings"      element={<RequireAuth roles={["Admin"]}><Settings /></RequireAuth>} />
           <Route path="audit"         element={<RequireAuth roles={["Admin"]}><Audit /></RequireAuth>} />
           <Route path="scheduler"     element={<RequireAuth roles={["Admin","Doctor","Registrar"]}><Scheduler /></RequireAuth>} />
           <Route path="appointments"  element={<RequireAuth roles={["Admin","Registrar"]}><Appointments /></RequireAuth>} />
           <Route path="visits/:id"    element={<VisitDetails />} />
+          <Route path="search"        element={<Search />} />
           <Route path="*"             element={<Navigate to="/" replace />} />
         </Route>
       </Route>

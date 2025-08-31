@@ -18,12 +18,16 @@ export default function Nav() {
 
   // Маршруты приложения — при необходимости синхронизируй с src/App.jsx
   const routes = [
-    { key: "Health",     to: "/health",      label: "Health",       roles: ["Admin","Registrar","Doctor","Lab","Cashier","User"] },
-    { key: "Registrar",  to: "/registrar",   label: "Регистратура", roles: ["Admin","Registrar"] },
+    { key: "Health",     to: "/",            label: "Health",       roles: ["Admin","Registrar","Doctor","Lab","Cashier","User"] },
     { key: "Doctor",     to: "/doctor",      label: "Врач",         roles: ["Admin","Doctor"] },
-    { key: "Lab",        to: "/lab",         label: "Лаборатория",  roles: ["Admin","Lab"] },
     { key: "Cashier",    to: "/cashier",     label: "Касса",        roles: ["Admin","Cashier"] },
     { key: "Scheduler",  to: "/scheduler",   label: "Расписание",   roles: ["Admin","Registrar","Doctor"] },
+    { key: "Admin",      to: "/admin",       label: "Админ",        roles: ["Admin"] },
+    { key: "RegistrarPanel", to: "/registrar-panel", label: "Панель регистратора", roles: ["Admin","Registrar"] },
+    { key: "Cardiologist", to: "/cardiologist", label: "Кардиолог", roles: ["Admin","Doctor"] },
+    { key: "Dermatologist", to: "/dermatologist", label: "Дерматолог", roles: ["Admin","Doctor"] },
+    { key: "Dentist",    to: "/dentist",     label: "Стоматолог",  roles: ["Admin","Doctor"] },
+    { key: "LabPanel",   to: "/lab-panel",   label: "Лаборатория", roles: ["Admin","Lab"] },
     { key: "Audit",      to: "/audit",       label: "Аудит",        roles: ["Admin"] },
     { key: "Activation", to: "/activation",  label: "Activation",   roles: ["Admin"] },
     { key: "Settings",   to: "/settings",    label: "Настройки",    roles: ["Admin"] },

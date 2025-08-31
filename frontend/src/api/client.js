@@ -10,7 +10,7 @@
 
 import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -68,8 +68,8 @@ async function apiRequest(method, url, { params = {}, data = {} } = {}) {
  * Convenience API helpers used by frontend code
  */
 async function me() {
-  // GET /me
-  const resp = await api.get("/me");
+  // GET /auth/me
+  const resp = await api.get("/auth/me");
   return resp.data;
 }
 
@@ -84,9 +84,10 @@ async function login(username, password) {
   params.append("password", password);
   params.append("grant_type", "password");
 
-  const resp = await api.post("/login", params.toString(), {
+  const resp = await api.post("/auth/login", params.toString(), {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
+  
   return resp.data;
 }
 

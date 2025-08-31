@@ -19,6 +19,20 @@ class VisitCreate(ORMModel):
     notes: Optional[str] = Field(default=None, max_length=1000)
 
 
+class VisitUpdate(ORMModel):
+    patient_id: Optional[int] = None
+    doctor_id: Optional[int] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    status: Optional[str] = Field(None, max_length=16)
+
+
+class Visit(VisitBase):
+    id: int
+    created_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+
+
 class VisitOut(VisitBase):
     id: int
     created_at: Optional[datetime] = None

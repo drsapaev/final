@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Nav from "../components/Nav.jsx";
 import RoleGate from "../components/RoleGate.jsx";
 import { api, getApiBase } from "../api/client.js";
 
@@ -63,7 +62,6 @@ export default function Cashier() {
 
   return (
     <div>
-      <Nav active={page} onNavigate={setPage} />
       <RoleGate roles={["Admin", "Cashier"]}>
         <div style={{ padding: 16, display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Касса</h2>

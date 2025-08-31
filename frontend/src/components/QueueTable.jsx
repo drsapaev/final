@@ -57,15 +57,13 @@ export default function QueueTable({ department }) {
 
   function openQueueWS() {
     try {
-      const apiBase = getApiBase(); // e.g. http://localhost:8000/api/v1
-      // derive origin (scheme + host)
-      const url = new URL(apiBase);
-      const origin = `${url.protocol}//${url.host}`; // includes trailing host
-      const wsProto = url.protocol === "https:" ? "wss:" : "ws:";
-      // build ws url on same host: /ws/queue?department=...&date_str=...
-      const wsUrl = `${wsProto}//${url.host}/ws/queue?department=${encodeURIComponent(
+      const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsHost = "localhost:8000"; // Бэкенд работает на порту 8000
+      const token = localStorage.getItem('auth_token') || '';
+      // build ws url: ws://localhost:8000/ws/queue?department=...&date_str=...&token=...
+      const wsUrl = `${wsProto}//${wsHost}/ws/queue?department=${encodeURIComponent(
         department
-      )}&date_str=${encodeURIComponent(todayStr)}`;
+      )}&date_str=${encodeURIComponent(todayStr)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
 
       // close previous
       if (wsRef.current) {

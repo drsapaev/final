@@ -14,6 +14,7 @@ from app.crud.payment_webhook import (
 )
 from app.schemas.payment_webhook import PaymentWebhookCreate, PaymentTransactionCreate, PaymeWebhookData, ClickWebhookData
 from app.models.payment_webhook import PaymentWebhook, PaymentTransaction
+from app.services.visit_payment_integration import VisitPaymentIntegrationService
 
 
 class PaymentWebhookService:
@@ -123,6 +124,43 @@ class PaymentWebhookService:
             
             update_webhook(db, webhook.id, webhook_update)
             
+            # Интеграция с визитами - если платёж успешен
+            if status == "processed":
+                try:
+                    # Извлекаем ID визита из данных вебхука (если есть)
+                    visit_id = None
+                    if hasattr(webhook_data, 'account') and webhook_data.account:
+                        # Пытаемся найти visit_id в account данных
+                        if hasattr(webhook_data.account, 'visit_id'):
+                            visit_id = int(webhook_data.account.visit_id)
+                        elif hasattr(webhook_data.account, 'order_id'):
+                            # Если есть order_id, можно попробовать найти визит по нему
+                            # Здесь можно добавить логику поиска визита по order_id
+                            pass
+                    
+                    if visit_id:
+                        # Обновляем существующий визит
+                        success, message = VisitPaymentIntegrationService.process_payment_for_existing_visit(
+                            db, visit_id, webhook
+                        )
+                        if success:
+                            print(f"✅ Платёж для визита {visit_id} обработан: {message}")
+                        else:
+                            print(f"⚠️ Ошибка обработки платежа для визита {visit_id}: {message}")
+                    else:
+                        # Создаём новый визит на основе платежа
+                        success, message, new_visit_id = VisitPaymentIntegrationService.create_visit_from_payment(
+                            db, webhook
+                        )
+                        if success:
+                            print(f"✅ Создан новый визит {new_visit_id} на основе платежа: {message}")
+                        else:
+                            print(f"⚠️ Ошибка создания визита: {message}")
+                            
+                except Exception as e:
+                    print(f"⚠️ Ошибка интеграции с визитами: {e}")
+                    # Не прерываем обработку вебхука из-за ошибки интеграции
+            
             return True, "Webhook processed successfully", webhook
             
         except Exception as e:
@@ -183,6 +221,42 @@ class PaymentWebhookService:
                 webhook_update["error_message"] = f"Click error: {webhook_data.error}"
             
             update_webhook(db, webhook.id, webhook_update)
+            
+            # Интеграция с визитами - если платёж успешен
+            if status == "success":
+                try:
+                    # Извлекаем ID визита из данных вебхука (если есть)
+                    visit_id = None
+                    if hasattr(webhook_data, 'merchant_trans_id'):
+                        # Пытаемся найти visit_id в merchant_trans_id
+                        try:
+                            visit_id = int(webhook_data.merchant_trans_id)
+                        except (ValueError, TypeError):
+                            # Если merchant_trans_id не является числом, пропускаем
+                            pass
+                    
+                    if visit_id:
+                        # Обновляем существующий визит
+                        success, message = VisitPaymentIntegrationService.process_payment_for_existing_visit(
+                            db, visit_id, webhook
+                        )
+                        if success:
+                            print(f"✅ Платёж для визита {visit_id} обработан: {message}")
+                        else:
+                            print(f"⚠️ Ошибка обработки платежа для визита {visit_id}: {message}")
+                    else:
+                        # Создаём новый визит на основе платежа
+                        success, message, new_visit_id = VisitPaymentIntegrationService.create_visit_from_payment(
+                            db, webhook
+                        )
+                        if success:
+                            print(f"✅ Создан новый визит {new_visit_id} на основе платежа: {message}")
+                        else:
+                            print(f"⚠️ Ошибка создания визита: {message}")
+                            
+                except Exception as e:
+                    print(f"⚠️ Ошибка интеграции с визитами: {e}")
+                    # Не прерываем обработку вебхука из-за ошибки интеграции
             
             return True, "Webhook processed successfully", webhook
             

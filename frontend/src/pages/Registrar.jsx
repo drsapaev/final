@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react";
-import Nav from "../components/Nav.jsx";
 import RoleGate from "../components/RoleGate.jsx";
 import QueueTable from "../components/QueueTable.jsx";
 
@@ -34,7 +33,6 @@ export default function Registrar() {
 
   return (
     <div>
-      <Nav active={page} onNavigate={setPage} />
       <RoleGate roles={["Admin", "Registrar"]}>
         <div style={{ padding: 16, display: "grid", gap: 12 }}>
           <h2 style={{ margin: 0 }}>Регистратура</h2>

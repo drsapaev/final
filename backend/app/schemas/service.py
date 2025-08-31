@@ -24,6 +24,18 @@ class ServiceUpdate(ORMModel):
     active: Optional[bool] = None
 
 
+class Service(ORMModel):
+    id: int
+    code: Optional[str] = Field(default=None, max_length=32)
+    name: str = Field(max_length=255)
+    department: Optional[str] = Field(default=None, max_length=64)
+    unit: Optional[str] = Field(default=None, max_length=32)
+    price: float
+    active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
 class ServiceItem(ORMModel):
     id: int
     code: Optional[str] = Field(default=None, max_length=32)
