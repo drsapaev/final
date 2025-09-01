@@ -8,9 +8,10 @@ import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import Registrar from './pages/Registrar.jsx';
-import Doctor from './pages/Doctor.jsx';
+// import Doctor from './pages/Doctor.jsx';
 import Lab from './pages/Lab.jsx';
 import Cashier from './pages/Cashier.jsx';
+import CashierPanel from './pages/CashierPanel.jsx';
 import Settings from './pages/Settings.jsx';
 import Audit from './pages/Audit.jsx';
 import Scheduler from './pages/Scheduler.jsx';
@@ -25,6 +26,7 @@ import DentistPanel from './pages/DentistPanel.jsx';
 import LabPanel from './pages/LabPanel.jsx';
 import UserSelect from './pages/UserSelect.jsx';
 import Search from './pages/Search.jsx';
+import PatientPanel from './pages/PatientPanel.jsx';
 
 import auth from './stores/auth.js';
 
@@ -55,7 +57,9 @@ function RequireAuth({ roles, children }) {
 /** Каркас: только Nav, без дублирующего заголовка */
 function AppShell() {
   const location = useLocation();
-  const isRegistrarPanel = location.pathname === '/registrar-panel';
+  const path = location.pathname;
+  const isRegistrarPanel = path === '/registrar-panel';
+  const hideSidebar = isRegistrarPanel || path === '/doctor-panel';
   
   return (
     <div style={wrapStyle}>
@@ -64,9 +68,9 @@ function AppShell() {
           <Header />
         </header>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: isRegistrarPanel ? '1fr' : '240px 1fr' }}>
-        {!isRegistrarPanel && <Sidebar />}
-        <main style={{ ...main, ...(isRegistrarPanel && { maxWidth: 'none', margin: 0, padding: 0 }) }}>
+      <div style={{ display: 'grid', gridTemplateColumns: hideSidebar ? '1fr' : '240px 1fr' }}>
+        {!hideSidebar && <Sidebar />}
+        <main style={{ ...main, ...(hideSidebar && { maxWidth: 'none', margin: 0, padding: 0 }) }}>
           <Outlet />
         </main>
       </div>
@@ -83,9 +87,10 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="registrar"     element={<RequireAuth roles={['Admin','Registrar']}><Registrar /></RequireAuth>} />
-          <Route path="doctor"        element={<RequireAuth roles={['Admin','Doctor']}><Doctor /></RequireAuth>} />
+          <Route path="doctor"        element={<Navigate to="/doctor-panel" replace />} />
           <Route path="lab"           element={<RequireAuth roles={['Admin','Lab']}><Lab /></RequireAuth>} />
           <Route path="cashier"       element={<RequireAuth roles={['Admin','Cashier']}><Cashier /></RequireAuth>} />
+          <Route path="cashier-panel" element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
           <Route path="admin"         element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
           <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
@@ -93,6 +98,7 @@ export default function App() {
           <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor']}><DermatologistPanel /></RequireAuth>} />
           <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor']}><DentistPanel /></RequireAuth>} />
           <Route path="lab-panel"     element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
+          <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
           <Route path="settings"      element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
           <Route path="audit"         element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
           <Route path="scheduler"     element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />

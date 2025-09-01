@@ -31,7 +31,6 @@ export default function Sidebar() {
   }
   if (role === 'doctor') {
     byRole.push(
-      { to: '/doctor', label: 'Врач' },
       { to: '/doctor-panel', label: 'Панель врача' }
     );
   }
@@ -39,7 +38,7 @@ export default function Sidebar() {
     byRole.push({ to: '/lab-panel', label: 'Лаборатория' });
   }
   if (role === 'cashier') {
-    byRole.push({ to: '/cashier', label: 'Касса' });
+    byRole.push({ to: '/cashier-panel', label: 'Касса' });
   }
 
   const items = [...byRole, ...common];
@@ -47,6 +46,16 @@ export default function Sidebar() {
   return (
     <aside style={{ width: 240, borderRight: '1px solid #e5e7eb', padding: 12, background: '#fff' }}>
       <div style={{ display: 'grid', gap: 6 }}>
+        {/* Общие пункты для демонстрации */}
+        <NavLink
+          key="patient-panel"
+          to="/patient-panel"
+          style={({ isActive }) => ({
+            ...item,
+            background: isActive ? '#111' : '#fff',
+            color: isActive ? '#fff' : '#111',
+          })}
+        >Пациент</NavLink>
         {items.map(x => (
           <NavLink
             key={x.to}

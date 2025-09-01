@@ -663,10 +663,10 @@ const RegistrarPanel = () => {
           : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
       }}>
         {/* Верхнее меню */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
           padding: isMobile ? '16px' : '20px 24px',
           border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
           borderRadius: isMobile ? '12px' : '20px',
@@ -687,7 +687,7 @@ const RegistrarPanel = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize['2xl'] }}>
               <Hospital size={28} color={designTokens.primary[500]} />
               <span>Clinic</span>
-            </div>
+        </div>
             <div style={{ opacity: 0.7, fontSize: typography.fontSize.base }}>|</div>
             <div style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.medium }}>{language === 'ru' ? 'Панель регистратора' : 'Registrar Panel'}</div>
           </div>
@@ -734,10 +734,10 @@ const RegistrarPanel = () => {
             }} />
             
             {/* Настройки */}
-            <select
-              aria-label="Язык интерфейса"
-              value={language}
-              onChange={(e)=>setLanguage(e.target.value)}
+          <select
+            aria-label="Язык интерфейса"
+            value={language}
+            onChange={(e)=>setLanguage(e.target.value)}
               style={{ 
                 padding: '8px 12px', 
                 border: '1px solid #e5e5e5', 
@@ -749,10 +749,10 @@ const RegistrarPanel = () => {
             >
               <option value="ru">🇷🇺 RU</option>
               <option value="uz">🇺🇿 UZ</option>
-            </select>
-            <button
-              aria-label="Переключить тему"
-              onClick={()=>setTheme(theme === 'light' ? 'dark' : 'light')}
+          </select>
+          <button
+            aria-label="Переключить тему"
+            onClick={()=>setTheme(theme === 'light' ? 'dark' : 'light')}
               style={{ 
                 padding: '8px 12px', 
                 border: '1px solid #e5e5e5', 
@@ -763,20 +763,20 @@ const RegistrarPanel = () => {
               }}
             >
               {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            </button>
+          </button>
             <Button
               variant="danger"
               size="sm"
-              aria-label="Выход"
-              onClick={()=>{ localStorage.removeItem('auth_token'); window.location.href = '/login'; }}
-            >
+            aria-label="Выход"
+            onClick={()=>{ localStorage.removeItem('auth_token'); window.location.href = '/login'; }}
+          >
               <LogOut size={14} />
               Выход
             </Button>
-          </div>
         </div>
+      </div>
 
-        {/* Вкладки */}
+      {/* Вкладки */}
         <div style={{
           display: 'flex',
           gap: isMobile ? '4px' : spacing.sm,
@@ -804,63 +804,63 @@ const RegistrarPanel = () => {
             <Home size={16} style={{ marginRight: '8px' }} />
             {t('tabs_welcome')}
           </button>
-          <button
-            style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('appointments')}
-            aria-selected={activeTab === 'appointments'}
-          >
+        <button
+          style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('appointments')}
+          aria-selected={activeTab === 'appointments'}
+        >
             <FileText size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_appointments')} ({filteredAppointments.length})
-          </button>
-          <button
-            style={activeTab === 'cardio' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('cardio')}
-            aria-selected={activeTab === 'cardio'}
-          >
+          {t('tabs_appointments')} ({filteredAppointments.length})
+        </button>
+        <button
+          style={activeTab === 'cardio' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('cardio')}
+          aria-selected={activeTab === 'cardio'}
+        >
             <Heart size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_cardio')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('cardio')).length})
-          </button>
-          <button
-            style={activeTab === 'echokg' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('echokg')}
-            aria-selected={activeTab === 'echokg'}
-          >
+          {t('tabs_cardio')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('cardio')).length})
+        </button>
+        <button
+          style={activeTab === 'echokg' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('echokg')}
+          aria-selected={activeTab === 'echokg'}
+        >
             <Activity size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_echokg')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('echo')).length})
-          </button>
-          <button
-            style={activeTab === 'derma' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('derma')}
-            aria-selected={activeTab === 'derma'}
-          >
+          {t('tabs_echokg')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('echo')).length})
+        </button>
+        <button
+          style={activeTab === 'derma' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('derma')}
+          aria-selected={activeTab === 'derma'}
+        >
             <User size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_derma')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('derma')).length})
-          </button>
-          <button
-            style={activeTab === 'dental' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('dental')}
-            aria-selected={activeTab === 'dental'}
-          >
+          {t('tabs_derma')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('derma')).length})
+        </button>
+        <button
+          style={activeTab === 'dental' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('dental')}
+          aria-selected={activeTab === 'dental'}
+        >
             <User size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_dental')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('dental')).length})
-          </button>
-          <button
-            style={activeTab === 'lab' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('lab')}
-            aria-selected={activeTab === 'lab'}
-          >
+          {t('tabs_dental')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('dental')).length})
+        </button>
+        <button
+          style={activeTab === 'lab' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('lab')}
+          aria-selected={activeTab === 'lab'}
+        >
             <TestTube size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_lab')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('lab')).length})
-          </button>
-          <button
-            style={activeTab === 'procedures' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('procedures')}
-            aria-selected={activeTab === 'procedures'}
-          >
+          {t('tabs_lab')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('lab')).length})
+        </button>
+        <button
+          style={activeTab === 'procedures' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('procedures')}
+          aria-selected={activeTab === 'procedures'}
+        >
             <Syringe size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_procedures')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('proc')).length})
-          </button>
-        </div>
+          {t('tabs_procedures')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('proc')).length})
+        </button>
+      </div>
       </div> {/* Закрытие фиксированного контейнера */}
 
       {/* Скроллируемый контент с отступом сверху */}
@@ -892,7 +892,7 @@ const RegistrarPanel = () => {
                       month: 'long', 
                       day: 'numeric' 
                     })}
-                  </div>
+        </div>
                 </AnimatedTransition>
               </Card.Header>
             
@@ -918,8 +918,8 @@ const RegistrarPanel = () => {
                   <div style={{ fontSize: '16px', opacity: 0.9 }}>
                     {t('total_patients')}
                   </div>
-                </div>
-                
+              </div>
+              
                 <div style={{
                   background: `linear-gradient(135deg, ${successColor} 0%, #1e7e34 100%)`,
                   color: 'white',
@@ -932,8 +932,8 @@ const RegistrarPanel = () => {
                   </div>
                   <div style={{ fontSize: '16px', opacity: 0.9 }}>
                     {t('today_appointments')}
-                  </div>
                 </div>
+            </div>
                 
                 <div style={{
                   background: `linear-gradient(135deg, ${warningColor} 0%, #e0a800 100%)`,
@@ -947,9 +947,9 @@ const RegistrarPanel = () => {
                   </div>
                   <div style={{ fontSize: '16px', opacity: 0.9 }}>
                     {t('pending_payments')}
-                  </div>
-                </div>
-                
+            </div>
+          </div>
+
                 <div style={{
                   background: `linear-gradient(135deg, ${dangerColor} 0%, #c82333 100%)`,
                   color: 'white',
@@ -959,7 +959,7 @@ const RegistrarPanel = () => {
                 }}>
                   <div style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
                     {stats.activeQueues}
-                  </div>
+            </div>
                   <div style={{ fontSize: '16px', opacity: 0.9 }}>
                     {t('active_queues')}
                   </div>
@@ -1065,13 +1065,13 @@ const RegistrarPanel = () => {
                     borderRadius: '8px',
                     padding: '16px'
                   }}>
-                    <AppointmentsTable
+            <AppointmentsTable
                       appointments={appointments.slice(0, 5)}
-                      appointmentsSelected={appointmentsSelected}
-                      setAppointmentsSelected={setAppointmentsSelected}
-                      updateAppointmentStatus={updateAppointmentStatus}
-                      setShowWizard={setShowWizard}
-                    />
+              appointmentsSelected={appointmentsSelected}
+              setAppointmentsSelected={setAppointmentsSelected}
+              updateAppointmentStatus={updateAppointmentStatus}
+              setShowWizard={setShowWizard}
+            />
                   </div>
                 </div>
               )}
@@ -1119,7 +1119,7 @@ const RegistrarPanel = () => {
                   <Button variant="warning" size={isMobile ? 'xs' : 'sm'} onClick={() => handleBulkAction('no_show')}>
                     ⚠️ {!isMobile && t('no_show')}
                   </Button>
-                </div>
+        </div>
               )}
               
               {/* Таблица записей */}
@@ -1191,7 +1191,7 @@ const RegistrarPanel = () => {
                   }}
                 />
               )}
-            </div>
+      </div>
           </div>
         )}
       </div> {/* Закрытие скроллируемого контента */}
@@ -1231,11 +1231,11 @@ const RegistrarPanel = () => {
                 <div style={{ display: 'grid', gap: '16px' }}>
                   <div>
                     <label style={labelStyle}>ФИО пациента</label>
-                    <input
-                      type="text"
-                      style={inputStyle}
+                <input
+                  type="text"
+                  style={inputStyle}
                       placeholder="Введите ФИО"
-                      value={wizardData.patient.fio || ''}
+                  value={wizardData.patient.fio || ''}
                       onChange={(e) => setWizardData({
                         ...wizardData,
                         patient: { ...wizardData.patient, fio: e.target.value }
@@ -1244,12 +1244,12 @@ const RegistrarPanel = () => {
                   </div>
                   <div>
                     <label style={labelStyle}>Год рождения</label>
-                    <input
-                      type="number"
+                <input
+                  type="number"
                       style={inputStyle}
                       placeholder="1985"
-                      min="1900"
-                      max={new Date().getFullYear() - 1}
+                  min="1900"
+                  max={new Date().getFullYear() - 1}
                       value={wizardData.patient.birthYear || ''}
                       onChange={(e) => setWizardData({
                         ...wizardData,
@@ -1261,7 +1261,7 @@ const RegistrarPanel = () => {
                     <label style={labelStyle}>Телефон</label>
                     <InputMask
                       mask="+7 (999) 999-99-99"
-                      style={inputStyle}
+                  style={inputStyle}
                       placeholder="+7 (999) 123-45-67"
                       value={wizardData.patient.phone || ''}
                       onChange={(e) => setWizardData({
@@ -1299,8 +1299,8 @@ const RegistrarPanel = () => {
                   </div>
                   <div>
                     <label style={labelStyle}>Тип обращения</label>
-                    <select
-                      style={inputStyle}
+                <select
+                  style={inputStyle}
                       value={wizardData.visit.type || 'paid'}
                       onChange={(e) => setWizardData({
                         ...wizardData,
@@ -1310,12 +1310,12 @@ const RegistrarPanel = () => {
                       <option value="paid">Платный</option>
                       <option value="repeat">Повторный</option>
                       <option value="free">Льготный</option>
-                    </select>
+                </select>
                   </div>
                   <div>
                     <label style={labelStyle}>Приоритет</label>
                     <select
-                      style={inputStyle}
+                  style={inputStyle}
                       value={wizardData.visit.priority || 'normal'}
                       onChange={(e) => setWizardData({
                         ...wizardData,
@@ -1346,22 +1346,22 @@ const RegistrarPanel = () => {
                 <div style={{ display: 'grid', gap: '16px' }}>
                   <div>
                     <label style={labelStyle}>Способ оплаты</label>
-                    <select
-                      style={inputStyle}
+                <select
+                  style={inputStyle}
                       value={wizardData.payment.method || 'cash'}
                       onChange={(e) => setWizardData({
                         ...wizardData,
                         payment: { ...wizardData.payment, method: e.target.value }
                       })}
                     >
-                      <option value="cash">Наличные</option>
+                  <option value="cash">Наличные</option>
                       <option value="card">Банковская карта</option>
-                      <option value="online">Онлайн</option>
-                    </select>
+                  <option value="online">Онлайн</option>
+                </select>
                   </div>
                   <div>
                     <label style={labelStyle}>Стоимость (₽)</label>
-                    <input
+                  <input
                       type="number"
                       style={inputStyle}
                       placeholder="1000"
@@ -1372,12 +1372,12 @@ const RegistrarPanel = () => {
                         payment: { ...wizardData.payment, amount: e.target.value }
                       })}
                     />
-                  </div>
+              </div>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
                   <button style={buttonSecondaryStyle} onClick={() => setWizardStep(2)}>
                     ← {t('back')}
-                  </button>
+                </button>
                   <button style={buttonStyle} onClick={() => {
                     // Здесь будет логика сохранения записи
                     setShowWizard(false);
@@ -1386,11 +1386,11 @@ const RegistrarPanel = () => {
                   }}>
                     ✅ {t('save')}
                   </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
+      )}
+          </div>
+              </div>
       )}
       
       {/* Модальное окно слотов */}
