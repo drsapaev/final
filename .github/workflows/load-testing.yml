@@ -40,16 +40,16 @@ jobs:
         export WS_DEV_ALLOW="1"
         
         python -c "
-import sys
-sys.path.insert(0, '.')
-try:
-    from app.db.base import Base
-    from app.db.session import engine
-    Base.metadata.create_all(bind=engine)
-    print('✅ Тестовая база создана')
-except Exception as e:
-    print(f'❌ Ошибка создания базы: {e}')
-    sys.exit(1)
+        import sys
+        sys.path.insert(0, '.')
+        try:
+            from app.db.base import Base
+            from app.db.session import engine
+            Base.metadata.create_all(bind=engine)
+            print('✅ Тестовая база создана')
+        except Exception as e:
+            print('❌ Ошибка создания базы:', e)
+            sys.exit(1)
         "
         
     - name: 🚀 Запуск сервера
