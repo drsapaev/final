@@ -182,7 +182,7 @@ const DoctorPanel = () => {
     background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${getColor('primary', 200)}`,
-    boxShadow: designTokens.shadows.lg
+    boxShadow: designTokens.boxShadow.lg
   };
 
   const headerContentStyle = {
@@ -262,7 +262,7 @@ const DoctorPanel = () => {
     background: 'rgba(255, 255, 255, 0.9)',
     borderRadius: designTokens.borderRadius['2xl'],
     padding: getSpacing('lg'),
-    boxShadow: designTokens.shadows.lg,
+    boxShadow: designTokens.boxShadow.lg,
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255, 255, 255, 0.2)',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -271,14 +271,14 @@ const DoctorPanel = () => {
 
   const statCardHoverStyle = {
     transform: 'translateY(-4px) scale(1.02)',
-    boxShadow: designTokens.shadows['2xl']
+    boxShadow: designTokens.boxShadow['2xl']
   };
 
   const patientsTableStyle = {
     background: 'rgba(255, 255, 255, 0.9)',
     borderRadius: designTokens.borderRadius['2xl'],
     overflow: 'hidden',
-    boxShadow: designTokens.shadows.lg,
+    boxShadow: designTokens.boxShadow.lg,
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255, 255, 255, 0.2)'
   };
@@ -494,7 +494,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.shadows.lg;
+                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -530,7 +530,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.shadows.lg;
+                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -566,7 +566,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.shadows.lg;
+                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -602,7 +602,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.shadows.lg;
+                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>

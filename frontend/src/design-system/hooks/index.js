@@ -1,13 +1,10 @@
 // Экспорт всех хуков дизайн-системы
 export { useBreakpoint, useTouchDevice } from './useMediaQuery';
 export { 
-  useFadeIn, 
+  useFade, 
   useScale, 
   useSlide, 
-  useRotate, 
-  usePulse, 
-  useBounce, 
-  useShake, 
+  useAnimation,
   useProgress, 
   useStagger 
 } from './useAnimation';

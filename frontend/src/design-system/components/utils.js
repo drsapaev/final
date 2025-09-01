@@ -15,7 +15,7 @@ const getFontSize = (size) => {
 };
 
 const getShadow = (size) => {
-  return designTokens.shadows[size] || 'none';
+  return designTokens.boxShadow[size] || 'none';
 };
 
 // Функция для создания стилей кнопки
