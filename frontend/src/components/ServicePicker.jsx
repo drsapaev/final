@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../api/client.js";
+import React, { useEffect, useMemo, useState } from 'react';
+import { api } from '../api/client.js';
 
 /**
  * Универсальный выбор услуги (одиночный или множественный).
@@ -15,17 +15,17 @@ export default function ServicePicker({
   value = null,
   onChange = () => {},
   multi = false,
-  placeholder = "Выберите услугу…",
+  placeholder = 'Выберите услугу…',
   style,
 }) {
   const [items, setItems] = useState([]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get("/services", { params: { limit: 1000 } });
+      const res = await api.get('/services', { params: { limit: 1000 } });
       // ожидаем массив вида [{id, name, code, price, group}]
       setItems(Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []);
     } catch {
@@ -42,9 +42,9 @@ export default function ServicePicker({
     const qq = q.toLowerCase();
     return items.filter(
       (s) =>
-        String(s.name || "").toLowerCase().includes(qq) ||
-        String(s.code || "").toLowerCase().includes(qq) ||
-        String(s.group || "").toLowerCase().includes(qq)
+        String(s.name || '').toLowerCase().includes(qq) ||
+        String(s.code || '').toLowerCase().includes(qq) ||
+        String(s.group || '').toLowerCase().includes(qq)
     );
   }, [q, items]);
 
@@ -67,7 +67,7 @@ export default function ServicePicker({
   );
 
   return (
-    <div style={{ display: "grid", gap: 8, ...style }}>
+    <div style={{ display: 'grid', gap: 8, ...style }}>
       <input
         placeholder="Поиск по названию/коду…"
         value={q}
@@ -87,19 +87,19 @@ export default function ServicePicker({
               onClick={() => toggle(s)}
               style={{
                 ...row,
-                background: active ? "#eef2ff" : "#fff",
-                borderColor: active ? "#c7d2fe" : "#eee",
-                cursor: "pointer",
+                background: active ? '#eef2ff' : '#fff',
+                borderColor: active ? '#c7d2fe' : '#eee',
+                cursor: 'pointer',
               }}
               title={placeholder}
             >
               <div style={{ fontWeight: 600 }}>{s.name}</div>
               <div style={{ opacity: 0.75, fontSize: 12 }}>
-                {s.code ? <code>{s.code}</code> : null}{" "}
+                {s.code ? <code>{s.code}</code> : null}{' '}
                 {s.group ? <span>· {s.group}</span> : null}
               </div>
-              <div style={{ marginLeft: "auto", fontWeight: 700 }}>
-                {s.price != null ? Number(s.price).toFixed(0) : "—"}
+              <div style={{ marginLeft: 'auto', fontWeight: 700 }}>
+                {s.price != null ? Number(s.price).toFixed(0) : '—'}
               </div>
             </div>
           );
@@ -109,7 +109,7 @@ export default function ServicePicker({
   );
 }
 
-const inp = { padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 8 };
-const listBox = { display: "grid", gap: 6, maxHeight: 280, overflow: "auto", border: "1px solid #eee", borderRadius: 10, padding: 6, background: "#fff" };
-const row = { display: "grid", gridTemplateColumns: "1fr auto", gap: 6, alignItems: "center", padding: 8, border: "1px solid #eee", borderRadius: 8 };
+const inp = { padding: '8px 10px', border: '1px solid #e5e7eb', borderRadius: 8 };
+const listBox = { display: 'grid', gap: 6, maxHeight: 280, overflow: 'auto', border: '1px solid #eee', borderRadius: 10, padding: 6, background: '#fff' };
+const row = { display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, alignItems: 'center', padding: 8, border: '1px solid #eee', borderRadius: 8 };
 

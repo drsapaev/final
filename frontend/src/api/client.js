@@ -8,13 +8,13 @@
 //  - me() - GET /me
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
-import axios from "axios";
+import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "/api/v1";
+const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE,
-  headers: { "Content-Type": "application/json" },
+  headers: { 'Content-Type': 'application/json' },
   // Optionally timeout: timeout: 15000,
 });
 
@@ -24,16 +24,16 @@ function getApiBase() {
 
 function setToken(token) {
   if (token) {
-    localStorage.setItem("auth_token", token);
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    localStorage.setItem('auth_token', token);
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
-    localStorage.removeItem("auth_token");
-    delete api.defaults.headers.common["Authorization"];
+    localStorage.removeItem('auth_token');
+    delete api.defaults.headers.common['Authorization'];
   }
 }
 
 function getToken() {
-  return localStorage.getItem("auth_token");
+  return localStorage.getItem('auth_token');
 }
 
 function clearToken() {
@@ -69,7 +69,7 @@ async function apiRequest(method, url, { params = {}, data = {} } = {}) {
  */
 async function me() {
   // GET /auth/me
-  const resp = await api.get("/auth/me");
+  const resp = await api.get('/auth/me');
   return resp.data;
 }
 
@@ -80,12 +80,12 @@ async function me() {
  */
 async function login(username, password) {
   const params = new URLSearchParams();
-  params.append("username", username);
-  params.append("password", password);
-  params.append("grant_type", "password");
+  params.append('username', username);
+  params.append('password', password);
+  params.append('grant_type', 'password');
 
-  const resp = await api.post("/auth/login", params.toString(), {
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const resp = await api.post('/auth/login', params.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
   
   return resp.data;

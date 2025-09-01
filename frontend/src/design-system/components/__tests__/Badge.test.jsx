@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { Badge } from '../Badge';
+import Badge from '../Badge';
 import { SIZES, VARIANTS } from '../types';
 
 describe('Badge', () => {
@@ -15,14 +15,14 @@ describe('Badge', () => {
   });
 
   it('applies correct className', () => {
-    render(<Badge className="custom-class">Badge text</Badge>);
-    expect(screen.getByText('Badge text')).toHaveClass('custom-class');
+    render(<Badge className="custom-class">Badge with className</Badge>);
+    expect(screen.getByText('Badge with className')).toHaveClass('custom-class');
   });
 
   it('applies custom style', () => {
     const customStyle = { backgroundColor: 'red' };
-    render(<Badge style={customStyle}>Badge text</Badge>);
-    expect(screen.getByText('Badge text')).toHaveStyle('background-color: red');
+    render(<Badge style={customStyle}>Badge with custom style</Badge>);
+    expect(screen.getByText('Badge with custom style')).toHaveStyle('background-color: rgb(255, 0, 0)');
   });
 
   it('applies different variants', () => {

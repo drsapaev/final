@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button } from '../Button';
+import Button from '../Button';
 import { SIZES, VARIANTS } from '../types';
 
 describe('Button', () => {
@@ -79,7 +79,7 @@ describe('Button', () => {
   it('applies custom style', () => {
     const customStyle = { backgroundColor: 'red' };
     render(<Button style={customStyle}>Click me</Button>);
-    expect(screen.getByRole('button')).toHaveStyle('background-color: red');
+    expect(screen.getByRole('button')).toHaveStyle('background-color: rgb(255, 0, 0)');
   });
 
   it('forwards ref correctly', () => {

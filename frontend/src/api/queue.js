@@ -1,3 +1,3 @@
 // Обёртка для исторических импортов: любой импорт из "./api/queue"
 // будет работать так же, как из "./api/queues".
-export * from "./queues";
+export * from './queues';

@@ -2,10 +2,10 @@
 // Simple auth store used by UI components.
 // Exports functions and `auth` object for compatibility with older imports.
 
-import { me, setAuthToken } from "../api/client.js";
+import { me, setAuthToken } from '../api/client.js';
 
-const TOKEN_KEY = "auth_token";
-const PROFILE_KEY = "auth_profile";
+const TOKEN_KEY = 'auth_token';
+const PROFILE_KEY = 'auth_profile';
 
 let token = null;
 let profile = null;
@@ -17,7 +17,7 @@ try {
   if (t) {
     token = t;
     // ensure axios header is set
-    if (typeof setAuthToken === "function") setAuthToken(token);
+    if (typeof setAuthToken === 'function') setAuthToken(token);
   }
   const p = localStorage.getItem(PROFILE_KEY);
   if (p) {
@@ -64,7 +64,7 @@ export function setToken(nextToken) {
       localStorage.removeItem(TOKEN_KEY);
     }
   } catch {}
-  if (typeof setAuthToken === "function") setAuthToken(token);
+  if (typeof setAuthToken === 'function') setAuthToken(token);
   notify();
 }
 
@@ -76,7 +76,7 @@ export function clearToken() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
   } catch {}
-  if (typeof setAuthToken === "function") setAuthToken(null);
+  if (typeof setAuthToken === 'function') setAuthToken(null);
   notify();
 }
 
@@ -106,10 +106,10 @@ export async function getProfile(force = false) {
   const t = getToken();
   if (!t) {
     clearToken();
-    throw new Error("Not authenticated");
+    throw new Error('Not authenticated');
   }
   // ensure axios header is set
-  if (typeof setAuthToken === "function") setAuthToken(t);
+  if (typeof setAuthToken === 'function') setAuthToken(t);
   const data = await me(); // may throw
   setProfile(data);
   return profile;

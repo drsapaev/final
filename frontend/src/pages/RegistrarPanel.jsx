@@ -694,21 +694,21 @@ const RegistrarPanel = () => {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Основные функции */}
-            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
               <Calendar size={isMobile ? 14 : 16} />
-              {!isMobile && "Расписание"}
+              {!isMobile && 'Расписание'}
             </Button>
-            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
               <Search size={isMobile ? 14 : 16} />
-              {!isMobile && "Поиск пациента"}
+              {!isMobile && 'Поиск пациента'}
             </Button>
-            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
               <MessageCircle size={isMobile ? 14 : 16} />
-              {!isMobile && "Сообщения"}
+              {!isMobile && 'Сообщения'}
             </Button>
-            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
               <HelpCircle size={isMobile ? 14 : 16} />
-              {!isMobile && "Справка"}
+              {!isMobile && 'Справка'}
             </Button>
             
             {/* Разделитель */}
@@ -720,7 +720,7 @@ const RegistrarPanel = () => {
             }} />
             
                     {/* Быстрые действия */}
-        <Button variant="primary" size={isMobile ? "sm" : "md"} onClick={() => setShowWizard(true)}>
+        <Button variant="primary" size={isMobile ? 'sm' : 'md'} onClick={() => setShowWizard(true)}>
           <Plus size={isMobile ? 14 : 16} />
           {!isMobile && t('new_appointment')}
         </Button>
@@ -1107,16 +1107,16 @@ const RegistrarPanel = () => {
                   <span style={{ fontWeight: 600, marginRight: '12px' }}>
                     🎯 {t('bulk_actions')} ({appointmentsSelected.size}):
                   </span>
-                  <Button variant="success" size={isMobile ? "xs" : "sm"} onClick={() => handleBulkAction('confirmed')}>
+                  <Button variant="success" size={isMobile ? 'xs' : 'sm'} onClick={() => handleBulkAction('confirmed')}>
                     ✅ {!isMobile && t('confirm')}
                   </Button>
-                  <Button variant="danger" size={isMobile ? "xs" : "sm"} onClick={() => {
+                  <Button variant="danger" size={isMobile ? 'xs' : 'sm'} onClick={() => {
                     const reason = prompt(t('reason'));
                     if (reason) handleBulkAction('cancelled', reason);
                   }}>
                     ❌ {!isMobile && t('cancel')}
                   </Button>
-                  <Button variant="warning" size={isMobile ? "xs" : "sm"} onClick={() => handleBulkAction('no_show')}>
+                  <Button variant="warning" size={isMobile ? 'xs' : 'sm'} onClick={() => handleBulkAction('no_show')}>
                     ⚠️ {!isMobile && t('no_show')}
                   </Button>
                 </div>

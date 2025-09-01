@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from "react";
-import RoleGate from "../components/RoleGate.jsx";
-import { getApiBase } from "../api/client.js";
-import { getHealth, getActivationStatus } from "../api/index.js";
+import React, { useEffect, useState } from 'react';
+import RoleGate from '../components/RoleGate.jsx';
+import { getApiBase } from '../api/client.js';
+import { getHealth, getActivationStatus } from '../api/index.js';
 
 export default function Health() {
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState(null);
   const [act, setAct] = useState(null);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState('');
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      setErr("");
+      setErr('');
       setLoading(true);
       try {
         const [h, a] = await Promise.all([getHealth(), getActivationStatus()]);
@@ -21,7 +21,7 @@ export default function Health() {
         setAct(a);
       } catch (e) {
         if (!mounted) return;
-        setErr(e?.data?.detail || e?.message || "Ошибка загрузки");
+        setErr(e?.data?.detail || e?.message || 'Ошибка загрузки');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -50,7 +50,7 @@ export default function Health() {
             <div>Проверка состояния сервера…</div>
           ) : health ? (
             <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
-              {typeof health === "string" ? health : JSON.stringify(health, null, 2)}
+              {typeof health === 'string' ? health : JSON.stringify(health, null, 2)}
             </pre>
           ) : (
             <div className="text-sm text-gray-700">
@@ -59,14 +59,14 @@ export default function Health() {
           )}
         </section>
 
-        <RoleGate roles={["Admin"]}>
+        <RoleGate roles={['Admin']}>
           <section>
             <h2 className="text-lg font-medium mb-2">Статус активации</h2>
             {loading ? (
               <div>Загрузка статуса…</div>
             ) : act ? (
               <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
-                {typeof act === "string" ? act : JSON.stringify(act, null, 2)}
+                {typeof act === 'string' ? act : JSON.stringify(act, null, 2)}
               </pre>
             ) : (
               <div className="text-sm text-gray-700">

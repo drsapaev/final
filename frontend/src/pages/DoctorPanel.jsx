@@ -379,15 +379,15 @@ const DoctorPanel = () => {
           </div>
           
           <div style={headerActionsStyle}>
-            <Button variant="ghost" size={isMobile ? "sm" : "md"} style={{ color: 'white' }}>
+            <Button variant="ghost" size={isMobile ? 'sm' : 'md'} style={{ color: 'white' }}>
               <Bell size={isMobile ? 16 : 20} />
               {!isMobile && <span>Уведомления</span>}
             </Button>
-            <Button variant="ghost" size={isMobile ? "sm" : "md"} style={{ color: 'white' }}>
+            <Button variant="ghost" size={isMobile ? 'sm' : 'md'} style={{ color: 'white' }}>
               <Settings size={isMobile ? 16 : 20} />
               {!isMobile && <span>Настройки</span>}
             </Button>
-            <Button variant="ghost" size={isMobile ? "sm" : "md"} style={{ color: 'white' }}>
+            <Button variant="ghost" size={isMobile ? 'sm' : 'md'} style={{ color: 'white' }}>
               <LogOut size={isMobile ? 16 : 20} />
               {!isMobile && <span>Выход</span>}
             </Button>

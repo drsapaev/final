@@ -2,7 +2,7 @@
 // Мини-обёртки для служебных эндпойнтов здоровья/активации.
 // ВАЖНО: никаких импортов из "../api" (во избежание циклов).
 
-import { api } from "./client";
+import { api } from './client';
 
 /**
  * Проверка состояния сервера (если эндпойнт реализован).
@@ -10,7 +10,7 @@ import { api } from "./client";
  * @returns {Promise<any>}
  */
 export async function getHealth() {
-  const res = await api.get("/health");
+  const res = await api.get('/health');
   return res.data;
 }
 
@@ -20,6 +20,6 @@ export async function getHealth() {
  * @returns {Promise<any>}
  */
 export async function getActivationStatus() {
-  const res = await api.get("/activation/status");
+  const res = await api.get('/activation/status');
   return res.data;
 }

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
 export default function Search() {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState('');
   const [patients, setPatients] = useState([]);
   const [visits, setVisits] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -11,7 +11,7 @@ export default function Search() {
     try {
       const token = localStorage.getItem('auth_token');
       const p = await fetch(`/api/v1/patients/?q=${encodeURIComponent(q)}&limit=20`, { headers: { Authorization: `Bearer ${token}` } });
-      const v = await fetch(`/api/v1/visits/visits?limit=20`, { headers: { Authorization: `Bearer ${token}` } });
+      const v = await fetch('/api/v1/visits/visits?limit=20', { headers: { Authorization: `Bearer ${token}` } });
       const pp = p.ok ? await p.json() : [];
       const vv = v.ok ? await v.json() : [];
       setPatients(Array.isArray(pp) ? pp : []);

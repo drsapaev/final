@@ -1,12 +1,12 @@
-import React, { useEffect, useState, useRef } from "react";
-import PropTypes from "prop-types";
-import { openOnlineQueue, getOnlineQueueStats } from "../api/queues";
-import { getApiBase } from "../api/client";
+import React, { useEffect, useState, useRef } from 'react';
+import PropTypes from 'prop-types';
+import { openOnlineQueue, getOnlineQueueStats } from '../api/queues';
+import { getApiBase } from '../api/client';
 
 function formatDateYYYYMMDD(d) {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
@@ -41,7 +41,7 @@ export default function QueueTable({ department }) {
       const res = await getOnlineQueueStats(department, todayStr);
       setStats(res);
     } catch (err) {
-      console.error("Failed to load queue stats:", err);
+      console.error('Failed to load queue stats:', err);
     }
   }
 
@@ -51,14 +51,14 @@ export default function QueueTable({ department }) {
       await openOnlineQueue(department, todayStr, 0); // <-- start_number = 0
       await refreshStats();
     } catch (err) {
-      console.error("Failed to open queue:", err);
+      console.error('Failed to open queue:', err);
     }
   }
 
   function openQueueWS() {
     try {
-      const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = "localhost:8000"; // Бэкенд работает на порту 8000
+      const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = 'localhost:8000'; // Бэкенд работает на порту 8000
       const token = localStorage.getItem('auth_token') || '';
       // build ws url: ws://localhost:8000/ws/queue?department=...&date_str=...&token=...
       const wsUrl = `${wsProto}//${wsHost}/ws/queue?department=${encodeURIComponent(
@@ -74,11 +74,11 @@ export default function QueueTable({ department }) {
       const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
-      socket.addEventListener("open", () => {
+      socket.addEventListener('open', () => {
         // console.log("Queue WS open", wsUrl);
       });
 
-      socket.addEventListener("message", (ev) => {
+      socket.addEventListener('message', (ev) => {
         try {
           const data = JSON.parse(ev.data);
           // refresh or set stats based on event shape
@@ -94,15 +94,15 @@ export default function QueueTable({ department }) {
         }
       });
 
-      socket.addEventListener("close", () => {
+      socket.addEventListener('close', () => {
         // console.info("Queue WS closed");
       });
 
-      socket.addEventListener("error", (e) => {
-        console.warn("Queue WS error", e);
+      socket.addEventListener('error', (e) => {
+        console.warn('Queue WS error', e);
       });
     } catch (e) {
-      console.error("Failed to open queue WS", e);
+      console.error('Failed to open queue WS', e);
     }
   }
 

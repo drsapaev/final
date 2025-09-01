@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import auth from "../stores/auth";
+import React, { useEffect, useState } from 'react';
+import auth from '../stores/auth';
 
 /**
  * Ограничивает доступ по ролям.
@@ -21,7 +21,7 @@ export default function RoleGate({ allow = [], roles, fallback, children }) {
   const needArr = (Array.isArray(roles) ? roles : allow) || [];
   const need = new Set(
     needArr
-      .map((r) => String(r || "").trim().toLowerCase())
+      .map((r) => String(r || '').trim().toLowerCase())
       .filter(Boolean)
   );
 
@@ -41,7 +41,7 @@ export default function RoleGate({ allow = [], roles, fallback, children }) {
     if (p.role) have.add(String(p.role).toLowerCase());
     if (p.role_name) have.add(String(p.role_name).toLowerCase());
     if (Array.isArray(p.roles)) p.roles.forEach((r) => have.add(String(r).toLowerCase()));
-    if (p.is_superuser || p.is_admin || p.admin) have.add("admin");
+    if (p.is_superuser || p.is_admin || p.admin) have.add('admin');
   }
 
   // Совпадение по ролям — пропускаем
@@ -57,21 +57,21 @@ export default function RoleGate({ allow = [], roles, fallback, children }) {
 }
 
 function denyBox(have, need) {
-  const roleLabel = have.length ? have.join(", ") : "—";
+  const roleLabel = have.length ? have.join(', ') : '—';
   return (
     <div style={box}>
       <div style={cap}>Доступ ограничен</div>
       <div>
-        Ваша роль: <b>{roleLabel}</b>. Требуется одна из: <code>{need.join(", ")}</code>
+        Ваша роль: <b>{roleLabel}</b>. Требуется одна из: <code>{need.join(', ')}</code>
       </div>
     </div>
   );
 }
 
 const box = {
-  border: "1px solid #fecaca",
-  background: "#fef2f2",
-  color: "#7f1d1d",
+  border: '1px solid #fecaca',
+  background: '#fef2f2',
+  color: '#7f1d1d',
   borderRadius: 8,
   padding: 12,
 };

@@ -1,4 +1,4 @@
-﻿import { api } from "./client";
+﻿import { api } from './client';
 
 /**
  * Получить визит по ID
@@ -16,7 +16,7 @@ export async function getVisit(visitId) {
  */
 export async function rescheduleVisit(visitId, newDate) {
   const params = new URLSearchParams();
-  if (newDate) params.set("new_date", newDate);
+  if (newDate) params.set('new_date', newDate);
   const { data } = await api.post(
     `/visits/${encodeURIComponent(visitId)}/reschedule?${params.toString()}`
   );

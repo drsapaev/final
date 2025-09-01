@@ -1,19 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function UserSelect() {
   const [items, setItems] = useState([]);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setErr("");
+      setErr('');
       try {
         const token = localStorage.getItem('auth_token');
-        const r = await fetch('/api/v1/admin/users', { headers: { Authorization: `Bearer ${token}` }});
+        const r = await fetch('/api/v1/admin/users', { headers: { Authorization: `Bearer ${token}` } });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
         setItems(Array.isArray(data) ? data : []);

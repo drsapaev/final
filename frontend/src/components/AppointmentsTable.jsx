@@ -662,7 +662,7 @@ const AppointmentsTable = ({
                </div>
              </td>
            </tr>
-            )
+            );
           })}
         </tbody>
       </table>

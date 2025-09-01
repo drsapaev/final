@@ -1,37 +1,37 @@
-import React, { useEffect, useMemo, useState } from "react";
-import Nav from "../components/Nav.jsx";
-import RoleGate from "../components/RoleGate.jsx";
-import { api } from "../api/client.js";
-import { getActivationStatus } from "../api";
+import React, { useEffect, useMemo, useState } from 'react';
+import Nav from '../components/Nav.jsx';
+import RoleGate from '../components/RoleGate.jsx';
+import { api } from '../api/client.js';
+import { getActivationStatus } from '../api';
 
 export default function Activation() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
   const [rows, setRows] = useState([]);
-  const [filterStatus, setFilterStatus] = useState("");
-  const [err, setErr] = useState("");
+  const [filterStatus, setFilterStatus] = useState('');
+  const [err, setErr] = useState('');
 
   const filtered = useMemo(() => {
     if (!filterStatus) return rows;
     return (rows || []).filter(
-      (r) => String(r?.status || "").toLowerCase() === String(filterStatus).toLowerCase()
+      (r) => String(r?.status || '').toLowerCase() === String(filterStatus).toLowerCase()
     );
   }, [rows, filterStatus]);
 
   async function loadAll() {
     setLoading(true);
-    setErr("");
+    setErr('');
     try {
       const [st, lst] = await Promise.all([
         getActivationStatus(), // 404/405 -> null
         api
-          .get("/activation/list", { params: { status: filterStatus || undefined, limit: 200 } })
+          .get('/activation/list', { params: { status: filterStatus || undefined, limit: 200 } })
           .catch(() => ({ items: [] })),
       ]);
       setStatus(st || null);
       setRows((lst && lst.items) || []);
     } catch (e) {
-      setErr(e?.data?.detail || e?.message || "Ошибка загрузки");
+      setErr(e?.data?.detail || e?.message || 'Ошибка загрузки');
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ export default function Activation() {
             <div>Загрузка статуса…</div>
           ) : status ? (
             <pre className="text-sm bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
-              {typeof status === "string" ? status : JSON.stringify(status, null, 2)}
+              {typeof status === 'string' ? status : JSON.stringify(status, null, 2)}
             </pre>
           ) : (
             <div className="text-sm text-gray-700">
@@ -91,7 +91,7 @@ export default function Activation() {
           )}
         </section>
 
-        <RoleGate roles={["Admin"]}>
+        <RoleGate roles={['Admin']}>
           <section>
             <h2 className="text-lg font-medium mb-2">Список</h2>
             {loading ? (
@@ -111,10 +111,10 @@ export default function Activation() {
                     {filtered.map((r) => (
                       <tr key={r.id}>
                         <td className="px-3 py-2 border-b">{r.id}</td>
-                        <td className="px-3 py-2 border-b">{r.name || r.title || "—"}</td>
-                        <td className="px-3 py-2 border-b">{r.status || "—"}</td>
+                        <td className="px-3 py-2 border-b">{r.name || r.title || '—'}</td>
+                        <td className="px-3 py-2 border-b">{r.status || '—'}</td>
                         <td className="px-3 py-2 border-b">
-                          {r.updated_at ? new Date(r.updated_at).toLocaleString() : "—"}
+                          {r.updated_at ? new Date(r.updated_at).toLocaleString() : '—'}
                         </td>
                       </tr>
                     ))}

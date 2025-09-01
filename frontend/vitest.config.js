@@ -7,6 +7,16 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
-    css: true
+    css: true,
+    // Отключаем worker процессы для Windows
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true
+      }
+    },
+    // Уменьшаем количество worker'ов до 1
+    minThreads: 1,
+    maxThreads: 1
   }
 });

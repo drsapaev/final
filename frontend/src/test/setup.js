@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom';
-import { designTokens } from '../design-system';
-import '../design-system/styles/global.css';
-import '../design-system/styles/animations.css';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
+
+// Очищаем DOM после каждого теста
+afterEach(() => {
+  cleanup();
+});
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

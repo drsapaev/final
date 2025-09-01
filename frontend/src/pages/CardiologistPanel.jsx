@@ -537,7 +537,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="date"
                     value={ecgForm.ecg_date}
-                    onChange={(e) => setEcgForm({...ecgForm, ecg_date: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, ecg_date: e.target.value })}
                     required
                   />
                 </div>
@@ -546,7 +546,7 @@ const CardiologistPanel = () => {
                   <select
                     style={inputStyle}
                     value={ecgForm.rhythm}
-                    onChange={(e) => setEcgForm({...ecgForm, rhythm: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, rhythm: e.target.value })}
                     required
                   >
                     <option value="">Выберите ритм</option>
@@ -566,7 +566,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={ecgForm.heart_rate}
-                    onChange={(e) => setEcgForm({...ecgForm, heart_rate: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, heart_rate: e.target.value })}
                     required
                     placeholder="60-100"
                   />
@@ -577,7 +577,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={ecgForm.pr_interval}
-                    onChange={(e) => setEcgForm({...ecgForm, pr_interval: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, pr_interval: e.target.value })}
                     placeholder="120-200"
                   />
                 </div>
@@ -590,7 +590,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={ecgForm.qrs_duration}
-                    onChange={(e) => setEcgForm({...ecgForm, qrs_duration: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, qrs_duration: e.target.value })}
                     placeholder="80-120"
                   />
                 </div>
@@ -600,7 +600,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={ecgForm.qt_interval}
-                    onChange={(e) => setEcgForm({...ecgForm, qt_interval: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, qt_interval: e.target.value })}
                     placeholder="350-450"
                   />
                 </div>
@@ -612,7 +612,7 @@ const CardiologistPanel = () => {
                   <select
                     style={inputStyle}
                     value={ecgForm.st_segment}
-                    onChange={(e) => setEcgForm({...ecgForm, st_segment: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, st_segment: e.target.value })}
                   >
                     <option value="">Выберите</option>
                     <option value="normal">Нормальный</option>
@@ -626,7 +626,7 @@ const CardiologistPanel = () => {
                   <select
                     style={inputStyle}
                     value={ecgForm.t_wave}
-                    onChange={(e) => setEcgForm({...ecgForm, t_wave: e.target.value})}
+                    onChange={(e) => setEcgForm({ ...ecgForm, t_wave: e.target.value })}
                   >
                     <option value="">Выберите</option>
                     <option value="normal">Нормальная</option>
@@ -642,7 +642,7 @@ const CardiologistPanel = () => {
                 <textarea
                   style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
                   value={ecgForm.interpretation}
-                  onChange={(e) => setEcgForm({...ecgForm, interpretation: e.target.value})}
+                  onChange={(e) => setEcgForm({ ...ecgForm, interpretation: e.target.value })}
                   placeholder="Описание ЭКГ изменений"
                 />
               </div>
@@ -652,7 +652,7 @@ const CardiologistPanel = () => {
                 <textarea
                   style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
                   value={ecgForm.recommendations}
-                  onChange={(e) => setEcgForm({...ecgForm, recommendations: e.target.value})}
+                  onChange={(e) => setEcgForm({ ...ecgForm, recommendations: e.target.value })}
                   placeholder="Рекомендации по лечению и наблюдению"
                 />
               </div>
@@ -692,7 +692,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="date"
                     value={bloodTestForm.test_date}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, test_date: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, test_date: e.target.value })}
                     required
                   />
                 </div>
@@ -702,7 +702,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.cholesterol_total}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, cholesterol_total: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_total: e.target.value })}
                     placeholder="<200"
                   />
                 </div>
@@ -715,7 +715,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.cholesterol_hdl}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, cholesterol_hdl: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_hdl: e.target.value })}
                     placeholder=">40"
                   />
                 </div>
@@ -725,7 +725,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.cholesterol_ldl}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, cholesterol_ldl: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, cholesterol_ldl: e.target.value })}
                     placeholder="<100"
                   />
                 </div>
@@ -738,7 +738,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.triglycerides}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, triglycerides: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, triglycerides: e.target.value })}
                     placeholder="<150"
                   />
                 </div>
@@ -748,7 +748,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.glucose}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, glucose: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, glucose: e.target.value })}
                     placeholder="70-100"
                   />
                 </div>
@@ -761,7 +761,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.crp}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, crp: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, crp: e.target.value })}
                     placeholder="<3.0"
                   />
                 </div>
@@ -771,7 +771,7 @@ const CardiologistPanel = () => {
                     style={inputStyle}
                     type="number"
                     value={bloodTestForm.troponin}
-                    onChange={(e) => setBloodTestForm({...bloodTestForm, troponin: e.target.value})}
+                    onChange={(e) => setBloodTestForm({ ...bloodTestForm, troponin: e.target.value })}
                     placeholder="<0.04"
                   />
                 </div>
@@ -782,7 +782,7 @@ const CardiologistPanel = () => {
                 <textarea
                   style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
                   value={bloodTestForm.interpretation}
-                  onChange={(e) => setBloodTestForm({...bloodTestForm, interpretation: e.target.value})}
+                  onChange={(e) => setBloodTestForm({ ...bloodTestForm, interpretation: e.target.value })}
                   placeholder="Интерпретация результатов анализов"
                 />
               </div>

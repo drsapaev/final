@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import PropTypes from "prop-types";
-import { getVisit, rescheduleVisit } from "../api";
-import RescheduleDialog from "../components/RescheduleDialog";
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import PropTypes from 'prop-types';
+import { getVisit, rescheduleVisit } from '../api';
+import RescheduleDialog from '../components/RescheduleDialog';
 
 /**
  * VisitDetails page
@@ -17,22 +17,22 @@ function VisitDetails() {
   const navigate = useNavigate();
   const [visit, setVisit] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     let mounted = true;
     setLoading(true);
-    setError("");
+    setError('');
     getVisit(id)
       .then((data) => {
         if (!mounted) return;
         setVisit(data || null);
       })
       .catch((err) => {
-        console.error("getVisit error:", err);
-        setError((err && err.data && (err.data.detail || err.data.message)) || err.message || "Ошибка загрузки приёма");
+        console.error('getVisit error:', err);
+        setError((err && err.data && (err.data.detail || err.data.message)) || err.message || 'Ошибка загрузки приёма');
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -50,7 +50,7 @@ function VisitDetails() {
   const rescheduleTomorrow = async () => {
     if (!visit) return;
     setLoading(true);
-    setError("");
+    setError('');
     try {
       const baseDate = visit.scheduled_at ? new Date(visit.scheduled_at) : new Date();
       const tomorrow = new Date(baseDate);
@@ -59,8 +59,8 @@ function VisitDetails() {
       const res = await rescheduleVisit(visit.id, iso);
       setVisit((prev) => ({ ...(prev || {}), scheduled_at: iso, ...(res || {}) }));
     } catch (err) {
-      console.error("rescheduleTomorrow error:", err);
-      setError((err && err.data && (err.data.detail || err.data.message)) || err.message || "Ошибка переноса");
+      console.error('rescheduleTomorrow error:', err);
+      setError((err && err.data && (err.data.detail || err.data.message)) || err.message || 'Ошибка переноса');
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ function VisitDetails() {
   if (!visit) {
     return (
       <div className="p-6">
-        <div className="text-red-600 mb-4">{error || "Приём не найден."}</div>
+        <div className="text-red-600 mb-4">{error || 'Приём не найден.'}</div>
         <Link to="/" className="text-blue-600 underline">Вернуться на главную</Link>
       </div>
     );
@@ -108,19 +108,19 @@ function VisitDetails() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="text-sm text-gray-500">Пациент</div>
-            <div className="font-medium">{visit.patient?.full_name || visit.patient_name || "—"}</div>
+            <div className="font-medium">{visit.patient?.full_name || visit.patient_name || '—'}</div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Статус</div>
-            <div className="font-medium">{visit.status || "—"}</div>
+            <div className="font-medium">{visit.status || '—'}</div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Запланировано</div>
-            <div className="font-medium">{visit.scheduled_at ? new Date(visit.scheduled_at).toLocaleString() : "—"}</div>
+            <div className="font-medium">{visit.scheduled_at ? new Date(visit.scheduled_at).toLocaleString() : '—'}</div>
           </div>
           <div>
             <div className="text-sm text-gray-500">Врач / кабинет</div>
-            <div className="font-medium">{visit.doctor?.name || visit.room || "—"}</div>
+            <div className="font-medium">{visit.doctor?.name || visit.room || '—'}</div>
           </div>
         </div>
 

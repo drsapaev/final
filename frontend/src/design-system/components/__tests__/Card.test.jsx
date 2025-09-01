@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Card } from '../Card';
+import Card from '../Card';
 
 describe('Card', () => {
   it('renders with children', () => {
@@ -25,8 +25,8 @@ describe('Card', () => {
 
   it('applies custom style', () => {
     const customStyle = { backgroundColor: 'red' };
-    render(<Card style={customStyle}>Card content</Card>);
-    expect(screen.getByText('Card content').closest('div')).toHaveStyle('background-color: red');
+    render(<Card style={customStyle}>Test card with custom style</Card>);
+    expect(screen.getByText('Test card with custom style').closest('div')).toHaveStyle('background-color: rgb(255, 0, 0)');
   });
 
   it('calls onClick when clicked', async () => {
@@ -73,11 +73,11 @@ describe('Card', () => {
       render(
         <Card>
           <Card.Content>
-            <p>Card content</p>
+            <p>Unique card content test</p>
           </Card.Content>
         </Card>
       );
-      expect(screen.getByText('Card content')).toBeInTheDocument();
+      expect(screen.getByText('Unique card content test')).toBeInTheDocument();
     });
 
     it('applies correct className', () => {
