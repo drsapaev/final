@@ -19,7 +19,9 @@ jobs:
     - name: 📦 Установка зависимостей
       run: |
         cd backend
-        pip install -r requirements.txt
+        echo "📦 Устанавливаем Python зависимости..."
+        pip install --no-cache-dir -r requirements.txt
+        echo "✅ Зависимости установлены"
         
     - name: 🗄️ Проверка базы данных
       run: |
@@ -63,35 +65,62 @@ jobs:
         echo "🔌 Проверяем API эндпоинты..."
         
         # Запускаем сервер в фоне
+        echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
-        echo $! > server.pid
-        sleep 10
+        server_pid=$!
+        echo $server_pid > server.pid
+        
+        # Ждем запуска сервера с проверкой
+        echo "⏳ Ожидаем запуск сервера..."
+        for i in {1..30}; do
+            if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+                echo "✅ Сервер запущен успешно"
+                break
+            fi
+            if [ $i -eq 30 ]; then
+                echo "❌ Не удалось дождаться запуска сервера"
+                echo "📄 Логи сервера:"
+                cat server.log || echo "Логи недоступны"
+                kill $server_pid 2>/dev/null || true
+                exit 1
+            fi
+            sleep 2
+        done
         
         # Проверяем основные эндпоинты
-        endpoints = [
-            "/api/v1/health",
-            "/api/v1/status",
-            "/api/v1/queue/stats",
+        endpoints=(
+            "/api/v1/health"
+            "/api/v1/status"
+            "/api/v1/queue/stats"
             "/api/v1/appointments/stats"
-        ]
+        )
         
-        for endpoint in endpoints:
-            try:
-                response=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8000${endpoint}")
-                if [ "$response" = "200" ]; then
-                    echo "✅ ${endpoint}: HTTP ${response}"
-                else
-                    echo "⚠️ ${endpoint}: HTTP ${response}"
-                fi
-            except:
-                echo "❌ ${endpoint}: недоступен"
+        for endpoint in "${endpoints[@]}"; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://127.0.0.1:8000${endpoint}" 2>/dev/null)
+            if [ "$response" = "200" ]; then
+                echo "✅ ${endpoint}: HTTP ${response}"
+            elif [ -n "$response" ]; then
+                echo "⚠️ ${endpoint}: HTTP ${response}"
+            else
+                echo "❌ ${endpoint}: недоступен или timeout"
+            fi
         done
         
         # Останавливаем сервер
+        echo "🛑 Останавливаем сервер..."
         if [ -f server.pid ]; then
-            kill $(cat server.pid) || true
+            server_pid=$(cat server.pid)
+            kill $server_pid 2>/dev/null || true
+            # Даем время на graceful shutdown
+            sleep 3
+            # Принудительно останавливаем если еще работает
+            kill -9 $server_pid 2>/dev/null || true
             rm server.pid
+            echo "✅ Сервер остановлен"
         fi
+        
+        # Cleanup - убиваем все возможные uvicorn процессы на этом порту
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
         
     - name: 📊 Создание отчёта мониторинга
       run: |
