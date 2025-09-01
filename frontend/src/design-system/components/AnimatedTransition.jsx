@@ -36,7 +36,7 @@ const AnimatedTransition = ({
           transform: isAnimating ? 'translateY(0)' : 'translateY(20px)'
         };
       
-      case ANIMATION_TYPES.SLIDE:
+      case ANIMATION_TYPES.SLIDE: {
         const slideTransform = {
           [ANIMATION_DIRECTIONS.UP]: isAnimating ? 'translateY(0)' : 'translateY(100%)',
           [ANIMATION_DIRECTIONS.DOWN]: isAnimating ? 'translateY(0)' : 'translateY(-100%)',
@@ -48,6 +48,7 @@ const AnimatedTransition = ({
           opacity: isAnimating ? 1 : 0,
           transform: slideTransform[direction] || slideTransform[ANIMATION_DIRECTIONS.UP]
         };
+      }
       
       case ANIMATION_TYPES.SCALE:
         return {

@@ -29,7 +29,9 @@ export default function QueueTable({ department }) {
     return () => {
       // cleanup socket
       if (wsRef.current) {
-        try { wsRef.current.close(); } catch (e) {}
+        try { wsRef.current.close(); } catch (e) {
+          // Игнорируем ошибки закрытия WebSocket
+        }
         wsRef.current = null;
       }
     };
@@ -67,7 +69,9 @@ export default function QueueTable({ department }) {
 
       // close previous
       if (wsRef.current) {
-        try { wsRef.current.close(); } catch (e) {}
+        try { wsRef.current.close(); } catch (e) {
+          // Игнорируем ошибки закрытия WebSocket
+        }
         wsRef.current = null;
       }
 

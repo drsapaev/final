@@ -56,6 +56,7 @@ export default function Login() {
         const meRes = await fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } });
         if (meRes.ok) setProfile(await meRes.json()); else setProfile(null);
       } catch {
+        // Игнорируем ошибки получения профиля
         setProfile(null);
       }
     } catch (error) {
@@ -77,7 +78,10 @@ export default function Login() {
       if (role === 'doctor') return '/doctor';
       if (role === 'cashier') return '/cashier';
       return '/search';
-    } catch { return defaultPath; }
+    } catch {
+      // Игнорируем ошибки доступа к localStorage
+      return defaultPath;
+    }
   }
 
   async function onLoginClick(e) {

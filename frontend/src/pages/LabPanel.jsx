@@ -25,21 +25,27 @@ const LabPanel = () => {
       setLoading(true);
       const res = await fetch('/api/v1/patients?department=Lab&limit=100', { headers: authHeader() });
       if (res.ok) setPatients(await res.json());
-    } catch {} finally { setLoading(false); }
+    } catch {
+      // Игнорируем ошибки загрузки пациентов
+    } finally { setLoading(false); }
   };
 
   const loadTests = async () => {
     try {
       const res = await fetch('/api/v1/lab/tests?limit=100', { headers: authHeader() });
       if (res.ok) setTests(await res.json());
-    } catch {}
+    } catch {
+      // Игнорируем ошибки загрузки тестов
+    }
   };
 
   const loadResults = async () => {
     try {
       const res = await fetch('/api/v1/lab/results?limit=100', { headers: authHeader() });
       if (res.ok) setResults(await res.json());
-    } catch {}
+    } catch {
+      // Игнорируем ошибки загрузки результатов
+    }
   };
 
   const handleTestSubmit = async (e) => {
@@ -47,7 +53,9 @@ const LabPanel = () => {
     try {
       const res = await fetch('/api/v1/lab/tests', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(testForm) });
       if (res.ok) { setShowTestForm(false); setTestForm({ patient_id: '', test_date: '', test_type: '', sample_type: '', notes: '' }); loadTests(); }
-    } catch {}
+    } catch {
+      // Игнорируем ошибки создания теста
+    }
   };
 
   const handleResultSubmit = async (e) => {
@@ -55,7 +63,9 @@ const LabPanel = () => {
     try {
       const res = await fetch('/api/v1/lab/results', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(resultForm) });
       if (res.ok) { setShowResultForm(false); setResultForm({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' }); loadResults(); }
-    } catch {}
+    } catch {
+      // Игнорируем ошибки создания результата
+    }
   };
 
   const pageStyle = { padding: '20px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' };

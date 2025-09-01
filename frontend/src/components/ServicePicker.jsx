@@ -29,6 +29,7 @@ export default function ServicePicker({
       // ожидаем массив вида [{id, name, code, price, group}]
       setItems(Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []);
     } catch {
+      // Игнорируем ошибки загрузки услуг
       setItems([]);
     } finally {
       setLoading(false);

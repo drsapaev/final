@@ -82,21 +82,27 @@ const DentistPanel = () => {
     try {
       const res = await fetch('/api/v1/dental/examinations?limit=100', { headers: authHeader() });
       if (res.ok) setDentalExaminations(await res.json());
-    } catch {}
+    } catch {
+      // Игнорируем ошибки загрузки обследований
+    }
   };
 
   const loadTreatmentPlans = async () => {
     try {
       const res = await fetch('/api/v1/dental/treatments?limit=100', { headers: authHeader() });
       if (res.ok) setTreatmentPlans(await res.json());
-    } catch {}
+    } catch {
+      // Игнорируем ошибки загрузки планов лечения
+    }
   };
 
   const loadProsthetics = async () => {
     try {
       const res = await fetch('/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
       if (res.ok) setProsthetics(await res.json());
-    } catch {}
+    } catch {
+      // Игнорируем ошибки загрузки протезирования
+    }
   };
 
   const handleExaminationSubmit = async (e) => {

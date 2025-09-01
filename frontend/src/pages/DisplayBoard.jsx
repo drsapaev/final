@@ -88,6 +88,16 @@ function todayStr() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Объявляем стили до их использования
+const errBox = {
+  textAlign: 'center',
+  color: '#fecaca',
+  background: 'rgba(239,68,68,0.2)',
+  border: '1px solid rgba(239,68,68,0.35)',
+  padding: 8,
+  borderRadius: 12,
+};
+
 const wrap = {
   minHeight: '100vh',
   background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)',
@@ -122,12 +132,5 @@ const statBox = {
 };
 const statLabel = { fontSize: '18px', opacity: 0.8 };
 const statValue = { fontSize: '72px', fontWeight: 800, marginTop: 8 };
-const errBox = {
-  textAlign: 'center',
-  color: '#fecaca',
-  background: 'rgba(239,68,68,0.2)',
-  border: '1px solid rgba(239,68,68,0.35)',
-  padding: 8,
-  borderRadius: 12,
-};
+// errBox перемещен выше
 

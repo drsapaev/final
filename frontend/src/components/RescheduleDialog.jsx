@@ -65,6 +65,17 @@ export default function RescheduleDialog({ open, onClose, visit, onRescheduled }
     }
   }
 
+  // Объявляем стили до использования  
+  const errBox = {
+    color: '#dc2626',
+    background: '#fee2e2', 
+    border: '1px solid #fecaca',
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 14,
+    marginTop: 8
+  };
+
   return (
     <div style={backdrop} onClick={(e) => e.target === e.currentTarget && !busy && onClose?.()}>
       <div style={modal}>

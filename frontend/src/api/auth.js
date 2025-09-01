@@ -32,7 +32,9 @@ export function subscribe(fn) {
   listeners.add(fn);
   try {
     fn(getState());
-  } catch {}
+  } catch {
+    // Игнорируем ошибки состояния
+  }
   return () => unsubscribe(fn);
 }
 
@@ -45,7 +47,9 @@ function notify() {
   for (const fn of listeners) {
     try {
       fn(s);
-    } catch {}
+    } catch {
+      // Игнорируем ошибки вызова функции
+    }
   }
 }
 
@@ -63,7 +67,9 @@ export function setToken(nextToken) {
     } else {
       localStorage.removeItem(TOKEN_KEY);
     }
-  } catch {}
+  } catch {
+    // Игнорируем ошибки localStorage
+  }
   if (typeof setAuthToken === 'function') setAuthToken(token);
   notify();
 }
@@ -75,7 +81,9 @@ export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(PROFILE_KEY);
-  } catch {}
+  } catch {
+    // Игнорируем ошибки очистки localStorage
+  }
   if (typeof setAuthToken === 'function') setAuthToken(null);
   notify();
 }
@@ -93,7 +101,9 @@ export function setProfile(nextProfile) {
     } else {
       localStorage.removeItem(PROFILE_KEY);
     }
-  } catch {}
+  } catch {
+    // Игнорируем ошибки удаления профиля
+  }
   notify();
 }
 

@@ -42,7 +42,9 @@ export function openQueueWS(department, dateStr, onMessage) {
   return function close() {
     try {
       ws && ws.close(1000, 'bye');
-    } catch {}
+    } catch {
+      // Игнорируем ошибки закрытия WebSocket
+    }
     ws = null;
   };
 }
