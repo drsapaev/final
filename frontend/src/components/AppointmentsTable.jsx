@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Printer, X, Calendar, CreditCard } from 'lucide-react';
+import { Button, Badge } from './ui';
 
 const AppointmentsTable = ({
   appointments = [],
@@ -71,6 +73,22 @@ const AppointmentsTable = ({
       'paid': { background: '#e8f5e8', color: '#388e3c' }
     };
     return statusStyles[status] || { background: '#607d8b', color: '#fff' };
+  };
+
+  // Варианты для Badge компонента
+  const getStatusVariant = (status) => {
+    const variantMap = {
+      'plan': 'primary',
+      'confirmed': 'success',
+      'queued': 'warning',
+      'in_cabinet': 'purple',
+      'done': 'success',
+      'cancelled': 'danger',
+      'no_show': 'orange',
+      'paid_pending': 'warning',
+      'paid': 'success'
+    };
+    return variantMap[status] || 'default';
   };
 
   // Стили для типов обращения
@@ -378,38 +396,38 @@ const AppointmentsTable = ({
                 borderLeft: '2px solid #dee2e6'
               }}>
                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                 <button
-                   style={{...buttonStyle, backgroundColor: '#007bff'}}
+                 <Button
+                   variant="primary"
+                   size="sm"
                    title="Печать талона"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   🖨️
-                 </button>
-                 <button
-                   style={{...buttonDangerStyle}}
+                   <Printer size={16} />
+                 </Button>
+                 <Button
+                   variant="danger"
+                   size="sm"
                    title="Отмена"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   ❌
-                 </button>
-                 <button
-                   style={{...buttonWarningStyle}}
+                   <X size={16} />
+                 </Button>
+                 <Button
+                   variant="warning"
+                   size="sm"
                    title="Перенос"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   📅
-                 </button>
-                 <button
-                   style={{...buttonInfoStyle}}
+                   <Calendar size={16} />
+                 </Button>
+                 <Button
+                   variant="info"
+                   size="sm"
                    title="Оплата"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   💳
-                 </button>
+                   <CreditCard size={16} />
+                 </Button>
                </div>
              </td>
            </tr>
@@ -590,17 +608,13 @@ const AppointmentsTable = ({
                textAlign: 'center', 
                backgroundColor: rowBgColor + ' !important'
              }}>
-               <span style={{
-                 ...getStatusStyle(appointment.status),
-                 padding: '4px 8px',
-                 borderRadius: '12px',
-                 fontSize: '12px',
-                 fontWeight: '500',
-                 display: 'inline-block',
-                 minWidth: '80px'
-               }}>
+               <Badge 
+                 variant={getStatusVariant(appointment.status)}
+                 size="md"
+                 style={{ minWidth: '80px' }}
+               >
                  {appointment.status || 'scheduled'}
-               </span>
+               </Badge>
              </td>
                 <td data-sticky="true" style={{
                   ...cellStickyStyle,
@@ -613,38 +627,38 @@ const AppointmentsTable = ({
                   textAlign: 'center'
                 }}>
                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                 <button
-                   style={{...buttonStyle, backgroundColor: '#007bff'}}
+                 <Button
+                   variant="primary"
+                   size="sm"
                    title="Печать талона"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   🖨️
-                 </button>
-                 <button
-                   style={{...buttonDangerStyle}}
+                   <Printer size={16} />
+                 </Button>
+                 <Button
+                   variant="danger"
+                   size="sm"
                    title="Отмена"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   ❌
-                 </button>
-                 <button
-                   style={{...buttonWarningStyle}}
+                   <X size={16} />
+                 </Button>
+                 <Button
+                   variant="warning"
+                   size="sm"
                    title="Перенос"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   📅
-                 </button>
-                 <button
-                   style={{...buttonInfoStyle}}
+                   <Calendar size={16} />
+                 </Button>
+                 <Button
+                   variant="info"
+                   size="sm"
                    title="Оплата"
-                   onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                   onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                   style={{ width: '36px', height: '36px', padding: '0' }}
                  >
-                   💳
-                 </button>
+                   <CreditCard size={16} />
+                 </Button>
                </div>
              </td>
            </tr>

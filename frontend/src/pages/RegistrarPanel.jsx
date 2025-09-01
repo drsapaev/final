@@ -3,8 +3,43 @@ import InputMask from 'react-input-mask';
 import { Toaster, toast } from 'react-hot-toast';
 import AppointmentsTable from '../components/AppointmentsTable';
 import ServiceChecklist from '../components/ServiceChecklist';
+import ResponsiveTable from '../components/ResponsiveTable';
+import ResponsiveNavigation from '../components/ResponsiveNavigation';
+import { Button, Card, Badge, Skeleton, AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
+import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
+import { 
+  Hospital, 
+  Calendar, 
+  Search, 
+  MessageCircle, 
+  HelpCircle, 
+  Plus, 
+  Download, 
+  Sun, 
+  Moon, 
+  LogOut,
+  Home,
+  FileText,
+  Heart,
+  Activity,
+  User,
+  TestTube,
+  Syringe,
+  Settings,
+  Globe,
+  Printer,
+  X,
+  CreditCard
+} from 'lucide-react';
+import '../components/ui/animations.css';
+import '../styles/responsive.css';
+import '../styles/animations.css';
 
 const RegistrarPanel = () => {
+  // Адаптивные хуки
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
+  const isTouch = useTouchDevice();
+
   // Основные состояния
   const [activeTab, setActiveTab] = useState('welcome');
   const [appointments, setAppointments] = useState([
@@ -223,43 +258,138 @@ const RegistrarPanel = () => {
   };
   const t = (key) => (translations[language] && translations[language][key]) || translations.ru[key] || key;
 
-  // Стили
-  const cardBg = theme === 'light' ? '#ffffff' : '#111827';
-  const textColor = theme === 'light' ? '#111827' : '#f9fafb';
-  const borderColor = theme === 'light' ? '#e5e5e5' : '#374151';
-  const accentColor = '#007bff';
-  const successColor = '#28a745';
-  const warningColor = '#ffc107';
-  const dangerColor = '#dc3545';
+  // Современная дизайн-система с CSS Custom Properties
+  const designTokens = {
+    // Основные цвета
+    primary: {
+      50: '#eff6ff',
+      100: '#dbeafe', 
+      200: '#bfdbfe',
+      300: '#93c5fd',
+      400: '#60a5fa',
+      500: '#3b82f6', // Основной синий
+      600: '#2563eb',
+      700: '#1d4ed8',
+      800: '#1e40af',
+      900: '#1e3a8a'
+    },
+    gray: {
+      50: '#f9fafb',
+      100: '#f3f4f6',
+      200: '#e5e7eb',
+      300: '#d1d5db',
+      400: '#9ca3af',
+      500: '#6b7280',
+      600: '#4b5563',
+      700: '#374151',
+      800: '#1f2937',
+      900: '#111827'
+    },
+    success: {
+      50: '#f0fdf4',
+      500: '#22c55e',
+      600: '#16a34a'
+    },
+    warning: {
+      50: '#fffbeb',
+      500: '#f59e0b',
+      600: '#d97706'
+    },
+    danger: {
+      50: '#fef2f2',
+      500: '#ef4444',
+      600: '#dc2626'
+    }
+  };
+
+  // Адаптивные цвета для тем
+  const cardBg = theme === 'light' ? designTokens.gray[50] : designTokens.gray[900];
+  const textColor = theme === 'light' ? designTokens.gray[900] : designTokens.gray[50];
+  const borderColor = theme === 'light' ? designTokens.gray[200] : designTokens.gray[700];
+  const accentColor = designTokens.primary[500];
+  const successColor = designTokens.success[500];
+  const warningColor = designTokens.warning[500];
+  const dangerColor = designTokens.danger[500];
+
+  // Типографическая система
+  const typography = {
+    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontSize: {
+      xs: '12px',
+      sm: '14px',
+      base: '16px',
+      lg: '18px',
+      xl: '20px',
+      '2xl': '24px',
+      '3xl': '30px',
+      '4xl': '36px'
+    },
+    fontWeight: {
+      normal: '400',
+      medium: '500',
+      semibold: '600',
+      bold: '700'
+    },
+    lineHeight: {
+      tight: '1.25',
+      normal: '1.5',
+      relaxed: '1.75'
+    }
+  };
+
+  // 8px Grid System для консистентных отступов
+  const spacing = {
+    xs: '4px',   // 0.5 * 8px
+    sm: '8px',   // 1 * 8px
+    md: '16px',  // 2 * 8px
+    lg: '24px',  // 3 * 8px
+    xl: '32px',  // 4 * 8px
+    '2xl': '40px', // 5 * 8px
+    '3xl': '48px', // 6 * 8px
+    '4xl': '64px'  // 8 * 8px
+  };
 
   const pageStyle = {
     padding: '0',
     maxWidth: 'none',
     margin: '0',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    background: theme === 'light' ? '#f8f9fa' : '#1f2937',
-    minHeight: '100vh'
+    fontFamily: typography.fontFamily,
+    fontSize: isMobile ? typography.fontSize.sm : isTablet ? typography.fontSize.base : typography.fontSize.lg,
+    fontWeight: typography.fontWeight.normal,
+    lineHeight: typography.lineHeight.normal,
+    background: theme === 'light' 
+      ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+      : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+    minHeight: '100vh',
+    position: 'relative'
   };
 
   const cardStyle = {
-    background: cardBg,
+    background: theme === 'light' 
+      ? 'rgba(255, 255, 255, 0.8)' 
+      : 'rgba(15, 23, 42, 0.8)',
+    backdropFilter: 'blur(20px)',
     color: textColor,
-    border: `1px solid ${borderColor}`,
-    borderRadius: '12px',
+    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+    borderRadius: '20px',
     margin: '0 20px 20px 20px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    overflow: 'hidden'
+    boxShadow: theme === 'light' 
+      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+    overflow: 'hidden',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
   };
 
   const cardHeaderStyle = {
-    padding: '24px',
-    borderBottom: `1px solid ${borderColor}`,
+    padding: '32px',
+    borderBottom: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    color: textColor,
-    background: `linear-gradient(135deg, ${accentColor} 0%, #0056b3 100%)`,
-    color: 'white'
+    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[700]} 50%, ${designTokens.primary[900]} 100%)`,
+    color: 'white',
+    position: 'relative',
+    overflow: 'hidden'
   };
 
   const cardContentStyle = {
@@ -269,13 +399,18 @@ const RegistrarPanel = () => {
 
   // Контейнер таблицы, визуально "сливается" с вкладками
   const tableContainerStyle = {
-    background: cardBg,
+    background: theme === 'light' 
+      ? 'rgba(255, 255, 255, 0.8)' 
+      : 'rgba(15, 23, 42, 0.8)',
+    backdropFilter: 'blur(20px)',
     color: textColor,
-    border: `1px solid ${borderColor}`,
+    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
     borderTop: 'none',
-    borderRadius: '0 0 12px 12px',
+    borderRadius: '0 0 20px 20px',
     margin: '0 20px 20px 20px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+    boxShadow: theme === 'light' 
+      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
     overflow: 'hidden'
   };
 
@@ -286,38 +421,45 @@ const RegistrarPanel = () => {
   };
 
   const buttonStyle = {
-    padding: '12px 20px',
-    backgroundColor: accentColor,
+    padding: `${spacing.sm} ${spacing.lg}`,
+    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '12px',
     cursor: 'pointer',
-    marginRight: '12px',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    marginRight: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: typography.lineHeight.tight,
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
+    position: 'relative',
+    overflow: 'hidden'
   };
 
   const buttonSecondaryStyle = {
     ...buttonStyle,
-    backgroundColor: '#6c757d'
+    background: `linear-gradient(135deg, ${designTokens.gray[500]} 0%, ${designTokens.gray[600]} 100%)`,
+    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
   };
 
   const buttonSuccessStyle = {
     ...buttonStyle,
-    backgroundColor: successColor
+    background: `linear-gradient(135deg, ${designTokens.success[500]} 0%, ${designTokens.success[600]} 100%)`,
+    boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
   };
 
   const buttonDangerStyle = {
     ...buttonStyle,
-    backgroundColor: dangerColor
+    background: `linear-gradient(135deg, ${designTokens.danger[500]} 0%, ${designTokens.danger[600]} 100%)`,
+    boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
   };
 
   const buttonWarningStyle = {
     ...buttonStyle,
-    backgroundColor: warningColor,
-    color: '#212529'
+    background: `linear-gradient(135deg, ${designTokens.warning[500]} 0%, ${designTokens.warning[600]} 100%)`,
+    color: '#212529',
+    boxShadow: '0 4px 14px 0 rgba(245, 158, 11, 0.3)'
   };
 
   const inputStyle = {
@@ -338,23 +480,32 @@ const RegistrarPanel = () => {
   };
 
   const tabStyle = {
-    padding: '16px 24px',
+    padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.sm} ${spacing.xl}`,
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
+    fontSize: isMobile ? typography.fontSize.xs : typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    lineHeight: typography.lineHeight.tight,
     color: textColor,
-    borderBottom: '3px solid transparent',
-    transition: 'all 0.3s',
-    borderRadius: '8px 8px 0 0'
+    borderRadius: isMobile ? '8px' : '12px',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative',
+    overflow: 'hidden',
+    minWidth: isMobile ? 'auto' : '120px',
+    justifyContent: isMobile ? 'center' : 'flex-start',
+    whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+    gap: isMobile ? '4px' : spacing.xs
   };
 
   const activeTabStyle = {
     ...tabStyle,
-    borderBottom: `3px solid ${accentColor}`,
-    color: accentColor,
-    background: theme === 'light' ? '#f8f9fa' : '#374151'
+    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    color: 'white',
+    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
+    transform: 'translateY(-2px)'
   };
 
   // Загрузка данных
@@ -399,6 +550,22 @@ const RegistrarPanel = () => {
       console.error('Ошибка обновления статуса:', error);
     }
   }, []);
+
+  // Функция для определения варианта Badge по статусу
+  const getStatusVariant = (status) => {
+    const variantMap = {
+      'plan': 'primary',
+      'confirmed': 'success',
+      'queued': 'warning',
+      'in_cabinet': 'purple',
+      'done': 'success',
+      'cancelled': 'danger',
+      'no_show': 'orange',
+      'paid_pending': 'warning',
+      'paid': 'success'
+    };
+    return variantMap[status] || 'default';
+  };
 
   const handleBulkAction = useCallback(async (action, reason = '') => {
     if (appointmentsSelected.size === 0) return;
@@ -485,44 +652,64 @@ const RegistrarPanel = () => {
         left: 0,
         right: 0,
         zIndex: 1000,
-        background: theme === 'light' ? '#f8f9fa' : '#1f2937',
-        padding: '16px',
-        borderBottom: '1px solid #e5e5e5',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        background: theme === 'light' 
+          ? 'rgba(248, 250, 252, 0.8)' 
+          : 'rgba(15, 23, 42, 0.8)',
+        backdropFilter: 'blur(20px)',
+        padding: '20px',
+        borderBottom: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+        boxShadow: theme === 'light' 
+          ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
       }}>
         {/* Верхнее меню */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '16px 20px',
-          border: '1px solid #e5e5e5',
-          borderRadius: '16px',
-          marginBottom: '16px',
-          background: theme === 'light' ? '#ffffff' : '#1f2937',
-          color: theme === 'light' ? '#111827' : '#f9fafb',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          padding: isMobile ? '16px' : '20px 24px',
+          border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+          borderRadius: isMobile ? '12px' : '20px',
+          marginBottom: isMobile ? '12px' : '20px',
+          background: theme === 'light' 
+            ? 'rgba(255, 255, 255, 0.9)' 
+            : 'rgba(15, 23, 42, 0.9)',
+          backdropFilter: 'blur(20px)',
+          color: theme === 'light' ? designTokens.gray[900] : designTokens.gray[50],
+          boxShadow: theme === 'light' 
+            ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          gap: isMobile ? '12px' : '0'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ fontWeight: 700, fontSize: '24px' }}>🏥 Clinic</div>
-            <div style={{ opacity: 0.7, fontSize: '16px' }}>|</div>
-            <div style={{ fontSize: '18px' }}>{language === 'ru' ? 'Панель регистратора' : 'Registrar Panel'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize['2xl'] }}>
+              <Hospital size={28} color={designTokens.primary[500]} />
+              <span>Clinic</span>
+            </div>
+            <div style={{ opacity: 0.7, fontSize: typography.fontSize.base }}>|</div>
+            <div style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.medium }}>{language === 'ru' ? 'Панель регистратора' : 'Registrar Panel'}</div>
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Основные функции */}
-            <button style={buttonStyle}>
-              📅 Расписание
-            </button>
-            <button style={buttonStyle}>
-              🔍 Поиск пациента
-            </button>
-            <button style={buttonStyle}>
-              💬 Сообщения
-            </button>
-            <button style={buttonStyle}>
-              ❓ Справка
-            </button>
+            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+              <Calendar size={isMobile ? 14 : 16} />
+              {!isMobile && "Расписание"}
+            </Button>
+            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+              <Search size={isMobile ? 14 : 16} />
+              {!isMobile && "Поиск пациента"}
+            </Button>
+            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+              <MessageCircle size={isMobile ? 14 : 16} />
+              {!isMobile && "Сообщения"}
+            </Button>
+            <Button variant="primary" size={isMobile ? "sm" : "md"}>
+              <HelpCircle size={isMobile ? 14 : 16} />
+              {!isMobile && "Справка"}
+            </Button>
             
             {/* Разделитель */}
             <div style={{ 
@@ -533,9 +720,10 @@ const RegistrarPanel = () => {
             }} />
             
                     {/* Быстрые действия */}
-        <button style={buttonStyle} onClick={() => setShowWizard(true)}>
-          ➕ {t('new_appointment')}
-        </button>
+        <Button variant="primary" size={isMobile ? "sm" : "md"} onClick={() => setShowWizard(true)}>
+          <Plus size={isMobile ? 14 : 16} />
+          {!isMobile && t('new_appointment')}
+        </Button>
             
             {/* Разделитель */}
             <div style={{ 
@@ -574,93 +762,103 @@ const RegistrarPanel = () => {
                 fontSize: '16px'
               }}
             >
-              {theme === 'light' ? '🌙' : '☀️'}
+              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
-            <button
+            <Button
+              variant="danger"
+              size="sm"
               aria-label="Выход"
               onClick={()=>{ localStorage.removeItem('auth_token'); window.location.href = '/login'; }}
-              style={{ 
-                padding: '8px 12px', 
-                border: `1px solid #dc3545`, 
-                color: '#dc3545', 
-                borderRadius: '8px', 
-                background: 'inherit',
-                fontSize: '14px'
-              }}
             >
-              ↩︎ Выход
-            </button>
+              <LogOut size={14} />
+              Выход
+            </Button>
           </div>
         </div>
 
         {/* Вкладки */}
         <div style={{
           display: 'flex',
-          gap: '4px',
-          background: cardBg,
-          padding: '0 16px',
+          gap: isMobile ? '4px' : spacing.sm,
+          background: theme === 'light' 
+            ? 'rgba(255, 255, 255, 0.8)' 
+            : 'rgba(15, 23, 42, 0.8)',
+          backdropFilter: 'blur(20px)',
+          padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.sm} ${spacing.md}`,
           // Стили для слияния с таблицей
-          border: `1px solid ${borderColor}`,
+          border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
           borderBottom: 'none',
-          borderRadius: '12px 12px 0 0',
-          margin: '0 20px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          borderRadius: isMobile ? '12px 12px 0 0' : '20px 20px 0 0',
+          margin: `0 ${isMobile ? spacing.md : spacing.xl}`,
+          boxShadow: theme === 'light' 
+            ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+          overflowX: isMobile ? 'auto' : 'visible',
+          flexWrap: isMobile ? 'nowrap' : 'wrap'
         }}>
           <button
             style={activeTab === 'welcome' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('welcome')}
             aria-selected={activeTab === 'welcome'}
           >
-            🏠 {t('tabs_welcome')}
+            <Home size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_welcome')}
           </button>
           <button
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('appointments')}
             aria-selected={activeTab === 'appointments'}
           >
-            📋 {t('tabs_appointments')} ({filteredAppointments.length})
+            <FileText size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_appointments')} ({filteredAppointments.length})
           </button>
           <button
             style={activeTab === 'cardio' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('cardio')}
             aria-selected={activeTab === 'cardio'}
           >
-            ❤️ {t('tabs_cardio')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('cardio')).length})
+            <Heart size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_cardio')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('cardio')).length})
           </button>
           <button
             style={activeTab === 'echokg' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('echokg')}
             aria-selected={activeTab === 'echokg'}
           >
-            📊 {t('tabs_echokg')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('echo')).length})
+            <Activity size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_echokg')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('echo')).length})
           </button>
           <button
             style={activeTab === 'derma' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('derma')}
             aria-selected={activeTab === 'derma'}
           >
-            🩺 {t('tabs_derma')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('derma')).length})
+            <User size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_derma')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('derma')).length})
           </button>
           <button
             style={activeTab === 'dental' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('dental')}
             aria-selected={activeTab === 'dental'}
           >
-            🦷 {t('tabs_dental')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('dental')).length})
+            <User size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_dental')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('dental')).length})
           </button>
           <button
             style={activeTab === 'lab' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('lab')}
             aria-selected={activeTab === 'lab'}
           >
-            🧪 {t('tabs_lab')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('lab')).length})
+            <TestTube size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_lab')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('lab')).length})
           </button>
           <button
             style={activeTab === 'procedures' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('procedures')}
             aria-selected={activeTab === 'procedures'}
           >
-            💉 {t('tabs_procedures')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('proc')).length})
+            <Syringe size={16} style={{ marginRight: '8px' }} />
+            {t('tabs_procedures')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('proc')).length})
           </button>
         </div>
       </div> {/* Закрытие фиксированного контейнера */}
@@ -669,29 +867,44 @@ const RegistrarPanel = () => {
       <div style={{ marginTop: `${headerHeight}px`, overflow: 'hidden' }}>
         {/* Экран приветствия */}
         {activeTab === 'welcome' && (
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <h1 style={{ margin: 0, fontSize: '32px', fontWeight: '300' }}>
-                {t('welcome')} в панель регистратора! 👋
-              </h1>
-              <div style={{ fontSize: '18px', opacity: 0.9 }}>
-                {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </div>
-            </div>
+          <AnimatedTransition type="fade" delay={100}>
+            <Card variant="default" style={{ margin: `0 ${spacing.xl} ${spacing.xl} ${spacing.xl}` }}>
+              <Card.Header>
+                <AnimatedTransition type="slide" direction="up" delay={200}>
+                  <h1 style={{ 
+                    margin: 0, 
+                    fontSize: typography.fontSize['3xl'], 
+                    fontWeight: typography.fontWeight.normal, 
+                    lineHeight: typography.lineHeight.tight,
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px' 
+                  }}>
+                    {t('welcome')} в панель регистратора!
+                    <span style={{ fontSize: typography.fontSize['2xl'] }}>👋</span>
+                  </h1>
+                </AnimatedTransition>
+                <AnimatedTransition type="fade" delay={400}>
+                  <div style={{ fontSize: typography.fontSize.lg, opacity: 0.9, lineHeight: typography.lineHeight.normal }}>
+                    {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </div>
+                </AnimatedTransition>
+              </Card.Header>
             
-            <div style={cardContentStyle}>
+            <Card.Content>
               {/* Статистика */}
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-                gap: '20px', 
-                marginBottom: '32px' 
-              }}>
+              <AnimatedTransition type="fade" delay={600}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+                  gap: '20px', 
+                  marginBottom: '32px' 
+                }}>
                 <div style={{
                   background: `linear-gradient(135deg, ${accentColor} 0%, #0056b3 100%)`,
                   color: 'white',
@@ -751,35 +964,94 @@ const RegistrarPanel = () => {
                     {t('active_queues')}
                   </div>
                 </div>
-              </div>
+                </div>
+              </AnimatedTransition>
 
               {/* Быстрый старт */}
-              <div style={{ marginBottom: '32px' }}>
-                <h2 style={{ fontSize: '24px', marginBottom: '20px', color: accentColor }}>
-                  🚀 {t('quick_start')}
-                </h2>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                  gap: '16px' 
-                }}>
-                  <button 
-                    style={buttonStyle}
-                    onClick={() => setShowWizard(true)}
-                  >
-                    ➕ {t('new_appointment')}
-                  </button>
-                  <button style={buttonSecondaryStyle}>
-                    📊 {t('export_csv')}
-                  </button>
-                  <button style={buttonWarningStyle}>
-                    📅 {t('today')}
-                  </button>
-                  <button style={buttonSecondaryStyle}>
-                    🔄 {t('reset')}
-                  </button>
+              <AnimatedTransition type="fade" delay={1000}>
+                <div style={{ marginBottom: '32px' }}>
+                  <AnimatedTransition type="slide" direction="up" delay={1100}>
+                    <h2 style={{ fontSize: '24px', marginBottom: '20px', color: accentColor }}>
+                      🚀 {t('quick_start')}
+                    </h2>
+                  </AnimatedTransition>
+                  <AnimatedTransition type="fade" delay={1200}>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                      gap: '16px' 
+                    }}>
+                  <AnimatedTransition type="scale" delay={1300}>
+                    <button 
+                      style={{
+                        ...buttonStyle,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onClick={() => setShowWizard(true)}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                        e.target.style.boxShadow = '0 8px 25px 0 rgba(59, 130, 246, 0.4)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0) scale(1)';
+                        e.target.style.boxShadow = '0 4px 14px 0 rgba(59, 130, 246, 0.3)';
+                      }}
+                    >
+                      ➕ {t('new_appointment')}
+                    </button>
+                  </AnimatedTransition>
+                  <AnimatedTransition type="scale" delay={1400}>
+                    <button 
+                      style={{
+                        ...buttonSecondaryStyle,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0) scale(1)';
+                      }}
+                    >
+                      📊 {t('export_csv')}
+                    </button>
+                  </AnimatedTransition>
+                  <AnimatedTransition type="scale" delay={1500}>
+                    <button 
+                      style={{
+                        ...buttonWarningStyle,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0) scale(1)';
+                      }}
+                    >
+                      📅 {t('today')}
+                    </button>
+                  </AnimatedTransition>
+                  <AnimatedTransition type="scale" delay={1600}>
+                    <button 
+                      style={{
+                        ...buttonSecondaryStyle,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'translateY(0) scale(1)';
+                      }}
+                    >
+                      🔄 {t('reset')}
+                    </button>
+                  </AnimatedTransition>
+                    </div>
+                  </AnimatedTransition>
                 </div>
-              </div>
+              </AnimatedTransition>
 
               {/* Недавние записи */}
               {appointments.length > 0 && (
@@ -803,55 +1075,120 @@ const RegistrarPanel = () => {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
+            </Card.Content>
+          </Card>
+          </AnimatedTransition>
         )}
 
         {/* Основная панель с записями */}
         {activeTab !== 'welcome' && (
-          <div style={{...tableContainerStyle, marginTop: '-1px' }}>
-            <div style={tableContentStyle}>
+          <div style={{
+            ...tableContainerStyle, 
+            marginTop: '-1px',
+            margin: `0 ${isMobile ? spacing.md : spacing.xl} ${spacing.xl} ${isMobile ? spacing.md : spacing.xl}`,
+            borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px'
+          }}>
+            <div style={{
+              ...tableContentStyle,
+              padding: isMobile ? spacing.sm : spacing.md
+            }}>
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
                 <div style={{ 
                   display: 'flex', 
-                  gap: '12px', 
+                  gap: isMobile ? spacing.xs : '12px', 
                   alignItems: 'center',
-                  padding: '16px',
+                  padding: isMobile ? spacing.sm : '16px',
                   background: theme === 'light' ? '#f8f9fa' : '#374151',
-                  borderRadius: '8px'
+                  borderRadius: isMobile ? '6px' : '8px',
+                  flexWrap: isMobile ? 'wrap' : 'nowrap'
                 }}>
                   <span style={{ fontWeight: 600, marginRight: '12px' }}>
                     🎯 {t('bulk_actions')} ({appointmentsSelected.size}):
                   </span>
-                  <button style={buttonSuccessStyle} onClick={() => handleBulkAction('confirmed')}>
-                    ✅ {t('confirm')}
-                  </button>
-                  <button style={buttonDangerStyle} onClick={() => {
+                  <Button variant="success" size={isMobile ? "xs" : "sm"} onClick={() => handleBulkAction('confirmed')}>
+                    ✅ {!isMobile && t('confirm')}
+                  </Button>
+                  <Button variant="danger" size={isMobile ? "xs" : "sm"} onClick={() => {
                     const reason = prompt(t('reason'));
                     if (reason) handleBulkAction('cancelled', reason);
                   }}>
-                    ❌ {t('cancel')}
-                  </button>
-                  <button style={buttonWarningStyle} onClick={() => handleBulkAction('no_show')}>
-                    ⚠️ {t('no_show')}
-                  </button>
+                    ❌ {!isMobile && t('cancel')}
+                  </Button>
+                  <Button variant="warning" size={isMobile ? "xs" : "sm"} onClick={() => handleBulkAction('no_show')}>
+                    ⚠️ {!isMobile && t('no_show')}
+                  </Button>
                 </div>
               )}
               
               {/* Таблица записей */}
               {appointmentsLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px' }} aria-busy="true">
-                  Загрузка записей...
-                </div>
+                <AnimatedLoader.AnimatedTableSkeleton rows={8} columns={10} />
               ) : (
-                <AppointmentsTable
-                  appointments={filteredAppointments}
-                  appointmentsSelected={appointmentsSelected}
-                  setAppointmentsSelected={setAppointmentsSelected}
-                  updateAppointmentStatus={updateAppointmentStatus}
-                  setShowWizard={setShowWizard}
+                <ResponsiveTable
+                  data={filteredAppointments}
+                  columns={[
+                    { key: 'id', label: '№', align: 'center', minWidth: '60px' },
+                    { key: 'patient_fio', label: 'ФИО', minWidth: '200px' },
+                    { key: 'birth_year', label: 'Год рождения', align: 'center', minWidth: '120px' },
+                    { key: 'phone', label: 'Телефон', minWidth: '150px' },
+                    { key: 'services', label: 'Услуги', minWidth: '200px', mobileHidden: isMobile },
+                    { key: 'visit_type', label: 'Тип обращения', minWidth: '120px', mobileHidden: isMobile },
+                    { key: 'payment_type', label: 'Вид оплаты', minWidth: '120px', mobileHidden: isMobile },
+                    { key: 'total_cost', label: 'Стоимость', align: 'center', minWidth: '100px' },
+                    { 
+                      key: 'status', 
+                      label: 'Статус', 
+                      align: 'center', 
+                      minWidth: '120px',
+                      render: (value) => (
+                        <Badge variant={getStatusVariant(value)} size="md">
+                          {value || 'scheduled'}
+                        </Badge>
+                      )
+                    }
+                  ]}
+                  actions={[
+                    { 
+                      icon: <Printer size={16} />, 
+                      variant: 'primary', 
+                      title: 'Печать талона',
+                      onClick: (row) => console.log('Print', row)
+                    },
+                    { 
+                      icon: <X size={16} />, 
+                      variant: 'danger', 
+                      title: 'Отмена',
+                      onClick: (row) => console.log('Cancel', row)
+                    },
+                    { 
+                      icon: <Calendar size={16} />, 
+                      variant: 'warning', 
+                      title: 'Перенос',
+                      onClick: (row) => console.log('Reschedule', row)
+                    },
+                    { 
+                      icon: <CreditCard size={16} />, 
+                      variant: 'info', 
+                      title: 'Оплата',
+                      onClick: (row) => console.log('Payment', row)
+                    }
+                  ]}
+                  selectedRows={appointmentsSelected}
+                  onRowSelect={(index, selected) => {
+                    const newSelected = new Set(appointmentsSelected);
+                    if (selected) {
+                      newSelected.add(index);
+                    } else {
+                      newSelected.delete(index);
+                    }
+                    setAppointmentsSelected(newSelected);
+                  }}
+                  onRowClick={(row, index) => {
+                    // Логика клика по строке
+                    console.log('Row clicked', row, index);
+                  }}
                 />
               )}
             </div>
