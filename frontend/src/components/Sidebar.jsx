@@ -30,7 +30,10 @@ export default function Sidebar() {
     );
   }
   if (role === "doctor") {
-    byRole.push({ to: "/doctor", label: "Врач" });
+    byRole.push(
+      { to: "/doctor", label: "Врач" },
+      { to: "/doctor-panel", label: "Панель врача" }
+    );
   }
   if (role === "lab") {
     byRole.push({ to: "/lab-panel", label: "Лаборатория" });

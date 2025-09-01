@@ -18,6 +18,7 @@ import Appointments from "./pages/Appointments.jsx";
 import VisitDetails from "./pages/VisitDetails.jsx";
 import AdminPanel from "./pages/AdminPanel.jsx";
 import RegistrarPanel from "./pages/RegistrarPanel.jsx";
+import DoctorPanel from "./pages/DoctorPanel.jsx";
 import CardiologistPanel from "./pages/CardiologistPanel.jsx";
 import DermatologistPanel from "./pages/DermatologistPanel.jsx";
 import DentistPanel from "./pages/DentistPanel.jsx";
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="cashier"       element={<RequireAuth roles={["Admin","Cashier"]}><Cashier /></RequireAuth>} />
           <Route path="admin"         element={<RequireAuth roles={["Admin"]}><AdminPanel /></RequireAuth>} />
           <Route path="registrar-panel" element={<RequireAuth roles={["Admin","Registrar"]}><RegistrarPanel /></RequireAuth>} />
+          <Route path="doctor-panel" element={<RequireAuth roles={["Admin","Doctor"]}><DoctorPanel /></RequireAuth>} />
           <Route path="cardiologist"  element={<RequireAuth roles={["Admin","Doctor"]}><CardiologistPanel /></RequireAuth>} />
           <Route path="dermatologist" element={<RequireAuth roles={["Admin","Doctor"]}><DermatologistPanel /></RequireAuth>} />
           <Route path="dentist"       element={<RequireAuth roles={["Admin","Doctor"]}><DentistPanel /></RequireAuth>} />
