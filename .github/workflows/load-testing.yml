@@ -23,12 +23,14 @@ jobs:
       run: |
         cd backend
         echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_ENV
-        echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_PATH
         
     - name: 📦 Установка инструментов
       run: |
         cd backend
-        pip install httpx websockets
+        echo "📦 Устанавливаем инструменты нагрузочного тестирования..."
+        pip install --no-cache-dir httpx websockets
+        pip install --no-cache-dir -r requirements.txt
+        echo "✅ Инструменты установлены"
         
     - name: 🗄️ Настройка тестовой базы
       run: |
@@ -38,10 +40,16 @@ jobs:
         export WS_DEV_ALLOW="1"
         
         python -c "
-        from app.db.base import Base
-        from app.db.session import engine
-        Base.metadata.create_all(bind=engine)
-        print('✅ Тестовая база создана')
+import sys
+sys.path.insert(0, '.')
+try:
+    from app.db.base import Base
+    from app.db.session import engine
+    Base.metadata.create_all(bind=engine)
+    print('✅ Тестовая база создана')
+except Exception as e:
+    print(f'❌ Ошибка создания базы: {e}')
+    sys.exit(1)
         "
         
     - name: 🚀 Запуск сервера
@@ -51,11 +59,27 @@ jobs:
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
+        echo "🚀 Запускаем сервер для нагрузочного тестирования..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
-        echo $! > server.pid
-        sleep 15
-        curl -f http://127.0.0.1:8000/api/v1/health || exit 1
-        echo "✅ Сервер запущен"
+        server_pid=$!
+        echo $server_pid > server.pid
+        
+        # Ждем запуска сервера с проверкой
+        echo "⏳ Ожидаем запуск сервера..."
+        for i in {1..30}; do
+            if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+                echo "✅ Сервер запущен успешно"
+                break
+            fi
+            if [ $i -eq 30 ]; then
+                echo "❌ Не удалось дождаться запуска сервера"
+                echo "📄 Логи сервера:"
+                cat server.log || echo "Логи недоступны"
+                kill $server_pid 2>/dev/null || true
+                exit 1
+            fi
+            sleep 2
+        done
         
     - name: ⚡ API нагрузочное тестирование
       run: |
@@ -74,8 +98,9 @@ jobs:
         async def test_endpoint(client, endpoint):
             try:
                 response = await client.get(f"http://127.0.0.1:8000{endpoint}")
-                return response.status_code, response.elapsed.total_seconds()
-            except:
+                return response.status_code, float(response.elapsed.total_seconds()) if hasattr(response, 'elapsed') else 0.1
+            except Exception as e:
+                print(f"❌ Ошибка запроса к {endpoint}: {e}")
                 return 0, 0
         
         async def load_test():
@@ -165,7 +190,16 @@ jobs:
       if: always()
       run: |
         cd backend
+        echo "🛑 Останавливаем сервер..."
         if [ -f server.pid ]; then
-          kill $(cat server.pid) || true
+          server_pid=$(cat server.pid)
+          kill $server_pid 2>/dev/null || true
+          # Даем время на graceful shutdown
+          sleep 3
+          # Принудительно останавливаем если еще работает
+          kill -9 $server_pid 2>/dev/null || true
           rm server.pid
+          echo "✅ Сервер остановлен"
         fi
+        # Cleanup - убиваем все возможные uvicorn процессы
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
