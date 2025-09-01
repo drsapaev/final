@@ -32,30 +32,37 @@ jobs:
         pip install --no-cache-dir -r requirements.txt
         echo "✅ Инструменты установлены"
         
-    - name: 🗄️ Настройка тестовой базы
+    - name: 🗄️ Проверка базы данных
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
+        export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
-        python -c "
-        import sys
-        sys.path.insert(0, '.')
-        try:
-            from app.db.base import Base
-            from app.db.session import engine
-            Base.metadata.create_all(bind=engine)
-            print('✅ Тестовая база создана')
-        except Exception as e:
-            print('❌ Ошибка создания базы:', e)
-            sys.exit(1)
-        "
+        echo "🗄️ Проверяем существующую базу clinic.db..."
+        if [ -f "clinic.db" ]; then
+            echo "✅ База данных clinic.db найдена"
+            ls -la clinic.db
+        else
+            echo "⚠️ База данных clinic.db не найдена, создаем..."
+            python -c "
+            import sys
+            sys.path.insert(0, '.')
+            try:
+                from app.db.base import Base
+                from app.db.session import engine
+                Base.metadata.create_all(bind=engine)
+                print('✅ База данных создана')
+            except Exception as e:
+                print('❌ Ошибка создания базы:', e)
+                sys.exit(1)
+            "
+        fi
         
     - name: 🚀 Запуск сервера
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
+        export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
@@ -84,7 +91,7 @@ jobs:
     - name: ⚡ API нагрузочное тестирование
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
+        export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         
