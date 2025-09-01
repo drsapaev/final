@@ -1,18 +1,111 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import InputMask from 'react-input-mask';
+import { Toaster, toast } from 'react-hot-toast';
 import AppointmentsTable from '../components/AppointmentsTable';
 import ServiceChecklist from '../components/ServiceChecklist';
 
 const RegistrarPanel = () => {
   // Основные состояния
   const [activeTab, setActiveTab] = useState('welcome');
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState([
+    // Тестовые данные для демонстрации кнопок
+    {
+      id: 1,
+      patient_fio: 'Иванов Иван Иванович',
+      patient_birth_year: 1985,
+      patient_phone: '+7 (999) 123-45-67',
+      services: ['Консультация кардиолога', 'ЭКГ'],
+      visit_type: 'Платный',
+      payment_type: 'Карта',
+      cost: 2500,
+      status: 'confirmed',
+      isEmpty: false,
+      department: 'cardio'
+    },
+    {
+      id: 2,
+      patient_fio: 'Петрова Анна Сергеевна',
+      patient_birth_year: 1990,
+      patient_phone: '+7 (999) 234-56-78',
+      services: ['УЗИ сердца'],
+      visit_type: 'Повторный',
+      payment_type: 'Наличные',
+      cost: 1800,
+      status: 'queued',
+      isEmpty: false,
+      department: 'echokg'
+    },
+    {
+      id: 3,
+      patient_fio: 'Сидоров Петр Александрович',
+      patient_birth_year: 1975,
+      patient_phone: '+7 (999) 345-67-89',
+      services: ['Консультация дерматолога'],
+      visit_type: 'Платный',
+      payment_type: 'Карта',
+      cost: 2000,
+      status: 'confirmed',
+      isEmpty: false,
+      department: 'derma'
+    },
+    {
+      id: 4,
+      patient_fio: 'Козлова Мария Владимировна',
+      patient_birth_year: 1988,
+      patient_phone: '+7 (999) 456-78-90',
+      services: ['Лечение кариеса'],
+      visit_type: 'Платный',
+      payment_type: 'Наличные',
+      cost: 3000,
+      status: 'plan',
+      isEmpty: false,
+      department: 'dental'
+    },
+    {
+      id: 5,
+      patient_fio: 'Морозов Алексей Игоревич',
+      patient_birth_year: 1992,
+      patient_phone: '+7 (999) 567-89-01',
+      services: ['Общий анализ крови', 'Биохимия'],
+      visit_type: 'Платный',
+      payment_type: 'Карта',
+      cost: 1200,
+      status: 'confirmed',
+      isEmpty: false,
+      department: 'lab'
+    },
+    {
+      id: 6,
+      patient_fio: 'Волкова Елена Сергеевна',
+      patient_birth_year: 1983,
+      patient_phone: '+7 (999) 678-90-12',
+      services: ['Капельница', 'Инъекция'],
+      visit_type: 'Повторный',
+      payment_type: 'Наличные',
+      cost: 1500,
+      status: 'queued',
+      isEmpty: false,
+      department: 'procedures'
+    }
+  ]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [showAddressColumn, setShowAddressColumn] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [showSlotsModal, setShowSlotsModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+
+  // Высота фиксированной шапки для точного отступа контента
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const headerRef = React.useRef(null);
+  useEffect(() => {
+    const measure = () => {
+      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight || 0);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
   
   // Состояния мастера
   const [wizardStep, setWizardStep] = useState(1);
@@ -174,6 +267,24 @@ const RegistrarPanel = () => {
     color: textColor
   };
 
+  // Контейнер таблицы, визуально "сливается" с вкладками
+  const tableContainerStyle = {
+    background: cardBg,
+    color: textColor,
+    border: `1px solid ${borderColor}`,
+    borderTop: 'none',
+    borderRadius: '0 0 12px 12px',
+    margin: '0 20px 20px 20px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+    overflow: 'hidden'
+  };
+
+  // Содержимое контейнера таблицы без верхнего внутреннего отступа
+  const tableContentStyle = {
+    padding: '0',
+    color: textColor
+  };
+
   const buttonStyle = {
     padding: '12px 20px',
     backgroundColor: accentColor,
@@ -297,6 +408,7 @@ const RegistrarPanel = () => {
     );
     
     await Promise.all(promises);
+    toast.success(`Статус ${appointmentsSelected.size} записей успешно обновлен!`);
     setAppointmentsSelected(new Set());
   }, [appointmentsSelected, updateAppointmentStatus]);
 
@@ -365,8 +477,9 @@ const RegistrarPanel = () => {
 
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
+      <Toaster position="bottom-right" />
       {/* Фиксированная верхняя часть */}
-      <div style={{
+      <div ref={headerRef} style={{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -419,13 +532,10 @@ const RegistrarPanel = () => {
               margin: '0 8px' 
             }} />
             
-            {/* Быстрые действия */}
-            <button style={buttonStyle} onClick={() => setShowWizard(true)}>
-              ➕ {t('new_appointment')}
-            </button>
-            <button style={buttonSecondaryStyle}>
-              📊 {t('export_csv')}
-            </button>
+                    {/* Быстрые действия */}
+        <button style={buttonStyle} onClick={() => setShowWizard(true)}>
+          ➕ {t('new_appointment')}
+        </button>
             
             {/* Разделитель */}
             <div style={{ 
@@ -484,14 +594,17 @@ const RegistrarPanel = () => {
         </div>
 
         {/* Вкладки */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '4px', 
-          borderBottom: `2px solid ${borderColor}`,
+        <div style={{
+          display: 'flex',
+          gap: '4px',
           background: cardBg,
-          borderRadius: '12px 12px 0 0',
           padding: '0 16px',
-          marginBottom: '0'
+          // Стили для слияния с таблицей
+          border: `1px solid ${borderColor}`,
+          borderBottom: 'none',
+          borderRadius: '12px 12px 0 0',
+          margin: '0 20px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
         }}>
           <button
             style={activeTab === 'welcome' ? activeTabStyle : tabStyle}
@@ -553,7 +666,7 @@ const RegistrarPanel = () => {
       </div> {/* Закрытие фиксированного контейнера */}
 
       {/* Скроллируемый контент с отступом сверху */}
-      <div style={{ marginTop: '280px', overflow: 'hidden' }}>
+      <div style={{ marginTop: `${headerHeight}px`, overflow: 'hidden' }}>
         {/* Экран приветствия */}
         {activeTab === 'welcome' && (
           <div style={cardStyle}>
@@ -696,8 +809,8 @@ const RegistrarPanel = () => {
 
         {/* Основная панель с записями */}
         {activeTab !== 'welcome' && (
-          <div style={cardStyle}>
-            <div style={cardContentStyle}>
+          <div style={{...tableContainerStyle, marginTop: '-1px' }}>
+            <div style={tableContentStyle}>
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
