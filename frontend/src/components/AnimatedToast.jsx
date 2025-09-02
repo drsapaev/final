@@ -78,12 +78,12 @@ const AnimatedToast = ({
 
   const toastStyles = {
     position: 'fixed',
-    zIndex: designTokens.zIndex.tooltip,
+    zIndex: 9999,
     minWidth: '300px',
     maxWidth: '400px',
     padding: '16px 20px',
-    borderRadius: designTokens.borderRadius.lg,
-    boxShadow: designTokens.shadows.xl,
+    borderRadius: '12px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',

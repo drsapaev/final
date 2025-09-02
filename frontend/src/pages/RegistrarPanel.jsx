@@ -272,17 +272,16 @@ const RegistrarPanel = () => {
   const dangerColor = getColor('danger', 500);
 
   // Используем централизованную типографику и отступы
-  const typography = designTokens.typography;
-  const spacing = designTokens.spacing;
+  // Убираем локальные spacing и typography - используем getSpacing и getColor напрямую
 
   const pageStyle = {
     padding: '0',
     maxWidth: 'none',
     margin: '0',
-    fontFamily: designTokens.typography.fontFamily.sans.join(', '),
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     fontSize: isMobile ? getFontSize('sm') : isTablet ? getFontSize('base') : getFontSize('lg'),
-    fontWeight: designTokens.typography.fontWeight.normal,
-    lineHeight: designTokens.typography.lineHeight.normal,
+    fontWeight: 400,
+    lineHeight: 1.5,
     background: theme === 'light' 
       ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
       : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -353,10 +352,10 @@ const RegistrarPanel = () => {
     border: 'none',
     borderRadius: '12px',
     cursor: 'pointer',
-    marginRight: spacing.sm,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    lineHeight: typography.lineHeight.tight,
+    marginRight: getSpacing('sm'),
+    fontSize: getFontSize('sm'),
+    fontWeight: '600',
+    lineHeight: '1.25',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
     position: 'relative',
@@ -365,25 +364,25 @@ const RegistrarPanel = () => {
 
   const buttonSecondaryStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${designTokens.gray[500]} 0%, ${designTokens.gray[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('gray', 500)} 0%, ${getColor('gray', 600)} 100%)`,
     boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
   };
 
   const buttonSuccessStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${designTokens.success[500]} 0%, ${designTokens.success[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('success', 500)} 0%, ${getColor('success', 600)} 100%)`,
     boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
   };
 
   const buttonDangerStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${designTokens.danger[500]} 0%, ${designTokens.danger[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
     boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
   };
 
   const buttonWarningStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${designTokens.warning[500]} 0%, ${designTokens.warning[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('warning', 500)} 0%, ${getColor('warning', 600)} 100%)`,
     color: '#212529',
     boxShadow: '0 4px 14px 0 rgba(245, 158, 11, 0.3)'
   };
@@ -406,13 +405,13 @@ const RegistrarPanel = () => {
   };
 
   const tabStyle = {
-    padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.sm} ${spacing.xl}`,
+    padding: isMobile ? `${getSpacing('xs')} ${getSpacing('sm')}` : `${getSpacing('sm')} ${getSpacing('xl')}`,
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    fontSize: isMobile ? typography.fontSize.xs : typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    lineHeight: typography.lineHeight.tight,
+    fontSize: isMobile ? getFontSize('xs') : getFontSize('sm'),
+    fontWeight: '500',
+    lineHeight: '1.25',
     color: textColor,
     borderRadius: isMobile ? '8px' : '12px',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -423,7 +422,7 @@ const RegistrarPanel = () => {
     whiteSpace: 'nowrap',
     display: 'flex',
     alignItems: 'center',
-    gap: isMobile ? '4px' : spacing.xs
+    gap: isMobile ? '4px' : getSpacing('xs')
   };
 
   const activeTabStyle = {
@@ -633,17 +632,17 @@ const RegistrarPanel = () => {
       {/* Вкладки */}
         <div style={{
           display: 'flex',
-          gap: isMobile ? '4px' : spacing.sm,
+          gap: isMobile ? '4px' : getSpacing('sm'),
           background: theme === 'light' 
             ? 'rgba(255, 255, 255, 0.8)' 
             : 'rgba(15, 23, 42, 0.8)',
           backdropFilter: 'blur(20px)',
-          padding: isMobile ? `${spacing.xs} ${spacing.sm}` : `${spacing.sm} ${spacing.md}`,
+          padding: isMobile ? `${getSpacing('xs')} ${getSpacing('sm')}` : `${getSpacing('sm')} ${getSpacing('md')}`,
           // Стили для слияния с таблицей
           border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
           borderBottom: 'none',
           borderRadius: isMobile ? '12px 12px 0 0' : '20px 20px 0 0',
-          margin: `0 ${isMobile ? spacing.md : spacing.xl}`,
+          margin: `0 ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
           boxShadow: theme === 'light' 
             ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
             : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
@@ -722,24 +721,24 @@ const RegistrarPanel = () => {
         {/* Экран приветствия */}
         {activeTab === 'welcome' && (
           <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" style={{ margin: `0 ${spacing.xl} ${spacing.xl} ${spacing.xl}` }}>
+            <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
               <Card.Header>
                 <AnimatedTransition type="slide" direction="up" delay={200}>
                   <h1 style={{ 
                     margin: 0, 
-                    fontSize: typography.fontSize['3xl'], 
-                    fontWeight: typography.fontWeight.normal, 
-                    lineHeight: typography.lineHeight.tight,
+                    fontSize: getFontSize('3xl'), 
+                    fontWeight: '400', 
+                    lineHeight: '1.25',
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '12px' 
                   }}>
                     {t('welcome')} в панель регистратора!
-                    <span style={{ fontSize: typography.fontSize['2xl'] }}>👋</span>
+                    <span style={{ fontSize: getFontSize('2xl') }}>👋</span>
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={400}>
-                  <div style={{ fontSize: typography.fontSize.lg, opacity: 0.9, lineHeight: typography.lineHeight.normal }}>
+                  <div style={{ fontSize: getFontSize('lg'), opacity: 0.9, lineHeight: '1.5' }}>
                     {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { 
                       weekday: 'long', 
                       year: 'numeric', 
@@ -939,21 +938,21 @@ const RegistrarPanel = () => {
           <div style={{
             ...tableContainerStyle, 
             marginTop: '-1px',
-            margin: `0 ${isMobile ? spacing.md : spacing.xl} ${spacing.xl} ${isMobile ? spacing.md : spacing.xl}`,
+            margin: `0 ${isMobile ? getSpacing('md') : getSpacing('xl')} ${getSpacing('xl')} ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
             borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px'
           }}>
             <div style={{
               ...tableContentStyle,
-              padding: isMobile ? spacing.sm : spacing.md
+              padding: isMobile ? getSpacing('sm') : getSpacing('md')
             }}>
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
                 <div style={{ 
                   display: 'flex', 
-                  gap: isMobile ? spacing.xs : '12px', 
+                  gap: isMobile ? getSpacing('xs') : '12px', 
                   alignItems: 'center',
-                  padding: isMobile ? spacing.sm : '16px',
+                  padding: isMobile ? getSpacing('sm') : '16px',
                   background: theme === 'light' ? '#f8f9fa' : '#374151',
                   borderRadius: isMobile ? '6px' : '8px',
                   flexWrap: isMobile ? 'wrap' : 'nowrap'

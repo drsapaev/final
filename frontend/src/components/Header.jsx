@@ -40,9 +40,9 @@ export default function Header() {
   } = useTheme();
 
   // Адаптивные цвета для тем
-  const textColor = theme === 'light' ? designTokens.gray[900] : designTokens.gray[50];
-  const bgColor = theme === 'light' ? designTokens.gray[50] : designTokens.gray[900];
-  const borderColor = theme === 'light' ? designTokens.gray[200] : designTokens.gray[700];
+  const textColor = theme === 'light' ? getColor('gray', 900) : getColor('gray', 50);
+  const bgColor = theme === 'light' ? getColor('gray', 50) : getColor('gray', 900);
+  const borderColor = theme === 'light' ? getColor('gray', 200) : getColor('gray', 700);
 
   const navItems = [];
   // Для администратора навигационные пункты скрыты
@@ -64,7 +64,7 @@ export default function Header() {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: `${spacing.md} ${spacing.xl}`,
+    padding: `${getSpacing('md')} ${getSpacing('xl')}`,
     background: theme === 'light' 
       ? 'rgba(255, 255, 255, 0.9)' 
       : 'rgba(15, 23, 42, 0.9)',
@@ -85,39 +85,39 @@ export default function Header() {
   const logoStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: getSpacing('sm'),
     cursor: 'pointer',
-    fontWeight: typography.fontWeight.extrabold,
-    fontSize: typography.fontSize.xl,
+    fontWeight: '800',
+    fontSize: getFontSize('xl'),
     color: textColor,
     transition: 'all 0.3s ease'
   };
 
   const navStyle = {
     display: 'flex',
-    gap: spacing.sm,
+    gap: getSpacing('sm'),
     alignItems: 'center'
   };
 
   const navButtonStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.xs,
-    padding: `${spacing.sm} ${spacing.md}`,
+    gap: getSpacing('xs'),
+    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     border: 'none',
     borderRadius: '12px',
     background: 'transparent',
     color: textColor,
     cursor: 'pointer',
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: getFontSize('sm'),
+    fontWeight: '500',
     transition: 'all 0.3s ease',
     textDecoration: 'none'
   };
 
   const activeNavButtonStyle = {
     ...navButtonStyle,
-    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
     transform: 'translateY(-1px)'
@@ -125,45 +125,45 @@ export default function Header() {
 
   const controlsStyle = {
     display: 'flex',
-    gap: spacing.sm,
+    gap: getSpacing('sm'),
     alignItems: 'center'
   };
 
   const buttonStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.xs,
-    padding: `${spacing.sm} ${spacing.md}`,
+    gap: getSpacing('xs'),
+    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
     border: `1px solid ${borderColor}`,
     borderRadius: '8px',
-    background: theme === 'light' ? 'white' : designTokens.gray[800],
+    background: theme === 'light' ? 'white' : getColor('gray', 800),
     color: textColor,
     cursor: 'pointer',
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: getFontSize('sm'),
+    fontWeight: '500',
     transition: 'all 0.3s ease'
   };
 
   const selectStyle = {
     ...buttonStyle,
-    padding: `${spacing.sm} ${spacing.sm}`,
+    padding: `${getSpacing('sm')} ${getSpacing('sm')}`,
     minWidth: '60px'
   };
 
   const userInfoStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: `${spacing.sm} ${spacing.md}`,
-    background: theme === 'light' ? designTokens.gray[100] : designTokens.gray[800],
+    gap: getSpacing('sm'),
+    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+    background: theme === 'light' ? getColor('gray', 100) : getColor('gray', 800),
     borderRadius: '8px',
-    fontSize: typography.fontSize.sm,
+    fontSize: getFontSize('sm'),
     color: textColor
   };
 
   const logoutButtonStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${designTokens.danger[500]} 0%, ${designTokens.danger[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
     color: 'white',
     border: 'none',
     boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
@@ -202,7 +202,7 @@ export default function Header() {
     borderRadius: 999,
     fontSize: '12px',
     border: `1px solid ${borderColor}`,
-    background: theme === 'light' ? designTokens.gray[100] : designTokens.gray[800],
+    background: theme === 'light' ? getColor('gray', 100) : getColor('gray', 800),
     color: textColor,
     whiteSpace: 'nowrap'
   };
@@ -211,9 +211,9 @@ export default function Header() {
     <div style={headerStyle}>
       {/* Логотип */}
       <div style={logoStyle} onClick={() => navigate('/')}>
-        <Hospital size={24} color={designTokens.primary[500]} />
+        <Hospital size={24} color={getColor('primary', 500)} />
         <span>Clinic</span>
-        <span style={{ opacity: 0.6, fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.normal }}>v0.1.0</span>
+        <span style={{ opacity: 0.6, fontSize: getFontSize('xs'), fontWeight: '400' }}>v0.1.0</span>
       </div>
 
       {/* Навигация */}
@@ -227,11 +227,11 @@ export default function Header() {
               onClick={() => navigate(item.to)}
               onMouseOver={(e) => {
                 if (!isActive && e.target.style.background === 'transparent') {
-                  e.target.style.background = theme === 'light' ? designTokens.gray[100] : designTokens.gray[800];
+                  e.target.style.background = theme === 'light' ? getColor('gray', 100) : getColor('gray', 800);
                 }
               }}
               onMouseOut={(e) => {
-                if (!isActive && e.target.style.background !== `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`) {
+                if (!isActive && e.target.style.background !== `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`) {
                   e.target.style.background = 'transparent';
                 }
               }}
@@ -272,7 +272,7 @@ export default function Header() {
           <>
             <div style={userInfoStyle}>
               <User size={16} />
-              <span style={{ fontWeight: typography.fontWeight.semibold }}>{displayName}</span>
+              <span style={{ fontWeight: '600' }}>{displayName}</span>
               {showRoleBadge && (
                 <span style={roleBadgeStyle}>{roleLabel}</span>
               )}
@@ -292,7 +292,7 @@ export default function Header() {
             onClick={() => navigate('/login')} 
             style={{
               ...buttonStyle,
-              background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+              background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
               color: 'white',
               border: 'none',
               boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)'

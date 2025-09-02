@@ -212,7 +212,13 @@ export default function DisplayBoard({
           <div style={dateBox}>{dateStr}</div>
           <div style={clockBox}>{nowStr}</div>
           {lastUpdatedAt ? <div style={updBox}>{t('updated', lang)}: {lastUpdatedAt}</div> : null}
-          <button onClick={toggleFullscreen} style={fsBtn} title="Полноэкранный режим">⛶</button>
+          <button onClick={() => {
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else {
+              document.documentElement.requestFullscreen();
+            }
+          }} style={fsBtn} title="Полноэкранный режим">⛶</button>
           <button onClick={()=>setSoundOn(s=>!s)} style={fsBtn} title={soundOn ? 'Выключить звук' : 'Включить звук'}>{soundOn ? '🔊' : '🔇'}</button>
         </div>
       </div>

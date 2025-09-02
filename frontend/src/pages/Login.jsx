@@ -209,10 +209,10 @@ export default function Login() {
   };
 
   const buttonSecondaryStyle = {
-    padding: `${spacing.sm} ${spacing.lg}`,
+    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
     background: 'transparent',
     color: textColor,
-    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
     borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
@@ -224,11 +224,11 @@ export default function Login() {
 
   const inputStyle = {
     width: '100%',
-    padding: `${spacing.md} ${spacing.md}`,
-    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    padding: `${getSpacing('md')} ${getSpacing('md')}`,
+    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
     borderRadius: '12px',
     fontSize: '16px',
-    background: theme === 'light' ? 'white' : designTokens.gray[800],
+    background: theme === 'light' ? 'white' : getColor('gray', 800),
     color: textColor,
     outline: 'none',
     transition: 'all 0.3s ease',
@@ -237,37 +237,37 @@ export default function Login() {
 
   const labelStyle = {
     display: 'block',
-    marginBottom: spacing.xs,
+    marginBottom: getSpacing('xs'),
     fontWeight: '500',
     fontSize: '14px',
     color: textColor
   };
 
   const errorStyle = {
-    color: designTokens.danger[600],
+    color: getColor('danger', 600),
     background: theme === 'light' ? '#fee2e2' : 'rgba(239, 68, 68, 0.1)',
-    border: `1px solid ${designTokens.danger[500]}`,
+    border: `1px solid ${getColor('danger', 500)}`,
     borderRadius: '8px',
-    padding: spacing.sm,
-    marginBottom: spacing.md,
+    padding: getSpacing('sm'),
+    marginBottom: getSpacing('md'),
     fontSize: '14px'
   };
 
   const toggleButtonStyle = {
-    padding: spacing.xs,
+    padding: getSpacing('xs'),
     background: 'transparent',
-    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
     borderRadius: '8px',
     cursor: 'pointer',
     color: textColor,
-    marginLeft: spacing.sm
+    marginLeft: getSpacing('sm')
   };
 
   const headerStyle = {
     fontSize: '32px',
     fontWeight: '800',
-    marginBottom: spacing.sm,
-    background: `linear-gradient(135deg, ${designTokens.primary[600]} 0%, ${designTokens.primary[400]} 100%)`,
+    marginBottom: getSpacing('sm'),
+    background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 400)} 100%)`,
     backgroundClip: 'text',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
@@ -277,7 +277,7 @@ export default function Login() {
   const subtitleStyle = {
     fontSize: '16px',
     opacity: 0.8,
-    marginBottom: spacing.xl,
+    marginBottom: getSpacing('xl'),
     textAlign: 'center',
     lineHeight: '1.5'
   };
@@ -285,9 +285,9 @@ export default function Login() {
   return (
     <div style={pageStyle}>
       {/* Переключатели темы и языка */}
-      <div style={{ position: 'absolute', top: spacing.lg, right: spacing.lg, display: 'flex', alignItems: 'center' }}>
+      <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
         <button 
-          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          onClick={() => toggleTheme()}
           style={toggleButtonStyle}
           title="Переключить тему"
         >
@@ -298,8 +298,8 @@ export default function Login() {
           onChange={(e) => setLanguage(e.target.value)}
           style={{
             ...toggleButtonStyle,
-            marginLeft: spacing.sm,
-            background: theme === 'light' ? 'white' : designTokens.gray[800]
+            marginLeft: getSpacing('sm'),
+            background: theme === 'light' ? 'white' : getColor('gray', 800)
           }}
         >
           <option value="RU">RU</option>
@@ -309,7 +309,7 @@ export default function Login() {
       </div>
 
       {/* Кнопка "На главную" */}
-      <div style={{ position: 'absolute', top: spacing.lg, left: spacing.lg }}>
+      <div style={{ position: 'absolute', top: getSpacing('lg'), left: getSpacing('lg') }}>
         <button 
           onClick={() => navigate('/')} 
           style={buttonSecondaryStyle}
@@ -326,7 +326,7 @@ export default function Login() {
         {err && <div style={errorStyle}>{err}</div>}
         
         <form onSubmit={(e) => { e.preventDefault(); onLoginClick(); }}>
-          <div style={{ marginBottom: spacing.lg }}>
+          <div style={{ marginBottom: getSpacing('lg') }}>
             <label style={labelStyle}>
               {t.selectRole}
             </label>
@@ -335,7 +335,7 @@ export default function Login() {
               onChange={(e) => onSelectRole(e.target.value)}
               style={{
                 ...inputStyle,
-                background: theme === 'light' ? 'white' : designTokens.gray[800]
+                background: theme === 'light' ? 'white' : getColor('gray', 800)
               }}
               disabled={busy}
             >
@@ -345,7 +345,7 @@ export default function Login() {
             </select>
           </div>
 
-          <div style={{ marginBottom: spacing.lg }}>
+          <div style={{ marginBottom: getSpacing('lg') }}>
             <label style={labelStyle}>
               {t.username}
             </label>
@@ -363,7 +363,7 @@ export default function Login() {
             />
           </div>
 
-          <div style={{ marginBottom: spacing.lg }}>
+          <div style={{ marginBottom: getSpacing('lg') }}>
             <label style={labelStyle}>
               {t.password}
             </label>
@@ -378,7 +378,7 @@ export default function Login() {
             />
           </div>
 
-          <div style={{ marginBottom: spacing.lg }}>
+          <div style={{ marginBottom: getSpacing('lg') }}>
             <button 
               type="submit" 
               disabled={busy} 
@@ -394,11 +394,11 @@ export default function Login() {
             </button>
           </div>
 
-          <div style={{ textAlign: 'center', marginBottom: spacing.md }}>
+          <div style={{ textAlign: 'center', marginBottom: getSpacing('md') }}>
             <a 
               href="#" 
               style={{ 
-                color: designTokens.primary[600], 
+                color: getColor('primary', 600), 
                 textDecoration: 'none',
                 fontSize: '14px'
               }}
@@ -414,10 +414,10 @@ export default function Login() {
           opacity: 0.7, 
           lineHeight: '1.4', 
           textAlign: 'center',
-          padding: spacing.sm,
-          background: theme === 'light' ? designTokens.gray[50] : designTokens.gray[800],
+          padding: getSpacing('sm'),
+          background: theme === 'light' ? getColor('gray', 50) : getColor('gray', 800),
           borderRadius: '8px',
-          border: `1px solid ${theme === 'light' ? designTokens.gray[200] : designTokens.gray[700]}`
+          border: `1px solid ${theme === 'light' ? getColor('gray', 200) : getColor('gray', 700)}`
         }}>
           💡 {t.note}
         </div>

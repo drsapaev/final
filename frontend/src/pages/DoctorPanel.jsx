@@ -74,8 +74,7 @@ const DoctorPanel = () => {
   const warningColor = getColor('warning', 500);
   const dangerColor = getColor('danger', 500);
   const accentColor = getColor('info', 500);
-  const spacing = designTokens.spacing;
-  const typography = designTokens.typography;
+  // Используем централизованные функции темизации вместо прямых designTokens
 
   // Загрузка данных
   const loadData = useCallback(async () => {
@@ -175,9 +174,9 @@ const DoctorPanel = () => {
   const pageStyle = {
     minHeight: '100vh',
     background: `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`,
-    fontFamily: typography.fontFamily.sans.join(', '),
+    fontFamily: 'system-ui, -apple-system, sans-serif',
     fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
-    lineHeight: typography.lineHeight.normal,
+    lineHeight: '1.5',
     color: getColor('secondary', 800)
   };
 
@@ -190,7 +189,7 @@ const DoctorPanel = () => {
     background: `linear-gradient(135deg, ${primaryColor} 0%, ${getColor('primary', 600)} 100%)`,
     backdropFilter: 'blur(20px)',
     borderBottom: `1px solid ${getColor('primary', 200)}`,
-    boxShadow: designTokens.boxShadow.lg
+    boxShadow: getShadow('lg')
   };
 
   const headerContentStyle = {
@@ -208,7 +207,7 @@ const DoctorPanel = () => {
     gap: getSpacing('sm'),
     color: 'white',
     fontSize: isMobile ? getFontSize('lg') : getFontSize('xl'),
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: '700',
     textDecoration: 'none'
   };
 
@@ -235,12 +234,12 @@ const DoctorPanel = () => {
 
   const tabStyle = {
     padding: isMobile ? `${getSpacing('sm')} ${getSpacing('md')}` : `${getSpacing('md')} ${getSpacing('lg')}`,
-    borderRadius: designTokens.borderRadius.lg,
+    borderRadius: '12px',
     background: 'rgba(255, 255, 255, 0.8)',
     border: '1px solid rgba(255, 255, 255, 0.2)',
     color: getColor('secondary', 700),
     fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
@@ -268,9 +267,9 @@ const DoctorPanel = () => {
 
   const statCardStyle = {
     background: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: designTokens.borderRadius['2xl'],
+    borderRadius: '20px',
     padding: getSpacing('lg'),
-    boxShadow: designTokens.boxShadow.lg,
+    boxShadow: getShadow('lg'),
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255, 255, 255, 0.2)',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -279,14 +278,14 @@ const DoctorPanel = () => {
 
   const statCardHoverStyle = {
     transform: 'translateY(-4px) scale(1.02)',
-    boxShadow: designTokens.boxShadow['2xl']
+    boxShadow: getShadow('2xl')
   };
 
   const patientsTableStyle = {
     background: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: designTokens.borderRadius['2xl'],
+    borderRadius: '20px',
     overflow: 'hidden',
-    boxShadow: designTokens.boxShadow.lg,
+    boxShadow: getShadow('lg'),
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255, 255, 255, 0.2)'
   };
@@ -305,7 +304,7 @@ const DoctorPanel = () => {
   const thStyle = {
     padding: getSpacing('md'),
     textAlign: 'left',
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: '600',
     color: getColor('secondary', 700),
     fontSize: getFontSize('sm'),
     borderBottom: `1px solid ${getColor('secondary', 200)}`
@@ -320,7 +319,7 @@ const DoctorPanel = () => {
 
   const actionButtonStyle = {
     padding: getSpacing('xs'),
-    borderRadius: designTokens.borderRadius.md,
+    borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -502,7 +501,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
+                      e.currentTarget.style.boxShadow = getShadow('lg');
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -519,7 +518,7 @@ const DoctorPanel = () => {
                         <User size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: typography.fontWeight.bold, color: getColor('secondary', 800) }}>
+                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
                           {patients.length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
@@ -538,7 +537,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
+                      e.currentTarget.style.boxShadow = getShadow('lg');
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -555,7 +554,7 @@ const DoctorPanel = () => {
                         <Calendar size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: typography.fontWeight.bold, color: getColor('secondary', 800) }}>
+                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
                           {appointments.filter(a => a.status === 'scheduled').length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
@@ -574,7 +573,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
+                      e.currentTarget.style.boxShadow = getShadow('lg');
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -591,7 +590,7 @@ const DoctorPanel = () => {
                         <Clock size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: typography.fontWeight.bold, color: getColor('secondary', 800) }}>
+                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
                           {appointments.filter(a => a.status === 'in_progress').length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
@@ -610,7 +609,7 @@ const DoctorPanel = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = designTokens.boxShadow.lg;
+                      e.currentTarget.style.boxShadow = getShadow('lg');
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
@@ -627,7 +626,7 @@ const DoctorPanel = () => {
                         <CheckCircle size={24} />
                       </div>
                       <div>
-                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: typography.fontWeight.bold, color: getColor('secondary', 800) }}>
+                        <div style={{ fontSize: getFontSize('2xl'), fontWeight: '700', color: getColor('secondary', 800) }}>
                           {appointments.filter(a => a.status === 'completed').length}
                         </div>
                         <div style={{ fontSize: getFontSize('sm'), color: getColor('secondary', 600) }}>
@@ -645,7 +644,7 @@ const DoctorPanel = () => {
                   <Card.Header>
                     <h2 style={{ 
                       fontSize: getFontSize('xl'), 
-                      fontWeight: typography.fontWeight.bold,
+                      fontWeight: '700',
                       color: getColor('secondary', 800),
                       margin: 0
                     }}>
@@ -689,7 +688,7 @@ const DoctorPanel = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <h2 style={{ 
                     fontSize: getFontSize('xl'), 
-                    fontWeight: typography.fontWeight.bold,
+                    fontWeight: '700',
                     color: getColor('secondary', 800),
                     margin: 0
                   }}>
@@ -706,7 +705,7 @@ const DoctorPanel = () => {
                         style={{
                           padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
                           border: `1px solid ${getColor('secondary', 200)}`,
-                          borderRadius: designTokens.borderRadius.lg,
+                          borderRadius: '12px',
                           fontSize: getFontSize('sm'),
                           width: isMobile ? '200px' : '250px',
                           background: 'white'
@@ -719,7 +718,7 @@ const DoctorPanel = () => {
                       style={{
                         padding: getSpacing('sm'),
                         border: `1px solid ${getColor('secondary', 200)}`,
-                        borderRadius: designTokens.borderRadius.lg,
+                        borderRadius: '12px',
                         fontSize: getFontSize('sm'),
                         background: 'white'
                       }}
@@ -779,12 +778,12 @@ const DoctorPanel = () => {
                                 justifyContent: 'center',
                                 color: 'white',
                                 fontSize: getFontSize('sm'),
-                                fontWeight: typography.fontWeight.bold
+                                fontWeight: '700'
                               }}>
                                 {patient.name.split(' ').map(n => n[0]).join('')}
                               </div>
                               <div>
-                                <div style={{ fontWeight: typography.fontWeight.medium, color: getColor('secondary', 800) }}>
+                                <div style={{ fontWeight: '500', color: getColor('secondary', 800) }}>
                                   {patient.name}
                                 </div>
                                 <div style={{ fontSize: getFontSize('xs'), color: getColor('secondary', 500) }}>
@@ -847,7 +846,7 @@ const DoctorPanel = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <h2 style={{ 
                     fontSize: getFontSize('xl'), 
-                    fontWeight: typography.fontWeight.bold,
+                    fontWeight: '700',
                     color: getColor('secondary', 800),
                     margin: 0
                   }}>
@@ -864,7 +863,7 @@ const DoctorPanel = () => {
                         style={{
                           padding: `${getSpacing('sm')} ${getSpacing('sm')} ${getSpacing('sm')} 40px`,
                           border: `1px solid ${getColor('secondary', 200)}`,
-                          borderRadius: designTokens.borderRadius.lg,
+                          borderRadius: '12px',
                           fontSize: getFontSize('sm'),
                           width: isMobile ? '200px' : '250px',
                           background: 'white'
@@ -877,7 +876,7 @@ const DoctorPanel = () => {
                       style={{
                         padding: getSpacing('sm'),
                         border: `1px solid ${getColor('secondary', 200)}`,
-                        borderRadius: designTokens.borderRadius.lg,
+                        borderRadius: '12px',
                         fontSize: getFontSize('sm'),
                         background: 'white'
                       }}
@@ -984,7 +983,7 @@ const DoctorPanel = () => {
               <Card.Header>
                 <h2 style={{ 
                   fontSize: getFontSize('xl'), 
-                  fontWeight: typography.fontWeight.bold,
+                  fontWeight: '700',
                   color: getColor('secondary', 800),
                   margin: 0
                 }}>

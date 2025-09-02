@@ -57,9 +57,9 @@ const AnimatedTableSkeleton = ({
 }) => {
   const tableStyles = {
     background: 'white',
-    borderRadius: designTokens.borderRadius.lg,
+    borderRadius: '12px',
     padding: '20px',
-    boxShadow: designTokens.shadows.md,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     ...style
   };
 
@@ -72,7 +72,7 @@ const AnimatedTableSkeleton = ({
 
   const skeletonCellStyles = {
     backgroundColor: getColor('secondary', 200),
-    borderRadius: designTokens.borderRadius.md,
+    borderRadius: '8px',
     animation: 'skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
     height: '20px'
   };
@@ -121,15 +121,15 @@ const AnimatedCardSkeleton = ({
 }) => {
   const cardStyles = {
     background: 'white',
-    borderRadius: designTokens.borderRadius.lg,
+    borderRadius: '12px',
     padding: '20px',
-    boxShadow: designTokens.shadows.md,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     ...style
   };
 
   const skeletonStyles = {
     backgroundColor: getColor('secondary', 200),
-    borderRadius: designTokens.borderRadius.md,
+    borderRadius: '8px',
     animation: 'skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
   };
 
