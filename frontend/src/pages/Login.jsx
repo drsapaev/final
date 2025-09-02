@@ -184,7 +184,7 @@ export default function Login() {
       : 'rgba(15, 23, 42, 0.9)',
     border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
     borderRadius: '20px',
-    padding: spacing.xxl,
+    padding: getSpacing('2xl'),
     boxShadow: theme === 'light' 
       ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
       : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
@@ -194,8 +194,8 @@ export default function Login() {
   };
 
   const buttonStyle = {
-    padding: `${spacing.md} ${spacing.lg}`,
-    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    padding: `${getSpacing('md')} ${getSpacing('lg')}`,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     border: 'none',
     borderRadius: '12px',

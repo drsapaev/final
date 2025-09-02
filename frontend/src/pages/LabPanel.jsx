@@ -69,11 +69,11 @@ const LabPanel = () => {
   };
 
   const pageStyle = { 
-    padding: getSpacing('lg'), 
+    padding: '20px', 
     maxWidth: '1400px', 
     margin: '0 auto', 
     fontFamily: 'system-ui, -apple-system, sans-serif',
-    background: isLight ? 'var(--bg-primary)' : 'var(--bg-secondary)',
+    background: 'var(--bg-primary)',
     color: 'var(--text-primary)',
     minHeight: '100vh'
   };
@@ -81,39 +81,39 @@ const LabPanel = () => {
     background: 'var(--bg-primary)', 
     border: '1px solid var(--border-color)', 
     borderRadius: '12px', 
-    marginBottom: getSpacing('lg'), 
+    marginBottom: '20px', 
     boxShadow: 'var(--shadow-md)' 
   };
   const cardHeaderStyle = { 
-    padding: getSpacing('lg'), 
+    padding: '20px', 
     borderBottom: '1px solid var(--border-color)', 
     display: 'flex', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    backgroundColor: getColor('success', 500), 
+    backgroundColor: '#28a745', 
     color: 'white', 
     borderRadius: '12px 12px 0 0' 
   };
   const cardContentStyle = { 
-    padding: getSpacing('lg') 
+    padding: '20px' 
   };
   const buttonStyle = { 
-    padding: `${getSpacing('xs')} ${getSpacing('sm')}`, 
-    backgroundColor: getColor('success', 500), 
+    padding: '8px 16px', 
+    backgroundColor: '#28a745', 
     color: 'white', 
     border: 'none', 
     borderRadius: '4px', 
     cursor: 'pointer', 
-    marginRight: getSpacing('xs'), 
-    fontSize: getFontSize('sm') 
+    marginRight: '8px', 
+    fontSize: '14px' 
   };
   const buttonSecondaryStyle = { 
     ...buttonStyle, 
-    backgroundColor: getColor('secondary', 500) 
+    backgroundColor: '#6c757d' 
   };
   const buttonSuccessStyle = { 
     ...buttonStyle, 
-    backgroundColor: getColor('info', 500) 
+    backgroundColor: '#0d6efd' 
   };
   const tabsStyle = { display: 'flex', borderBottom: '1px solid #e5e5e5', marginBottom: '20px' };
   const tabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid transparent' };
