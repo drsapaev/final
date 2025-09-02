@@ -1,0 +1,41 @@
+{
+  "instructions": [
+    "Never revert code to its previous state if it has already been manually fixed.",
+    "Always treat the latest changes in the local project as the single source of truth.",
+    "Avoid code duplication — if similar functions appear, suggest refactoring into a shared solution.",
+    "Before rewriting a file, compare changes with the current version (diff).",
+    "If there is doubt or conflict, ask me instead of overwriting code automatically.",
+
+    "Follow best practices for readability and maintainability: clean architecture, separation of concerns, consistent formatting, and strict typing.",
+    "Use environment variables for all secrets and configuration. Never hardcode sensitive information.",
+    "Ensure secure handling of data: password hashing (bcrypt/argon2), role-based access control, audit logging, and encryption of clinical records.",
+    "When working with APIs or databases, always include proper error handling and input validation.",
+
+    "Propose improvements proactively — not only bug fixes but also refactoring and optimizations.",
+    "Automatically suggest unit and integration tests for new features.",
+    "Document changes clearly: update README, inline comments only when necessary, and maintain developer documentation.",
+    "Ensure every implementation passes linters, type checks, and automated tests.",
+    "Respect modern UI/UX principles: clean design, responsive layout, dark/light mode support, intuitive navigation.",
+    "For clinical data, prioritize compliance with privacy standards (GDPR/HIPAA) and enable anonymization where required.",
+
+    "Encourage modularity and scalability: design so that components, services, or databases can be swapped with minimal effort.",
+    "When introducing new features, consider future maintainability and suggest patterns that keep the system extensible.",
+
+    "PROJECT SPECIFIC RULES:",
+    "Always use the centralized theming system via useTheme() hook - never use direct designTokens imports.",
+    "Use getColor(), getSpacing(), getFontSize(), getShadow() utility functions for consistent styling.",
+    "All database operations must include proper audit logging for medical compliance.",
+    "Patient data handling requires explicit permission checks and data anonymization options.",
+    "For medical workflows (appointments, EMR, prescriptions), follow established patterns in existing endpoints.",
+    "Backend server should always be launched from C:\\final\\backend directory using uvicorn.",
+    "Russian language support is primary - ensure all user-facing text supports localization.",
+    "Maintain backward compatibility with existing API endpoints when making changes.",
+    "All medical data operations must be transactional and include rollback mechanisms.",
+    "Use existing authentication patterns (role-based: admin, doctor, registrar, lab, cashier, etc.)",
+    "WebSocket connections for real-time updates should follow the established patterns in backend/app/ws/",
+    "Payment integration uses PayMe provider - respect existing webhook patterns.",
+    "File uploads (medical documents, images) must include virus scanning and format validation.",
+    "Database migrations should be thoroughly tested and include rollback scripts.",
+    "Always test multi-user scenarios - clinic systems have concurrent user access patterns."
+  ]
+}
