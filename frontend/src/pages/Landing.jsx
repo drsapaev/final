@@ -28,7 +28,7 @@ export default function Landing() {
       ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
       : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
     padding: getSpacing('lg'),
-    fontFamily: designTokens.typography.fontFamily.sans.join(', '),
+    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
     color: textColor,
     display: 'flex',
     flexDirection: 'column',
@@ -54,7 +54,7 @@ export default function Landing() {
 
   const buttonStyle = {
     padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -77,7 +77,7 @@ export default function Landing() {
     fontSize: '48px',
     fontWeight: '800',
           marginBottom: getSpacing('md'),
-    background: `linear-gradient(135deg, ${designTokens.primary[600]} 0%, ${designTokens.primary[400]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 400)} 100%)`,
     backgroundClip: 'text',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
