@@ -11,6 +11,7 @@ const AppointmentsTable = ({
   headerHeight
 }) => {
   const [activeRow, setActiveRow] = useState(null); // <--- ДОБАВЛЕНО: состояние для активной строки
+  const { isDark, isLight, getColor, getSpacing } = useTheme();
 
   // Показывать ли пустые строки (можно сделать настраиваемым)
   const showEmptyRows = true;
@@ -101,29 +102,20 @@ const AppointmentsTable = ({
     return typeStyles[type] || { background: '#e9ecef', color: '#495057' };
   };
 
-  // Стили для способов оплаты
+  // Стили для способов оплаты с централизованной темой
   const getPaymentTypeStyle = (type) => {
     const paymentStyles = {
-      'cash': { background: '#e8f5e8', color: '#388e3c' },
-      'card': { background: '#e3f2fd', color: '#1976d2' },
-      'online': { background: '#fff3e0', color: '#f57c00' }
+      'cash': { background: getColor('success', 100), color: getColor('success', 700) },
+      'card': { background: getColor('info', 100), color: getColor('info', 700) },
+      'online': { background: getColor('warning', 100), color: getColor('warning', 700) }
     };
-    return paymentStyles[type] || { background: '#e9ecef', color: '#495057' };
+    return paymentStyles[type] || { 
+      background: isLight ? getColor('secondary', 100) : getColor('secondary', 800), 
+      color: isLight ? getColor('secondary', 700) : getColor('secondary', 200) 
+    };
   };
 
-  // Стили для услуг
-  const getServiceStyle = (service) => {
-    const serviceStyles = {
-      'derm': { background: '#e3f2fd', color: '#1976d2' },
-      'cosmetology': { background: '#fce4ec', color: '#c2185b' },
-      'cardio': { background: '#ffebee', color: '#d32f2f' },
-      'ecg': { background: '#e8f5e8', color: '#388e3c' },
-      'echo': { background: '#fff3e0', color: '#f57c00' },
-      'stomatology': { background: '#f3e5f5', color: '#7b1fa2' },
-      'lab': { background: '#e0f2f1', color: '#00695c' }
-    };
-    return serviceStyles[service] || { background: '#e9ecef', color: '#495057' };
-  };
+  // Дублированный код удален - функция уже определена выше
 
   // Константы ширин и позиций для фиксированных колонок
   const COL_WIDTHS = {
@@ -141,7 +133,7 @@ const AppointmentsTable = ({
   const headerStickyStyle = {
     position: 'sticky',
     zIndex: 800,
-    background: 'linear-gradient(135deg, #495057 0%, #6c757d 100%)',
+    background: `linear-gradient(135deg, ${getColor('secondary', 600)} 0%, ${getColor('secondary', 500)} 100%)`,
     boxShadow: '2px 0 5px rgba(0,0,0,0.1)'
   };
 

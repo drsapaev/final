@@ -68,9 +68,32 @@ const LabPanel = () => {
     }
   };
 
-  const pageStyle = { padding: '20px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' };
-  const cardStyle = { background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' };
-  const cardHeaderStyle = { padding: '20px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#28a745', color: 'white', borderRadius: '8px 8px 0 0' };
+  const pageStyle = { 
+    padding: getSpacing('lg'), 
+    maxWidth: '1400px', 
+    margin: '0 auto', 
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    background: isLight ? 'var(--bg-primary)' : 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    minHeight: '100vh'
+  };
+  const cardStyle = { 
+    background: 'var(--bg-primary)', 
+    border: '1px solid var(--border-color)', 
+    borderRadius: '12px', 
+    marginBottom: getSpacing('lg'), 
+    boxShadow: 'var(--shadow-md)' 
+  };
+  const cardHeaderStyle = { 
+    padding: getSpacing('lg'), 
+    borderBottom: '1px solid var(--border-color)', 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    backgroundColor: getColor('success', 500), 
+    color: 'white', 
+    borderRadius: '12px 12px 0 0' 
+  };
   const cardContentStyle = { padding: '20px' };
   const buttonStyle = { padding: '8px 16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px', fontSize: '14px' };
   const buttonSecondaryStyle = { ...buttonStyle, backgroundColor: '#6c757d' };

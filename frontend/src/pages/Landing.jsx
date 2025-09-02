@@ -15,6 +15,7 @@ export default function Landing() {
     getColor, 
     getSpacing, 
     getFontSize,
+    getShadow,
     designTokens 
   } = useTheme();
 
@@ -27,7 +28,7 @@ export default function Landing() {
       ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
       : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
     padding: getSpacing('lg'),
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: designTokens.typography.fontFamily.sans.join(', '),
     color: textColor,
     display: 'flex',
     flexDirection: 'column',
@@ -36,15 +37,15 @@ export default function Landing() {
   };
 
   const cardStyle = {
-    background: theme === 'light' 
+    background: isLight 
       ? 'rgba(255, 255, 255, 0.9)' 
-      : 'rgba(15, 23, 42, 0.9)',
-    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+      : 'rgba(30, 41, 59, 0.9)',
+    border: `1px solid ${isLight ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
     borderRadius: '20px',
-    padding: spacing.xxl,
-    marginBottom: spacing.lg,
-    boxShadow: theme === 'light' 
-      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+    padding: getSpacing('2xl'),
+    marginBottom: getSpacing('lg'),
+    boxShadow: isLight 
+      ? getShadow('xl')
       : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
     backdropFilter: 'blur(10px)',
     maxWidth: '600px',

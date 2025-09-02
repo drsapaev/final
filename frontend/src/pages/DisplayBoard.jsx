@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as api from '../api/client';
 import { openQueueWS } from '../api/ws';
+import { useTheme } from '../contexts/ThemeContext';
 
 /**
  * Экран табло ожидания (Full HD/UHD дружественно):
@@ -19,6 +20,8 @@ export default function DisplayBoard({
   contrast = false,
   fontScale = 1,
 }) {
+  const { isDark, isLight, getColor, getSpacing, getFontSize } = useTheme();
+  
   const qs = useMemo(
     () => ({ department: String(department).trim(), d: String(dateStr).trim() }),
     [department, dateStr]
@@ -295,20 +298,20 @@ function todayStr() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// Объявляем стили до их использования
+// Объявляем стили до их использования - используем CSS переменные
 const errBox = {
   textAlign: 'center',
-  color: '#fecaca',
-  background: 'rgba(239,68,68,0.2)',
-  border: '1px solid rgba(239,68,68,0.35)',
+  color: 'var(--danger-color)',
+  background: 'rgba(239, 68, 68, 0.1)',
+  border: '1px solid var(--danger-color)',
   padding: 8,
   borderRadius: 12,
 };
 
 const wrap = {
   minHeight: '100vh',
-  background: 'linear-gradient(180deg, #0f172a 0%, #111827 100%)',
-  color: 'white',
+  background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
+  color: 'var(--text-primary)',
   display: 'grid',
   gridTemplateRows: 'auto 1fr auto',
   gap: 24,

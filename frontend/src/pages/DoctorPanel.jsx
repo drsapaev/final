@@ -7,12 +7,9 @@ import {
   Skeleton, 
   AnimatedTransition,
   useBreakpoint,
-  useTouchDevice,
-  designTokens,
-  getColor,
-  getSpacing,
-  getFontSize
+  useTouchDevice
 } from '../design-system';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   User, 
   Calendar, 
@@ -59,6 +56,17 @@ const DoctorPanel = () => {
   // Refs
   const headerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+
+  // Используем централизованную систему темизации
+  const { 
+    isDark, 
+    isLight, 
+    getColor, 
+    getSpacing, 
+    getFontSize, 
+    getShadow,
+    designTokens 
+  } = useTheme();
 
   // Цвета и стили
   const primaryColor = getColor('primary', 500);
