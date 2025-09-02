@@ -29,6 +29,7 @@ from app.api.v1.endpoints import (
     dental,
     lab_specialized,
     admin_users,
+    appointment_flow,
 )
 
 api_router = APIRouter()
@@ -54,5 +55,6 @@ api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
 api_router.include_router(lab_specialized.router, tags=["lab_specialized"])
+api_router.include_router(appointment_flow.router, prefix="/appointments", tags=["appointment_flow"])
 api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(activation_ep.router, tags=["activation"])

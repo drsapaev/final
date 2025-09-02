@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import ServiceChecklist from '../components/ServiceChecklist';
 
 const DermatologistPanel = () => {
   const [activeTab, setActiveTab] = useState('patients');
@@ -9,6 +10,30 @@ const DermatologistPanel = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showExaminationForm, setShowExaminationForm] = useState(false);
   const [showProcedureForm, setShowProcedureForm] = useState(false);
+
+  // Дерма: выбор услуг и цена от врача
+  const [selectedServices, setSelectedServices] = useState([]);
+  const [doctorPrice, setDoctorPrice] = useState('');
+
+  // Локальный справочник цен для дерма/косметологии (синхронен с ServiceChecklist)
+  const dermaPriceMap = useMemo(() => ({
+    derma_consultation: 50000,
+    derma_biopsy: 150000,
+    cosm_cleaning: 80000,
+    cosm_botox: 300000,
+    cosm_laser: 250000,
+  }), []);
+
+  const servicesSubtotal = useMemo(() => {
+    return selectedServices.reduce((sum, id) => sum + (dermaPriceMap[id] || 0), 0);
+  }, [selectedServices, dermaPriceMap]);
+
+  const doctorPriceNum = useMemo(() => {
+    const n = Number(String(doctorPrice).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  }, [doctorPrice]);
+
+  const totalCost = useMemo(() => servicesSubtotal + doctorPriceNum, [servicesSubtotal, doctorPriceNum]);
 
   const [examinationForm, setExaminationForm] = useState({
     patient_id: '',
@@ -131,7 +156,13 @@ const DermatologistPanel = () => {
           'Content-Type': 'application/json',
           ...authHeader(),
         },
-        body: JSON.stringify(procedureForm),
+        body: JSON.stringify({
+          ...procedureForm,
+          services: selectedServices,
+          services_subtotal: servicesSubtotal,
+          doctor_price: doctorPriceNum,
+          total_cost: totalCost,
+        }),
       });
       if (response.ok) {
         setShowProcedureForm(false);
@@ -146,6 +177,8 @@ const DermatologistPanel = () => {
           results: '',
           recommendations: '',
         });
+        setSelectedServices([]);
+        setDoctorPrice('');
         loadCosmeticProcedures();
       }
     } catch (error) {
@@ -267,6 +300,18 @@ const DermatologistPanel = () => {
                       <div style={{ fontSize: '12px', color: '#666' }}>✨ Тип: {procedure.procedure_type} | 🎯 Область: {procedure.area_treated} | ⏱️ Длительность: {procedure.duration}</div>
                       <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>🧪 Техника: {procedure.technique} | 🧴 Продукты: {procedure.products_used}</div>
                       <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>📊 Результаты: {procedure.results}</div>
+                      {Array.isArray(procedure.services) && procedure.services.length > 0 && (
+                        <div style={{ fontSize: '12px', color: '#444', marginTop: '6px' }}>
+                          Услуги: {procedure.services.join(', ')}
+                        </div>
+                      )}
+                      {(procedure.total_cost || procedure.services_subtotal || procedure.doctor_price) && (
+                        <div style={{ fontSize: '12px', color: '#111', marginTop: '6px', fontWeight: 600 }}>
+                          Стоимость: {(procedure.total_cost ?? 0).toLocaleString()} UZS
+                          {procedure.services_subtotal ? ` (услуги: ${Number(procedure.services_subtotal).toLocaleString()} UZS` : ''}
+                          {procedure.doctor_price ? `${procedure.services_subtotal ? ', ' : ' ('}от врача: ${Number(procedure.doctor_price).toLocaleString()} UZS)` : (procedure.services_subtotal ? ')' : '')}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <button style={buttonStyle}>📋 Отчет</button>
@@ -368,6 +413,16 @@ const DermatologistPanel = () => {
           </div>
           <div style={cardContentStyle}>
             <form onSubmit={handleProcedureSubmit}>
+              {/* Выбор услуг (дерма/косметология) */}
+              <div>
+                <label style={labelStyle}>Услуги</label>
+                <ServiceChecklist
+                  value={selectedServices}
+                  onChange={setSelectedServices}
+                  department="derma"
+                />
+              </div>
+
               <div style={formStyle}>
                 <div>
                   <label style={labelStyle}>Дата процедуры *</label>
@@ -408,6 +463,32 @@ const DermatologistPanel = () => {
                 <div>
                   <label style={labelStyle}>Длительность процедуры (мин)</label>
                   <input style={inputStyle} value={procedureForm.duration} onChange={(e) => setProcedureForm({ ...procedureForm, duration: e.target.value })} placeholder="Время в минутах" />
+                </div>
+              </div>
+
+              {/* Стоимость от врача + Итог */}
+              <div style={formStyle}>
+                <div>
+                  <label style={labelStyle}>Стоимость от врача (UZS)</label>
+                  <input
+                    style={inputStyle}
+                    value={doctorPrice}
+                    onChange={(e) => setDoctorPrice(e.target.value)}
+                    placeholder="Например: 50000"
+                    inputMode="numeric"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Итого к оплате</label>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', height: '38px', padding: '0 12px',
+                    border: '1px dashed #ddd', borderRadius: '4px', fontWeight: 600
+                  }}>
+                    {totalCost.toLocaleString()} UZS
+                    <span style={{ marginLeft: '8px', color: '#666', fontWeight: 400 }}>
+                      (услуги: {servicesSubtotal.toLocaleString()} UZS{doctorPriceNum ? `, врач: ${doctorPriceNum.toLocaleString()} UZS` : ''})
+                    </span>
+                  </div>
                 </div>
               </div>
 

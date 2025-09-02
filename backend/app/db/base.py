@@ -20,3 +20,6 @@ from app.models import audit as _m_audit       # noqa: F401
 from app.models import service as _m_service   # noqa: F401
 from app.models import schedule as _m_schedule # noqa: F401
 from app.models import online as _m_online     # noqa: F401
+from app.models import appointment as _m_appointment # noqa: F401
+from app.models import emr as _m_emr           # noqa: F401
+from app.models import enums as _m_enums       # noqa: F401

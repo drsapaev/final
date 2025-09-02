@@ -59,5 +59,8 @@ function routeForRole(role) {
   if (r === 'lab') return '/lab-panel';
   if (r === 'doctor') return '/doctor';
   if (r === 'cashier') return '/cashier';
+  if (r === 'cardio') return '/cardiologist';
+  if (r === 'derma') return '/dermatologist';
+  if (r === 'dentist') return '/dentist';
   return '/';
 }

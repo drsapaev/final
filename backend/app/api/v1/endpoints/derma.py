@@ -13,7 +13,7 @@ router = APIRouter(prefix="/derma", tags=["derma"])
 @router.get("/examinations", summary="Осмотры кожи")
 async def get_skin_examinations(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
@@ -31,7 +31,7 @@ async def get_skin_examinations(
 async def create_skin_examination(
     examination_data: Dict[str, Any],
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
 ) -> Dict[str, Any]:
     """
     Создать новый осмотр кожи
@@ -46,7 +46,7 @@ async def create_skin_examination(
 @router.get("/procedures", summary="Косметические процедуры")
 async def get_cosmetic_procedures(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
     limit: int = Query(100, ge=1, le=1000),
     patient_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
@@ -64,7 +64,7 @@ async def get_cosmetic_procedures(
 async def create_cosmetic_procedure(
     procedure_data: Dict[str, Any],
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
 ) -> Dict[str, Any]:
     """
     Создать новую косметическую процедуру
@@ -79,7 +79,7 @@ async def create_cosmetic_procedure(
 @router.get("/photo-gallery", summary="Фотогалерея")
 async def get_photo_gallery(
     db: Session = Depends(deps.get_db),
-    user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
     patient_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """

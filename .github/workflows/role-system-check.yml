@@ -1,0 +1,63 @@
+name: Role System Integrity Check
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/src/App.jsx'
+      - 'frontend/src/pages/Login.jsx'
+      - 'frontend/src/pages/UserSelect.jsx'
+      - 'backend/app/api/v1/endpoints/*.py'
+      - 'backend/app/core/role_validation.py'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/src/App.jsx'
+      - 'frontend/src/pages/Login.jsx'
+      - 'frontend/src/pages/UserSelect.jsx'
+      - 'backend/app/api/v1/endpoints/*.py'
+      - 'backend/app/core/role_validation.py'
+
+jobs:
+  role-system-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install requests
+    
+    - name: Start backend server
+      run: |
+        cd backend
+        python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+        sleep 10
+    
+    - name: Run role system tests
+      run: |
+        cd backend
+        python test_role_routing.py
+    
+    - name: Check system integrity
+      run: |
+        cd backend
+        python check_system_integrity.py
+    
+    - name: Validate role consistency
+      run: |
+        cd backend
+        python -c "
+        from app.core.role_validation import validate_critical_user_roles
+        if not validate_critical_user_roles():
+            exit(1)
+        print('✅ Role validation passed')
+        "

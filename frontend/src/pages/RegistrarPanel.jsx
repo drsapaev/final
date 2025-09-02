@@ -3,6 +3,7 @@ import InputMask from 'react-input-mask';
 import { Toaster, toast } from 'react-hot-toast';
 import AppointmentsTable from '../components/AppointmentsTable';
 import ServiceChecklist from '../components/ServiceChecklist';
+import AppointmentFlow from '../components/AppointmentFlow';
 import ResponsiveTable from '../components/ResponsiveTable';
 import ResponsiveNavigation from '../components/ResponsiveNavigation';
 import { Button, Card, Badge, Skeleton, AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
@@ -34,6 +35,7 @@ import {
 import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
+ 
 
 const RegistrarPanel = () => {
   // Адаптивные хуки
@@ -128,19 +130,11 @@ const RegistrarPanel = () => {
   const [showAddressColumn, setShowAddressColumn] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [showSlotsModal, setShowSlotsModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showAppointmentFlow, setShowAppointmentFlow] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
 
-  // Высота фиксированной шапки для точного отступа контента
-  const [headerHeight, setHeaderHeight] = useState(0);
-  const headerRef = React.useRef(null);
-  useEffect(() => {
-    const measure = () => {
-      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight || 0);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
+  // Фиксированный хедер убран - теперь используется глобальный хедер
   
   // Состояния мастера
   const [wizardStep, setWizardStep] = useState(1);
@@ -258,105 +252,37 @@ const RegistrarPanel = () => {
   };
   const t = (key) => (translations[language] && translations[language][key]) || translations.ru[key] || key;
 
-  // Современная дизайн-система с CSS Custom Properties
-  const designTokens = {
-    // Основные цвета
-    primary: {
-      50: '#eff6ff',
-      100: '#dbeafe', 
-      200: '#bfdbfe',
-      300: '#93c5fd',
-      400: '#60a5fa',
-      500: '#3b82f6', // Основной синий
-      600: '#2563eb',
-      700: '#1d4ed8',
-      800: '#1e40af',
-      900: '#1e3a8a'
-    },
-    gray: {
-      50: '#f9fafb',
-      100: '#f3f4f6',
-      200: '#e5e7eb',
-      300: '#d1d5db',
-      400: '#9ca3af',
-      500: '#6b7280',
-      600: '#4b5563',
-      700: '#374151',
-      800: '#1f2937',
-      900: '#111827'
-    },
-    success: {
-      50: '#f0fdf4',
-      500: '#22c55e',
-      600: '#16a34a'
-    },
-    warning: {
-      50: '#fffbeb',
-      500: '#f59e0b',
-      600: '#d97706'
-    },
-    danger: {
-      50: '#fef2f2',
-      500: '#ef4444',
-      600: '#dc2626'
-    }
-  };
+  // Импортируем централизованную тему
+  const { 
+    isDark, 
+    isLight, 
+    getColor, 
+    getSpacing, 
+    getFontSize, 
+    designTokens 
+  } = useTheme();
 
-  // Адаптивные цвета для тем
-  const cardBg = theme === 'light' ? designTokens.gray[50] : designTokens.gray[900];
-  const textColor = theme === 'light' ? designTokens.gray[900] : designTokens.gray[50];
-  const borderColor = theme === 'light' ? designTokens.gray[200] : designTokens.gray[700];
-  const accentColor = designTokens.primary[500];
-  const successColor = designTokens.success[500];
-  const warningColor = designTokens.warning[500];
-  const dangerColor = designTokens.danger[500];
+  // Адаптивные цвета из централизованной системы темизации
+  const cardBg = isDark ? getColor('secondary', 900) : getColor('secondary', 50);
+  const textColor = isDark ? getColor('secondary', 50) : getColor('secondary', 900);
+  const borderColor = isDark ? getColor('secondary', 700) : getColor('secondary', 200);
+  const accentColor = getColor('primary', 500);
+  const successColor = getColor('success', 500);
+  const warningColor = getColor('warning', 500);
+  const dangerColor = getColor('danger', 500);
 
-  // Типографическая система
-  const typography = {
-    fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    fontSize: {
-      xs: '12px',
-      sm: '14px',
-      base: '16px',
-      lg: '18px',
-      xl: '20px',
-      '2xl': '24px',
-      '3xl': '30px',
-      '4xl': '36px'
-    },
-    fontWeight: {
-      normal: '400',
-      medium: '500',
-      semibold: '600',
-      bold: '700'
-    },
-    lineHeight: {
-      tight: '1.25',
-      normal: '1.5',
-      relaxed: '1.75'
-    }
-  };
-
-  // 8px Grid System для консистентных отступов
-  const spacing = {
-    xs: '4px',   // 0.5 * 8px
-    sm: '8px',   // 1 * 8px
-    md: '16px',  // 2 * 8px
-    lg: '24px',  // 3 * 8px
-    xl: '32px',  // 4 * 8px
-    '2xl': '40px', // 5 * 8px
-    '3xl': '48px', // 6 * 8px
-    '4xl': '64px'  // 8 * 8px
-  };
+  // Используем централизованную типографику и отступы
+  const typography = designTokens.typography;
+  const spacing = designTokens.spacing;
 
   const pageStyle = {
     padding: '0',
     maxWidth: 'none',
     margin: '0',
-    fontFamily: typography.fontFamily,
-    fontSize: isMobile ? typography.fontSize.sm : isTablet ? typography.fontSize.base : typography.fontSize.lg,
-    fontWeight: typography.fontWeight.normal,
-    lineHeight: typography.lineHeight.normal,
+    fontFamily: designTokens.typography.fontFamily.sans.join(', '),
+    fontSize: isMobile ? getFontSize('sm') : isTablet ? getFontSize('base') : getFontSize('lg'),
+    fontWeight: designTokens.typography.fontWeight.normal,
+    lineHeight: designTokens.typography.lineHeight.normal,
     background: theme === 'light' 
       ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
       : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -386,7 +312,7 @@ const RegistrarPanel = () => {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[700]} 50%, ${designTokens.primary[900]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 700)} 50%, ${getColor('primary', 900)} 100%)`,
     color: 'white',
     position: 'relative',
     overflow: 'hidden'
@@ -421,8 +347,8 @@ const RegistrarPanel = () => {
   };
 
   const buttonStyle = {
-    padding: `${spacing.sm} ${spacing.lg}`,
-    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -502,7 +428,7 @@ const RegistrarPanel = () => {
 
   const activeTabStyle = {
     ...tabStyle,
-    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
     transform: 'translateY(-2px)'
@@ -531,6 +457,61 @@ const RegistrarPanel = () => {
   useEffect(() => {
     loadAppointments();
   }, []);
+
+  // Функции для жесткого потока
+  const handleStartVisit = async (appointment) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${appointment.id}/start-visit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        const updatedAppointment = await response.json();
+        // Обновляем список записей
+        setAppointments(prev => prev.map(apt => 
+          apt.id === appointment.id ? updatedAppointment : apt
+        ));
+        toast.success('Прием начат успешно!');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Ошибка при начале приема');
+      }
+    } catch (error) {
+      console.error('RegistrarPanel: Start visit error:', error);
+      toast.error('Ошибка при начале приема');
+    }
+  };
+
+  const handlePayment = async (appointment) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${appointment.id}/mark-paid`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        const updatedAppointment = await response.json();
+        // Обновляем список записей
+        setAppointments(prev => prev.map(apt => 
+          apt.id === appointment.id ? updatedAppointment : apt
+        ));
+        toast.success('Запись отмечена как оплаченная!');
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || 'Ошибка при оплате');
+      }
+    } catch (error) {
+      console.error('RegistrarPanel: Payment error:', error);
+      toast.error('Ошибка при оплате');
+    }
+  };
 
   // Обработчики событий
   const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '') => {
@@ -642,139 +623,12 @@ const RegistrarPanel = () => {
     activeQueues: appointments.filter(a => a.status === 'queued').length
   };
 
+  
+
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
       <Toaster position="bottom-right" />
-      {/* Фиксированная верхняя часть */}
-      <div ref={headerRef} style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 1000,
-        background: theme === 'light' 
-          ? 'rgba(248, 250, 252, 0.8)' 
-          : 'rgba(15, 23, 42, 0.8)',
-        backdropFilter: 'blur(20px)',
-        padding: '20px',
-        borderBottom: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-        boxShadow: theme === 'light' 
-          ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
-      }}>
-        {/* Верхнее меню */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-          padding: isMobile ? '16px' : '20px 24px',
-          border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-          borderRadius: isMobile ? '12px' : '20px',
-          marginBottom: isMobile ? '12px' : '20px',
-          background: theme === 'light' 
-            ? 'rgba(255, 255, 255, 0.9)' 
-            : 'rgba(15, 23, 42, 0.9)',
-          backdropFilter: 'blur(20px)',
-          color: theme === 'light' ? designTokens.gray[900] : designTokens.gray[50],
-          boxShadow: theme === 'light' 
-            ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          flexWrap: isMobile ? 'wrap' : 'nowrap',
-          gap: isMobile ? '12px' : '0'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize['2xl'] }}>
-              <Hospital size={28} color={designTokens.primary[500]} />
-              <span>Clinic</span>
-        </div>
-            <div style={{ opacity: 0.7, fontSize: typography.fontSize.base }}>|</div>
-            <div style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.medium }}>{language === 'ru' ? 'Панель регистратора' : 'Registrar Panel'}</div>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Основные функции */}
-            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
-              <Calendar size={isMobile ? 14 : 16} />
-              {!isMobile && 'Расписание'}
-            </Button>
-            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
-              <Search size={isMobile ? 14 : 16} />
-              {!isMobile && 'Поиск пациента'}
-            </Button>
-            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
-              <MessageCircle size={isMobile ? 14 : 16} />
-              {!isMobile && 'Сообщения'}
-            </Button>
-            <Button variant="primary" size={isMobile ? 'sm' : 'md'}>
-              <HelpCircle size={isMobile ? 14 : 16} />
-              {!isMobile && 'Справка'}
-            </Button>
-            
-            {/* Разделитель */}
-            <div style={{ 
-              width: '1px', 
-              height: '24px', 
-              background: '#e5e5e5', 
-              margin: '0 8px' 
-            }} />
-            
-                    {/* Быстрые действия */}
-        <Button variant="primary" size={isMobile ? 'sm' : 'md'} onClick={() => setShowWizard(true)}>
-          <Plus size={isMobile ? 14 : 16} />
-          {!isMobile && t('new_appointment')}
-        </Button>
-            
-            {/* Разделитель */}
-            <div style={{ 
-              width: '1px', 
-              height: '24px', 
-              background: '#e5e5e5', 
-              margin: '0 8px' 
-            }} />
-            
-            {/* Настройки */}
-          <select
-            aria-label="Язык интерфейса"
-            value={language}
-            onChange={(e)=>setLanguage(e.target.value)}
-              style={{ 
-                padding: '8px 12px', 
-                border: '1px solid #e5e5e5', 
-                borderRadius: '8px', 
-                background: 'inherit', 
-                color: 'inherit',
-                fontSize: '14px'
-              }}
-            >
-              <option value="ru">🇷🇺 RU</option>
-              <option value="uz">🇺🇿 UZ</option>
-          </select>
-          <button
-            aria-label="Переключить тему"
-            onClick={()=>setTheme(theme === 'light' ? 'dark' : 'light')}
-              style={{ 
-                padding: '8px 12px', 
-                border: '1px solid #e5e5e5', 
-                borderRadius: '8px', 
-                background: 'inherit', 
-                color: 'inherit',
-                fontSize: '16px'
-              }}
-            >
-              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
-            <Button
-              variant="danger"
-              size="sm"
-            aria-label="Выход"
-            onClick={()=>{ localStorage.removeItem('auth_token'); window.location.href = '/login'; }}
-          >
-              <LogOut size={14} />
-              Выход
-            </Button>
-        </div>
-      </div>
+      {/* Фиксированная верхняя часть убрана - используется глобальный хедер */}
 
       {/* Вкладки */}
         <div style={{
@@ -861,10 +715,10 @@ const RegistrarPanel = () => {
           {t('tabs_procedures')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('proc')).length})
         </button>
       </div>
-      </div> {/* Закрытие фиксированного контейнера */}
+      {/* </div> Закрытие фиксированного контейнера */}
 
-      {/* Скроллируемый контент с отступом сверху */}
-      <div style={{ marginTop: `${headerHeight}px`, overflow: 'hidden' }}>
+      {/* Основной контент без отступа сверху */}
+      <div style={{ overflow: 'hidden' }}>
         {/* Экран приветствия */}
         {activeTab === 'welcome' && (
           <AnimatedTransition type="fade" delay={100}>
@@ -1186,8 +1040,9 @@ const RegistrarPanel = () => {
                     setAppointmentsSelected(newSelected);
                   }}
                   onRowClick={(row, index) => {
-                    // Логика клика по строке
-                    console.log('Row clicked', row, index);
+                    // Открываем поток записи
+                    setSelectedAppointment(row);
+                    setShowAppointmentFlow(true);
                   }}
                 />
               )}
@@ -1478,6 +1333,43 @@ const RegistrarPanel = () => {
             <button style={buttonStyle} onClick={() => setShowQRModal(false)}>
               {t('close')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно жесткого потока */}
+      {showAppointmentFlow && selectedAppointment && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} role="dialog" aria-modal="true">
+          <div style={{
+            background: cardBg,
+            padding: '32px',
+            borderRadius: '16px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0 }}>🔄 Поток записи</h2>
+              <button onClick={() => setShowAppointmentFlow(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            <AppointmentFlow
+              appointment={selectedAppointment}
+              onStartVisit={handleStartVisit}
+              onPayment={handlePayment}
+            />
           </div>
         </div>
       )}

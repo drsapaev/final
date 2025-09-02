@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.crud.base import CRUDBase
 from app.models.appointment import Appointment
+from app.models.enums import AppointmentStatus, normalize_appointment_status, can_transition_status
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 from datetime import datetime, date
+from fastapi import HTTPException
 
 class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate]):
     def get_appointments(
@@ -170,6 +172,94 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
                 self.model.status != "cancelled"
             )
         ).order_by(self.model.appointment_date, self.model.appointment_time).limit(limit).all()
+    
+    def update_status(
+        self, 
+        db: Session, 
+        *, 
+        appointment_id: int, 
+        new_status: str, 
+        validate_transition: bool = True
+    ) -> Optional[Appointment]:
+        """
+        Обновить статус записи с валидацией перехода
+        """
+        appointment = db.query(self.model).filter(self.model.id == appointment_id).first()
+        if not appointment:
+            return None
+        
+        current_status = normalize_appointment_status(appointment.status)
+        new_status_normalized = normalize_appointment_status(new_status)
+        
+        if validate_transition and not can_transition_status(current_status, new_status_normalized):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Недопустимый переход статуса: {current_status} -> {new_status_normalized}"
+            )
+        
+        appointment.status = new_status_normalized
+        appointment.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(appointment)
+        return appointment
+    
+    def start_visit(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+        """
+        Начать прием (переход paid -> in_visit)
+        """
+        return self.update_status(db, appointment_id=appointment_id, new_status=AppointmentStatus.IN_VISIT)
+    
+    def complete_visit(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+        """
+        Завершить прием (переход in_visit -> completed)
+        """
+        return self.update_status(db, appointment_id=appointment_id, new_status=AppointmentStatus.COMPLETED)
+    
+    def mark_paid(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+        """
+        Отметить как оплаченное (переход pending -> paid)
+        """
+        return self.update_status(db, appointment_id=appointment_id, new_status=AppointmentStatus.PAID)
+    
+    def cancel_appointment(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+        """
+        Отменить запись
+        """
+        return self.update_status(db, appointment_id=appointment_id, new_status=AppointmentStatus.CANCELLED)
+    
+    def mark_no_show(self, db: Session, *, appointment_id: int) -> Optional[Appointment]:
+        """
+        Отметить как неявку
+        """
+        return self.update_status(db, appointment_id=appointment_id, new_status=AppointmentStatus.NO_SHOW)
+    
+    def get_by_status(
+        self, 
+        db: Session, 
+        *, 
+        status: str, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Appointment]:
+        """
+        Получить записи по статусу
+        """
+        normalized_status = normalize_appointment_status(status)
+        return db.query(self.model).filter(
+            self.model.status == normalized_status
+        ).offset(skip).limit(limit).all()
+    
+    def get_paid_appointments(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[Appointment]:
+        """
+        Получить оплаченные записи для отправки к врачу
+        """
+        return self.get_by_status(db, status=AppointmentStatus.PAID, skip=skip, limit=limit)
+    
+    def get_active_visits(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[Appointment]:
+        """
+        Получить активные приемы (in_visit)
+        """
+        return self.get_by_status(db, status=AppointmentStatus.IN_VISIT, skip=skip, limit=limit)
 
 appointment = CRUDAppointment(Appointment)
 

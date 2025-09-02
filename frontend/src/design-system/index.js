@@ -206,4 +206,6 @@ export * from './hooks';
 // Экспорт стилей
 export * from './styles';
 
+// Тема экспортируется из contexts/ThemeContext.jsx
+
 export default designTokens;

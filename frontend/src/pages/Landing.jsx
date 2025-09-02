@@ -1,38 +1,226 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Landing() {
   const navigate = useNavigate();
+  const [language, setLanguage] = useState('RU');
+  
+  // Используем централизованную систему темизации
+  const { 
+    theme, 
+    isDark, 
+    isLight, 
+    toggleTheme, 
+    getColor, 
+    getSpacing, 
+    getFontSize,
+    designTokens 
+  } = useTheme();
+
+  const textColor = isDark ? getColor('secondary', 200) : getColor('secondary', 700);
+  const bgColor = isDark ? getColor('secondary', 900) : getColor('secondary', 50);
+
+  const pageStyle = {
+    minHeight: '100vh',
+    background: isLight 
+      ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
+      : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
+    padding: getSpacing('lg'),
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    color: textColor,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center'
+  };
+
+  const cardStyle = {
+    background: theme === 'light' 
+      ? 'rgba(255, 255, 255, 0.9)' 
+      : 'rgba(15, 23, 42, 0.9)',
+    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+    borderRadius: '20px',
+    padding: spacing.xxl,
+    marginBottom: spacing.lg,
+    boxShadow: theme === 'light' 
+      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+    backdropFilter: 'blur(10px)',
+    maxWidth: '600px',
+    width: '100%'
+  };
+
+  const buttonStyle = {
+    padding: `${spacing.sm} ${spacing.lg}`,
+    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm
+  };
+
+  const buttonSecondaryStyle = {
+    ...buttonStyle,
+    background: `linear-gradient(135deg, ${designTokens.gray[500]} 0%, ${designTokens.gray[600]} 100%)`,
+    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
+  };
+
+  const headerStyle = {
+    fontSize: '48px',
+    fontWeight: '800',
+    marginBottom: spacing.md,
+    background: `linear-gradient(135deg, ${designTokens.primary[600]} 0%, ${designTokens.primary[400]} 100%)`,
+    backgroundClip: 'text',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    textAlign: 'center'
+  };
+
+  const subtitleStyle = {
+    fontSize: '18px',
+    opacity: 0.8,
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+    lineHeight: '1.6'
+  };
+
+  const contactCardStyle = {
+    ...cardStyle,
+    padding: getSpacing('lg'),
+    marginBottom: spacing.sm
+  };
+
+  const toggleButtonStyle = {
+    padding: spacing.xs,
+    background: 'transparent',
+    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    borderRadius: '8px',
+    cursor: 'pointer',
+    color: textColor,
+    marginLeft: spacing.sm
+  };
+
+  const translations = {
+    RU: {
+      title: '🏥 Clinic Manager',
+      subtitle: 'Добро пожаловать в современную систему управления клиникой',
+      login: 'Войти',
+      activate: 'Активировать аккаунт',
+      contacts: 'Контакты',
+      address: 'Адрес: г. Ташкент, ул. Примерная 1',
+      phone: 'Телефон: +998 (90) 000-00-00',
+      schedule: 'График: Пн–Сб 9:00–18:00',
+      telegram: 'Telegram: @clinic',
+      footer: 'v1.0.0 · Политика конфиденциальности · Условия использования'
+    },
+    UZ: {
+      title: '🏥 Klinika Menejeri',
+      subtitle: 'Zamonaviy klinika boshqaruv tizimiga xush kelibsiz',
+      login: 'Kirish',
+      activate: 'Akkauntni faollashtirish',
+      contacts: 'Kontaktlar',
+      address: 'Manzil: Toshkent sh., Namunaviy k., 1-uy',
+      phone: 'Telefon: +998 (90) 000-00-00',
+      schedule: 'Ish vaqti: Du–Sha 9:00–18:00',
+      telegram: 'Telegram: @clinic',
+      footer: 'v1.0.0 · Maxfiylik siyosati · Foydalanish shartlari'
+    },
+    EN: {
+      title: '🏥 Clinic Manager',
+      subtitle: 'Welcome to the modern clinic management system',
+      login: 'Login',
+      activate: 'Activate Account',
+      contacts: 'Contacts',
+      address: 'Address: Tashkent, Example St. 1',
+      phone: 'Phone: +998 (90) 000-00-00',
+      schedule: 'Schedule: Mon–Sat 9:00–18:00',
+      telegram: 'Telegram: @clinic',
+      footer: 'v1.0.0 · Privacy Policy · Terms of Use'
+    }
+  };
+
+  const t = translations[language];
+
   return (
-    <div style={wrap}>
-      <div style={card}>
-        <div style={{ fontSize: 36, fontWeight: 800, marginBottom: 8 }}>🏥 Clinic Manager</div>
-        <div style={{ opacity: .7, marginBottom: 16 }}>Добро пожаловать в систему клиники</div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-          <button onClick={()=>navigate('/login')} style={btnPrimary}>Войти</button>
-          <button onClick={()=>navigate('/activation')} style={btn}>Активировать аккаунт</button>
-        </div>
-        <div style={{ marginTop: 8, fontSize: 12, opacity: .7 }}>
-          RU / UZ / EN
+    <div style={pageStyle}>
+      {/* Переключатели темы и языка */}
+              <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
+        <button 
+          onClick={toggleTheme}
+          style={toggleButtonStyle}
+          title="Переключить тему"
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+        <select 
+          value={language} 
+          onChange={(e) => setLanguage(e.target.value)}
+          style={{
+            ...toggleButtonStyle,
+            marginLeft: getSpacing('sm'),
+            background: isLight ? 'white' : getColor('secondary', 800)
+          }}
+        >
+          <option value="RU">RU</option>
+          <option value="UZ">UZ</option>
+          <option value="EN">EN</option>
+        </select>
+      </div>
+
+      {/* Главная карточка */}
+      <div style={cardStyle}>
+        <div style={headerStyle}>{t.title}</div>
+        <div style={subtitleStyle}>{t.subtitle}</div>
+        
+        <div style={{ display: 'flex', gap: getSpacing('sm'), flexWrap: 'wrap', justifyContent: 'center', marginBottom: getSpacing('lg') }}>
+          <button 
+            onClick={() => navigate('/login')} 
+            style={buttonStyle}
+            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+          >
+            {t.login}
+          </button>
+          <button 
+            onClick={() => navigate('/activation')} 
+            style={buttonSecondaryStyle}
+            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+          >
+            {t.activate}
+          </button>
         </div>
       </div>
 
-      <div style={card}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Контакты</div>
-        <div>Адрес: г. Ташкент, ул. Примерная 1</div>
-        <div>Телефон: +998 (90) 000-00-00</div>
-        <div>График: Пн–Сб 9:00–18:00</div>
-        <div>Telegram: @clinic</div>
+      {/* Карточка контактов */}
+      <div style={contactCardStyle}>
+        <div style={{ fontWeight: '700', marginBottom: spacing.sm, fontSize: '18px', color: designTokens.primary[600] }}>
+          {t.contacts}
+        </div>
+        <div style={{ lineHeight: '1.6' }}>
+          <div style={{ marginBottom: '4px' }}>{t.address}</div>
+          <div style={{ marginBottom: '4px' }}>{t.phone}</div>
+          <div style={{ marginBottom: '4px' }}>{t.schedule}</div>
+          <div>{t.telegram}</div>
+        </div>
       </div>
 
-      <div style={{ opacity: .6, fontSize: 12, marginTop: 12 }}>
-        v0.1.0 · Политика конфиденциальности · Условия использования
+      {/* Футер */}
+      <div style={{ 
+        opacity: 0.6, 
+        fontSize: '14px', 
+        textAlign: 'center',
+        marginTop: spacing.lg 
+      }}>
+        {t.footer}
       </div>
     </div>
   );
 }
-
-const wrap = { maxWidth: 920, margin: '40px auto', padding: 16, display: 'grid', gap: 16 };
-const card = { border: '1px solid #eee', borderRadius: 12, background: '#fff', padding: 16 };
-const btn = { padding: '10px 14px', borderRadius: 10, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' };
-const btnPrimary = { ...btn, borderColor: '#0284c7', background: '#0ea5e9', color: '#fff' };

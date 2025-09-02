@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { ThemeProvider } from './contexts/ThemeContext.jsx';
+import PWAInstallPrompt from './components/PWAInstallPrompt.jsx';
+import './styles/theme.css';
+import './styles/theme.css';
 
 import Header from './components/Header.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -7,10 +11,7 @@ import Sidebar from './components/Sidebar.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
-import Registrar from './pages/Registrar.jsx';
 // import Doctor from './pages/Doctor.jsx';
-import Lab from './pages/Lab.jsx';
-import Cashier from './pages/Cashier.jsx';
 import CashierPanel from './pages/CashierPanel.jsx';
 import Settings from './pages/Settings.jsx';
 import Audit from './pages/Audit.jsx';
@@ -27,6 +28,8 @@ import LabPanel from './pages/LabPanel.jsx';
 import UserSelect from './pages/UserSelect.jsx';
 import Search from './pages/Search.jsx';
 import PatientPanel from './pages/PatientPanel.jsx';
+import QueueBoard from './pages/QueueBoard.jsx';
+import DisplayBoardPage from './pages/DisplayBoardPage.jsx';
 
 import auth from './stores/auth.js';
 
@@ -54,20 +57,18 @@ function RequireAuth({ roles, children }) {
   return children || <Outlet />;
 }
 
-/** Каркас: только Nav, без дублирующего заголовка */
+/** Каркас: хедер на весь экран для всех панелей */
 function AppShell() {
   const location = useLocation();
   const path = location.pathname;
-  const isRegistrarPanel = path === '/registrar-panel';
-  const hideSidebar = isRegistrarPanel || path === '/doctor-panel';
+  const hideSidebar = path === '/registrar-panel' || path === '/doctor-panel';
   
   return (
     <div style={wrapStyle}>
-      {!isRegistrarPanel && (
-        <header style={hdr}>
-          <Header />
-        </header>
-      )}
+      {/* Хедер на весь экран для всех панелей */}
+      <header style={hdr}>
+        <Header />
+      </header>
       <div style={{ display: 'grid', gridTemplateColumns: hideSidebar ? '1fr' : '240px 1fr' }}>
         {!hideSidebar && <Sidebar />}
         <main style={{ ...main, ...(hideSidebar && { maxWidth: 'none', margin: 0, padding: 0 }) }}>
@@ -80,25 +81,27 @@ function AppShell() {
 
 export default function App() {
   return (
-    <Routes>
+    <ThemeProvider>
+      <PWAInstallPrompt />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Landing />} />
       <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route path="registrar"     element={<RequireAuth roles={['Admin','Registrar']}><Registrar /></RequireAuth>} />
           <Route path="doctor"        element={<Navigate to="/doctor-panel" replace />} />
-          <Route path="lab"           element={<RequireAuth roles={['Admin','Lab']}><Lab /></RequireAuth>} />
-          <Route path="cashier"       element={<RequireAuth roles={['Admin','Cashier']}><Cashier /></RequireAuth>} />
           <Route path="cashier-panel" element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
           <Route path="admin"         element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
           <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
-          <Route path="cardiologist"  element={<RequireAuth roles={['Admin','Doctor']}><CardiologistPanel /></RequireAuth>} />
-          <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor']}><DermatologistPanel /></RequireAuth>} />
-          <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor']}><DentistPanel /></RequireAuth>} />
+          <Route path="cardiologist"  element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanel /></RequireAuth>} />
+          <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
+          <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
           <Route path="lab-panel"     element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
           <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
+          <Route path="queue-board"   element={<QueueBoard />} />
+          <Route path="display-board" element={<DisplayBoardPage />} />
+          <Route path="display-board/:role" element={<DisplayBoardPage />} />
           <Route path="settings"      element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
           <Route path="audit"         element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
           <Route path="scheduler"     element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
@@ -109,27 +112,32 @@ export default function App() {
         </Route>
       </Route>
     </Routes>
+    </ThemeProvider>
   );
 }
 
 const wrapStyle = {
   fontFamily:
     'system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"',
-  color: '#0f172a',
+  color: 'var(--text-primary)',
   minHeight: '100vh',
-  background: '#f8fafc',
+  background: 'var(--bg-secondary)',
+  width: '100%',
+  margin: 0,
+  padding: 0,
+  boxSizing: 'border-box'
 };
 const hdr = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  padding: '10px 12px',
-  borderBottom: '1px solid #e5e7eb',
-  position: 'sticky',
-  top: 0,
-  background: 'white',
-  zIndex: 10,
+  width: '100%',
+  margin: 0,
+  padding: 0,
+  boxSizing: 'border-box'
 };
-const main = { padding: 16, maxWidth: 1100, margin: '0 auto' };
+const main = { 
+  padding: 16, 
+  maxWidth: 1100, 
+  margin: '0 auto',
+  width: '100%',
+  boxSizing: 'border-box'
+};
 

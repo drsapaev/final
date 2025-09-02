@@ -6,8 +6,9 @@ const item = {
   display: 'block',
   padding: '8px 10px',
   borderRadius: 8,
-  color: '#111',
+  color: 'var(--text-secondary)',
   textDecoration: 'none',
+  transition: 'all 0.2s ease',
 };
 
 export default function Sidebar() {
@@ -44,7 +45,7 @@ export default function Sidebar() {
   const items = [...byRole, ...common];
 
   return (
-    <aside style={{ width: 240, borderRight: '1px solid #e5e7eb', padding: 12, background: '#fff' }}>
+    <aside style={{ width: 240, borderRight: '1px solid var(--border-color)', padding: 12, background: 'var(--bg-primary)' }}>
       <div style={{ display: 'grid', gap: 6 }}>
         {/* Общие пункты для демонстрации */}
         <NavLink
@@ -52,8 +53,8 @@ export default function Sidebar() {
           to="/patient-panel"
           style={({ isActive }) => ({
             ...item,
-            background: isActive ? '#111' : '#fff',
-            color: isActive ? '#fff' : '#111',
+            background: isActive ? 'var(--text-primary)' : 'transparent',
+            color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
           })}
         >Пациент</NavLink>
         {items.map(x => (
@@ -62,8 +63,8 @@ export default function Sidebar() {
             to={x.to}
             style={({ isActive }) => ({
               ...item,
-              background: isActive ? '#111' : '#fff',
-              color: isActive ? '#fff' : '#111',
+              background: isActive ? 'var(--text-primary)' : 'transparent',
+              color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
             })}
           >
             {x.label}

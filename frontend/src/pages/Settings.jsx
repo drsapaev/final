@@ -109,8 +109,8 @@ export default function Settings() {
   }
 
   useEffect(() => {
-    if (tab === 'printer' || tab === 'online_queue') {
-      const c = tab === 'printer' ? 'printer' : 'online_queue';
+    if (tab === 'printer' || tab === 'online_queue' || tab === 'display_board') {
+      const c = tab === 'printer' ? 'printer' : (tab === 'online_queue' ? 'online_queue' : 'display_board');
       setCat(c);
       loadCat(c);
     }
@@ -142,6 +142,7 @@ export default function Settings() {
             <TabButton active={tab==='license'} onClick={()=>setTab('license')}>Лицензия</TabButton>
             <TabButton active={tab==='printer'} onClick={()=>setTab('printer')}>Принтер</TabButton>
             <TabButton active={tab==='online_queue'} onClick={()=>setTab('online_queue')}>Онлайн-очередь</TabButton>
+            <TabButton active={tab==='display_board'} onClick={()=>setTab('display_board')}>Табло очереди</TabButton>
           </div>
 
           {tab === 'license' && (
@@ -178,7 +179,7 @@ export default function Settings() {
             </div>
           )}
 
-          {(tab === 'printer' || tab === 'online_queue') && (
+          {(tab === 'printer' || tab === 'online_queue' || tab === 'display_board') && (
             <div style={{ display: 'grid', gap: 12 }}>
               <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>
@@ -200,6 +201,32 @@ export default function Settings() {
                   )}
                 </div>
               </div>
+
+              {tab === 'display_board' && (
+                <>
+                  <div style={card}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: бренд и объявления</div>
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <KVField label="Бренд (brand)" defKey="brand" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Логотип (logo URL)" defKey="logo" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Объявление RU (announcement_ru)" defKey="announcement_ru" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Объявление UZ (announcement_uz)" defKey="announcement_uz" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Объявление EN (announcement_en)" defKey="announcement_en" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Основной цвет (primary_color)" defKey="primary_color" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Цвет фона (bg_color)" defKey="bg_color" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Цвет текста (text_color)" defKey="text_color" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Контраст по умолчанию (contrast_default=true/false)" defKey="contrast_default" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Киоск по умолчанию (kiosk_default=true/false)" defKey="kiosk_default" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                      <KVField label="Звук по умолчанию (sound_default=true/false)" defKey="sound_default" items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                    </div>
+                  </div>
+
+                  <div style={card}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Табло: мэппинг Роль → Отделение</div>
+                    <RoleMapEditor items={items} onSave={(k,v)=>saveKV('display_board', k, v)} />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -214,4 +241,38 @@ const inp  = { padding: '6px 10px', border: '1px solid #ddd', borderRadius: 8, b
 const btn  = { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' };
 const btnPrimary = { ...btn, borderColor: '#0284c7', background: '#0ea5e9', color: '#fff' };
 const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8 };
+
+function KVField({ label, defKey, items, onSave }) {
+  const found = (items || []).find((x) => x.key === defKey);
+  const [val, setVal] = React.useState(found?.value || '');
+  React.useEffect(() => setVal(found?.value || ''), [found?.value]);
+  return (
+    <div style={row}>
+      <div style={{ fontWeight: 600 }}>{label}</div>
+      <input value={val} onChange={(e)=>setVal(e.target.value)} style={inp} />
+      <button onClick={()=>onSave(defKey, val)} style={btn}>Сохранить</button>
+    </div>
+  );
+}
+
+function RoleMapEditor({ items, onSave }) {
+  const roles = ['admin','registrar','doctor','cardio','derma','dentist','lab','procedures','cashier','patient'];
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {roles.map((r) => {
+        const key = r;
+        const found = (items || []).find((x) => x.key === key);
+        const [val, setVal] = React.useState(found?.value || '');
+        React.useEffect(() => setVal(found?.value || ''), [found?.value]);
+        return (
+          <div key={key} style={row}>
+            <div style={{ fontWeight: 600 }}>{r}</div>
+            <input value={val} onChange={(e)=>setVal(e.target.value)} style={inp} placeholder="Например: Cardio" />
+            <button onClick={()=>onSave(key, val)} style={btn}>Сохранить</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 

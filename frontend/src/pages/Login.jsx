@@ -26,6 +26,97 @@ export default function Login() {
   const [password, setPassword] = useState('admin123');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [theme, setTheme] = useState('light');
+  const [language, setLanguage] = useState('RU');
+
+  // Design tokens как в Landing и RegistrarPanel
+  const designTokens = {
+    primary: {
+      50: '#eff6ff',
+      100: '#dbeafe', 
+      200: '#bfdbfe',
+      300: '#93c5fd',
+      400: '#60a5fa',
+      500: '#3b82f6',
+      600: '#2563eb',
+      700: '#1d4ed8',
+      800: '#1e40af',
+      900: '#1e3a8a'
+    },
+    gray: {
+      50: '#f9fafb',
+      100: '#f3f4f6',
+      200: '#e5e7eb',
+      300: '#d1d5db',
+      400: '#9ca3af',
+      500: '#6b7280',
+      600: '#4b5563',
+      700: '#374151',
+      800: '#1f2937',
+      900: '#111827'
+    },
+    success: {
+      500: '#10b981',
+      600: '#059669'
+    },
+    danger: {
+      500: '#ef4444',
+      600: '#dc2626'
+    }
+  };
+
+  const spacing = {
+    xs: '8px',
+    sm: '12px',
+    md: '16px',
+    lg: '20px',
+    xl: '24px',
+    xxl: '32px'
+  };
+
+  const translations = {
+    RU: {
+      title: 'Вход в систему',
+      subtitle: 'Войдите в свой аккаунт для продолжения работы',
+      selectRole: 'Выбрать роль',
+      username: 'Логин',
+      password: 'Пароль',
+      login: 'Войти',
+      loggingIn: 'Входим...',
+      forgotPassword: 'Забыли пароль?',
+      rememberMe: 'Запомнить меня',
+      backToHome: 'На главную',
+      note: 'По умолчанию админ создаётся скриптом create_admin.py (admin/admin123).'
+    },
+    UZ: {
+      title: 'Tizimga kirish',
+      subtitle: 'Ishni davom ettirish uchun akkauntingizga kiring',
+      selectRole: 'Rolni tanlang',
+      username: 'Login',
+      password: 'Parol',
+      login: 'Kirish',
+      loggingIn: 'Kirilmoqda...',
+      forgotPassword: 'Parolni unutdingizmi?',
+      rememberMe: 'Meni eslab qol',
+      backToHome: 'Bosh sahifaga',
+      note: 'Odatiy holda admin create_admin.py skripti bilan yaratiladi (admin/admin123).'
+    },
+    EN: {
+      title: 'System Login',
+      subtitle: 'Sign in to your account to continue',
+      selectRole: 'Select Role',
+      username: 'Username',
+      password: 'Password',
+      login: 'Sign In',
+      loggingIn: 'Signing in...',
+      forgotPassword: 'Forgot password?',
+      rememberMe: 'Remember me',
+      backToHome: 'Back to Home',
+      note: 'By default, admin is created by create_admin.py script (admin/admin123).'
+    }
+  };
+
+  const t = translations[language];
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,8 +166,11 @@ export default function Login() {
       if (role === 'admin') return '/admin'; // или "/user-select"
       if (role === 'registrar') return '/registrar-panel';
       if (role === 'lab') return '/lab-panel';
-      if (role === 'doctor') return '/doctor';
+      if (role === 'doctor') return '/doctor-panel';
       if (role === 'cashier') return '/cashier';
+      if (role === 'cardio') return '/cardiologist';
+      if (role === 'derma') return '/dermatologist';
+      if (role === 'dentist') return '/dentist';
       return '/search';
     } catch {
       // Игнорируем ошибки доступа к localStorage
@@ -102,50 +196,269 @@ export default function Login() {
     }
   }
 
+  const textColor = theme === 'light' ? designTokens.gray[700] : designTokens.gray[200];
+
+  const pageStyle = {
+    minHeight: '100vh',
+    background: theme === 'light' 
+      ? `linear-gradient(135deg, ${designTokens.primary[50]} 0%, ${designTokens.gray[50]} 100%)`
+      : `linear-gradient(135deg, ${designTokens.gray[900]} 0%, ${designTokens.gray[800]} 100%)`,
+    padding: spacing.lg,
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    color: textColor,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center'
+  };
+
+  const cardStyle = {
+    background: theme === 'light' 
+      ? 'rgba(255, 255, 255, 0.9)' 
+      : 'rgba(15, 23, 42, 0.9)',
+    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+    borderRadius: '20px',
+    padding: spacing.xxl,
+    boxShadow: theme === 'light' 
+      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+    backdropFilter: 'blur(10px)',
+    maxWidth: '450px',
+    width: '100%'
+  };
+
+  const buttonStyle = {
+    padding: `${spacing.md} ${spacing.lg}`,
+    background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
+    width: '100%',
+    disabled: busy
+  };
+
+  const buttonSecondaryStyle = {
+    padding: `${spacing.sm} ${spacing.lg}`,
+    background: 'transparent',
+    color: textColor,
+    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.3s ease',
+    textDecoration: 'none',
+    display: 'inline-block',
+    textAlign: 'center'
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: `${spacing.md} ${spacing.md}`,
+    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    borderRadius: '12px',
+    fontSize: '16px',
+    background: theme === 'light' ? 'white' : designTokens.gray[800],
+    color: textColor,
+    outline: 'none',
+    transition: 'all 0.3s ease',
+    boxSizing: 'border-box'
+  };
+
+  const labelStyle = {
+    display: 'block',
+    marginBottom: spacing.xs,
+    fontWeight: '500',
+    fontSize: '14px',
+    color: textColor
+  };
+
+  const errorStyle = {
+    color: designTokens.danger[600],
+    background: theme === 'light' ? '#fee2e2' : 'rgba(239, 68, 68, 0.1)',
+    border: `1px solid ${designTokens.danger[500]}`,
+    borderRadius: '8px',
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    fontSize: '14px'
+  };
+
+  const toggleButtonStyle = {
+    padding: spacing.xs,
+    background: 'transparent',
+    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    borderRadius: '8px',
+    cursor: 'pointer',
+    color: textColor,
+    marginLeft: spacing.sm
+  };
+
+  const headerStyle = {
+    fontSize: '32px',
+    fontWeight: '800',
+    marginBottom: spacing.sm,
+    background: `linear-gradient(135deg, ${designTokens.primary[600]} 0%, ${designTokens.primary[400]} 100%)`,
+    backgroundClip: 'text',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    textAlign: 'center'
+  };
+
+  const subtitleStyle = {
+    fontSize: '16px',
+    opacity: 0.8,
+    marginBottom: spacing.xl,
+    textAlign: 'center',
+    lineHeight: '1.5'
+  };
+
   return (
-    <div style={wrap}>
-      <div style={card}>
-        <h2 style={{ margin: 0, marginBottom: 8 }}>Вход</h2>
-        {err ? <div style={errBox}>{err}</div> : null}
-        <div style={{ display: 'grid', gap: 10 }}>
-          <label style={lbl}>
-            <span>Выбрать логин</span>
+    <div style={pageStyle}>
+      {/* Переключатели темы и языка */}
+      <div style={{ position: 'absolute', top: spacing.lg, right: spacing.lg, display: 'flex', alignItems: 'center' }}>
+        <button 
+          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+          style={toggleButtonStyle}
+          title="Переключить тему"
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+        <select 
+          value={language} 
+          onChange={(e) => setLanguage(e.target.value)}
+          style={{
+            ...toggleButtonStyle,
+            marginLeft: spacing.sm,
+            background: theme === 'light' ? 'white' : designTokens.gray[800]
+          }}
+        >
+          <option value="RU">RU</option>
+          <option value="UZ">UZ</option>
+          <option value="EN">EN</option>
+        </select>
+      </div>
+
+      {/* Кнопка "На главную" */}
+      <div style={{ position: 'absolute', top: spacing.lg, left: spacing.lg }}>
+        <button 
+          onClick={() => navigate('/')} 
+          style={buttonSecondaryStyle}
+        >
+          ← {t.backToHome}
+        </button>
+      </div>
+
+      {/* Форма входа */}
+      <div style={cardStyle}>
+        <div style={headerStyle}>🔐 {t.title}</div>
+        <div style={subtitleStyle}>{t.subtitle}</div>
+        
+        {err && <div style={errorStyle}>{err}</div>}
+        
+        <form onSubmit={(e) => { e.preventDefault(); onLoginClick(); }}>
+          <div style={{ marginBottom: spacing.lg }}>
+            <label style={labelStyle}>
+              {t.selectRole}
+            </label>
             <select
               value={selectedRoleKey}
               onChange={(e) => onSelectRole(e.target.value)}
-              style={{ ...inp, padding: '8px 10px' }}
+              style={{
+                ...inputStyle,
+                background: theme === 'light' ? 'white' : designTokens.gray[800]
+              }}
               disabled={busy}
             >
               {roleOptions.map((opt) => (
                 <option key={opt.key} value={opt.key}>{opt.label}</option>
               ))}
             </select>
-          </label>
-          <label style={lbl}>
-            <span>Логин</span>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} style={inp} autoComplete="username" disabled readOnly />
-          </label>
-          <label style={lbl}>
-            <span>Пароль</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={inp} autoComplete="current-password" disabled={busy} />
-          </label>
-          <button type="button" disabled={busy} onClick={onLoginClick} style={btnPrimary}>
-            {busy ? 'Входим...' : 'Войти'}
-          </button>
+          </div>
+
+          <div style={{ marginBottom: spacing.lg }}>
+            <label style={labelStyle}>
+              {t.username}
+            </label>
+            <input 
+              value={username} 
+              onChange={(e) => setUsername(e.target.value)} 
+              style={{
+                ...inputStyle,
+                opacity: 0.7,
+                cursor: 'not-allowed'
+              }}
+              autoComplete="username" 
+              disabled 
+              readOnly 
+            />
+          </div>
+
+          <div style={{ marginBottom: spacing.lg }}>
+            <label style={labelStyle}>
+              {t.password}
+            </label>
+            <input 
+              type="password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              style={inputStyle}
+              autoComplete="current-password" 
+              disabled={busy}
+              placeholder="••••••••"
+            />
+          </div>
+
+          <div style={{ marginBottom: spacing.lg }}>
+            <button 
+              type="submit" 
+              disabled={busy} 
+              style={{
+                ...buttonStyle,
+                opacity: busy ? 0.7 : 1,
+                cursor: busy ? 'not-allowed' : 'pointer'
+              }}
+              onMouseOver={(e) => !busy && (e.target.style.transform = 'translateY(-2px)')}
+              onMouseOut={(e) => !busy && (e.target.style.transform = 'translateY(0)')}
+            >
+              {busy ? t.loggingIn : t.login}
+            </button>
+          </div>
+
+          <div style={{ textAlign: 'center', marginBottom: spacing.md }}>
+            <a 
+              href="#" 
+              style={{ 
+                color: designTokens.primary[600], 
+                textDecoration: 'none',
+                fontSize: '14px'
+              }}
+              onClick={(e) => { e.preventDefault(); /* TODO: implement */ }}
+            >
+              {t.forgotPassword}
+            </a>
+          </div>
+        </form>
+
+        <div style={{ 
+          fontSize: '12px', 
+          opacity: 0.7, 
+          lineHeight: '1.4', 
+          textAlign: 'center',
+          padding: spacing.sm,
+          background: theme === 'light' ? designTokens.gray[50] : designTokens.gray[800],
+          borderRadius: '8px',
+          border: `1px solid ${theme === 'light' ? designTokens.gray[200] : designTokens.gray[700]}`
+        }}>
+          💡 {t.note}
         </div>
-        <small style={{ opacity: 0.8, lineHeight: 1.4, display: 'block', marginTop: 10 }}>
-          По умолчанию админ создаётся скриптом <code>create_admin.py</code> (admin/admin123).
-        </small>
       </div>
     </div>
   );
 }
 
-/* стили */
-const wrap = { minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f8fafc', padding: 16 };
-const card = { width: 'min(420px, 94vw)', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,.06)', padding: 16 };
-const lbl = { display: 'grid', gap: 6, fontSize: 14 };
-const inp = { padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, outline: 'none' };
-const btnPrimary = { padding: '10px 12px', borderRadius: 10, border: '1px solid #0284c7', background: '#0ea5e9', color: 'white', cursor: 'pointer' };
-const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8, whiteSpace: 'pre-wrap', marginBottom: 10 };
+
 

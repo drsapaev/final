@@ -125,3 +125,4 @@ const CashierPanel = () => {
 export default CashierPanel;
 
 
+
