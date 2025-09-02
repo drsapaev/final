@@ -3,7 +3,6 @@ import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
 import PWAInstallPrompt from './components/PWAInstallPrompt.jsx';
 import './styles/theme.css';
-import './styles/theme.css';
 
 import Header from './components/Header.jsx';
 import Sidebar from './components/Sidebar.jsx';

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const Card = ({
   children,
@@ -8,17 +9,19 @@ const Card = ({
   style = {},
   ...props
 }) => {
-  // Варианты карточек
+  const { isDark, isLight, getColor, getSpacing, getShadow } = useTheme();
+
+  // Варианты карточек с использованием централизованной темы
   const variants = {
     default: {
-      background: 'rgba(255, 255, 255, 0.8)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+      background: isLight ? 'rgba(255, 255, 255, 0.8)' : 'rgba(30, 41, 59, 0.8)',
+      border: `1px solid ${isLight ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+      boxShadow: getShadow('xl')
     },
-    dark: {
-      background: 'rgba(15, 23, 42, 0.8)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
-      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
+    elevated: {
+      background: isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(30, 41, 59, 0.9)',
+      border: `1px solid ${isLight ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)'}`,
+      boxShadow: getShadow('2xl')
     },
     glass: {
       background: 'rgba(255, 255, 255, 0.1)',
@@ -28,14 +31,14 @@ const Card = ({
     }
   };
 
-  // Размеры отступов
+  // Размеры отступов используя централизованную систему
   const paddings = {
     none: '0',
-    xs: '8px',
-    sm: '16px',
-    md: '24px',
-    lg: '32px',
-    xl: '40px'
+    xs: getSpacing('xs'),
+    sm: getSpacing('sm'),
+    md: getSpacing('md'),
+    lg: getSpacing('lg'),
+    xl: getSpacing('xl')
   };
 
   // Базовые стили

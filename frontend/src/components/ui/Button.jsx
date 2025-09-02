@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const Button = ({
   children,
@@ -13,38 +14,40 @@ const Button = ({
   className = '',
   ...props
 }) => {
-  // Варианты кнопок
+  const { isDark, isLight, getColor, getSpacing, getFontSize } = useTheme();
+
+  // Варианты кнопок с использованием централизованной темы
   const variants = {
     primary: {
-      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+      background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
       color: 'white',
-      boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)'
+      boxShadow: `0 4px 14px 0 ${getColor('primary', 500)}30`
     },
     secondary: {
-      background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+      background: `linear-gradient(135deg, ${getColor('secondary', 500)} 0%, ${getColor('secondary', 600)} 100%)`,
       color: 'white',
-      boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
+      boxShadow: `0 4px 14px 0 ${getColor('secondary', 500)}30`
     },
     success: {
-      background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+      background: `linear-gradient(135deg, ${getColor('success', 500)} 0%, ${getColor('success', 600)} 100%)`,
       color: 'white',
-      boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
+      boxShadow: `0 4px 14px 0 ${getColor('success', 500)}30`
     },
     danger: {
-      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
       color: 'white',
-      boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
+      boxShadow: `0 4px 14px 0 ${getColor('danger', 500)}30`
     },
     warning: {
-      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-      color: '#212529',
-      boxShadow: '0 4px 14px 0 rgba(245, 158, 11, 0.3)'
+      background: `linear-gradient(135deg, ${getColor('warning', 500)} 0%, ${getColor('warning', 600)} 100%)`,
+      color: 'white',
+      boxShadow: `0 4px 14px 0 ${getColor('warning', 500)}30`
     },
     ghost: {
       background: 'transparent',
-      color: 'inherit',
+      color: isLight ? getColor('primary', 500) : getColor('primary', 400),
       boxShadow: 'none',
-      border: '1px solid rgba(255, 255, 255, 0.2)'
+      border: `1px solid ${isLight ? getColor('primary', 500) : getColor('primary', 400)}`
     }
   };
 

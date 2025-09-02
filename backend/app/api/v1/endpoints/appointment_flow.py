@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app import deps
+from app.api import deps
 from app.models.user import User
 from app.models.enums import AppointmentStatus
 from app.crud import appointment as crud_appointment
