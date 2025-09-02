@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../stores/auth.js';
 import RoleGate from './RoleGate.jsx';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Nav() {
+  const { isDark, isLight, getColor, getSpacing } = useTheme();
   const [st, setSt] = useState(auth.getState());
   const navigate = useNavigate();
   const { pathname } = useLocation();

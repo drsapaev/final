@@ -3,8 +3,10 @@ import Nav from '../components/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Activation() {
+  const { isDark, isLight, getColor, getSpacing } = useTheme();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState(null);
   const [rows, setRows] = useState([]);

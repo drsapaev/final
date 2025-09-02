@@ -29,8 +29,9 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
-import { useBreakpoint, useTouchDevice, useTheme } from '../design-system/hooks';
+import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
 import { useFade, useSlide, useScale } from '../design-system/hooks/useAnimation';
+import { useTheme } from '../contexts/ThemeContext';
 
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -46,9 +47,17 @@ const AdminPanel = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [systemAlerts, setSystemAlerts] = useState([]);
   
-  const breakpoint = useBreakpoint();
+  const { isMobile, isTablet } = useBreakpoint();
   const isTouchDevice = useTouchDevice();
-  const { theme, toggleTheme } = useTheme();
+  const { 
+    theme, 
+    isDark, 
+    isLight, 
+    toggleTheme, 
+    getColor, 
+    getSpacing, 
+    getFontSize 
+  } = useTheme();
   
   // Анимации
   const { isVisible: fadeIn, fadeIn: startFadeIn } = useFade(false);

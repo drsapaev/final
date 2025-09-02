@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { User, Calendar, Heart, FileText, Search } from 'lucide-react';
 import { Card, Button, Badge, Skeleton } from '../design-system/components';
 import { useBreakpoint } from '../design-system/hooks';
+import { useTheme } from '../contexts/ThemeContext';
 
 const PatientPanel = () => {
   const { isMobile } = useBreakpoint();
+  const { isDark, isLight, getColor, getSpacing } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [appointments, setAppointments] = useState([]);
