@@ -94,10 +94,27 @@ const LabPanel = () => {
     color: 'white', 
     borderRadius: '12px 12px 0 0' 
   };
-  const cardContentStyle = { padding: '20px' };
-  const buttonStyle = { padding: '8px 16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px', fontSize: '14px' };
-  const buttonSecondaryStyle = { ...buttonStyle, backgroundColor: '#6c757d' };
-  const buttonSuccessStyle = { ...buttonStyle, backgroundColor: '#0d6efd' };
+  const cardContentStyle = { 
+    padding: getSpacing('lg') 
+  };
+  const buttonStyle = { 
+    padding: `${getSpacing('xs')} ${getSpacing('sm')}`, 
+    backgroundColor: getColor('success', 500), 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '4px', 
+    cursor: 'pointer', 
+    marginRight: getSpacing('xs'), 
+    fontSize: getFontSize('sm') 
+  };
+  const buttonSecondaryStyle = { 
+    ...buttonStyle, 
+    backgroundColor: getColor('secondary', 500) 
+  };
+  const buttonSuccessStyle = { 
+    ...buttonStyle, 
+    backgroundColor: getColor('info', 500) 
+  };
   const tabsStyle = { display: 'flex', borderBottom: '1px solid #e5e5e5', marginBottom: '20px' };
   const tabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid transparent' };
   const activeTabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid #28a745', color: '#28a745' };

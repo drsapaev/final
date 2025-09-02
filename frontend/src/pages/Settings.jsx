@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
+import { useTheme } from '../contexts/ThemeContext';
 
 function TabButton({ active, onClick, children }) {
+  // Используем CSS переменные вместо хардкод стилей
   const st = {
     padding: '8px 12px',
     borderRadius: 10,
-    border: '1px solid #ddd',
-    background: active ? '#111' : '#fff',
-    color: active ? '#fff' : '#111',
+    border: '1px solid var(--border-color)',
+    background: active ? 'var(--accent-color)' : 'var(--bg-primary)',
+    color: active ? 'white' : 'var(--text-primary)',
     cursor: 'pointer',
+    transition: 'all 0.2s ease'
   };
   return (
     <button onClick={onClick} style={st}>{children}</button>
@@ -35,6 +38,7 @@ function Row({ k, v, onSave }) {
  *  - Вкладка "online_queue": простые пары key/value
  */
 export default function Settings() {
+  const { isDark, isLight, getColor, getSpacing } = useTheme();
   const [page, setPage] = useState('Settings');
   const [tab, setTab] = useState('license');
 
@@ -235,17 +239,59 @@ export default function Settings() {
   );
 }
 
-const card = { border: '1px solid #eee', borderRadius: 12, padding: 12, background: '#fff' };
-const row  = { display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8, alignItems: 'center' };
-const inp  = { padding: '6px 10px', border: '1px solid #ddd', borderRadius: 8, background: '#fff' };
-const btn  = { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' };
-const btnPrimary = { ...btn, borderColor: '#0284c7', background: '#0ea5e9', color: '#fff' };
-const errBox = { color: '#7f1d1d', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: 8 };
+// Стили с использованием CSS переменных
+const card = { 
+  border: '1px solid var(--border-color)', 
+  borderRadius: 12, 
+  padding: 12, 
+  background: 'var(--bg-primary)',
+  boxShadow: 'var(--shadow-sm)'
+};
+
+const row = { 
+  display: 'grid', 
+  gridTemplateColumns: '1fr 2fr auto', 
+  gap: 8, 
+  alignItems: 'center' 
+};
+
+const inp = { 
+  padding: '6px 10px', 
+  border: '1px solid var(--border-color)', 
+  borderRadius: 8, 
+  background: 'var(--bg-primary)',
+  color: 'var(--text-primary)'
+};
+
+const btn = { 
+  padding: '6px 10px', 
+  borderRadius: 8, 
+  border: '1px solid var(--border-color)', 
+  background: 'var(--bg-secondary)', 
+  color: 'var(--text-primary)',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease'
+};
+
+const btnPrimary = { 
+  ...btn, 
+  borderColor: 'var(--accent-color)', 
+  background: 'var(--accent-color)', 
+  color: 'white' 
+};
+
+const errBox = { 
+  color: 'var(--danger-color)', 
+  background: 'rgba(239, 68, 68, 0.1)', 
+  border: '1px solid var(--danger-color)', 
+  borderRadius: 8, 
+  padding: 8 
+};
 
 function KVField({ label, defKey, items, onSave }) {
   const found = (items || []).find((x) => x.key === defKey);
-  const [val, setVal] = React.useState(found?.value || '');
-  React.useEffect(() => setVal(found?.value || ''), [found?.value]);
+  const [val, setVal] = useState(found?.value || '');
+  useEffect(() => setVal(found?.value || ''), [found?.value]);
   return (
     <div style={row}>
       <div style={{ fontWeight: 600 }}>{label}</div>
@@ -255,23 +301,40 @@ function KVField({ label, defKey, items, onSave }) {
   );
 }
 
+// Отдельный компонент для роли чтобы избежать hooks в map
+function RoleMapItem({ role, items, onSave }) {
+  const found = (items || []).find((x) => x.key === role);
+  const [val, setVal] = useState(found?.value || '');
+  useEffect(() => setVal(found?.value || ''), [found?.value]);
+  
+  return (
+    <div style={row}>
+      <div style={{ fontWeight: 600 }}>{role}</div>
+      <input 
+        value={val} 
+        onChange={(e) => setVal(e.target.value)} 
+        style={inp} 
+        placeholder="Например: Cardio" 
+      />
+      <button onClick={() => onSave(role, val)} style={btn}>
+        Сохранить
+      </button>
+    </div>
+  );
+}
+
 function RoleMapEditor({ items, onSave }) {
   const roles = ['admin','registrar','doctor','cardio','derma','dentist','lab','procedures','cashier','patient'];
   return (
     <div style={{ display: 'grid', gap: 8 }}>
-      {roles.map((r) => {
-        const key = r;
-        const found = (items || []).find((x) => x.key === key);
-        const [val, setVal] = React.useState(found?.value || '');
-        React.useEffect(() => setVal(found?.value || ''), [found?.value]);
-        return (
-          <div key={key} style={row}>
-            <div style={{ fontWeight: 600 }}>{r}</div>
-            <input value={val} onChange={(e)=>setVal(e.target.value)} style={inp} placeholder="Например: Cardio" />
-            <button onClick={()=>onSave(key, val)} style={btn}>Сохранить</button>
-          </div>
-        );
-      })}
+      {roles.map((r) => (
+        <RoleMapItem 
+          key={r} 
+          role={r} 
+          items={items} 
+          onSave={onSave} 
+        />
+      ))}
     </div>
   );
 }

@@ -162,14 +162,14 @@ export default function Login() {
     }
   }
 
-  const textColor = theme === 'light' ? designTokens.gray[700] : designTokens.gray[200];
+  const textColor = isLight ? getColor('secondary', 700) : getColor('secondary', 200);
 
   const pageStyle = {
     minHeight: '100vh',
-    background: theme === 'light' 
-      ? `linear-gradient(135deg, ${designTokens.primary[50]} 0%, ${designTokens.gray[50]} 100%)`
-      : `linear-gradient(135deg, ${designTokens.gray[900]} 0%, ${designTokens.gray[800]} 100%)`,
-    padding: spacing.lg,
+    background: isLight 
+      ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
+      : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
+    padding: getSpacing('lg'),
     fontFamily: 'system-ui, -apple-system, sans-serif',
     color: textColor,
     display: 'flex',

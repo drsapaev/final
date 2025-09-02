@@ -115,7 +115,22 @@ const AppointmentsTable = ({
     };
   };
 
-  // Дублированный код удален - функция уже определена выше
+  // Стили для услуг с использованием централизованной темы  
+  const getServiceStyle = (service) => {
+    const serviceStyles = {
+      'derm': { background: getColor('info', 100), color: getColor('info', 700) },
+      'cosmetology': { background: getColor('primary', 100), color: getColor('primary', 700) },
+      'cardio': { background: getColor('danger', 100), color: getColor('danger', 700) },
+      'ecg': { background: getColor('success', 100), color: getColor('success', 700) },
+      'echo': { background: getColor('warning', 100), color: getColor('warning', 700) },
+      'stomatology': { background: getColor('secondary', 100), color: getColor('secondary', 700) },
+      'lab': { background: getColor('info', 100), color: getColor('info', 700) }
+    };
+    return serviceStyles[service] || { 
+      background: isLight ? getColor('secondary', 100) : getColor('secondary', 800), 
+      color: isLight ? getColor('secondary', 700) : getColor('secondary', 200) 
+    };
+  };
 
   // Константы ширин и позиций для фиксированных колонок
   const COL_WIDTHS = {

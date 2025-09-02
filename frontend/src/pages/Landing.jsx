@@ -53,7 +53,7 @@ export default function Landing() {
   };
 
   const buttonStyle = {
-    padding: `${spacing.sm} ${spacing.lg}`,
+    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
     background: `linear-gradient(135deg, ${designTokens.primary[500]} 0%, ${designTokens.primary[600]} 100%)`,
     color: 'white',
     border: 'none',
@@ -63,20 +63,20 @@ export default function Landing() {
     fontWeight: '600',
     transition: 'all 0.3s ease',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    marginRight: spacing.sm,
-    marginBottom: spacing.sm
+    marginRight: getSpacing('sm'),
+    marginBottom: getSpacing('sm')
   };
 
   const buttonSecondaryStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${designTokens.gray[500]} 0%, ${designTokens.gray[600]} 100%)`,
+    background: `linear-gradient(135deg, ${getColor('secondary', 500)} 0%, ${getColor('secondary', 600)} 100%)`,
     boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
   };
 
   const headerStyle = {
     fontSize: '48px',
     fontWeight: '800',
-    marginBottom: spacing.md,
+          marginBottom: getSpacing('md'),
     background: `linear-gradient(135deg, ${designTokens.primary[600]} 0%, ${designTokens.primary[400]} 100%)`,
     backgroundClip: 'text',
     WebkitBackgroundClip: 'text',
@@ -87,7 +87,7 @@ export default function Landing() {
   const subtitleStyle = {
     fontSize: '18px',
     opacity: 0.8,
-    marginBottom: spacing.xl,
+          marginBottom: getSpacing('xl'),
     textAlign: 'center',
     lineHeight: '1.6'
   };
@@ -95,17 +95,17 @@ export default function Landing() {
   const contactCardStyle = {
     ...cardStyle,
     padding: getSpacing('lg'),
-    marginBottom: spacing.sm
+          marginBottom: getSpacing('sm')
   };
 
   const toggleButtonStyle = {
-    padding: spacing.xs,
+    padding: getSpacing('xs'),
     background: 'transparent',
-    border: `1px solid ${theme === 'light' ? designTokens.gray[300] : designTokens.gray[600]}`,
+    border: `1px solid ${isLight ? getColor('secondary', 300) : getColor('secondary', 600)}`,
     borderRadius: '8px',
     cursor: 'pointer',
     color: textColor,
-    marginLeft: spacing.sm
+    marginLeft: getSpacing('sm')
   };
 
   const translations = {
@@ -202,7 +202,7 @@ export default function Landing() {
 
       {/* Карточка контактов */}
       <div style={contactCardStyle}>
-        <div style={{ fontWeight: '700', marginBottom: spacing.sm, fontSize: '18px', color: designTokens.primary[600] }}>
+        <div style={{ fontWeight: '700', marginBottom: getSpacing('sm'), fontSize: '18px', color: getColor('primary', 600) }}>
           {t.contacts}
         </div>
         <div style={{ lineHeight: '1.6' }}>
@@ -218,7 +218,7 @@ export default function Landing() {
         opacity: 0.6, 
         fontSize: '14px', 
         textAlign: 'center',
-        marginTop: spacing.lg 
+        marginTop: getSpacing('lg') 
       }}>
         {t.footer}
       </div>

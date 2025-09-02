@@ -8,6 +8,7 @@ import ResponsiveTable from '../components/ResponsiveTable';
 import ResponsiveNavigation from '../components/ResponsiveNavigation';
 import { Button, Card, Badge, Skeleton, AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
 import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Hospital, 
   Calendar, 
@@ -144,11 +145,9 @@ const RegistrarPanel = () => {
     payment: {}
   });
   
-  // Тема и язык
-  const [theme, setTheme] = useState(() => localStorage.getItem('ui_theme') || 'light');
+  // Язык (тема теперь централизована)
   const [language, setLanguage] = useState(() => localStorage.getItem('ui_lang') || 'ru');
   
-  useEffect(() => { localStorage.setItem('ui_theme', theme); }, [theme]);
   useEffect(() => { localStorage.setItem('ui_lang', language); }, [language]);
 
   // Переводы
@@ -252,8 +251,9 @@ const RegistrarPanel = () => {
   };
   const t = (key) => (translations[language] && translations[language][key]) || translations.ru[key] || key;
 
-  // Импортируем централизованную тему
+  // Используем централизованную тему
   const { 
+    theme,
     isDark, 
     isLight, 
     getColor, 
