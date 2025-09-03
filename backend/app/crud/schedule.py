@@ -325,7 +325,7 @@ def get_doctors_by_department(
     """
     Получить список врачей, сгруппированных по отделениям
     """
-    # Получаем уникальные отделения
+    # Получаем уникальные отделения (обновлено для CI/CD)
     dept_stmt = (
         select(ScheduleTemplate.department).distinct().where(ScheduleTemplate.active)
     )

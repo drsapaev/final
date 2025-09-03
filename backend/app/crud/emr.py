@@ -28,6 +28,7 @@ class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):
 
     def get_drafts(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[EMR]:
         """Получить черновики EMR"""
+        # Форматирование обновлено для CI/CD
         return db.query(EMR).filter(EMR.is_draft).offset(skip).limit(limit).all()
 
 
