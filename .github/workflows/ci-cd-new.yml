@@ -227,6 +227,10 @@ jobs:
           docker build -f ops/backend.Dockerfile -t clinic-backend .
       - name: Build Frontend Docker image
         run: |
+          # Очищаем зависимости перед сборкой Docker образа
+          cd frontend
+          rm -rf node_modules package-lock.json
+          cd ..
           docker build -f ops/frontend.Dockerfile -t clinic-frontend .
       - name: Test Backend run
         run: |
@@ -303,6 +307,8 @@ jobs:
       - name: Установка зависимостей Frontend
         run: |
           cd frontend
+          # Удаляем старые зависимости и переустанавливаем для исправления проблем с Rollup
+          rm -rf node_modules package-lock.json
           npm install
       - name: Установка Playwright
         run: |
