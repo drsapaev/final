@@ -41,18 +41,18 @@ jobs:
         from app.db.session import engine, SessionLocal
         from app.models.user import User
         from app.models.patient import Patient
-        from app.models.visit import Visit
+        from app.models.visit import Visit, VisitService
         from app.models.payment import Payment
-        from app.models.service import Service
+        from app.models.service import Service, ServiceCatalog
         from app.models.queue import QueueTicket
-        from app.models.schedule import Schedule
-        from app.models.lab import Lab
-        from app.models.audit import Audit
+        from app.models.schedule import ScheduleTemplate
+        from app.models.lab import LabOrder, LabResult
+        from app.models.audit import AuditLog
         from app.models.setting import Setting
         from app.models.appointment import Appointment
-        from app.models.payment_webhook import PaymentWebhook
+        from app.models.payment_webhook import PaymentWebhook, PaymentTransaction, PaymentProvider
         from app.models.online import OnlineDay
-        from app.models.emr import EMR
+        from app.models.emr import EMR, Prescription
         from app.models.activation import Activation
         from app.models.notification import NotificationTemplate, NotificationHistory, NotificationSettings
         from app.core.security import get_password_hash
@@ -67,7 +67,7 @@ jobs:
                 print('✅ База данных доступна')
                 
                 # Проверяем количество записей в основных таблицах
-                tables = ['users', 'patients', 'visits', 'payments', 'payment_webhooks', 'services', 'queue_tickets', 'schedules', 'labs', 'audits', 'settings', 'appointments', 'online_days', 'emrs', 'activations', 'notification_templates', 'notification_history', 'notification_settings']
+                tables = ['users', 'patients', 'visits', 'visit_services', 'payments', 'payment_webhooks', 'payment_transactions', 'payment_providers', 'services', 'service_catalog', 'queue_tickets', 'schedule_templates', 'lab_orders', 'lab_results', 'audit_logs', 'settings', 'appointments', 'online_days', 'emr', 'prescriptions', 'activations', 'notification_templates', 'notification_history', 'notification_settings']
                 for table in tables:
                     try:
                         result = conn.execute(text(f'SELECT COUNT(*) FROM {table}'))
