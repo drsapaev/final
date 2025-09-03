@@ -261,12 +261,13 @@ jobs:
       - name: Test Frontend run
         run: |
           # Запускаем контейнер в фоне
-          CONTAINER_ID=$(docker run -d -p 3000:3000 clinic-frontend)
+          CONTAINER_ID=$(docker run -d -p 3000:5173 clinic-frontend)
           echo "Container ID: $CONTAINER_ID"
           
           # Ждем запуска сервера
           echo "⏳ Ожидаем запуск frontend сервера..."
           for i in {1..30}; do
+            echo "Попытка $i/30: проверяем http://localhost:3000"
             if curl -s -f "http://localhost:3000" > /dev/null 2>&1; then
               echo "✅ Frontend сервер запущен успешно"
               break
@@ -275,6 +276,10 @@ jobs:
               echo "❌ Frontend сервер не запустился"
               echo "📄 Логи контейнера:"
               docker logs $CONTAINER_ID
+              echo "📊 Статус контейнера:"
+              docker ps -a | grep $CONTAINER_ID
+              echo "🔍 Проверяем процессы в контейнере:"
+              docker exec $CONTAINER_ID ps aux || echo "Не удалось выполнить ps aux"
               docker stop $CONTAINER_ID
               exit 1
             fi
@@ -317,7 +322,7 @@ jobs:
           
           # Запускаем frontend
           cd ../frontend
-          npm run dev &
+          npm run dev -- --port 3000 &
           echo $! > frontend.pid
           sleep 10
           
