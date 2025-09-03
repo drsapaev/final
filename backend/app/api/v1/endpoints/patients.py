@@ -31,7 +31,7 @@ def create_patient(
     *,
     db: Session = Depends(deps.get_db),
     patient_in: patient_schemas.PatientCreate,
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ):
     """
     Создать нового пациента
@@ -52,7 +52,7 @@ def get_patient(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ):
     """
     Получить пациента по ID
@@ -69,7 +69,7 @@ def update_patient(
     db: Session = Depends(deps.get_db),
     patient_id: int,
     patient_in: patient_schemas.PatientUpdate,
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ):
     """
     Обновить данные пациента
@@ -96,7 +96,7 @@ def delete_patient(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ):
     """
     Удалить пациента
@@ -120,7 +120,7 @@ def get_patient_appointments(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_user),
 ):
     """
     Получить все записи пациента

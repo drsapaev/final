@@ -5,8 +5,7 @@ import sys
 from typing import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import sessionmaker as orm_sessionmaker
+from sqlalchemy.orm import Session, sessionmaker as orm_sessionmaker
 
 
 def _get_db_url_from_env_or_settings() -> str:

@@ -1,3 +1,28 @@
+# Configuration for Python tooling in backend
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+skip-string-normalization = true
+exclude = '''
+/( 
+  \.venv
+  | dist
+  | build
+  | node_modules
+  | __pycache__
+  | .*\.pyi
+)
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+src_paths = ["app"]
+known_first_party = ["app"]
+combine_as_imports = true
+force_alphabetical_sort_within_sections = true
+skip = [".venv", "node_modules", "dist", "build", "__pycache__"]
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"

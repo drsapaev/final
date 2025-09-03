@@ -8,13 +8,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.crud import appointment as crud_appointment
-from app.crud import emr as crud_emr
+from app.crud import appointment as crud_appointment, emr as crud_emr
 from app.models.enums import AppointmentStatus
 from app.models.user import User
 from app.schemas.appointment import Appointment
-from app.schemas.emr import (EMR, EMRCreate, EMRUpdate, Prescription,
-                             PrescriptionCreate, PrescriptionUpdate)
+from app.schemas.emr import (
+    EMR,
+    EMRCreate,
+    EMRUpdate,
+    Prescription,
+    PrescriptionCreate,
+    PrescriptionUpdate,
+)
 
 router = APIRouter()
 

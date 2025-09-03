@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.appointment import Appointment
-from app.models.enums import (AppointmentStatus, can_transition_status,
-                              normalize_appointment_status)
+from app.models.enums import (
+    AppointmentStatus,
+    can_transition_status,
+    normalize_appointment_status,
+)
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 
 

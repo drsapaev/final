@@ -9,15 +9,20 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.core.activation import (activate_key, issue_key,
-                                 validate_server_activation)
+from app.core.activation import activate_key, issue_key, validate_server_activation
 from app.models.activation import Activation  # type: ignore[attr-defined]
 from app.models.activation import ActivationStatus
-from app.schemas.activation import (ActivationActivateIn,
-                                    ActivationActivateOut, ActivationExtendIn,
-                                    ActivationIssueIn, ActivationIssueOut,
-                                    ActivationListOut, ActivationListRow,
-                                    ActivationRevokeIn, ActivationStatusOut)
+from app.schemas.activation import (
+    ActivationActivateIn,
+    ActivationActivateOut,
+    ActivationExtendIn,
+    ActivationIssueIn,
+    ActivationIssueOut,
+    ActivationListOut,
+    ActivationListRow,
+    ActivationRevokeIn,
+    ActivationStatusOut,
+)
 
 router = APIRouter(prefix="/activation", tags=["activation"])
 

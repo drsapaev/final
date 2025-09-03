@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from sqlalchemy import MetaData, Table, select
+from sqlalchemy import MetaData, select, Table
 from sqlalchemy.orm import Session
 
 

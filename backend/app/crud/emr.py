@@ -5,8 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.emr import EMR, Prescription
-from app.schemas.emr import (EMRCreate, EMRUpdate, PrescriptionCreate,
-                             PrescriptionUpdate)
+from app.schemas.emr import EMRCreate, EMRUpdate, PrescriptionCreate, PrescriptionUpdate
 
 
 class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
-from sqlalchemy import MetaData, Table, create_engine, select
+from sqlalchemy import create_engine, MetaData, select, Table
 from sqlalchemy.orm import sessionmaker
 
 # Попытка использовать настройки проекта

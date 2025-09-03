@@ -5,18 +5,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db
-from app.crud import appointment as appointment_crud
-from app.crud import patient as patient_crud
-from app.crud import service as service_crud
-from app.crud import visit as visit_crud
+from app.crud import (
+    appointment as appointment_crud,
+    patient as patient_crud,
+    service as service_crud,
+    visit as visit_crud,
+)
 from app.models.user import User
 from app.schemas.appointment import Appointment, AppointmentCreate
 from app.schemas.patient import Patient, PatientCreate, PatientUpdate
 from app.schemas.service import Service
-from app.schemas.visit import (Visit, VisitCreate, VisitUpdate,
-                               VisitWithServices)
-from app.services.visit_payment_integration import \
-    VisitPaymentIntegrationService
+from app.schemas.visit import Visit, VisitCreate, VisitUpdate, VisitWithServices
+from app.services.visit_payment_integration import VisitPaymentIntegrationService
 
 router = APIRouter()
 

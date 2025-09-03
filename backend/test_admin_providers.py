@@ -9,12 +9,16 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy.orm import Session
 
-from app.crud.payment_webhook import (create_provider, delete_provider,
-                                      get_all_providers, get_provider_by_code,
-                                      get_provider_by_id, update_provider)
+from app.crud.payment_webhook import (
+    create_provider,
+    delete_provider,
+    get_all_providers,
+    get_provider_by_code,
+    get_provider_by_id,
+    update_provider,
+)
 from app.db.session import SessionLocal
-from app.schemas.payment_webhook import (PaymentProviderCreate,
-                                         PaymentProviderUpdate)
+from app.schemas.payment_webhook import PaymentProviderCreate, PaymentProviderUpdate
 
 
 def test_providers_crud():

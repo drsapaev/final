@@ -7,8 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.services.visit_payment_integration import \
-    VisitPaymentIntegrationService
+from app.services.visit_payment_integration import VisitPaymentIntegrationService
 
 router = APIRouter()
 

@@ -8,8 +8,12 @@ import sys
 # Добавляем путь к проекту
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.crud.payment_webhook import (count_transactions, count_webhooks,
-                                      get_all_transactions, get_all_webhooks)
+from app.crud.payment_webhook import (
+    count_transactions,
+    count_webhooks,
+    get_all_transactions,
+    get_all_webhooks,
+)
 from app.db.session import get_db
 
 

@@ -4,20 +4,34 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 # подключаем router из каждого модуля
-from app.api.v1.endpoints import activation as activation_ep
-from app.api.v1.endpoints import (admin_providers, admin_users, analytics,
-                                  appointment_flow, appointments, audit, auth)
-from app.api.v1.endpoints import board as board_ep
-from app.api.v1.endpoints import cardio, dental, derma
-from app.api.v1.endpoints import health as health_ep
-from app.api.v1.endpoints import (lab_specialized, online_queue, patients,
-                                  payment_webhook, payments)
-from app.api.v1.endpoints import print as print_ep
-from app.api.v1.endpoints import queue, queues
-from app.api.v1.endpoints import reports as reports_ep
-from app.api.v1.endpoints import schedule, services
-from app.api.v1.endpoints import settings as settings_ep
-from app.api.v1.endpoints import visits
+from app.api.v1.endpoints import (
+    activation as activation_ep,
+    admin_providers,
+    admin_users,
+    analytics,
+    appointment_flow,
+    appointments,
+    audit,
+    auth,
+    board as board_ep,
+    cardio,
+    dental,
+    derma,
+    health as health_ep,
+    lab_specialized,
+    online_queue,
+    patients,
+    payment_webhook,
+    payments,
+    print as print_ep,
+    queue,
+    queues,
+    reports as reports_ep,
+    schedule,
+    services,
+    settings as settings_ep,
+    visits,
+)
 
 api_router = APIRouter()
 

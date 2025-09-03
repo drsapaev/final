@@ -6,7 +6,7 @@ import os
 from collections import defaultdict
 from typing import Dict, Set
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, status, WebSocket, WebSocketDisconnect
 
 log = logging.getLogger("ws.queue")
 log.setLevel(logging.INFO)  # Устанавливаем уровень INFO

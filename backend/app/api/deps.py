@@ -21,7 +21,7 @@ from typing import Any, Callable, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-from sqlalchemy import MetaData, Table, select, update
+from sqlalchemy import MetaData, select, Table, update
 from sqlalchemy.orm import Session
 
 from app.crud.appointment import appointment as crud_appointment

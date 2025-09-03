@@ -5,8 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
-from app.crud import patient as patient_crud
-from app.crud import visit as visit_crud
+from app.crud import patient as patient_crud, visit as visit_crud
 from app.models.user import User
 from app.schemas.patient import Patient
 from app.schemas.visit import Visit

@@ -18,11 +18,14 @@ from sqlalchemy import select
 
 # helpers from deps
 from app.api.deps import create_access_token, get_current_user
+
 # password verification helper (assumed present in project)
 from app.core.security import verify_password
+
 # Import your project's DB session factory / dependency
 # get_db should be a dependency that yields either an AsyncSession or sync Session
 from app.db.session import get_db
+
 # ORM user model
 from app.models.user import User
 

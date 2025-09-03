@@ -383,8 +383,7 @@ class AnalyticsService:
         db: Session, start_date: datetime, end_date: datetime
     ) -> Dict[str, Any]:
         """Аналитика по провайдерам платежей"""
-        from app.models.payment_webhook import (PaymentProvider,
-                                                PaymentTransaction)
+        from app.models.payment_webhook import PaymentProvider, PaymentTransaction
 
         # Статистика по провайдерам
         providers = db.query(PaymentProvider).all()

@@ -5,15 +5,18 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
+
 # важно: алиасы дергают реализацию из appointments,
 # а не тянут что-то из services напрямую — так мы избегаем конфликтов сигнатур
 from app.api.v1.endpoints import appointments as impl
 from app.schemas.online import OnlineJoinRequest, OnlineJoinResponse
-from app.services.online_queue import (can_issue_more_today,
-                                       get_existing_ticket_for_identity,
-                                       is_within_morning_window,
-                                       issue_next_ticket,
-                                       remember_identity_ticket)
+from app.services.online_queue import (
+    can_issue_more_today,
+    get_existing_ticket_for_identity,
+    is_within_morning_window,
+    issue_next_ticket,
+    remember_identity_ticket,
+)
 
 router = APIRouter(prefix="/online-queue", tags=["online-queue"])
 

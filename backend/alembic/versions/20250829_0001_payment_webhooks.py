@@ -7,9 +7,8 @@ Create Date: 2025-08-29 06:45:00.000000
 """
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import sqlite
-
 from alembic import op
+from sqlalchemy.dialects import sqlite
 
 # revision identifiers, used by Alembic.
 revision = "20250829_0001"

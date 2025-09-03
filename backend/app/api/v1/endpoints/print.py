@@ -10,8 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.config import settings
-from app.crud.visit import \
-    get_visit as get_visit_by_id  # type: ignore[attr-defined]
+from app.crud.visit import get_visit as get_visit_by_id  # type: ignore[attr-defined]
 from app.services.escpos import escpos_print_text
 
 router = APIRouter(prefix="/print", tags=["print"])

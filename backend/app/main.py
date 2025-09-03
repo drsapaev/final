@@ -45,8 +45,7 @@ app = FastAPI(
 # -----------------------------------------------------------------------------
 # WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
-from app.ws.queue_ws import router as queue_ws_router  # noqa: E402
-from app.ws.queue_ws import ws_queue
+from app.ws.queue_ws import router as queue_ws_router, ws_queue  # noqa: E402
 
 app.include_router(queue_ws_router)  # /ws/queue
 app.add_api_websocket_route("/ws/dev-queue", ws_queue)
@@ -68,7 +67,9 @@ if not CORS_DISABLE:
 _USE_DEV_AUTH_FALLBACK = False
 try:
     from app.api.deps import (  # type: ignore  # noqa: E402
-        create_access_token, get_current_user)
+        create_access_token,
+        get_current_user,
+    )
 except Exception as e:  # pragma: no cover
     log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)
     _USE_DEV_AUTH_FALLBACK = True

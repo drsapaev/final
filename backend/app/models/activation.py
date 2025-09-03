@@ -4,9 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Enum as SAEnum, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base  # декларативная база

@@ -16,8 +16,7 @@ from app.models.setting import Setting  # type: ignore[attr-defined]
 # ЛЕНИВЫЙ импорт менеджера WS, чтобы избежать циклов импорта при старте приложения
 def _ws_manager():
     try:
-        from app.ws.queue_ws import \
-            ws_manager  # импорт только в момент использования
+        from app.ws.queue_ws import ws_manager  # импорт только в момент использования
 
         return ws_manager
     except Exception:

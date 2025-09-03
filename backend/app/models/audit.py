@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base

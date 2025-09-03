@@ -4,10 +4,8 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import (create_engine,  # create_engine добавлен
-                        engine_from_config, pool)
-
 from alembic import context
+from sqlalchemy import create_engine, engine_from_config, pool  # create_engine добавлен
 
 # --- ensure backend root on sys.path (so `import app` works) ---
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -16,6 +14,7 @@ if BASE_DIR not in sys.path:
 # ----------------------------------------------------------------
 
 from app.core.config import settings  # our central Settings
+
 # Now imports from our project work:
 from app.db.base import Base  # noqa: F401
 
