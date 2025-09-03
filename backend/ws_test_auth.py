@@ -101,7 +101,7 @@ async def test_broadcast_trigger():
             try:
                 error_details = e.read().decode()
                 print(f"📅 Детали ошибки: {error_details}")
-            except:
+            except Exception:
                 pass
 
         # Выдаём следующий талон (должно вызвать broadcast)

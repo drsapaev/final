@@ -81,7 +81,7 @@ def test_transactions_endpoint():
                 try:
                     error_text = e.read().decode("utf-8")
                     print(f"📄 Текст ошибки: {error_text}")
-                except:
+                except Exception:
                     pass
 
 

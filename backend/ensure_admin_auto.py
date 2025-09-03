@@ -292,7 +292,7 @@ async def main():
             finally:
                 try:
                     sess.close()
-                except:
+                except Exception:
                     pass
             return 0
         except Exception:

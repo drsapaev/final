@@ -121,7 +121,7 @@ def test_payme_webhook_with_real_signature():
             try:
                 error_text = e.read().decode("utf-8")
                 print(f"📄 Текст ошибки: {error_text}")
-            except:
+            except Exception:
                 pass
 
     return None

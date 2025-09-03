@@ -81,7 +81,7 @@ async def run_async():
             finally:
                 try:
                     sess.close()
-                except:
+                except Exception:
                     pass
         except Exception:
             traceback.print_exc()

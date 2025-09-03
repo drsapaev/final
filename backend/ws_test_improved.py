@@ -96,7 +96,7 @@ async def test_broadcast_trigger(token):
         try:
             error_details = e.read().decode()
             print(f"📅 Детали ошибки: {error_details}")
-        except:
+        except Exception:
             pass
     except Exception as e:
         print(f"📅 Ошибка запроса: {e}")
