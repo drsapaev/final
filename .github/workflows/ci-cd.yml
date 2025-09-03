@@ -7,6 +7,7 @@ on:
     branches: [ main, develop ]
   schedule:
     - cron: '0 2 * * *'
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: '3.11'
@@ -231,8 +232,8 @@ jobs:
   deploy-staging:
     name: 🚀 Деплой в тестовую среду
     runs-on: ubuntu-latest
-    needs: [code-quality, testing]
-    if: github.ref == 'refs/heads/develop'
+    needs: [code-quality, testing, e2e]
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
     environment: staging
     
     steps:
@@ -249,7 +250,7 @@ jobs:
   deploy-production:
     name: 🎯 Деплой в продакшен
     runs-on: ubuntu-latest
-    needs: [code-quality, testing, deploy-staging]
+    needs: [code-quality, testing, e2e, deploy-staging]
     if: github.ref == 'refs/heads/main'
     environment: production
     
@@ -268,7 +269,7 @@ jobs:
   notifications:
     name: 📊 Отчёты
     runs-on: ubuntu-latest
-    needs: [code-quality, testing]
+    needs: [code-quality, testing, e2e]
     if: always()
     
     steps:
@@ -306,3 +307,105 @@ jobs:
       with:
         name: test-report
         path: test-report.md
+
+  e2e:
+    name: 🎭 E2E тесты (Playwright)
+    runs-on: ubuntu-latest
+    needs: testing
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    - name: 📦 Установка зависимостей backend
+      run: |
+        cd backend
+        pip install -r requirements.txt
+    - name: 🗄️ Подготовка базы данных для E2E
+      run: |
+        cd backend
+        export DATABASE_URL="${{ env.DATABASE_URL }}"
+        export CORS_DISABLE="${{ env.CORS_DISABLE }}"
+        export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
+        python - << 'PY'
+        import sys
+        sys.path.insert(0, '.')
+        from app.db.base import Base
+        from app.db.session import engine, SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        from sqlalchemy import text
+        try:
+            Base.metadata.create_all(bind=engine)
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+                assert result.fetchone(), 'users table is not created'
+            db = SessionLocal()
+            try:
+                admin = db.query(User).filter(User.username == 'admin').first()
+                if not admin:
+                    admin = User(
+                        username='admin',
+                        email='admin@clinic.com',
+                        hashed_password=get_password_hash('admin123'),
+                        role='Admin',
+                        is_active=True,
+                        is_superuser=True,
+                    )
+                    db.add(admin)
+                    db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            print('⚠️ Ошибка подготовки БД для E2E:', e)
+            raise SystemExit(1)
+        PY
+    - name: 🚀 Запуск backend
+      run: |
+        cd backend
+        export DATABASE_URL="${{ env.DATABASE_URL }}"
+        export CORS_DISABLE="${{ env.CORS_DISABLE }}"
+        export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        echo $! > server.pid
+        echo "⏳ Ожидаем запуск backend..."
+        for i in {1..30}; do
+          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            echo "✅ Backend запущен"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Backend не поднялся"
+            echo "📄 Логи backend:"
+            cat server.log || true
+            exit 1
+          fi
+          sleep 2
+        done
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: 📦 Установка зависимостей frontend
+      run: |
+        cd frontend
+        npm ci || npm install
+        npx playwright install --with-deps
+    - name: 🎭 Запуск E2E тестов
+      run: |
+        cd frontend
+        npx playwright test --reporter=line
+    - name: 📤 Артефакты Playwright
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: frontend/playwright-report
+    - name: 🛑 Остановка backend
+      if: always()
+      run: |
+        cd backend
+        if [ -f server.pid ]; then
+          kill $(cat server.pid) 2>/dev/null || true
+          rm -f server.pid
+        fi
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
