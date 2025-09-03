@@ -10,11 +10,13 @@ Alembic (env.py) импортирует Base отсюда.
 # Подгружаем модули моделей (имена классов не нужны — важен факт импорта).
 # Если добавите новые модели — допишите импорт ниже.
 from app.models import (  # noqa: F401, E402
+    activation as _m_activation,
     appointment as _m_appointment,
     audit as _m_audit,
     emr as _m_emr,
     enums as _m_enums,
     lab as _m_lab,
+    notification as _m_notification,
     online as _m_online,
     patient as _m_patient,
     payment as _m_payment,

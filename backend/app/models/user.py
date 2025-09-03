@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base
+from app.db.base_class import Base
 
 
 class User(Base):

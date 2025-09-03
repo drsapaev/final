@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import DateTime, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base  # ваш общий Base (как в проекте)
+from app.db.base_class import Base
 
 
 class Setting(Base):
