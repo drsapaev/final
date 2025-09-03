@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test.describe('Базовая функциональность клиники', () => {
   test('главная страница загружается', async ({ page }) => {
