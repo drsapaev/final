@@ -80,9 +80,15 @@ jobs:
         export CORS_DISABLE="${{ env.CORS_DISABLE }}"
         export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
         
+        # Останавливаем любые существующие процессы на порту 8000
+        echo "🛑 Останавливаем существующие процессы..."
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
+        sleep 2
+        
         # Запускаем сервер в фоне и ждём готовности
         set -e
         export PYTHONPATH="${{ github.workspace }}/backend"
+        echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         server_pid=$!
         echo $server_pid > server.pid
@@ -107,32 +113,48 @@ jobs:
         export CORS_DISABLE="${{ env.CORS_DISABLE }}"
         export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
         
-        echo "🧪 Тестируем вебхуки оплат..."
-        export PYTHONPATH="${{ github.workspace }}/backend"
-        python test_payment_webhooks.py
+        # Список тестов для выполнения
+        tests=(
+            "test_payment_webhooks.py:Вебхуки оплат"
+            "test_queue_system.py:Система очередей"
+            "test_visit_reschedule.py:Перенос визитов"
+            "test_websocket.py:WebSocket"
+            "test_authentication.py:Аутентификация"
+            "test_reports.py:Отчёты"
+            "test_printing.py:Система печати"
+            "test_printing_edge_cases.py:Edge cases печати"
+        )
         
-        echo "🧪 Тестируем систему очередей..."
-        python test_queue_system.py
+        failed_tests=()
         
-        echo "🧪 Тестируем перенос визитов..."
-        python test_visit_reschedule.py
+        for test_info in "${tests[@]}"; do
+            IFS=':' read -r test_file test_name <<< "$test_info"
+            
+            if [ -f "$test_file" ]; then
+                echo "🧪 Тестируем $test_name..."
+                if python "$test_file"; then
+                    echo "✅ $test_name: ПРОЙДЕН"
+                else
+                    echo "❌ $test_name: ПРОВАЛЕН"
+                    failed_tests+=("$test_name")
+                fi
+            else
+                echo "⚠️ $test_name: Файл $test_file не найден, пропускаем"
+            fi
+        done
         
-        echo "🧪 Тестируем WebSocket..."
-        python test_websocket.py
-        
-        echo "🧪 Тестируем аутентификацию..."
-        python test_authentication.py
-        
-        echo "🧪 Тестируем отчёты..."
-        python test_reports.py
-        
-        echo "🧪 Тестируем систему печати..."
-        python test_printing.py
-        
-        echo "🧪 Тестируем edge cases печати..."
-        python test_printing_edge_cases.py
-    - run: |
+        # Проверяем результаты
+        if [ ${#failed_tests[@]} -eq 0 ]; then
+            echo "🎉 Все тесты пройдены успешно!"
+        else
+            echo "❌ Провалены тесты: ${failed_tests[*]}"
+            exit 1
+        fi
+    - name: 🛑 Очистка процессов
+      if: always()
+      run: |
         cd backend
+        echo "🛑 Останавливаем сервер..."
         if [ -f server.pid ]; then
           server_pid=$(cat server.pid)
           kill $server_pid 2>/dev/null || true
@@ -141,6 +163,7 @@ jobs:
           rm -f server.pid
         fi
         pkill -f "uvicorn.*8000" 2>/dev/null || true
+        echo "✅ Очистка завершена"
 
   deploy-staging:
     name: 🚀 Деплой в тестовую среду

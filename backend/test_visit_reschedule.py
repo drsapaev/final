@@ -18,7 +18,7 @@ def test_login():
     login_url = f"{BASE_URL}/api/v1/auth/login"
     # Пробуем разные комбинации пользователей
     login_attempts = [
-        {"username": "admin", "password": "admin"},
+        {"username": "admin", "password": "admin123"},
         {"username": "test", "password": "test"},
         {"username": "user", "password": "user"}
     ]
