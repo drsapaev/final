@@ -41,6 +41,7 @@ jobs:
     name: 🧪 Автоматическое тестирование
     runs-on: ubuntu-latest
     needs: code-quality
+    if: always()
     
     steps:
     - uses: actions/checkout@v4
