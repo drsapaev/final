@@ -39,7 +39,11 @@ def _row_to_out(r: LabRequest) -> LabRowOut:
 
 
 @router.get("", response_model=List[LabRowOut], summary="Список лабораторных заявок")
-@router.get("/requests", response_model=List[LabRowOut], summary="Список лабораторных заявок (alias)")
+@router.get(
+    "/requests",
+    response_model=List[LabRowOut],
+    summary="Список лабораторных заявок (alias)",
+)
 async def list_lab_requests(
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "Lab", "Doctor")),
@@ -59,12 +63,16 @@ async def list_lab_requests(
 
 
 @router.put("/{req_id}", response_model=LabRowOut, summary="Обновить результат заявки")
-@router.put("/requests/{req_id}", response_model=LabRowOut, summary="Обновить результат заявки (alias)")
+@router.put(
+    "/requests/{req_id}",
+    response_model=LabRowOut,
+    summary="Обновить результат заявки (alias)",
+)
 async def update_lab_result(
     payload: LabResultIn,
     req_id: int = Path(..., ge=1),
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Lab")):
+    user=Depends(require_roles("Admin", "Lab")),
 ):
     row = db.get(LabRequest, req_id)
     if not row:
