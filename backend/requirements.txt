@@ -11,3 +11,4 @@ qrcode[pil]>=7.4,<7.5
 pydantic[email]
 pyotp>=2.9,<2.10
 requests>=2.31,<2.32
+python-multipart>=0.0.7,<0.0.10
