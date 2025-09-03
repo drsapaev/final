@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Printer, X, Calendar, CreditCard } from 'lucide-react';
 import { Button, Badge } from './ui';
+import { useTheme } from '../contexts/ThemeContext';
 
 const AppointmentsTable = ({
   appointments = [],
