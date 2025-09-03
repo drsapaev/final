@@ -68,13 +68,30 @@ jobs:
         import sys
         sys.path.insert(0, '.')
         
+        # Импортируем все модели для создания таблиц
         from app.db.base import Base
         from app.db.session import engine, SessionLocal
         from app.models.user import User
+        from app.models.patient import Patient
+        from app.models.visit import Visit
+        from app.models.payment import Payment
+        from app.models.service import Service
+        from app.models.queue import Queue
+        from app.models.schedule import Schedule
+        from app.models.lab import Lab
+        from app.models.audit import Audit
+        from app.models.setting import Setting
+        from app.models.appointment import Appointment
+        from app.models.payment_webhook import PaymentWebhook
+        from app.models.online import OnlineQueue
+        from app.models.emr import EMR
+        from app.models.activation import Activation
+        from app.models.notification import NotificationTemplate, NotificationHistory, NotificationSettings
         from app.core.security import get_password_hash
         
         try:
             # Создаем таблицы
+            print('🔧 Создаем таблицы базы данных...')
             Base.metadata.create_all(bind=engine)
             print('✅ База данных создана')
             
@@ -102,6 +119,8 @@ jobs:
                 
         except Exception as e:
             print('⚠️ Ошибка создания БД:', e)
+            import traceback
+            traceback.print_exc()
             raise SystemExit(1)
         PY
     - run: |
