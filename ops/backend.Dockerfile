@@ -29,7 +29,7 @@ RUN pip install \
       pydantic==2.9.2
 
 # Copy backend sources
-COPY . /app/
+COPY backend/ /app/
 
 # Entrypoint script
 COPY ops/backend.entrypoint.sh /entrypoint.sh
