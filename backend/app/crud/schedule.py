@@ -327,9 +327,7 @@ def get_doctors_by_department(
     """
     # Получаем уникальные отделения
     dept_stmt = (
-        select(ScheduleTemplate.department)
-        .distinct()
-        .where(ScheduleTemplate.active)
+        select(ScheduleTemplate.department).distinct().where(ScheduleTemplate.active)
     )
     departments = [r[0] for r in db.execute(dept_stmt).all() if r[0]]
 
@@ -374,9 +372,7 @@ def get_departments(db: Session) -> List[Dict[str, Any]]:
     """
     # Получаем уникальные отделения
     dept_stmt = (
-        select(ScheduleTemplate.department)
-        .distinct()
-        .where(ScheduleTemplate.active)
+        select(ScheduleTemplate.department).distinct().where(ScheduleTemplate.active)
     )
     departments = [r[0] for r in db.execute(dept_stmt).all() if r[0]]
 

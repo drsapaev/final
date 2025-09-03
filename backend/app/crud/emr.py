@@ -28,9 +28,7 @@ class CRUDEMR(CRUDBase[EMR, EMRCreate, EMRUpdate]):
 
     def get_drafts(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[EMR]:
         """Получить черновики EMR"""
-        return (
-            db.query(EMR).filter(EMR.is_draft).offset(skip).limit(limit).all()
-        )
+        return db.query(EMR).filter(EMR.is_draft).offset(skip).limit(limit).all()
 
 
 class CRUDPrescription(CRUDBase[Prescription, PrescriptionCreate, PrescriptionUpdate]):
