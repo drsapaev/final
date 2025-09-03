@@ -2,7 +2,6 @@
 API Documentation endpoints
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session

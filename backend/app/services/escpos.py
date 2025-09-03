@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from app.core.config import settings
 
 # Библиотека python-escpos может отсутствовать в окружении — обрабатываем мягко
