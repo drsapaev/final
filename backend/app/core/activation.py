@@ -9,7 +9,7 @@ import socket
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional
 
 from jose import jwt
 from sqlalchemy import and_, select
@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.activation import Activation  # type: ignore[attr-defined]
 from app.models.activation import ActivationStatus
-from app.models.setting import Setting  # type: ignore[attr-defined]
 
 # ---------- Машинный идентификатор (серверный) ----------
 

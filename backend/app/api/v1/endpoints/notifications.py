@@ -16,7 +16,6 @@ from app.schemas.notification import (
     BulkNotificationRequest,
     NotificationHistory,
     NotificationSettings,
-    NotificationSettingsCreate,
     NotificationSettingsUpdate,
     NotificationStatsResponse,
     NotificationTemplate,
@@ -24,8 +23,6 @@ from app.schemas.notification import (
     NotificationTemplateUpdate,
     SendNotificationRequest,
 )
-from app.schemas.patient import Patient
-from app.schemas.visit import Visit
 from app.services.notifications import notification_service
 
 router = APIRouter()
@@ -305,7 +302,7 @@ async def update_notification_template(
     template = crud_notification_template.get(db, id=template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Шаблон не найден")
-    
+
     return crud_notification_template.update(db, db_obj=template, obj_in=template_data)
 
 
@@ -319,7 +316,7 @@ async def delete_notification_template(
     template = crud_notification_template.get(db, id=template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Шаблон не найден")
-    
+
     crud_notification_template.remove(db, id=template_id)
     return {"message": "Шаблон удален"}
 
@@ -356,7 +353,7 @@ async def get_notification_stats(
     """Получение статистики уведомлений"""
     stats = crud_notification_history.get_stats(db, days=days)
     recent_activity = crud_notification_history.get_recent(db, hours=24, limit=10)
-    
+
     return NotificationStatsResponse(
         total_sent=stats["total_sent"],
         successful=stats["successful"],
@@ -378,9 +375,11 @@ async def get_user_notification_settings(
 ):
     """Получение настроек уведомлений пользователя"""
     # Проверяем права доступа
-    if current_user.id != user_id and (not hasattr(current_user, "role") or current_user.role != "Admin"):
+    if current_user.id != user_id and (
+        not hasattr(current_user, "role") or current_user.role != "Admin"
+    ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
-    
+
     settings = crud_notification_settings.get_or_create(
         db, user_id=user_id, user_type=user_type
     )
@@ -397,13 +396,15 @@ async def update_user_notification_settings(
 ):
     """Обновление настроек уведомлений пользователя"""
     # Проверяем права доступа
-    if current_user.id != user_id and (not hasattr(current_user, "role") or current_user.role != "Admin"):
+    if current_user.id != user_id and (
+        not hasattr(current_user, "role") or current_user.role != "Admin"
+    ):
         raise HTTPException(status_code=403, detail="Нет прав доступа")
-    
+
     settings = crud_notification_settings.get_or_create(
         db, user_id=user_id, user_type=user_type
     )
-    
+
     return crud_notification_settings.update(db, db_obj=settings, obj_in=settings_data)
 
 
@@ -417,7 +418,7 @@ async def send_notification(
 ):
     """Отправка уведомления с использованием шаблона"""
     results = []
-    
+
     for channel in request.channels:
         # Получаем контакт получателя
         contact = None
@@ -429,10 +430,10 @@ async def send_notification(
                         contact = patient.email
                     elif channel == "sms":
                         contact = patient.phone
-        
+
         if not contact:
             continue
-        
+
         # Отправляем в фоновом режиме
         background_tasks.add_task(
             notification_service.send_templated_notification,
@@ -446,7 +447,7 @@ async def send_notification(
             related_entity_type=request.related_entity_type,
             related_entity_id=request.related_entity_id,
         )
-    
+
     return {"message": "Уведомления отправлены в фоновом режиме"}
 
 
@@ -459,20 +460,23 @@ async def send_bulk_notification(
 ):
     """Массовая отправка уведомлений"""
     recipients = []
-    
+
     # Формируем список получателей
     for recipient_id in request.recipient_ids:
         if request.recipient_type == "patient":
             patient = patient_crud.get(db, id=recipient_id)
             if patient:
-                recipients.append({
-                    "id": recipient_id,
-                    "type": "patient",
-                    "email": patient.email,
-                    "phone": patient.phone,
-                    "name": patient.full_name or f"{patient.first_name} {patient.last_name}",
-                })
-    
+                recipients.append(
+                    {
+                        "id": recipient_id,
+                        "type": "patient",
+                        "email": patient.email,
+                        "phone": patient.phone,
+                        "name": patient.full_name
+                        or f"{patient.first_name} {patient.last_name}",
+                    }
+                )
+
     # Отправляем в фоновом режиме
     background_tasks.add_task(
         notification_service.send_bulk_notification,
@@ -482,7 +486,7 @@ async def send_bulk_notification(
         recipients=recipients,
         template_data=request.template_data,
     )
-    
+
     return {
         "message": "Массовая отправка запущена",
         "recipients_count": len(recipients),

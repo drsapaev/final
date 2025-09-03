@@ -1,11 +1,10 @@
-from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.models.user import User
 from app.services import online_queue
 
 router = APIRouter(prefix="/queue", tags=["queue"])
@@ -389,7 +388,7 @@ async def get_queue_history(
                     "total": stats.waiting + stats.serving + stats.done,
                 }
                 history.append(day_history)
-            except Exception as e:
+            except Exception:
                 # Если не удалось загрузить статистику для дня, добавляем пустую запись
                 day_history = {
                     "date": date_str,

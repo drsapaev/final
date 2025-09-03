@@ -2,7 +2,6 @@
 Упрощенные тесты системы ролей (без эмодзи для Windows)
 """
 
-import json
 import sys
 
 import requests

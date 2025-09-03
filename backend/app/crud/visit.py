@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import inspect, MetaData, select, Table
+from sqlalchemy import MetaData, select, Table
 from sqlalchemy.orm import Session
 
 

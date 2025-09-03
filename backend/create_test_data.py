@@ -5,7 +5,6 @@
 
 from datetime import datetime
 
-from app.core.security import get_password_hash
 from app.db.session import SessionLocal
 from app.models.patient import Patient
 from app.models.service import Service

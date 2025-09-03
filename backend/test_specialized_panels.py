@@ -2,8 +2,6 @@
 """
 Тест специализированных панелей врачей
 """
-import json
-from datetime import date, datetime
 
 import httpx
 

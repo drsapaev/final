@@ -22,7 +22,7 @@ def check_patients_table():
             print("❌ Таблица patients не существует!")
             return
 
-        print(f"✅ Таблица patients найдена. Колонки:")
+        print("✅ Таблица patients найдена. Колонки:")
         print("-" * 50)
 
         for col in columns:
@@ -42,7 +42,7 @@ def check_patients_table():
         if count > 0:
             cursor.execute("SELECT * FROM patients LIMIT 3")
             rows = cursor.fetchall()
-            print(f"\n📋 Примеры записей:")
+            print("\n📋 Примеры записей:")
             for i, row in enumerate(rows, 1):
                 print(f"  Запись {i}: {row}")
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import datetime as _dt
 from dataclasses import dataclass
 from typing import Optional
@@ -186,7 +185,7 @@ def _broadcast(dep: str, d: str, stats: DayStats) -> None:
 
             # broadcast - синхронная функция, не нужно create_task
             mgr.broadcast(f"{dep}::{d}", payload)
-            print(f"🔔 Broadcast sent successfully")
+            print("🔔 Broadcast sent successfully")
         except Exception as e:
             print(f"❌ Broadcast error: {e}")
             import traceback
@@ -195,7 +194,7 @@ def _broadcast(dep: str, d: str, stats: DayStats) -> None:
             # не роняем транзакции/запрос, если рассылка не удалась
             pass
     else:
-        print(f"⚠️ WSManager not available for broadcast")
+        print("⚠️ WSManager not available for broadcast")
 
 
 def issue_next_ticket(

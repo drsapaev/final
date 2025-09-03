@@ -66,7 +66,6 @@ async def run_async():
 
     # try sync sessionmaker path in thread
     import concurrent.futures
-    import inspect
 
     def sync_job():
         try:

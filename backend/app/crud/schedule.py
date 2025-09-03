@@ -3,12 +3,11 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 from app.models.schedule import ScheduleTemplate
-from app.models.user import User
 
 
 def list_schedules(

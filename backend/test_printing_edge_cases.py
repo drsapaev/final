@@ -6,7 +6,6 @@ import json
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime
 
 BASE_URL = "http://127.0.0.1:8000"
 
@@ -99,7 +98,7 @@ def test_print_ticket_pdf_edge_cases(token):
 
         except urllib.error.HTTPError as e:
             if e.code == 422:
-                print(f"        ✅ Правильно отклонён (422)")
+                print("        ✅ Правильно отклонён (422)")
                 success_count += 1
             else:
                 print(f"        ❌ HTTP код {e.code}")
@@ -146,10 +145,10 @@ def test_print_invoice_pdf_edge_cases(token):
 
         except urllib.error.HTTPError as e:
             if e.code == 422:
-                print(f"        ✅ Правильно отклонён (422)")
+                print("        ✅ Правильно отклонён (422)")
                 success_count += 1
             elif e.code == 404:
-                print(f"        ✅ Правильно отклонён (404): Визит не найден")
+                print("        ✅ Правильно отклонён (404): Визит не найден")
                 success_count += 1
             else:
                 print(f"        ❌ HTTP код {e.code}")
@@ -193,10 +192,10 @@ def test_print_security_edge_cases():
 
         except urllib.error.HTTPError as e:
             if e.code == 401:
-                print(f"        ✅ Правильно отклонён (401): Неавторизованный доступ")
+                print("        ✅ Правильно отклонён (401): Неавторизованный доступ")
                 success_count += 1
             elif e.code == 422:
-                print(f"        ✅ Правильно отклонён (422): Неверные параметры")
+                print("        ✅ Правильно отклонён (422): Неверные параметры")
                 success_count += 1
             else:
                 print(f"        ⚠️ HTTP код {e.code}")

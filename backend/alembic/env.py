@@ -5,7 +5,7 @@ import sys
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, engine_from_config, pool  # create_engine добавлен
+from sqlalchemy import create_engine, pool  # create_engine добавлен
 
 # --- ensure backend root on sys.path (so `import app` works) ---
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

@@ -42,7 +42,9 @@ class NotificationTemplate(NotificationTemplateBase):
 class NotificationHistoryBase(BaseModel):
     recipient_type: str = Field(..., max_length=20, description="Тип получателя")
     recipient_id: Optional[int] = Field(None, description="ID получателя")
-    recipient_contact: str = Field(..., max_length=255, description="Контакт получателя")
+    recipient_contact: str = Field(
+        ..., max_length=255, description="Контакт получателя"
+    )
     notification_type: str = Field(..., max_length=50, description="Тип уведомления")
     channel: str = Field(..., max_length=20, description="Канал отправки")
     template_id: Optional[int] = Field(None, description="ID шаблона")
@@ -50,9 +52,13 @@ class NotificationHistoryBase(BaseModel):
     content: str = Field(..., description="Содержание")
     status: str = Field("pending", max_length=20, description="Статус")
     error_message: Optional[str] = Field(None, description="Сообщение об ошибке")
-    related_entity_type: Optional[str] = Field(None, max_length=50, description="Тип связанной сущности")
+    related_entity_type: Optional[str] = Field(
+        None, max_length=50, description="Тип связанной сущности"
+    )
     related_entity_id: Optional[int] = Field(None, description="ID связанной сущности")
-    notification_metadata: Optional[Dict[str, Any]] = Field(None, description="Метаданные")
+    notification_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Метаданные"
+    )
 
 
 class NotificationHistoryCreate(NotificationHistoryBase):
@@ -80,10 +86,18 @@ class NotificationSettingsBase(BaseModel):
     payment_notifications: bool = Field(True, description="Уведомления о платежах")
     queue_updates: bool = Field(True, description="Обновления очереди")
     system_alerts: bool = Field(False, description="Системные оповещения")
-    reminder_hours_before: int = Field(24, ge=1, le=168, description="За сколько часов напоминать")
-    notification_email: Optional[EmailStr] = Field(None, description="Email для уведомлений")
-    notification_phone: Optional[str] = Field(None, max_length=20, description="Телефон для SMS")
-    telegram_chat_id: Optional[str] = Field(None, max_length=50, description="Telegram chat ID")
+    reminder_hours_before: int = Field(
+        24, ge=1, le=168, description="За сколько часов напоминать"
+    )
+    notification_email: Optional[EmailStr] = Field(
+        None, description="Email для уведомлений"
+    )
+    notification_phone: Optional[str] = Field(
+        None, max_length=20, description="Телефон для SMS"
+    )
+    telegram_chat_id: Optional[str] = Field(
+        None, max_length=50, description="Telegram chat ID"
+    )
 
 
 class NotificationSettingsCreate(NotificationSettingsBase):
@@ -115,15 +129,23 @@ class NotificationSettings(NotificationSettingsBase):
 
 # Запросы для отправки уведомлений
 class SendNotificationRequest(BaseModel):
-    recipient_type: str = Field(..., description="Тип получателя: patient, doctor, admin")
+    recipient_type: str = Field(
+        ..., description="Тип получателя: patient, doctor, admin"
+    )
     recipient_id: Optional[int] = Field(None, description="ID получателя")
     notification_type: str = Field(..., description="Тип уведомления")
     channels: List[str] = Field(["email"], description="Каналы отправки")
-    template_data: Dict[str, Any] = Field({}, description="Данные для подстановки в шаблон")
-    related_entity_type: Optional[str] = Field(None, description="Тип связанной сущности")
+    template_data: Dict[str, Any] = Field(
+        {}, description="Данные для подстановки в шаблон"
+    )
+    related_entity_type: Optional[str] = Field(
+        None, description="Тип связанной сущности"
+    )
     related_entity_id: Optional[int] = Field(None, description="ID связанной сущности")
     priority: str = Field("normal", description="Приоритет: low, normal, high, urgent")
-    scheduled_at: Optional[datetime] = Field(None, description="Время отправки (для отложенных)")
+    scheduled_at: Optional[datetime] = Field(
+        None, description="Время отправки (для отложенных)"
+    )
 
 
 class BulkNotificationRequest(BaseModel):

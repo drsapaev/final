@@ -1,15 +1,17 @@
 """
 API Documentation endpoints
 """
+
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user
+
+from app.api.deps import get_current_user, get_db
 from app.models.user import User
-from typing import Dict, Any
-import json
 
 router = APIRouter()
+
 
 @router.get("/api-docs", response_class=HTMLResponse)
 async def get_api_docs():
@@ -223,6 +225,7 @@ async def get_api_docs():
     """
     return HTMLResponse(content=html_content)
 
+
 @router.get("/api-schema")
 async def get_api_schema():
     """Получить JSON схему API"""
@@ -232,16 +235,10 @@ async def get_api_schema():
             "title": "Clinic Management System API",
             "description": "API для системы управления клиникой",
             "version": "1.0.0",
-            "contact": {
-                "name": "Clinic Management Team",
-                "email": "admin@clinic.com"
-            }
+            "contact": {"name": "Clinic Management Team", "email": "admin@clinic.com"},
         },
         "servers": [
-            {
-                "url": "http://localhost:8000",
-                "description": "Development server"
-            }
+            {"url": "http://localhost:8000", "description": "Development server"}
         ],
         "paths": {
             "/api/v1/auth/login": {
@@ -256,12 +253,12 @@ async def get_api_schema():
                                     "type": "object",
                                     "properties": {
                                         "username": {"type": "string"},
-                                        "password": {"type": "string"}
+                                        "password": {"type": "string"},
                                     },
-                                    "required": ["username", "password"]
+                                    "required": ["username", "password"],
                                 }
                             }
-                        }
+                        },
                     },
                     "responses": {
                         "200": {
@@ -272,13 +269,13 @@ async def get_api_schema():
                                         "type": "object",
                                         "properties": {
                                             "access_token": {"type": "string"},
-                                            "token_type": {"type": "string"}
-                                        }
+                                            "token_type": {"type": "string"},
+                                        },
                                     }
                                 }
-                            }
+                            },
                         }
-                    }
+                    },
                 }
             },
             "/api/v1/users/me": {
@@ -298,77 +295,91 @@ async def get_api_schema():
                                             "username": {"type": "string"},
                                             "email": {"type": "string"},
                                             "role": {"type": "string"},
-                                            "is_active": {"type": "boolean"}
-                                        }
+                                            "is_active": {"type": "boolean"},
+                                        },
                                     }
                                 }
-                            }
+                            },
                         }
-                    }
+                    },
                 }
-            }
+            },
         },
         "components": {
             "securitySchemes": {
                 "BearerAuth": {
                     "type": "http",
                     "scheme": "bearer",
-                    "bearerFormat": "JWT"
+                    "bearerFormat": "JWT",
                 }
             }
-        }
+        },
     }
     return schema
 
+
 @router.get("/endpoints-summary")
 async def get_endpoints_summary(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Получить краткое описание всех эндпоинтов"""
     if current_user.role != "Admin":
         raise HTTPException(status_code=403, detail="Недостаточно прав")
-    
+
     summary = {
         "total_endpoints": 45,
         "categories": {
             "authentication": {
                 "count": 3,
-                "endpoints": ["/auth/login", "/auth/refresh", "/auth/logout"]
+                "endpoints": ["/auth/login", "/auth/refresh", "/auth/logout"],
             },
             "users": {
                 "count": 8,
-                "endpoints": ["/users/", "/users/me", "/users/{id}", "/users/{id}/activate"]
+                "endpoints": [
+                    "/users/",
+                    "/users/me",
+                    "/users/{id}",
+                    "/users/{id}/activate",
+                ],
             },
             "patients": {
                 "count": 6,
-                "endpoints": ["/patients/", "/patients/{id}", "/patients/search"]
+                "endpoints": ["/patients/", "/patients/{id}", "/patients/search"],
             },
             "visits": {
                 "count": 7,
-                "endpoints": ["/visits/", "/visits/{id}", "/visits/patient/{patient_id}"]
+                "endpoints": [
+                    "/visits/",
+                    "/visits/{id}",
+                    "/visits/patient/{patient_id}",
+                ],
             },
             "payments": {
                 "count": 5,
-                "endpoints": ["/payments/", "/payments/{id}", "/payments/webhook"]
+                "endpoints": ["/payments/", "/payments/{id}", "/payments/webhook"],
             },
             "analytics": {
                 "count": 3,
-                "endpoints": ["/analytics/payment-providers", "/analytics/appointment-flow", "/analytics/revenue-breakdown"]
+                "endpoints": [
+                    "/analytics/payment-providers",
+                    "/analytics/appointment-flow",
+                    "/analytics/revenue-breakdown",
+                ],
             },
             "notifications": {
                 "count": 10,
-                "endpoints": ["/notifications/templates", "/notifications/send", "/notifications/history"]
+                "endpoints": [
+                    "/notifications/templates",
+                    "/notifications/send",
+                    "/notifications/history",
+                ],
             },
-            "settings": {
-                "count": 3,
-                "endpoints": ["/settings/", "/settings/{id}"]
-            }
+            "settings": {"count": 3, "endpoints": ["/settings/", "/settings/{id}"]},
         },
         "authentication_required": 42,
         "public_endpoints": 3,
         "admin_only": 15,
-        "doctor_nurse_access": 20
+        "doctor_nurse_access": 20,
     }
-    
+
     return summary

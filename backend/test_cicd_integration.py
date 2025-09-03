@@ -8,7 +8,7 @@ import json
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Конфигурация
 BASE_URL = "http://127.0.0.1:8000"

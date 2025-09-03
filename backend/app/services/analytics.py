@@ -1,8 +1,8 @@
 import calendar
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from sqlalchemy import and_, extract, func
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
@@ -248,7 +248,7 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """Получение статистики очередей"""
         # Импортируем здесь, чтобы избежать циклических импортов
-        from app.models.online_queue import DailyQueue, QueueEntry
+        from app.models.online_queue import DailyQueue
 
         # Получаем статистику очередей
         queue_query = db.query(DailyQueue).filter(
@@ -484,7 +484,6 @@ class AnalyticsService:
         department: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Аналитика потока записей (appointments)"""
-        from app.models.appointment import Appointment
 
         query = db.query(Appointment).filter(
             and_(

@@ -14,9 +14,7 @@ from app.schemas.payment_webhook import (
     PaymentProviderCreate,
     PaymentProviderUpdate,
     PaymentTransactionCreate,
-    PaymentTransactionUpdate,
     PaymentWebhookCreate,
-    PaymentWebhookUpdate,
 )
 
 

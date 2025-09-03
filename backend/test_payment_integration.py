@@ -12,7 +12,6 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.enums import AppointmentStatus
 from app.schemas.payment_webhook import PaymentWebhookOut
 from app.services.visit_payment_integration import VisitPaymentIntegrationService
 

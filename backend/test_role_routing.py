@@ -3,7 +3,6 @@
 Запускать после каждого изменения в системе авторизации
 """
 
-import json
 import sys
 
 import requests
@@ -28,7 +27,7 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
         token_data = response.json()
         token = token_data.get("access_token")
         if not token:
-            print(f"❌ Токен не получен")
+            print("❌ Токен не получен")
             return False
 
         # Получение профиля

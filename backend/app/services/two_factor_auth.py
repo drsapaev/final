@@ -2,7 +2,7 @@ import base64
 import hashlib
 import io
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Tuple
 
 import pyotp

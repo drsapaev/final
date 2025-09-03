@@ -2,7 +2,6 @@
 """
 Тест панели регистратора - управление пациентами и записями
 """
-import json
 from datetime import datetime, timedelta
 
 import httpx

@@ -6,7 +6,7 @@ from sqlalchemy import MetaData, select, Table, update
 from sqlalchemy.orm import Session
 
 from app.crud.appointment import appointment as crud_appointment
-from app.crud.payment_webhook import get_webhook_by_id, update_webhook
+from app.crud.payment_webhook import update_webhook
 from app.models.enums import AppointmentStatus
 from app.schemas.payment_webhook import PaymentWebhookOut
 

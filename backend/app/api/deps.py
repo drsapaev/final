@@ -23,7 +23,6 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 try:

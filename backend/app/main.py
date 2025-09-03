@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List
+from typing import List
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,7 +68,6 @@ _USE_DEV_AUTH_FALLBACK = False
 try:
     from app.api.deps import (  # type: ignore  # noqa: E402
         create_access_token,
-        get_current_user,
     )
 except Exception as e:  # pragma: no cover
     log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)

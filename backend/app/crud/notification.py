@@ -19,7 +19,11 @@ from app.schemas.notification import (
 )
 
 
-class CRUDNotificationTemplate(CRUDBase[NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate]):
+class CRUDNotificationTemplate(
+    CRUDBase[
+        NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate
+    ]
+):
     def get_by_type_and_channel(
         self, db: Session, *, type: str, channel: str
     ) -> Optional[NotificationTemplate]:
@@ -29,12 +33,12 @@ class CRUDNotificationTemplate(CRUDBase[NotificationTemplate, NotificationTempla
                 and_(
                     NotificationTemplate.type == type,
                     NotificationTemplate.channel == channel,
-                    NotificationTemplate.is_active == True
+                    NotificationTemplate.is_active == True,
                 )
             )
             .first()
         )
-    
+
     def get_active_templates(self, db: Session) -> List[NotificationTemplate]:
         return (
             db.query(NotificationTemplate)
@@ -44,7 +48,9 @@ class CRUDNotificationTemplate(CRUDBase[NotificationTemplate, NotificationTempla
         )
 
 
-class CRUDNotificationHistory(CRUDBase[NotificationHistory, NotificationHistoryCreate, None]):
+class CRUDNotificationHistory(
+    CRUDBase[NotificationHistory, NotificationHistoryCreate, None]
+):
     def get_by_recipient(
         self, db: Session, *, recipient_id: int, recipient_type: str, limit: int = 100
     ) -> List[NotificationHistory]:
@@ -53,14 +59,14 @@ class CRUDNotificationHistory(CRUDBase[NotificationHistory, NotificationHistoryC
             .filter(
                 and_(
                     NotificationHistory.recipient_id == recipient_id,
-                    NotificationHistory.recipient_type == recipient_type
+                    NotificationHistory.recipient_type == recipient_type,
                 )
             )
             .order_by(desc(NotificationHistory.created_at))
             .limit(limit)
             .all()
         )
-    
+
     def get_by_status(
         self, db: Session, *, status: str, limit: int = 100
     ) -> List[NotificationHistory]:
@@ -71,7 +77,7 @@ class CRUDNotificationHistory(CRUDBase[NotificationHistory, NotificationHistoryC
             .limit(limit)
             .all()
         )
-    
+
     def get_recent(
         self, db: Session, *, hours: int = 24, limit: int = 100
     ) -> List[NotificationHistory]:
@@ -83,50 +89,50 @@ class CRUDNotificationHistory(CRUDBase[NotificationHistory, NotificationHistoryC
             .limit(limit)
             .all()
         )
-    
+
     def get_stats(self, db: Session, *, days: int = 7) -> Dict[str, Any]:
         since = datetime.utcnow() - timedelta(days=days)
-        
+
         # Общая статистика
         total_query = db.query(NotificationHistory).filter(
             NotificationHistory.created_at >= since
         )
-        
+
         total_sent = total_query.count()
         successful = total_query.filter(NotificationHistory.status == "sent").count()
         failed = total_query.filter(NotificationHistory.status == "failed").count()
         pending = total_query.filter(NotificationHistory.status == "pending").count()
-        
+
         # Статистика по каналам
         by_channel = {}
         channel_stats = (
             db.query(
                 NotificationHistory.channel,
-                func.count(NotificationHistory.id).label("count")
+                func.count(NotificationHistory.id).label("count"),
             )
             .filter(NotificationHistory.created_at >= since)
             .group_by(NotificationHistory.channel)
             .all()
         )
-        
+
         for channel, count in channel_stats:
             by_channel[channel] = count
-        
+
         # Статистика по типам
         by_type = {}
         type_stats = (
             db.query(
                 NotificationHistory.notification_type,
-                func.count(NotificationHistory.id).label("count")
+                func.count(NotificationHistory.id).label("count"),
             )
             .filter(NotificationHistory.created_at >= since)
             .group_by(NotificationHistory.notification_type)
             .all()
         )
-        
+
         for notif_type, count in type_stats:
             by_type[notif_type] = count
-        
+
         return {
             "period_days": days,
             "total_sent": total_sent,
@@ -137,33 +143,44 @@ class CRUDNotificationHistory(CRUDBase[NotificationHistory, NotificationHistoryC
             "by_channel": by_channel,
             "by_type": by_type,
         }
-    
+
     def update_status(
-        self, db: Session, *, notification_id: int, status: str, error_message: Optional[str] = None
+        self,
+        db: Session,
+        *,
+        notification_id: int,
+        status: str,
+        error_message: Optional[str] = None,
     ) -> Optional[NotificationHistory]:
-        notification = db.query(NotificationHistory).filter(
-            NotificationHistory.id == notification_id
-        ).first()
-        
+        notification = (
+            db.query(NotificationHistory)
+            .filter(NotificationHistory.id == notification_id)
+            .first()
+        )
+
         if notification:
             notification.status = status
             if error_message:
                 notification.error_message = error_message
-            
+
             if status == "sent":
                 notification.sent_at = datetime.utcnow()
             elif status == "delivered":
                 notification.delivered_at = datetime.utcnow()
                 if not notification.sent_at:
                     notification.sent_at = datetime.utcnow()
-            
+
             db.commit()
             db.refresh(notification)
-        
+
         return notification
 
 
-class CRUDNotificationSettings(CRUDBase[NotificationSettings, NotificationSettingsCreate, NotificationSettingsUpdate]):
+class CRUDNotificationSettings(
+    CRUDBase[
+        NotificationSettings, NotificationSettingsCreate, NotificationSettingsUpdate
+    ]
+):
     def get_by_user(
         self, db: Session, *, user_id: int, user_type: str
     ) -> Optional[NotificationSettings]:
@@ -172,32 +189,31 @@ class CRUDNotificationSettings(CRUDBase[NotificationSettings, NotificationSettin
             .filter(
                 and_(
                     NotificationSettings.user_id == user_id,
-                    NotificationSettings.user_type == user_type
+                    NotificationSettings.user_type == user_type,
                 )
             )
             .first()
         )
-    
+
     def get_or_create(
         self, db: Session, *, user_id: int, user_type: str
     ) -> NotificationSettings:
         settings = self.get_by_user(db, user_id=user_id, user_type=user_type)
-        
+
         if not settings:
             settings_data = NotificationSettingsCreate(
-                user_id=user_id,
-                user_type=user_type
+                user_id=user_id, user_type=user_type
             )
             settings = self.create(db, obj_in=settings_data)
-        
+
         return settings
-    
+
     def get_users_for_notification(
         self, db: Session, *, notification_type: str, channel: str
     ) -> List[NotificationSettings]:
         """Получить пользователей, которые должны получить уведомление определенного типа"""
         filters = [getattr(NotificationSettings, f"{channel}_enabled") == True]
-        
+
         # Добавляем фильтр по типу уведомления
         if notification_type == "appointment_reminder":
             filters.append(NotificationSettings.appointment_reminders == True)
@@ -207,7 +223,7 @@ class CRUDNotificationSettings(CRUDBase[NotificationSettings, NotificationSettin
             filters.append(NotificationSettings.queue_updates == True)
         elif notification_type == "system_alert":
             filters.append(NotificationSettings.system_alerts == True)
-        
+
         return db.query(NotificationSettings).filter(and_(*filters)).all()
 
 

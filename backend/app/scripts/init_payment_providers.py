@@ -4,7 +4,6 @@
 """
 import os
 import sys
-from datetime import datetime
 
 # Добавляем путь к приложению
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -73,12 +72,12 @@ def init_payment_providers():
 
         db.commit()
 
-        print(f"\n🎉 Инициализация завершена!")
+        print("\n🎉 Инициализация завершена!")
         print(f"📊 Создано: {created_count}")
         print(f"📊 Обновлено: {updated_count}")
 
         # Показываем список всех провайдеров
-        print(f"\n📋 Список провайдеров:")
+        print("\n📋 Список провайдеров:")
         from app.crud.payment_webhook import get_all_providers
 
         all_providers = get_all_providers(db)

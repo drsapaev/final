@@ -14,9 +14,7 @@ def test_broadcast_direct():
     print("🔔 Тестирую broadcast напрямую...")
 
     try:
-        from app.db.session import get_db
-        from app.models.setting import Setting
-        from app.services.online_queue import _broadcast, load_stats
+        from app.services.online_queue import _broadcast
 
         print("✅ Импорты успешны")
 

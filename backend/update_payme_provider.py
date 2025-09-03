@@ -38,7 +38,7 @@ def update_payme_provider():
 
         updated_provider = update_provider(db, provider.id, update_data)
         if updated_provider:
-            print(f"✅ Провайдер обновлён!")
+            print("✅ Провайдер обновлён!")
             print(f"🔑 Новый секретный ключ: {updated_provider.secret_key}")
         else:
             print("❌ Не удалось обновить провайдера")

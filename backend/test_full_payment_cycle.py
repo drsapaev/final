@@ -226,7 +226,7 @@ class PaymentCycleTester:
                 if response.status == 200:
                     response_text = response.read().decode("utf-8")
                     webhook = json.loads(response_text)
-                    print(f"✅ Вебхук найден:")
+                    print("✅ Вебхук найден:")
                     print(f"  - Статус: {webhook['status']}")
                     print(f"  - Провайдер: {webhook['provider']}")
                     print(f"  - Сумма: {webhook['amount']} тийин")
@@ -259,7 +259,7 @@ class PaymentCycleTester:
                     # Ищем транзакцию для нашего визита
                     for transaction in transactions:
                         if transaction.get("visit_id") == self.visit_id:
-                            print(f"✅ Транзакция найдена:")
+                            print("✅ Транзакция найдена:")
                             print(f"  - ID: {transaction['id']}")
                             print(f"  - Статус: {transaction['status']}")
                             print(f"  - Сумма: {transaction['amount']} тийин")
@@ -291,7 +291,7 @@ class PaymentCycleTester:
                 if response.status == 200:
                     response_text = response.read().decode("utf-8")
                     visit = json.loads(response_text)
-                    print(f"✅ Визит найден:")
+                    print("✅ Визит найден:")
                     print(f"  - ID: {visit['id']}")
                     print(f"  - Статус: {visit['status']}")
                     print(f"  - Пациент ID: {visit['patient_id']}")
@@ -319,7 +319,7 @@ class PaymentCycleTester:
                 if response.status == 200:
                     response_text = response.read().decode("utf-8")
                     summary = json.loads(response_text)
-                    print(f"✅ Сводка получена:")
+                    print("✅ Сводка получена:")
                     print(f"  - Всего вебхуков: {summary.get('total_webhooks', 'N/A')}")
                     print(f"  - Обработано: {summary.get('processed_webhooks', 'N/A')}")
                     print(f"  - Ошибок: {summary.get('failed_webhooks', 'N/A')}")
@@ -388,7 +388,7 @@ class PaymentCycleTester:
 
         print("\n" + "=" * 60)
         print("🎉 Полный тест завершён!")
-        print(f"📋 Результаты:")
+        print("📋 Результаты:")
         print(f"  - Пациент ID: {self.patient_id}")
         print(f"  - Визит ID: {self.visit_id}")
         print(f"  - Платёж ID: {self.payment_id}")

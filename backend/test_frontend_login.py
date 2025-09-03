@@ -3,7 +3,6 @@
 Тест фронтенда - проверка логина
 """
 
-import time
 
 import httpx
 

@@ -56,7 +56,7 @@ def test_webhook_list(token):
                 print(f"✅ Получено вебхуков: {len(webhooks)}")
                 return True
             else:
-                print(f"❌ Ошибка получения вебхуков")
+                print("❌ Ошибка получения вебхуков")
                 return False
     except Exception as e:
         print(f"❌ Ошибка: {e}")
@@ -83,7 +83,7 @@ def test_transaction_list(token):
                 print(f"✅ Получено транзакций: {len(transactions)}")
                 return True
             else:
-                print(f"❌ Ошибка получения транзакций")
+                print("❌ Ошибка получения транзакций")
                 return False
     except Exception as e:
         print(f"❌ Ошибка: {e}")
@@ -107,10 +107,10 @@ def test_webhook_summary(token):
 
             if response.status == 200:
                 summary = json.loads(response_text)
-                print(f"✅ Сводка получена")
+                print("✅ Сводка получена")
                 return True
             else:
-                print(f"❌ Ошибка получения сводки")
+                print("❌ Ошибка получения сводки")
                 return False
     except Exception as e:
         print(f"❌ Ошибка: {e}")

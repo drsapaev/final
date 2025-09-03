@@ -1,10 +1,10 @@
 # app/api/v1/endpoints/payment_webhook.py
-from typing import Any, Dict, List
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, require_roles
+from app.api.deps import get_db, require_roles
 from app.crud.payment_webhook import (
     create_provider,
     delete_provider,

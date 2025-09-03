@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,7 +13,7 @@ from app.crud import (
 )
 from app.models.user import User
 from app.schemas.appointment import Appointment, AppointmentCreate
-from app.schemas.patient import Patient, PatientCreate, PatientUpdate
+from app.schemas.patient import Patient, PatientUpdate
 from app.schemas.service import Service
 from app.schemas.visit import Visit, VisitCreate, VisitUpdate, VisitWithServices
 from app.services.visit_payment_integration import VisitPaymentIntegrationService

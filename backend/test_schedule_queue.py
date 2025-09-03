@@ -2,8 +2,7 @@
 """
 Тест новых API для расписания и очереди
 """
-import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import httpx
 
@@ -129,7 +128,7 @@ def test_schedule_queue_apis():
             print(f"Статус: {queue_response.status_code}")
             if queue_response.status_code == 200:
                 queue_data = queue_response.json()
-                print(f"✅ Статус очереди получен:")
+                print("✅ Статус очереди получен:")
                 print(f"   Отделение: {queue_data.get('department')}")
                 print(f"   Дата: {queue_data.get('date')}")
                 print(f"   Открыта: {queue_data.get('is_open')}")

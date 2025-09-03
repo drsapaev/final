@@ -241,13 +241,13 @@ def open_day(
     stats = load_stats(db, department=department, date_str=date_str)
     # Отправляем broadcast в WebSocket
     try:
-        print(f"🔔 Attempting to import _broadcast...")
-        print(f"🔔 _broadcast imported successfully")
+        print("🔔 Attempting to import _broadcast...")
+        print("🔔 _broadcast imported successfully")
         print(f"🔔 Calling _broadcast({department}, {date_str}, stats)")
         print(f"🔔 Stats object: {stats}")
         print(f"🔔 Stats type: {type(stats)}")
         _broadcast(department, date_str, stats)
-        print(f"🔔 _broadcast called successfully")
+        print("🔔 _broadcast called successfully")
     except Exception as e:
         # Не роняем запрос, если broadcast не удался
         print(f"⚠️ Broadcast error in open_day: {e}")

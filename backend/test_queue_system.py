@@ -19,7 +19,7 @@ def test_login():
     login_attempts = [
         {"username": "admin", "password": "admin123"},
         {"username": "test", "password": "test"},
-        {"username": "user", "password": "user"}
+        {"username": "user", "password": "user"},
     ]
 
     for login_data in login_attempts:
@@ -38,7 +38,7 @@ def test_login():
         except Exception as e:
             print(f"⚠️ Попытка логина с {login_data['username']}: {e}")
             continue
-    
+
     print("❌ Не удалось авторизоваться ни с одним пользователем")
     print("ℹ️ Продолжаем тест без авторизации (только публичные эндпоинты)")
     return None
@@ -269,14 +269,14 @@ def test_printing(token, visit_id):
 def test_public_endpoints():
     """Тестируем публичные эндпоинты без авторизации"""
     print("\n🌐 Тестируем публичные эндпоинты...")
-    
+
     public_endpoints = [
         "/api/v1/health",
         "/api/v1/status",
         "/api/v1/queue/stats?department=general&date=2024-01-01",
-        "/api/v1/appointments/stats?department=general&date=2024-01-01"
+        "/api/v1/appointments/stats?department=general&date=2024-01-01",
     ]
-    
+
     success_count = 0
     for endpoint in public_endpoints:
         try:
@@ -289,7 +289,7 @@ def test_public_endpoints():
                     print(f"⚠️ {endpoint}: HTTP {response.status}")
         except Exception as e:
             print(f"⚠️ {endpoint}: {e}")
-    
+
     print(f"\n📊 Публичные эндпоинты: {success_count}/{len(public_endpoints)} работают")
     return success_count > 0
 

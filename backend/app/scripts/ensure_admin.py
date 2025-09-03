@@ -4,7 +4,6 @@ import os
 import sys
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 # Разрешаем запуск из корня репозитория:
 #   python -m app.scripts.ensure_admin

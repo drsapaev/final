@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from reportlab.lib.pagesizes import A4, A5
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas

@@ -104,7 +104,7 @@ def test_payme_webhook_with_real_signature():
             if response.status == 200:
                 result = json.loads(response_text)
                 if result.get("ok"):
-                    print(f"✅ Вебхук успешно обработан!")
+                    print("✅ Вебхук успешно обработан!")
                     if result.get("webhook_id"):
                         print(f"📋 ID вебхука: {result['webhook_id']}")
                         return result["webhook_id"]
@@ -145,7 +145,7 @@ def check_webhook_status(webhook_id: int, token: str):
             if response.status == 200:
                 response_text = response.read().decode("utf-8")
                 webhook = json.loads(response_text)
-                print(f"✅ Вебхук найден:")
+                print("✅ Вебхук найден:")
                 print(f"  - Статус: {webhook.get('status', 'N/A')}")
                 print(f"  - Провайдер: {webhook.get('provider', 'N/A')}")
                 print(f"  - Сумма: {webhook.get('amount', 'N/A')} тийин")

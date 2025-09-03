@@ -78,7 +78,7 @@ def main():
         if test_analytics_endpoint(endpoint, endpoint_params):
             success_count += 1
 
-    print(f"\n📈 Результаты тестирования:")
+    print("\n📈 Результаты тестирования:")
     print(f"✅ Успешно: {success_count}/{total_count}")
     print(f"❌ Ошибок: {total_count - success_count}/{total_count}")
 

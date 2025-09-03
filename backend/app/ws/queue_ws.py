@@ -4,7 +4,6 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
-from typing import Dict, Set
 
 from fastapi import APIRouter, status, WebSocket, WebSocketDisconnect
 
@@ -34,7 +33,7 @@ class WSManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.rooms = defaultdict(set)
-            print(f"🔧 WSManager: создан новый экземпляр")
+            print("🔧 WSManager: создан новый экземпляр")
         return cls._instance
 
     def __init__(self) -> None:

@@ -8,7 +8,6 @@ Create Date: 2025-01-01 12:00:00.000000
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import sqlite
 
 # revision identifiers, used by Alembic.
 revision = "add_emr_prescription"

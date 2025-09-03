@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase

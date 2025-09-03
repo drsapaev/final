@@ -161,7 +161,7 @@ def main():
     log("=" * 60)
 
     # Проверяем переменные окружения
-    log(f"🔧 Конфигурация:")
+    log("🔧 Конфигурация:")
     log(f"   BASE_URL: {BASE_URL}")
     log(f"   MAX_RETRIES: {MAX_RETRIES}")
     log(f"   RETRY_DELAY: {RETRY_DELAY}")

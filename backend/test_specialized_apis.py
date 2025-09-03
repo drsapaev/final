@@ -2,7 +2,6 @@
 """
 Тест новых специализированных API эндпоинтов
 """
-import json
 import time
 
 import httpx

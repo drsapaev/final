@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 from reportlab.lib.pagesizes import A4, A6
 from reportlab.lib.units import mm

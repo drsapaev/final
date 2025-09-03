@@ -1,7 +1,6 @@
 # app/services/payment_webhook.py
 import hashlib
 import hmac
-import json
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
@@ -19,7 +18,7 @@ from app.crud.payment_webhook import (
     get_webhook_by_webhook_id,
     update_webhook,
 )
-from app.models.payment_webhook import PaymentTransaction, PaymentWebhook
+from app.models.payment_webhook import PaymentWebhook
 from app.schemas.payment_webhook import (
     ClickWebhookData,
     PaymentTransactionCreate,
