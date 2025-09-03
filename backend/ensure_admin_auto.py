@@ -9,6 +9,8 @@ import sys
 import traceback
 import types
 
+from sqlalchemy import select
+
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
@@ -150,8 +152,6 @@ async_session_maker = getattr(dbs, "async_session_maker", None) or getattr(
 if not async_strategy and async_session_maker and callable(async_session_maker):
     async_strategy = "async_session_maker"
     print("[ensure_admin_auto] async path available: async_session_maker()")
-
-from sqlalchemy import select
 
 
 def upsert_sync(session):

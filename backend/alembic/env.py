@@ -13,10 +13,9 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 # ----------------------------------------------------------------
 
-from app.core.config import settings  # our central Settings
-
-# Now imports from our project work:
-from app.db.base import Base  # noqa: F401
+# Импорты после настройки sys.path
+from app.core.config import settings  # noqa: E402
+from app.db.base import Base  # noqa: F401, E402
 
 # this is the Alembic Config object, which provides access to the values
 # within the .ini file in use.

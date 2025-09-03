@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+from app.db.base_class import Base  # noqa: F401
+
 """
 Импортирует Base и подгружает все модули моделей, чтобы таблицы попали в metadata.
 Alembic (env.py) импортирует Base отсюда.
 """
 
-from app.db.base_class import Base  # noqa: F401
-
 # Подгружаем модули моделей (имена классов не нужны — важен факт импорта).
 # Если добавите новые модели — допишите импорт ниже.
-from app.models import (  # noqa: F401
+from app.models import (  # noqa: F401, E402
     appointment as _m_appointment,
     audit as _m_audit,
     emr as _m_emr,
