@@ -62,9 +62,17 @@ jobs:
             # Создаем таблицы если их нет
             Base.metadata.create_all(bind=engine)
             
+            # Проверяем, что таблица users действительно создана
             with engine.connect() as conn:
                 result = conn.execute(text('SELECT 1'))
                 print('✅ База данных доступна')
+                
+                # Проверяем существование таблицы users
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+                if not result.fetchone():
+                    print('❌ Таблица users не найдена после создания')
+                    raise Exception("Таблица users не создана")
+                print('✅ Таблица users подтверждена')
                 
                 # Проверяем количество записей в основных таблицах
                 tables = ['users', 'patients', 'visits', 'visit_services', 'payments', 'payment_webhooks', 'payment_transactions', 'payment_providers', 'services', 'service_catalog', 'queue_tickets', 'schedule_templates', 'lab_orders', 'lab_results', 'audit_logs', 'settings', 'appointments', 'online_days', 'emr', 'prescriptions', 'activations', 'notification_templates', 'notification_history', 'notification_settings']
@@ -75,6 +83,10 @@ jobs:
                         print(f'   📊 {table}: {count} записей')
                     except:
                         print(f'   ⚠️ {table}: таблица не найдена')
+                        
+            # Небольшая задержка для стабилизации
+            import time
+            time.sleep(1)
                         
             # Создаем тестового пользователя admin если его нет
             db = SessionLocal()

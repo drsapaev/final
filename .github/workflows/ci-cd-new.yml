@@ -76,6 +76,7 @@ jobs:
           
           python - << 'PY'
           import sys
+          import time
           sys.path.insert(0, '.')
           
           # Импортируем все модели для создания таблиц
@@ -98,6 +99,7 @@ jobs:
           from app.models.activation import Activation
           from app.models.notification import NotificationTemplate, NotificationHistory, NotificationSettings
           from app.core.security import get_password_hash
+          from sqlalchemy import text
           
           try:
               # Создаем таблицы
@@ -105,9 +107,21 @@ jobs:
               Base.metadata.create_all(bind=engine)
               print('✅ База данных создана')
               
+              # Проверяем, что таблица users действительно создана
+              with engine.connect() as conn:
+                  result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+                  if not result.fetchone():
+                      print('❌ Таблица users не найдена после создания')
+                      raise Exception("Таблица users не создана")
+                  print('✅ Таблица users подтверждена')
+              
+              # Небольшая задержка для стабилизации
+              time.sleep(1)
+              
               # Создаем тестового пользователя admin
               db = SessionLocal()
               try:
+                  # Проверяем существование пользователя admin
                   existing_admin = db.query(User).filter(User.username == "admin").first()
                   if not existing_admin:
                       admin_user = User(
@@ -348,30 +362,57 @@ jobs:
           # Создаем тестовую базу и пользователя
           python - << 'PY'
           import sys
+          import time
           sys.path.insert(0, '.')
           
           from app.db.base import Base
           from app.db.session import engine, SessionLocal
           from app.models.user import User
           from app.core.security import get_password_hash
+          from sqlalchemy import text
           
-          Base.metadata.create_all(bind=engine)
-          db = SessionLocal()
           try:
-              existing_admin = db.query(User).filter(User.username == "admin").first()
-              if not existing_admin:
-                  admin_user = User(
-                      username="admin",
-                      email="admin@clinic.com",
-                      hashed_password=get_password_hash("admin123"),
-                      role="Admin",
-                      is_active=True,
-                      is_superuser=True
-                  )
-                  db.add(admin_user)
-                  db.commit()
-          finally:
-              db.close()
+              # Создаем таблицы
+              print('🔧 Создаем таблицы для интеграционных тестов...')
+              Base.metadata.create_all(bind=engine)
+              print('✅ База данных создана')
+              
+              # Проверяем, что таблица users действительно создана
+              with engine.connect() as conn:
+                  result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+                  if not result.fetchone():
+                      print('❌ Таблица users не найдена после создания')
+                      raise Exception("Таблица users не создана")
+                  print('✅ Таблица users подтверждена')
+              
+              # Небольшая задержка для стабилизации
+              time.sleep(1)
+              
+              # Создаем тестового пользователя admin
+              db = SessionLocal()
+              try:
+                  existing_admin = db.query(User).filter(User.username == "admin").first()
+                  if not existing_admin:
+                      admin_user = User(
+                          username="admin",
+                          email="admin@clinic.com",
+                          hashed_password=get_password_hash("admin123"),
+                          role="Admin",
+                          is_active=True,
+                          is_superuser=True
+                      )
+                      db.add(admin_user)
+                      db.commit()
+                      print('✅ Тестовый пользователь admin создан')
+                  else:
+                      print('✅ Пользователь admin уже существует')
+              finally:
+                  db.close()
+          except Exception as e:
+              print('⚠️ Ошибка создания БД для интеграционных тестов:', e)
+              import traceback
+              traceback.print_exc()
+              raise SystemExit(1)
           PY
       - name: Запуск интеграционных тестов
         run: |

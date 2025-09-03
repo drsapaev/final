@@ -88,12 +88,25 @@ jobs:
         from app.models.activation import Activation
         from app.models.notification import NotificationTemplate, NotificationHistory, NotificationSettings
         from app.core.security import get_password_hash
+        from sqlalchemy import text
         
         try:
             # Создаем таблицы
             print('🔧 Создаем таблицы базы данных...')
             Base.metadata.create_all(bind=engine)
             print('✅ База данных создана')
+            
+            # Проверяем, что таблица users действительно создана
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+                if not result.fetchone():
+                    print('❌ Таблица users не найдена после создания')
+                    raise Exception("Таблица users не создана")
+                print('✅ Таблица users подтверждена')
+            
+            # Небольшая задержка для стабилизации
+            import time
+            time.sleep(1)
             
             # Создаем тестового пользователя admin
             db = SessionLocal()
