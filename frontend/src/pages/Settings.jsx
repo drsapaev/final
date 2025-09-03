@@ -343,7 +343,7 @@ export default function Settings() {
               onSave={(data) => updateProvider(editingProvider.id, data)}
               title="Редактировать провайдера"
             />
-          )}
+              )}
             </div>
           )}
         </div>

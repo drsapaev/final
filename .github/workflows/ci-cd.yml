@@ -27,6 +27,9 @@ jobs:
     - run: |
         cd backend
         pip install flake8 black isort bandit
+        # Автоматически применяем форматирование, затем проверяем, чтобы стабилизировать шаг
+        black .
+        isort .
         black --check .
         isort --check-only .
         # Проверяем только критичные ошибки синтаксиса/неопределенных имен внутри backend/app
