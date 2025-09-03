@@ -33,7 +33,7 @@ class CRUDNotificationTemplate(
                 and_(
                     NotificationTemplate.type == type,
                     NotificationTemplate.channel == channel,
-                    NotificationTemplate.is_active == True,
+                    NotificationTemplate.is_active,
                 )
             )
             .first()
@@ -42,7 +42,7 @@ class CRUDNotificationTemplate(
     def get_active_templates(self, db: Session) -> List[NotificationTemplate]:
         return (
             db.query(NotificationTemplate)
-            .filter(NotificationTemplate.is_active == True)
+            .filter(NotificationTemplate.is_active)
             .order_by(NotificationTemplate.type, NotificationTemplate.channel)
             .all()
         )
@@ -212,17 +212,17 @@ class CRUDNotificationSettings(
         self, db: Session, *, notification_type: str, channel: str
     ) -> List[NotificationSettings]:
         """Получить пользователей, которые должны получить уведомление определенного типа"""
-        filters = [getattr(NotificationSettings, f"{channel}_enabled") == True]
+        filters = [getattr(NotificationSettings, f"{channel}_enabled")]
 
         # Добавляем фильтр по типу уведомления
         if notification_type == "appointment_reminder":
-            filters.append(NotificationSettings.appointment_reminders == True)
+            filters.append(NotificationSettings.appointment_reminders)
         elif notification_type == "payment_notification":
-            filters.append(NotificationSettings.payment_notifications == True)
+            filters.append(NotificationSettings.payment_notifications)
         elif notification_type == "queue_update":
-            filters.append(NotificationSettings.queue_updates == True)
+            filters.append(NotificationSettings.queue_updates)
         elif notification_type == "system_alert":
-            filters.append(NotificationSettings.system_alerts == True)
+            filters.append(NotificationSettings.system_alerts)
 
         return db.query(NotificationSettings).filter(and_(*filters)).all()
 

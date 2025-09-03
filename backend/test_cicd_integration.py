@@ -86,7 +86,7 @@ def get_auth_token():
             data = json.loads(response.read().decode())
             return data.get("access_token")
         return None
-    except:
+    except Exception:
         return None
 
 

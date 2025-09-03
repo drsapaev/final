@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.crud.payment_webhook import (
-    create_provider,
+    create_provider as crud_create_provider,
     delete_provider,
     get_all_providers,
     get_all_transactions,
@@ -14,7 +14,7 @@ from app.crud.payment_webhook import (
     get_provider_by_id,
     get_transaction_by_id,
     get_webhook_by_id,
-    update_provider,
+    update_provider as crud_update_provider,
 )
 from app.schemas.payment_webhook import (
     PaymentProviderCreate,
@@ -136,7 +136,7 @@ def create_provider(
             detail=f"Provider with code '{provider_in.code}' already exists",
         )
 
-    return create_provider(db, provider_in)
+    return crud_create_provider(db, provider_in)
 
 
 @router.get(
@@ -176,7 +176,7 @@ def update_provider(
             status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found"
         )
 
-    return update_provider(db, provider_id, provider_in)
+    return crud_update_provider(db, provider_id, provider_in)
 
 
 @router.delete("/payment/providers/{provider_id}", name="delete_provider")
@@ -321,23 +321,3 @@ def get_webhook(
             status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
         )
     return webhook
-
-
-@router.get("/payment/summary", name="webhook_summary")
-def get_webhook_summary(
-    provider: str = Query(None, description="Фильтр по провайдеру"),
-    db: Session = Depends(get_db),
-    current_user=Depends(require_roles("Admin", "Registrar")),
-):
-    """Сводка по вебхукам и транзакциям"""
-    try:
-        print(f"📊 Получаем сводку вебхуков для провайдера: {provider}")
-        summary = payment_webhook_service.get_webhook_summary(db, provider)
-        print(f"✅ Сводка получена: {summary}")
-        return summary
-    except Exception as e:
-        print(f"❌ Ошибка в get_webhook_summary: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting summary: {str(e)}",
-        )

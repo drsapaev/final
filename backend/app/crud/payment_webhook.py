@@ -319,7 +319,7 @@ def get_provider_by_code(db: Session, code: str) -> Optional[PaymentProvider]:
 def get_active_providers(db: Session) -> List[PaymentProvider]:
     """Получение активных провайдеров"""
     t = _payment_providers(db)
-    rows = db.execute(select(t).where(t.c.is_active == True)).mappings().all()
+    rows = db.execute(select(t).where(t.c.is_active)).mappings().all()
     return [PaymentProvider(**dict(row)) for row in rows]
 
 

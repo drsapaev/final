@@ -536,7 +536,7 @@ class NotificationService:
 
         return results
 
-    async def send_payment_notification(
+    async def send_payment_notification_by_id(
         self,
         db: Session,
         payment_id: int,

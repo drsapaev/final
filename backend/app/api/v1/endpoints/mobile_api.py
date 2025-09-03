@@ -253,7 +253,7 @@ async def get_mobile_queue_status(
 
     try:
         # Парсим дату
-        queue_date = datetime.strptime(date, "%Y-%m-%d").date()
+        datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Неверный формат даты")
 

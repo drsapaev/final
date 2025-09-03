@@ -125,7 +125,7 @@ class PaymentWebhookService:
                 webhook_id=webhook.id,
             )
 
-            transaction = create_transaction(db, transaction_create)
+            create_transaction(db, transaction_create)
 
             # Обновляем статус вебхука
             webhook_update = {"status": status, "processed_at": datetime.utcnow()}
@@ -261,7 +261,7 @@ class PaymentWebhookService:
                 webhook_id=webhook.id,
             )
 
-            transaction = create_transaction(db, transaction_create)
+            create_transaction(db, transaction_create)
 
             # Обновляем статус вебхука
             webhook_update = {"status": status, "processed_at": datetime.utcnow()}

@@ -106,7 +106,7 @@ def test_webhook_summary(token):
             print(f"📄 Ответ: {response_text}")
 
             if response.status == 200:
-                summary = json.loads(response_text)
+                json.loads(response_text)
                 print("✅ Сводка получена")
                 return True
             else:

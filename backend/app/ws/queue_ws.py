@@ -93,7 +93,7 @@ class WSManager:
                 import asyncio
 
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                     # Если loop уже запущен, создаём task
                     asyncio.create_task(self._send_one(ws, data))
                 except RuntimeError:

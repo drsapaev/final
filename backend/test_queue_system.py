@@ -236,7 +236,7 @@ def test_printing(token, visit_id):
 
     # Тест 1: Генерация билета PDF
     print("  🎫 Генерируем билет PDF...")
-    today = time.strftime("%Y-%m-%d")
+    time.strftime("%Y-%m-%d")
     ticket_url = (
         f"{BASE_URL}/api/v1/print/ticket.pdf?department=THERAPY&ticket_number=1"
     )

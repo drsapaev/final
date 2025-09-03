@@ -52,7 +52,7 @@ def _create_fk_if_absent(
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
+    op.get_bind()
 
 
 def downgrade() -> None:

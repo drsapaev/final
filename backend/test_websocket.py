@@ -230,7 +230,7 @@ async def test_websocket_error_handling():
         invalid_url = "ws://127.0.0.1:8000/invalid_ws"
 
         try:
-            async with websockets.connect(invalid_url) as websocket:
+            async with websockets.connect(invalid_url):
                 print("    ❌ Неожиданно подключились к несуществующему WebSocket")
                 return False
         except websockets.exceptions.InvalidURI:

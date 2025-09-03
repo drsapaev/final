@@ -417,7 +417,6 @@ async def send_notification(
     db: Session = Depends(get_db),
 ):
     """Отправка уведомления с использованием шаблона"""
-    results = []
 
     for channel in request.channels:
         # Получаем контакт получателя

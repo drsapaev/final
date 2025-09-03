@@ -301,7 +301,7 @@ def bulk_update_providers(
                     continue
 
                 # Обновляем провайдера
-                updated_provider = update_provider(
+                update_provider(
                     db, provider_id, PaymentProviderUpdate(**provider_updates)
                 )
 

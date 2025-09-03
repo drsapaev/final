@@ -102,7 +102,7 @@ if __name__ == "__main__":
         if response.status_code != 200:
             print("Сервер недоступен")
             sys.exit(1)
-    except:
+    except Exception:
         print("Сервер недоступен")
         sys.exit(1)
 

@@ -99,7 +99,7 @@ def get_weekly_schedule(
 
         # Получаем шаблоны расписания для этого дня недели
         stmt = select(ScheduleTemplate).where(
-            and_(ScheduleTemplate.weekday == weekday, ScheduleTemplate.active == True)
+            and_(ScheduleTemplate.weekday == weekday, ScheduleTemplate.active)
         )
 
         if department:
@@ -176,7 +176,7 @@ def get_daily_schedule(
 
     # Получаем шаблоны расписания
     stmt = select(ScheduleTemplate).where(
-        and_(ScheduleTemplate.weekday == weekday, ScheduleTemplate.active == True)
+        and_(ScheduleTemplate.weekday == weekday, ScheduleTemplate.active)
     )
 
     if department:
@@ -249,7 +249,7 @@ def get_available_slots(
     stmt = select(ScheduleTemplate).where(
         and_(
             ScheduleTemplate.weekday == weekday,
-            ScheduleTemplate.active == True,
+            ScheduleTemplate.active,
             ScheduleTemplate.department == department,
         )
     )
@@ -329,7 +329,7 @@ def get_doctors_by_department(
     dept_stmt = (
         select(ScheduleTemplate.department)
         .distinct()
-        .where(ScheduleTemplate.active == True)
+        .where(ScheduleTemplate.active)
     )
     departments = [r[0] for r in db.execute(dept_stmt).all() if r[0]]
 
@@ -346,7 +346,7 @@ def get_doctors_by_department(
             .where(
                 and_(
                     ScheduleTemplate.department == dept,
-                    ScheduleTemplate.active == True,
+                    ScheduleTemplate.active,
                     ScheduleTemplate.doctor_id.isnot(None),
                 )
             )
@@ -376,7 +376,7 @@ def get_departments(db: Session) -> List[Dict[str, Any]]:
     dept_stmt = (
         select(ScheduleTemplate.department)
         .distinct()
-        .where(ScheduleTemplate.active == True)
+        .where(ScheduleTemplate.active)
     )
     departments = [r[0] for r in db.execute(dept_stmt).all() if r[0]]
 
@@ -385,7 +385,7 @@ def get_departments(db: Session) -> List[Dict[str, Any]]:
     for dept in departments:
         # Подсчитываем количество активных шаблонов для отделения
         count_stmt = select(func.count(ScheduleTemplate.id)).where(
-            and_(ScheduleTemplate.department == dept, ScheduleTemplate.active == True)
+            and_(ScheduleTemplate.department == dept, ScheduleTemplate.active)
         )
         template_count = db.execute(count_stmt).scalar()
 
