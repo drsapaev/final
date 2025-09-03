@@ -230,16 +230,54 @@ jobs:
           docker build -f ops/frontend.Dockerfile -t clinic-frontend .
       - name: Test Backend run
         run: |
-          docker run --rm -d -p 8000:8000 -e DATABASE_URL="sqlite:///./test.db" clinic-backend &
-          sleep 10
-          curl -f http://localhost:8000/api/v1/health || exit 1
-          docker stop $(docker ps -q --filter ancestor=clinic-backend) || true
+          # Запускаем контейнер в фоне
+          CONTAINER_ID=$(docker run -d -p 8000:8000 -e DATABASE_URL="sqlite:///./test.db" clinic-backend)
+          echo "Container ID: $CONTAINER_ID"
+          
+          # Ждем запуска сервера
+          echo "⏳ Ожидаем запуск сервера..."
+          for i in {1..30}; do
+            if curl -s -f "http://localhost:8000/api/v1/health" > /dev/null 2>&1; then
+              echo "✅ Сервер запущен успешно"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "❌ Сервер не запустился"
+              echo "📄 Логи контейнера:"
+              docker logs $CONTAINER_ID
+              docker stop $CONTAINER_ID
+              exit 1
+            fi
+            sleep 2
+          done
+          
+          # Останавливаем контейнер
+          docker stop $CONTAINER_ID
       - name: Test Frontend run
         run: |
-          docker run --rm -d -p 3000:3000 clinic-frontend &
-          sleep 10
-          curl -f http://localhost:3000 || exit 1
-          docker stop $(docker ps -q --filter ancestor=clinic-frontend) || true
+          # Запускаем контейнер в фоне
+          CONTAINER_ID=$(docker run -d -p 3000:3000 clinic-frontend)
+          echo "Container ID: $CONTAINER_ID"
+          
+          # Ждем запуска сервера
+          echo "⏳ Ожидаем запуск frontend сервера..."
+          for i in {1..30}; do
+            if curl -s -f "http://localhost:3000" > /dev/null 2>&1; then
+              echo "✅ Frontend сервер запущен успешно"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "❌ Frontend сервер не запустился"
+              echo "📄 Логи контейнера:"
+              docker logs $CONTAINER_ID
+              docker stop $CONTAINER_ID
+              exit 1
+            fi
+            sleep 2
+          done
+          
+          # Останавливаем контейнер
+          docker stop $CONTAINER_ID
 
   # --- E2E тесты (Playwright) ---
   e2e:
