@@ -76,14 +76,14 @@ jobs:
         from app.models.visit import Visit
         from app.models.payment import Payment
         from app.models.service import Service
-        from app.models.queue import Queue
+        from app.models.queue import QueueTicket
         from app.models.schedule import Schedule
         from app.models.lab import Lab
         from app.models.audit import Audit
         from app.models.setting import Setting
         from app.models.appointment import Appointment
         from app.models.payment_webhook import PaymentWebhook
-        from app.models.online import OnlineQueue
+        from app.models.online import OnlineDay
         from app.models.emr import EMR
         from app.models.activation import Activation
         from app.models.notification import NotificationTemplate, NotificationHistory, NotificationSettings

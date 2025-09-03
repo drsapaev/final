@@ -44,14 +44,14 @@ jobs:
         from app.models.visit import Visit
         from app.models.payment import Payment
         from app.models.service import Service
-        from app.models.queue import Queue
+        from app.models.queue import QueueTicket
         from app.models.schedule import Schedule
         from app.models.lab import Lab
         from app.models.audit import Audit
         from app.models.setting import Setting
         from app.models.appointment import Appointment
         from app.models.payment_webhook import PaymentWebhook
-        from app.models.online import OnlineQueue
+        from app.models.online import OnlineDay
         from app.models.emr import EMR
         from app.models.activation import Activation
         from app.models.notification import NotificationTemplate, NotificationHistory, NotificationSettings
@@ -67,7 +67,7 @@ jobs:
                 print('✅ База данных доступна')
                 
                 # Проверяем количество записей в основных таблицах
-                tables = ['users', 'patients', 'visits', 'payments', 'payment_webhooks', 'services', 'queues', 'schedules', 'labs', 'audits', 'settings', 'appointments', 'online_queues', 'emrs', 'activations', 'notification_templates', 'notification_history', 'notification_settings']
+                tables = ['users', 'patients', 'visits', 'payments', 'payment_webhooks', 'services', 'queue_tickets', 'schedules', 'labs', 'audits', 'settings', 'appointments', 'online_days', 'emrs', 'activations', 'notification_templates', 'notification_history', 'notification_settings']
                 for table in tables:
                     try:
                         result = conn.execute(text(f'SELECT COUNT(*) FROM {table}'))
