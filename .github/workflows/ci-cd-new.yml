@@ -237,6 +237,7 @@ jobs:
           # Ждем запуска сервера
           echo "⏳ Ожидаем запуск сервера..."
           for i in {1..30}; do
+            echo "Попытка $i/30: проверяем http://localhost:8000/api/v1/health"
             if curl -s -f "http://localhost:8000/api/v1/health" > /dev/null 2>&1; then
               echo "✅ Сервер запущен успешно"
               break
@@ -245,6 +246,10 @@ jobs:
               echo "❌ Сервер не запустился"
               echo "📄 Логи контейнера:"
               docker logs $CONTAINER_ID
+              echo "📊 Статус контейнера:"
+              docker ps -a | grep $CONTAINER_ID
+              echo "🔍 Проверяем процессы в контейнере:"
+              docker exec $CONTAINER_ID ps aux || echo "Не удалось выполнить ps aux"
               docker stop $CONTAINER_ID
               exit 1
             fi

@@ -24,12 +24,14 @@ try:
     print('✅ Database tables created successfully')
 except Exception as e:
     print(f'⚠️ Error creating tables: {e}')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 "
 
 if [[ "${ENSURE_ADMIN}" == "1" ]]; then
   echo "[entrypoint] Ensuring admin user..."
-  python app/scripts/ensure_admin.py || true
+  python app/scripts/ensure_admin.py || echo "⚠️ Warning: Could not ensure admin user"
 fi
 
 echo "[entrypoint] Starting Uvicorn ${APP_MODULE} on ${HOST}:${PORT} (workers=${WORKERS}, reload=${RELOAD})"
