@@ -77,15 +77,27 @@ jobs:
         export CORS_DISABLE="${{ env.CORS_DISABLE }}"
         export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
         
-        # Запускаем сервер в фоне
+        # Запускаем сервер в фоне и ждём готовности
+        set -e
         export PYTHONPATH="${{ github.workspace }}/backend"
-        python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
-        echo $! > server.pid
-        sleep 10
-        
-        # Проверяем статус
-        curl -f http://127.0.0.1:8000/api/v1/health || exit 1
-        echo "✅ Сервер запущен"
+        nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        server_pid=$!
+        echo $server_pid > server.pid
+        echo "⏳ Ожидаем запуск сервера..."
+        for i in {1..30}; do
+          if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            echo "✅ Сервер запущен успешно"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Не удалось дождаться запуска сервера"
+            echo "📄 Логи сервера:"
+            cat server.log || echo "Логи недоступны"
+            kill $server_pid 2>/dev/null || true
+            exit 1
+          fi
+          sleep 2
+        done
     - run: |
         cd backend
         export DATABASE_URL="${{ env.DATABASE_URL }}"
@@ -119,9 +131,13 @@ jobs:
     - run: |
         cd backend
         if [ -f server.pid ]; then
-          kill $(cat server.pid) || true
-          rm server.pid
+          server_pid=$(cat server.pid)
+          kill $server_pid 2>/dev/null || true
+          sleep 3
+          kill -9 $server_pid 2>/dev/null || true
+          rm -f server.pid
         fi
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
 
   deploy-staging:
     name: 🚀 Деплой в тестовую среду
