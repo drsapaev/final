@@ -125,3 +125,4 @@ function AnalyticsMetrics({ metrics, columns = 4 }) {
 }
 
 export default AnalyticsMetrics;
+

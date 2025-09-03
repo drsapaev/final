@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     admin_providers,
     admin_users,
     analytics,
+    api_documentation,
     appointment_flow,
     appointments,
     audit,
@@ -17,8 +18,10 @@ from app.api.v1.endpoints import (
     cardio,
     dental,
     derma,
+    docs,
     health as health_ep,
     lab_specialized,
+    notifications,
     online_queue,
     patients,
     payment_webhook,
@@ -30,6 +33,7 @@ from app.api.v1.endpoints import (
     schedule,
     services,
     settings as settings_ep,
+    specialized_panels,
     visits,
 )
 
@@ -60,5 +64,9 @@ api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
 )
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(docs.router, prefix="/docs", tags=["documentation"])
+api_router.include_router(api_documentation.router, prefix="/documentation", tags=["api-docs"])
+api_router.include_router(specialized_panels.router, prefix="/specialized", tags=["specialized-panels"])
 api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(activation_ep.router, tags=["activation"])
