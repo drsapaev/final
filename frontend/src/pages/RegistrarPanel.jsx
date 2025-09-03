@@ -937,8 +937,8 @@ const RegistrarPanel = () => {
         {activeTab !== 'welcome' && (
           <div style={{
             ...tableContainerStyle, 
-            marginTop: '-1px',
-            margin: `0 ${isMobile ? getSpacing('md') : getSpacing('xl')} ${getSpacing('xl')} ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
+            // избегаем конфликта marginTop + margin (шорткат)
+            margin: `${-1}px ${isMobile ? getSpacing('md') : getSpacing('xl')} ${getSpacing('xl')} ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
             borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px'
           }}>
             <div style={{
@@ -977,7 +977,7 @@ const RegistrarPanel = () => {
               
               {/* Таблица записей */}
               {appointmentsLoading ? (
-                <AnimatedLoader.AnimatedTableSkeleton rows={8} columns={10} />
+                <AnimatedLoader.TableSkeleton rows={8} columns={10} />
               ) : (
                 <ResponsiveTable
                   data={filteredAppointments}
