@@ -4,10 +4,12 @@ Revision ID: 20250814_0003_queue
 Revises: 20250814_0002_auth
 Create Date: 2025-08-14 12:03:00.000000
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250814_0003"
@@ -43,7 +45,12 @@ def upgrade() -> None:
             sa.Column("department", sa.String(length=64), nullable=False),
             sa.Column("date_str", sa.String(length=16), nullable=False),
             sa.Column("ticket_number", sa.Integer(), nullable=False),
-            sa.Column("status", sa.String(length=16), nullable=False, server_default=sa.text("'waiting'")),
+            sa.Column(
+                "status",
+                sa.String(length=16),
+                nullable=False,
+                server_default=sa.text("'waiting'"),
+            ),
         )
 
     # 2) Индексы (создаём только если их нет)
@@ -95,10 +102,14 @@ def downgrade() -> None:
     # Удаляем уникальность
     if bind.dialect.name == "sqlite":
         if has_index("queue_tickets", "uq_queue_dep_date_ticket__uniq_idx"):
-            op.drop_index("uq_queue_dep_date_ticket__uniq_idx", table_name="queue_tickets")
+            op.drop_index(
+                "uq_queue_dep_date_ticket__uniq_idx", table_name="queue_tickets"
+            )
     else:
         if has_uc("queue_tickets", "uq_queue_dep_date_ticket"):
-            op.drop_constraint("uq_queue_dep_date_ticket", "queue_tickets", type_="unique")
+            op.drop_constraint(
+                "uq_queue_dep_date_ticket", "queue_tickets", type_="unique"
+            )
 
     # Индексы
     for ix in ["ix_queue_ticket", "ix_queue_status", "ix_queue_date", "ix_queue_dep"]:

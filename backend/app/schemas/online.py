@@ -1,9 +1,11 @@
 ﻿from __future__ import annotations
-from app.schemas.base import ORMModel
+
 from datetime import date
 from typing import Optional
 
 from pydantic import Field
+
+from app.schemas.base import ORMModel
 
 
 class OnlineJoinRequest(ORMModel):

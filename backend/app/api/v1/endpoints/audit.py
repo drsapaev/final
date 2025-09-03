@@ -24,7 +24,9 @@ class AuditOut(BaseModel):
 
 def _row_to_out(r) -> AuditOut:
     # created_at как ISO строка
-    created = r.created_at.isoformat() if hasattr(r, "created_at") and r.created_at else ""
+    created = (
+        r.created_at.isoformat() if hasattr(r, "created_at") and r.created_at else ""
+    )
     return AuditOut(
         id=r.id,
         action=r.action,

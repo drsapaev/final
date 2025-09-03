@@ -1,27 +1,30 @@
 from __future__ import annotations
 
-from typing import List, Optional, Union, Dict, Any
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
+
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+
 from app.crud.base import CRUDBase
 from app.models.patient import Patient
 from app.schemas.patient import PatientCreate, PatientUpdate
-from datetime import datetime
+
 
 class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
     def get_patients(
-        self, 
-        db: Session, 
-        *, 
-        skip: int = 0, 
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
         limit: int = 100,
-        search_query: Optional[str] = None
+        search_query: Optional[str] = None,
     ) -> List[Patient]:
         """
         Получить список пациентов с поиском
         """
         query = db.query(self.model)
-        
+
         if search_query:
             search_term = f"%{search_query}%"
             query = query.filter(
@@ -30,45 +33,55 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
                     self.model.last_name.ilike(search_term),
                     self.model.middle_name.ilike(search_term),
                     self.model.phone.ilike(search_term),
-                    self.model.document_no.ilike(search_term)
+                    self.model.document_no.ilike(search_term),
                 )
             )
-        
+
         return query.offset(skip).limit(limit).all()
-    
+
     def get_patient_by_phone(self, db: Session, *, phone: str) -> Optional[Patient]:
         """
         Получить пациента по номеру телефона
         """
         return db.query(self.model).filter(self.model.phone == phone).first()
-    
+
     def has_active_appointments(self, db: Session, *, patient_id: int) -> bool:
         """
         Проверить, есть ли у пациента активные записи
         """
         from app.models.appointment import Appointment
+
         today = datetime.now().date()
-        
-        active_appointments = db.query(Appointment).filter(
-            and_(
-                Appointment.patient_id == patient_id,
-                Appointment.appointment_date >= today,
-                Appointment.status != "cancelled"
+
+        active_appointments = (
+            db.query(Appointment)
+            .filter(
+                and_(
+                    Appointment.patient_id == patient_id,
+                    Appointment.appointment_date >= today,
+                    Appointment.status != "cancelled",
+                )
             )
-        ).count()
-        
+            .count()
+        )
+
         return active_appointments > 0
-    
-    def get_patient_appointments(self, db: Session, *, patient_id: int) -> List[Dict[str, Any]]:
+
+    def get_patient_appointments(
+        self, db: Session, *, patient_id: int
+    ) -> List[Dict[str, Any]]:
         """
         Получить все записи пациента
         """
         from app.models.appointment import Appointment
-        
-        appointments = db.query(Appointment).filter(
-            Appointment.patient_id == patient_id
-        ).order_by(Appointment.appointment_date.desc()).all()
-        
+
+        appointments = (
+            db.query(Appointment)
+            .filter(Appointment.patient_id == patient_id)
+            .order_by(Appointment.appointment_date.desc())
+            .all()
+        )
+
         return [
             {
                 "id": apt.id,
@@ -77,9 +90,10 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
                 "department": apt.department,
                 "doctor_id": apt.doctor_id,
                 "status": apt.status,
-                "reason": apt.reason
+                "reason": apt.reason,
             }
             for apt in appointments
         ]
+
 
 patient = CRUDPatient(Patient)

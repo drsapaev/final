@@ -4,10 +4,12 @@ Revision ID: 20250814_0008_audit
 Revises: 20250814_0007_settings
 Create Date: 2025-08-14 10:08:00.000000
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250814_0008"
@@ -25,7 +27,12 @@ def upgrade() -> None:
         sa.Column("entity", sa.String(length=64), nullable=True, index=True),
         sa.Column("entity_id", sa.Integer(), nullable=True, index=True),
         sa.Column("meta", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+        ),
     )
     op.create_index("ix_audit_created_at", "audit", ["created_at"])
 

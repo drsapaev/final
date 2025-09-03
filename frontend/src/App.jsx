@@ -29,6 +29,7 @@ import Search from './pages/Search.jsx';
 import PatientPanel from './pages/PatientPanel.jsx';
 import QueueBoard from './pages/QueueBoard.jsx';
 import DisplayBoardPage from './pages/DisplayBoardPage.jsx';
+import AnalyticsPage from './pages/AnalyticsPage.jsx';
 
 import auth from './stores/auth.js';
 
@@ -88,7 +89,7 @@ export default function App() {
       <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route path="doctor"        element={<Navigate to="/doctor-panel" replace />} />
+
           <Route path="cashier-panel" element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
           <Route path="admin"         element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
@@ -105,6 +106,7 @@ export default function App() {
           <Route path="audit"         element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
           <Route path="scheduler"     element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
           <Route path="appointments"  element={<RequireAuth roles={['Admin','Registrar']}><Appointments /></RequireAuth>} />
+          <Route path="analytics"     element={<RequireAuth roles={['Admin','Doctor','Nurse']}><AnalyticsPage /></RequireAuth>} />
           <Route path="visits/:id"    element={<VisitDetails />} />
           <Route path="search"        element={<Search />} />
           <Route path="*"             element={<Navigate to="/" replace />} />

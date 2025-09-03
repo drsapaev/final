@@ -4,33 +4,20 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 # подключаем router из каждого модуля
-from app.api.v1.endpoints import (
-    auth,
-    patients,
-    visits,
-    services,
-    payments,
-    settings as settings_ep,
-    audit,
-    appointments,
-    queues,
-    online_queue,
-    print as print_ep,
-    health as health_ep,
-    activation as activation_ep,
-    board as board_ep,
-    reports as reports_ep,
-    payment_webhook,
-    admin_providers,
-    schedule,
-    queue,
-    cardio,
-    derma,
-    dental,
-    lab_specialized,
-    admin_users,
-    appointment_flow,
-)
+from app.api.v1.endpoints import activation as activation_ep
+from app.api.v1.endpoints import (admin_providers, admin_users, analytics,
+                                  appointment_flow, appointments, audit, auth)
+from app.api.v1.endpoints import board as board_ep
+from app.api.v1.endpoints import cardio, dental, derma
+from app.api.v1.endpoints import health as health_ep
+from app.api.v1.endpoints import (lab_specialized, online_queue, patients,
+                                  payment_webhook, payments)
+from app.api.v1.endpoints import print as print_ep
+from app.api.v1.endpoints import queue, queues
+from app.api.v1.endpoints import reports as reports_ep
+from app.api.v1.endpoints import schedule, services
+from app.api.v1.endpoints import settings as settings_ep
+from app.api.v1.endpoints import visits
 
 api_router = APIRouter()
 
@@ -55,6 +42,9 @@ api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
 api_router.include_router(lab_specialized.router, tags=["lab_specialized"])
-api_router.include_router(appointment_flow.router, prefix="/appointments", tags=["appointment_flow"])
+api_router.include_router(
+    appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
+)
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(activation_ep.router, tags=["activation"])

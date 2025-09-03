@@ -4,11 +4,12 @@ Revision ID: 20250814_0010
 Revises: 20250814_0009
 Create Date: 2025-08-14
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "20250814_0010"
 down_revision = "20250814_0009"
@@ -26,7 +27,12 @@ def upgrade() -> None:
         sa.Column("unit", sa.String(length=32), nullable=True),  # шт., анализ, усл.
         sa.Column("price", sa.Numeric(12, 2), nullable=False, server_default="0"),
         sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ux_service_catalog_code", "service_catalog", ["code"], unique=True)

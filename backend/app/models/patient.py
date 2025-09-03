@@ -18,12 +18,16 @@ class Patient(Base):
     middle_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     birth_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    sex: Mapped[Optional[str]] = mapped_column(String(8), nullable=True, name="gender")  # M|F|X
+    sex: Mapped[Optional[str]] = mapped_column(
+        String(8), nullable=True, name="gender"
+    )  # M|F|X
 
     phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     document_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
 
     def short_name(self) -> str:
         mid = f" {self.middle_name}" if self.middle_name else ""

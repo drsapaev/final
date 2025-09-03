@@ -16,7 +16,9 @@ export default function Sidebar() {
   const profile = st.profile || st.user || {};
   const role = String(profile?.role || profile?.role_name || '').toLowerCase();
 
-  const common = [];
+  const common = [
+    { to: '/analytics', label: 'Аналитика' }
+  ];
 
   const byRole = [];
   if (role === 'admin') {

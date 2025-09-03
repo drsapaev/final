@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.crud import schedule as crud
-from app.schemas.schedule import ScheduleCreateIn, ScheduleRowOut
 from app.models.user import User
+from app.schemas.schedule import ScheduleCreateIn, ScheduleRowOut
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
@@ -84,13 +85,16 @@ async def delete_template(
 
 # Новые endpoints для интеграции с панелью регистратора
 
+
 @router.get("/weekly", summary="Расписание на неделю")
 async def get_weekly_schedule(
     db: Session = Depends(deps.get_db),
     user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
     department: Optional[str] = Query(default=None, description="Отделение"),
     doctor_id: Optional[int] = Query(default=None, description="ID врача"),
-    week_start: Optional[str] = Query(default=None, description="Начало недели (YYYY-MM-DD)"),
+    week_start: Optional[str] = Query(
+        default=None, description="Начало недели (YYYY-MM-DD)"
+    ),
 ):
     """
     Получить расписание на неделю с возможностью фильтрации по отделению или врачу
@@ -99,17 +103,16 @@ async def get_weekly_schedule(
         try:
             start_date = datetime.strptime(week_start, "%Y-%m-%d").date()
         except ValueError:
-            raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
+            raise HTTPException(
+                status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD"
+            )
     else:
         # Если дата не указана, берем начало текущей недели (понедельник)
         today = date.today()
         start_date = today - timedelta(days=today.weekday())
-    
+
     weekly_schedule = crud.get_weekly_schedule(
-        db, 
-        start_date=start_date,
-        department=department,
-        doctor_id=doctor_id
+        db, start_date=start_date, department=department, doctor_id=doctor_id
     )
     return weekly_schedule
 
@@ -128,13 +131,12 @@ async def get_daily_schedule(
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
-    
+        raise HTTPException(
+            status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD"
+        )
+
     daily_schedule = crud.get_daily_schedule(
-        db,
-        target_date=target_date,
-        department=department,
-        doctor_id=doctor_id
+        db, target_date=target_date, department=department, doctor_id=doctor_id
     )
     return daily_schedule
 
@@ -153,13 +155,12 @@ async def get_available_slots(
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD")
-    
+        raise HTTPException(
+            status_code=400, detail="Неверный формат даты. Используйте YYYY-MM-DD"
+        )
+
     available_slots = crud.get_available_slots(
-        db,
-        target_date=target_date,
-        department=department,
-        doctor_id=doctor_id
+        db, target_date=target_date, department=department, doctor_id=doctor_id
     )
     return available_slots
 

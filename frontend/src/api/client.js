@@ -91,8 +91,12 @@ async function login(username, password) {
   return resp.data;
 }
 
-// Backwards-compatible alias expected by older frontend code
+// Backwards-compatible aliases expected by older frontend code
 const setAuthToken = setToken; // alias
+const setAxiosAuthToken = setToken; // alias
+const setBearerToken = setToken; // alias
+const getProfile = me; // alias
+const get = api.get; // alias for direct axios usage
 
 export {
   api,
@@ -100,8 +104,12 @@ export {
   apiRequest,
   setToken,
   setAuthToken,
+  setAxiosAuthToken,
+  setBearerToken,
   getToken,
   clearToken,
   me,
+  getProfile,
   login,
+  get,
 };

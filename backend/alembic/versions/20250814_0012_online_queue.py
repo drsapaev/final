@@ -4,10 +4,12 @@ Revision ID: 20250814_0012_online_queue
 Revises: 20250814_0011_scheduling
 Create Date: 2025-08-14 12:12:00.000000
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250814_0012"

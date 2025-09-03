@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+
 from sqlalchemy import select
 
 # Универсальные импорты сессии
@@ -9,12 +10,13 @@ try:
 except Exception:
     from app.db.session import SessionLocal as SessionMaker  # type: ignore
 
-from app.models.user import User
 from app.core.security import get_password_hash
+from app.models.user import User
 
 USERNAME = "admin"
 PASSWORD = "admin"
 EMAIL = "admin@example.com"
+
 
 async def main():
     async with SessionMaker() as session:  # type: ignore
@@ -34,6 +36,7 @@ async def main():
         session.add(user)
         await session.commit()
         print("✅ Admin user created:", USERNAME, "/", PASSWORD)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

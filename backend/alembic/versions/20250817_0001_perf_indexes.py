@@ -4,9 +4,12 @@ Revision ID: 20250817_0001
 Revises: 20250814_0013_activation
 Create Date: 2025-08-17 14:00:00
 """
+
 from __future__ import annotations
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250817_0001"

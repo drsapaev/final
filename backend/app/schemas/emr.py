@@ -1,13 +1,16 @@
 from __future__ import annotations
-from app.schemas.base import ORMModel
+
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field
+
+from app.schemas.base import ORMModel
 
 
 class EMRBase(ORMModel):
     """Базовая схема EMR"""
+
     appointment_id: int
     complaints: Optional[str] = Field(None, max_length=5000)
     anamnesis: Optional[str] = Field(None, max_length=5000)
@@ -22,11 +25,13 @@ class EMRBase(ORMModel):
 
 class EMRCreate(EMRBase):
     """Схема создания EMR"""
+
     pass
 
 
 class EMRUpdate(ORMModel):
     """Схема обновления EMR"""
+
     complaints: Optional[str] = Field(None, max_length=5000)
     anamnesis: Optional[str] = Field(None, max_length=5000)
     examination: Optional[str] = Field(None, max_length=5000)
@@ -40,6 +45,7 @@ class EMRUpdate(ORMModel):
 
 class EMR(EMRBase):
     """Полная схема EMR"""
+
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -48,6 +54,7 @@ class EMR(EMRBase):
 
 class MedicationItem(ORMModel):
     """Элемент препарата в рецепте"""
+
     name: str = Field(..., max_length=200)
     dosage: str = Field(..., max_length=100)
     frequency: str = Field(..., max_length=100)
@@ -58,6 +65,7 @@ class MedicationItem(ORMModel):
 
 class PrescriptionBase(ORMModel):
     """Базовая схема рецепта"""
+
     appointment_id: int
     emr_id: int
     medications: Optional[List[MedicationItem]] = None
@@ -68,11 +76,13 @@ class PrescriptionBase(ORMModel):
 
 class PrescriptionCreate(PrescriptionBase):
     """Схема создания рецепта"""
+
     pass
 
 
 class PrescriptionUpdate(ORMModel):
     """Схема обновления рецепта"""
+
     medications: Optional[List[MedicationItem]] = None
     instructions: Optional[str] = Field(None, max_length=2000)
     doctor_notes: Optional[str] = Field(None, max_length=1000)
@@ -81,6 +91,7 @@ class PrescriptionUpdate(ORMModel):
 
 class Prescription(PrescriptionBase):
     """Полная схема рецепта"""
+
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None

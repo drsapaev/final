@@ -40,7 +40,9 @@ def _row_to_out(r) -> ServiceOut:
 @router.get("", response_model=List[ServiceOut], summary="Каталог услуг")
 async def list_services(
     db: Session = Depends(get_db),
-    user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "User")),
+    user=Depends(
+        require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "User")
+    ),
     q: Optional[str] = Query(default=None, max_length=120),
     active: Optional[bool] = Query(default=None),
     limit: int = Query(default=200, ge=1, le=1000),

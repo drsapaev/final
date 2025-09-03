@@ -18,10 +18,13 @@ class ScheduleTemplate(Base):
       - capacity_per_hour: вместимость записей на час (опц.)
       - active: активен/нет
     """
+
     __tablename__ = "schedule_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    department: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    department: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
     doctor_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     weekday: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     start_time: Mapped[str] = mapped_column(String(5), nullable=False)

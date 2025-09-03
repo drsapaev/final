@@ -21,9 +21,7 @@ class LicenseStatus:
 def _load_license_rows(db: Session) -> dict:
     """Считать все настройки категории 'license' в dict."""
     rows = (
-        db.execute(select(Setting).where(Setting.category == "license"))
-        .scalars()
-        .all()
+        db.execute(select(Setting).where(Setting.category == "license")).scalars().all()
     )
     out: dict[str, str] = {}
     for r in rows:
@@ -50,7 +48,9 @@ def validate_license(db: Session) -> LicenseStatus:
         try:
             dt = datetime.strptime(vu, "%Y-%m-%d").date()
             if datetime.utcnow().date() > dt:
-                return LicenseStatus(ok=False, reason="EXPIRED", key=key, valid_until=vu)
+                return LicenseStatus(
+                    ok=False, reason="EXPIRED", key=key, valid_until=vu
+                )
         except Exception:
             return LicenseStatus(ok=False, reason="BAD_DATE", key=key, valid_until=vu)
 

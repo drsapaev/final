@@ -8,7 +8,7 @@
 | registrar | registrar123 | Registrar | /registrar-panel | Регистратура |
 | lab | lab123 | Lab | /lab-panel | Лаборатория |
 | doctor | doctor123 | Doctor | /doctor-panel | Врач общей практики |
-| cashier | cashier123 | Cashier | /cashier | Касса |
+| cashier | cashier123 | Cashier | /cashier-panel | Касса |
 | cardio | cardio123 | cardio | /cardiologist | Кардиолог |
 | derma | derma123 | derma | /dermatologist | Дерматолог-косметолог |
 | dentist | dentist123 | dentist | /dentist | Стоматолог |
@@ -18,9 +18,14 @@
 ### Frontend маршруты (App.jsx)
 ```javascript
 // КРИТИЧЕСКИ ВАЖНО: Не изменять роли без обновления тестов!
-<Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanel /></RequireAuth>} />
-<Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
-<Route path="dentist" element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
+<Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
+<Route path="doctor-panel"    element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
+<Route path="cashier-panel"   element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
+<Route path="lab-panel"       element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
+
+<Route path="cardiologist"    element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanel /></RequireAuth>} />
+<Route path="dermatologist"   element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
+<Route path="dentist"         element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
 ```
 
 ### Backend API endpoints
@@ -36,17 +41,27 @@ user: User = Depends(deps.require_roles("Admin", "Doctor", "dentist")) # Dental 
 ### Login.jsx - pickRouteForRoleCached()
 ```javascript
 // КРИТИЧЕСКИ ВАЖНО: Синхронизировать с маршрутами!
-if (role === 'cardio') return '/cardiologist';
-if (role === 'derma') return '/dermatologist';
-if (role === 'dentist') return '/dentist';
+if (role === 'admin')     return '/admin';
+if (role === 'registrar') return '/registrar-panel';
+if (role === 'lab')       return '/lab-panel';
+if (role === 'doctor')    return '/doctor-panel';
+if (role === 'cashier')   return '/cashier-panel';
+if (role === 'cardio')    return '/cardiologist';
+if (role === 'derma')     return '/dermatologist';
+if (role === 'dentist')   return '/dentist';
 ```
 
 ### UserSelect.jsx - routeForRole()
 ```javascript
 // КРИТИЧЕСКИ ВАЖНО: Синхронизировать с Login.jsx!
-if (r === 'cardio') return '/cardiologist';
-if (r === 'derma') return '/dermatologist';
-if (r === 'dentist') return '/dentist';
+if (r === 'admin')     return '/admin';
+if (r === 'registrar') return '/registrar-panel';
+if (r === 'lab')       return '/lab-panel';
+if (r === 'doctor')    return '/doctor-panel';
+if (r === 'cashier')   return '/cashier-panel';
+if (r === 'cardio')    return '/cardiologist';
+if (r === 'derma')     return '/dermatologist';
+if (r === 'dentist')   return '/dentist';
 ```
 
 ## ⚠️ Правила изменений

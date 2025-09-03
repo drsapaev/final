@@ -1,10 +1,11 @@
 # ws_diag.py
 import asyncio
 import logging
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import uvicorn
 import threading
+
+import uvicorn
 import websockets
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 PORT = 8050
 WS_PATH = "/ws/diag"
@@ -12,6 +13,7 @@ WS_PATH = "/ws/diag"
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
+
 
 @app.websocket(WS_PATH)
 async def websocket_endpoint(websocket: WebSocket):
@@ -24,10 +26,12 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         logging.info("Disconnected")
 
+
 def start_server():
     config = uvicorn.Config(app, host="0.0.0.0", port=PORT, log_level="info")
     server = uvicorn.Server(config)
     server.run()
+
 
 async def run_client():
     await asyncio.sleep(2)  # подождать, пока сервер стартует
@@ -40,6 +44,7 @@ async def run_client():
             print(f"[CLIENT] 👂 Got response: {resp}")
     except Exception as e:
         print(f"[CLIENT] ❌ Failed to connect: {e}")
+
 
 if __name__ == "__main__":
     thread = threading.Thread(target=start_server, daemon=True)

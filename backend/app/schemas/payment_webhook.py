@@ -1,6 +1,7 @@
 # app/schemas/payment_webhook.py
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
 from app.schemas.base import ORMModel
@@ -100,8 +101,11 @@ class PaymentProviderOut(PaymentProviderBase, ORMModel):
 # Специальные схемы для вебхуков
 class PaymeWebhookData(BaseModel):
     """Данные вебхука от Payme"""
+
     id: str
-    state: int = Field(..., description="1 - pending, 2 - paid, -1 - cancelled, -2 - failed")
+    state: int = Field(
+        ..., description="1 - pending, 2 - paid, -1 - cancelled, -2 - failed"
+    )
     amount: int = Field(..., description="Сумма в тийинах")
     time: Optional[int] = Field(None, description="Время транзакции")
     account: Optional[Dict[str, Any]] = Field(None, description="Данные аккаунта")
@@ -114,6 +118,7 @@ class PaymeWebhookData(BaseModel):
 
 class ClickWebhookData(BaseModel):
     """Данные вебхука от Click"""
+
     click_trans_id: str = Field(..., description="ID транзакции Click")
     merchant_trans_id: str = Field(..., description="ID транзакции мерчанта")
     amount: str = Field(..., description="Сумма")

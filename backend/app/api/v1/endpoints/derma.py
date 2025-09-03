@@ -1,5 +1,6 @@
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -24,7 +25,9 @@ async def get_skin_examinations(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения осмотров: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения осмотров: {str(e)}"
+        )
 
 
 @router.post("/examinations", summary="Создать осмотр кожи")
@@ -40,7 +43,9 @@ async def create_skin_examination(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Осмотр кожи создан", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания осмотра: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания осмотра: {str(e)}"
+        )
 
 
 @router.get("/procedures", summary="Косметические процедуры")
@@ -57,7 +62,9 @@ async def get_cosmetic_procedures(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения процедур: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения процедур: {str(e)}"
+        )
 
 
 @router.post("/procedures", summary="Создать косметическую процедуру")
@@ -73,7 +80,9 @@ async def create_cosmetic_procedure(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Косметическая процедура создана", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания процедуры: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания процедуры: {str(e)}"
+        )
 
 
 @router.get("/photo-gallery", summary="Фотогалерея")
@@ -88,4 +97,6 @@ async def get_photo_gallery(
     try:
         return {"message": "Фотогалерея будет доступна в следующей версии"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения фотогалереи: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения фотогалереи: {str(e)}"
+        )

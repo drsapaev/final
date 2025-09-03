@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import DateTime, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, DateTime, UniqueConstraint
 
 from .base import Base  # ваш общий Base (как в проекте)
+
 
 class Setting(Base):
     __tablename__ = "settings"

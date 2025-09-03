@@ -16,26 +16,27 @@ if not log.handlers:
     # Создаём handler для вывода в консоль
     handler = logging.StreamHandler()
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
+    formatter = logging.Formatter("%(name)s: %(levelname)s: %(message)s")
     handler.setFormatter(formatter)
     log.addHandler(handler)
     log.info("WS logger initialized with console handler")
 
 router = APIRouter()
 
+
 # -----------------------------------------------------------------------------
 # Менеджер WS-комнат
 # -----------------------------------------------------------------------------
 class WSManager:
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.rooms = defaultdict(set)
             print(f"🔧 WSManager: создан новый экземпляр")
         return cls._instance
-    
+
     def __init__(self) -> None:
         # Инициализация уже выполнена в __new__
         pass
@@ -43,7 +44,9 @@ class WSManager:
     async def connect(self, ws: WebSocket, room: str) -> None:
         log.info("WSManager: connecting to room %s", room)
         self.rooms[room].add(ws)
-        log.info("WSManager: room %s now has %d connections", room, len(self.rooms[room]))
+        log.info(
+            "WSManager: room %s now has %d connections", room, len(self.rooms[room])
+        )
 
     def disconnect(self, ws: WebSocket, room: str) -> None:
         log.info("WSManager: disconnecting from room %s", room)
@@ -73,9 +76,13 @@ class WSManager:
 
     def broadcast(self, room: str, data) -> None:
         log.info("WSManager: broadcasting to room %s, data: %s", room, data)
-        log.info("WSManager: room %s has %d connections", room, len(self.rooms.get(room, set())))
+        log.info(
+            "WSManager: room %s has %d connections",
+            room,
+            len(self.rooms.get(room, set())),
+        )
         log.info("WSManager: all rooms: %s", list(self.rooms.keys()))
-        
+
         for ws in list(self.rooms.get(room, set())):
             log.info("WSManager: sending to websocket in room %s", room)
             # Убираем asyncio.create_task для синхронного контекста
@@ -85,6 +92,7 @@ class WSManager:
             try:
                 # Создаём новый event loop для этого вызова
                 import asyncio
+
                 try:
                     loop = asyncio.get_running_loop()
                     # Если loop уже запущен, создаём task
@@ -98,6 +106,7 @@ class WSManager:
 
 ws_manager = WSManager()
 print(f"🔧 WSManager: создан глобальный экземпляр {id(ws_manager)}")
+
 
 def _origin_allowed(origin: str | None) -> bool:
     if os.getenv("CORS_DISABLE", "0") == "1":
@@ -113,6 +122,7 @@ def _origin_allowed(origin: str | None) -> bool:
     ]
     return origin in allowed
 
+
 def _auth_ok(headers, token_qs: str | None) -> bool:
     if os.getenv("WS_DEV_ALLOW", "0") == "1":
         return True
@@ -122,6 +132,7 @@ def _auth_ok(headers, token_qs: str | None) -> bool:
     if token_qs:
         return True
     return False
+
 
 # -----------------------------------------------------------------------------
 # DEBUG: полностью безусловный сокет для диагностики
@@ -137,18 +148,28 @@ async def ws_noauth(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
 
+
 # -----------------------------------------------------------------------------
 # Основной сокет очереди: СНАЧАЛА accept(), потом проверки
 # -----------------------------------------------------------------------------
 @router.websocket("/ws/queue")
-async def ws_queue(websocket: WebSocket, department: str, date: str, token: str | None = None):
+async def ws_queue(
+    websocket: WebSocket, department: str, date: str, token: str | None = None
+):
     origin = websocket.headers.get("origin")
-    log.info("WS connect origin=%s path=%s query=%s", origin, websocket.url.path, websocket.url.query)
+    log.info(
+        "WS connect origin=%s path=%s query=%s",
+        origin,
+        websocket.url.path,
+        websocket.url.query,
+    )
 
     # ✅ DEV shortcut: если разрешён DEV-режим, сразу принимаем
     if os.getenv("WS_DEV_ALLOW", "0") == "1":
         await websocket.accept()
-        await websocket.send_json({"type": "dev.accepted", "room": f"{department}::{date}"})
+        await websocket.send_json(
+            {"type": "dev.accepted", "room": f"{department}::{date}"}
+        )
         return
 
     # Origin

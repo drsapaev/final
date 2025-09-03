@@ -4,8 +4,10 @@
 """
 import asyncio
 import json
-import websockets
 from datetime import datetime
+
+import websockets
+
 
 async def test_ws_noauth():
     """Тест WebSocket без аутентификации"""
@@ -16,16 +18,17 @@ async def test_ws_noauth():
             msg = await ws.recv()
             data = json.loads(msg)
             print(f"✅ Подключение успешно: {data}")
-            
+
             # Отправляем тестовое сообщение
             await ws.send("ping")
             print("📤 Отправлено: ping")
-            
+
             # Ждём немного
             await asyncio.sleep(1)
-            
+
     except Exception as e:
         print(f"❌ Ошибка подключения: {e}")
+
 
 async def test_ws_queue():
     """Тест основного WebSocket очереди"""
@@ -39,13 +42,14 @@ async def test_ws_queue():
             msg = await ws.recv()
             data = json.loads(msg)
             print(f"✅ Подключение успешно: {data}")
-            
+
             # Ждём обновления
             print("⏳ Ожидаю обновления очереди...")
             await asyncio.sleep(3)
-            
+
     except Exception as e:
         print(f"❌ Ошибка подключения: {e}")
+
 
 async def test_ws_dev_queue():
     """Тест dev WebSocket очереди"""
@@ -58,26 +62,28 @@ async def test_ws_dev_queue():
             msg = await ws.recv()
             data = json.loads(msg)
             print(f"✅ Подключение успешно: {data}")
-            
+
             # Ждём обновления
             print("⏳ Ожидаю обновления очереди...")
             await asyncio.sleep(3)
-            
+
     except Exception as e:
         print(f"❌ Ошибка подключения: {e}")
+
 
 async def main():
     """Основная функция тестирования"""
     print(f"🚀 WebSocket тест табло очереди - {datetime.now()}")
     print("=" * 50)
-    
+
     # Тестируем все WebSocket эндпоинты
     await test_ws_noauth()
     await test_ws_queue()
     await test_ws_dev_queue()
-    
+
     print("\n" + "=" * 50)
     print("✅ WebSocket тестирование завершено")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

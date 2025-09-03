@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
-from sqlalchemy import create_engine, MetaData, Table, select
+from sqlalchemy import MetaData, Table, create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 # Попытка использовать настройки проекта
@@ -12,6 +12,7 @@ DATABASE_URL = os.getenv("DATABASE_URL") or "sqlite:///clinic.db"
 # Создаём engine/session на базе DATABASE_URL
 engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+
 
 def find_users_table(meta: MetaData) -> Optional[Table]:
     """
@@ -31,16 +32,23 @@ def find_users_table(meta: MetaData) -> Optional[Table]:
             return t
     return None
 
+
 def upsert_admin() -> None:
     meta = MetaData()
     meta.reflect(bind=engine)
 
     users = find_users_table(meta)
     if users is None:
-        raise SystemExit("❌ Не нашёл таблицу пользователей (с колонками username + hashed_password/password).")
+        raise SystemExit(
+            "❌ Не нашёл таблицу пользователей (с колонками username + hashed_password/password)."
+        )
 
     cols = {c.name for c in users.columns}
-    pwd_col = "hashed_password" if "hashed_password" in cols else ("password" if "password" in cols else "pass")
+    pwd_col = (
+        "hashed_password"
+        if "hashed_password" in cols
+        else ("password" if "password" in cols else "pass")
+    )
 
     with engine.begin() as conn:
         # есть ли уже admin?
@@ -62,6 +70,7 @@ def upsert_admin() -> None:
 
         conn.execute(users.insert().values(**row))
         print("✅ Создан пользователь admin/admin (без bcrypt — dev).")
+
 
 if __name__ == "__main__":
     upsert_admin()

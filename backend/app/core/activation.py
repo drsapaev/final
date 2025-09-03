@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import os
 import platform
 import re
@@ -15,12 +16,12 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.activation import Activation, ActivationStatus  # type: ignore[attr-defined]
+from app.models.activation import Activation  # type: ignore[attr-defined]
+from app.models.activation import ActivationStatus
 from app.models.setting import Setting  # type: ignore[attr-defined]
-import hashlib
-
 
 # ---------- Машинный идентификатор (серверный) ----------
+
 
 def _collect_fingerprints() -> str:
     parts = []
@@ -60,6 +61,7 @@ def server_machine_hash() -> str:
 
 # ---------- Генерация человекочитаемых ключей ----------
 
+
 def generate_key(prefix: str = "CQ") -> str:
     """
     Ключ вида CQ-YYYYMMDD-XXXXX-XXXXX-XXXXX (только A-Z0-9).
@@ -67,13 +69,14 @@ def generate_key(prefix: str = "CQ") -> str:
     rnd = base64.b32encode(os.urandom(10)).decode().rstrip("=")  # ~16 симв.
     rnd = re.sub(r"[^A-Z0-9]", "", rnd)
     today = datetime.utcnow().strftime("%Y%m%d")
-    chunks = [rnd[i:i+5] for i in range(0, min(len(rnd), 15), 5)]
+    chunks = [rnd[i : i + 5] for i in range(0, min(len(rnd), 15), 5)]
     while len(chunks) < 3:
         chunks.append("X" * 5)
     return f"{prefix}-{today}-{chunks[0]}-{chunks[1]}-{chunks[2]}"
 
 
 # ---------- БД-операции для ключей/активаций ----------
+
 
 @dataclass
 class IssueResult:
@@ -95,9 +98,16 @@ def issue_key(
         key=key,
         machine_hash=None,
         expiry_date=exp,
-        status=status if status in {
-            ActivationStatus.ACTIVE, ActivationStatus.TRIAL, ActivationStatus.ISSUED
-        } else ActivationStatus.ACTIVE,
+        status=(
+            status
+            if status
+            in {
+                ActivationStatus.ACTIVE,
+                ActivationStatus.TRIAL,
+                ActivationStatus.ISSUED,
+            }
+            else ActivationStatus.ACTIVE
+        ),
         meta=meta,
     )
     db.add(row)
@@ -134,7 +144,9 @@ def activate_key(db: Session, *, key: str) -> ActivateResult:
 
     # Если ключ уже привязан к другому устройству — запрет
     if row.machine_hash and row.machine_hash != mh:
-        return ActivateResult(ok=False, reason="KEY_IN_USE", key=key, machine_hash=row.machine_hash)
+        return ActivateResult(
+            ok=False, reason="KEY_IN_USE", key=key, machine_hash=row.machine_hash
+        )
 
     # Проверим срок
     if row.expiry_date and datetime.utcnow() > row.expiry_date:
@@ -193,7 +205,9 @@ def validate_server_activation(db: Session) -> Status:
             select(Activation).where(
                 and_(
                     Activation.machine_hash == mh,
-                    Activation.status.in_([ActivationStatus.ACTIVE, ActivationStatus.TRIAL]),
+                    Activation.status.in_(
+                        [ActivationStatus.ACTIVE, ActivationStatus.TRIAL]
+                    ),
                 )
             )
         )

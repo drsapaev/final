@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import * as api from '../api/client';
+import { api } from '../api/client';
 import { openQueueWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 

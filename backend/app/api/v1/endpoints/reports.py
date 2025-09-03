@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.models.payment import Payment
 
-router = APIRouter(prefix="/reports", tags=["reports"], dependencies=[Depends(require_roles("Admin"))])
+router = APIRouter(
+    prefix="/reports", tags=["reports"], dependencies=[Depends(require_roles("Admin"))]
+)
 
 
 @router.get("/summary", summary="Сводка доходов за период")
@@ -35,7 +37,10 @@ def summary(
 
     # По дням
     stmt_by_day = (
-        select(func.date(Payment.created_at).label("d"), func.coalesce(func.sum(Payment.amount), 0).label("sum"))
+        select(
+            func.date(Payment.created_at).label("d"),
+            func.coalesce(func.sum(Payment.amount), 0).label("sum"),
+        )
         .where(Payment.status == "paid")
         .where(Payment.created_at >= dt_from, Payment.created_at <= dt_to)
         .group_by(func.date(Payment.created_at))
@@ -51,5 +56,3 @@ def summary(
         "total_paid": total,
         "by_day": by_day,
     }
-
-

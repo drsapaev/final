@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,7 @@ def _hash_or_plain(pw: str) -> str:
     """Вернуть bcrypt-хэш, если passlib доступен, иначе исходную строку (для dev)."""
     try:
         from passlib.hash import bcrypt  # type: ignore
+
         return bcrypt.hash(pw)
     except Exception:
         return pw
@@ -34,7 +36,9 @@ def ensure_admin() -> dict:
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
 
     with SessionLocal() as db:  # type: ignore # type: Session
-        row = db.execute(select(User).where(User.username == username)).scalars().first()
+        row = (
+            db.execute(select(User).where(User.username == username)).scalars().first()
+        )
         if row:
             changed = False
             if email and row.email != email:
@@ -43,7 +47,11 @@ def ensure_admin() -> dict:
             if full_name and row.full_name != full_name:
                 row.full_name = full_name
                 changed = True
-            if os.getenv("ADMIN_RESET_PASSWORD", "").strip().lower() in {"1", "true", "yes"}:
+            if os.getenv("ADMIN_RESET_PASSWORD", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+            }:
                 row.hashed_password = _hash_or_plain(password)
                 changed = True
             if row.role != "Admin":

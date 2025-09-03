@@ -19,10 +19,16 @@ class Service(Base):
     department: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     unit: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    currency: Mapped[Optional[str]] = mapped_column(String(8), nullable=True, default="UZS")
+    currency: Mapped[Optional[str]] = mapped_column(
+        String(8), nullable=True, default="UZS"
+    )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class ServiceCatalog(Base):
@@ -32,7 +38,11 @@ class ServiceCatalog(Base):
     code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    currency: Mapped[Optional[str]] = mapped_column(String(8), nullable=True, default="UZS")
+    currency: Mapped[Optional[str]] = mapped_column(
+        String(8), nullable=True, default="UZS"
+    )
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )

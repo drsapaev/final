@@ -15,15 +15,13 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import Optional, Callable, Any
-
 from datetime import datetime, timedelta
+from typing import Any, Callable, Optional
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
 from fastapi.concurrency import run_in_threadpool
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,7 +33,10 @@ except Exception:
     class _Fallback:
         SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
         ALGORITHM = os.getenv("ALGORITHM", "HS256")
-        ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+        ACCESS_TOKEN_EXPIRE_MINUTES = int(
+            os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+        )
+
     settings = _Fallback()
 
 # import get_db lazily -- it may return AsyncSession or sync Session
@@ -63,10 +64,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """
     to_encode = data.copy()
     if expires_delta is None:
-        expires_delta = timedelta(minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24))
+        expires_delta = timedelta(
+            minutes=getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24)
+        )
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=getattr(settings, "ALGORITHM", "HS256"))
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm=getattr(settings, "ALGORITHM", "HS256"),
+    )
     return encoded_jwt
 
 
@@ -75,7 +82,11 @@ def _username_from_token(token: str) -> Optional[str]:
     Decode JWT and extract 'sub' (username) claim. Returns None if invalid.
     """
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[getattr(settings, "ALGORITHM", "HS256")])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[getattr(settings, "ALGORITHM", "HS256")],
+        )
         sub = payload.get("sub")
         if isinstance(sub, str):
             return sub
@@ -165,6 +176,7 @@ def require_roles(*roles: str) -> Callable[..., Any]:
 
     If the user's attribute 'role' is not in roles and 'is_superuser' is False -> 403.
     """
+
     def _dep(current_user: User = Depends(get_current_user)) -> User:
         if not roles:
             return current_user
@@ -172,8 +184,15 @@ def require_roles(*roles: str) -> Callable[..., Any]:
         is_super = bool(getattr(current_user, "is_superuser", False))
         if is_super:
             return current_user
-        if role not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+
+        # Проверяем роль с учетом регистра
+        role_lower = str(role).lower() if role else ""
+        roles_lower = [str(r).lower() for r in roles]
+
+        if role_lower not in roles_lower:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
+            )
         return current_user
 
     return _dep

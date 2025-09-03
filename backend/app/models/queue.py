@@ -15,6 +15,7 @@ class QueueTicket(Base):
       - ticket_number: порядковый номер в рамках department+date
       - status: waiting|serving|done
     """
+
     __tablename__ = "queue_tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

@@ -4,10 +4,12 @@ Revision ID: 20250818_0005
 Revises: 20250818_0004
 Create Date: 2025-08-18 00:15:00
 """
+
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250818_0005"
@@ -17,7 +19,9 @@ depends_on = None
 
 
 def _table_has(insp, table: str, column: str) -> bool:
-    return table in insp.get_table_names() and any(c["name"] == column for c in insp.get_columns(table))
+    return table in insp.get_table_names() and any(
+        c["name"] == column for c in insp.get_columns(table)
+    )
 
 
 def _col_type(insp, table: str, column: str):
@@ -35,7 +39,11 @@ def _is_nullable(insp, table: str, column: str) -> bool:
 
 
 def _backfill_if_null(table: str, column: str, sql_expr_default: str) -> None:
-    op.execute(sa.text(f'UPDATE "{table}" SET "{column}" = {sql_expr_default} WHERE "{column}" IS NULL'))
+    op.execute(
+        sa.text(
+            f'UPDATE "{table}" SET "{column}" = {sql_expr_default} WHERE "{column}" IS NULL'
+        )
+    )
 
 
 def upgrade() -> None:
@@ -55,12 +63,16 @@ def upgrade() -> None:
         if bind.dialect.name == "sqlite":
             with op.batch_alter_table(table) as batch:
                 if existing_type is not None:
-                    batch.alter_column(column, existing_type=existing_type, nullable=False)
+                    batch.alter_column(
+                        column, existing_type=existing_type, nullable=False
+                    )
                 else:
                     batch.alter_column(column, nullable=False)
         else:
             if existing_type is not None:
-                op.alter_column(table, column, existing_type=existing_type, nullable=False)
+                op.alter_column(
+                    table, column, existing_type=existing_type, nullable=False
+                )
             else:
                 op.alter_column(table, column, nullable=False)
 

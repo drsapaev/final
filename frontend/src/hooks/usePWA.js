@@ -7,6 +7,40 @@ export const usePWA = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
+    const isProd = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD;
+
+    // В режиме разработки полностью отключаем SW и чистим возможные старые кеши,
+    // чтобы не было "разных версий" страниц и проблем с обновлениями.
+    if (!isProd) {
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations?.().then((regs) => {
+            regs?.forEach((r) => r.unregister());
+          });
+        }
+        if (typeof caches !== 'undefined' && caches?.keys) {
+          caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+        }
+      } catch (e) {
+        console.warn('PWA(dev): cleanup failed', e);
+      }
+
+      // Отключаем установку/подсказки в dev
+      setIsInstallable(false);
+      setIsInstalled(false);
+      setDeferredPrompt(null);
+
+      // Подписки на online/offline оставляем
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+
     // Проверка установки PWA
     const checkIfInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -49,7 +83,7 @@ export const usePWA = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Регистрация Service Worker
+    // Регистрация Service Worker (только в production)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {

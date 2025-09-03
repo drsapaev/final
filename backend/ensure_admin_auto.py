@@ -3,24 +3,39 @@
 # Поддерживает sync и async пути. Игнорирует неподготовленный app.db.session.sessionmaker.
 # Запуск:
 #   .venv\Scripts\python.exe ensure_admin_auto.py
-import os, sys, asyncio, traceback, types
+import asyncio
+import os
+import sys
+import traceback
+import types
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
-ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL", "admin@example.com")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com")
 
 print(f"[ensure_admin_auto] target user: {ADMIN_USERNAME}")
 
 # --- парольный хэш ---
 try:
     from passlib.context import CryptContext
-    pwdctx = CryptContext(schemes=["bcrypt", "sha256_crypt", "pbkdf2_sha256"], deprecated="auto")
-    def make_hash(p): return pwdctx.hash(p)
+
+    pwdctx = CryptContext(
+        schemes=["bcrypt", "sha256_crypt", "pbkdf2_sha256"], deprecated="auto"
+    )
+
+    def make_hash(p):
+        return pwdctx.hash(p)
+
     print("[ensure_admin_auto] using passlib for password hashing")
 except Exception:
     import hashlib
-    def make_hash(p): return "plain$" + hashlib.sha256(p.encode("utf-8")).hexdigest()
-    print("[ensure_admin_auto] passlib not available; falling back to sha256 (may be incompatible)")
+
+    def make_hash(p):
+        return "plain$" + hashlib.sha256(p.encode("utf-8")).hexdigest()
+
+    print(
+        "[ensure_admin_auto] passlib not available; falling back to sha256 (may be incompatible)"
+    )
 
 # --- попробовать импортировать User модель ---
 UserModel = None
@@ -30,6 +45,8 @@ user_candidates = [
     "app.models.User",
     "app.db.models.user.User",
 ]
+
+
 def try_import(path):
     try:
         mod, attr = path.rsplit(".", 1)
@@ -37,6 +54,7 @@ def try_import(path):
         return getattr(m, attr)
     except Exception:
         return None
+
 
 for p in user_candidates:
     obj = try_import(p)
@@ -52,18 +70,23 @@ if not UserModel:
 dbs = None
 try:
     import app.db.session as dbs
+
     print("[ensure_admin_auto] imported app.db.session")
 except Exception as e:
     print("[ensure_admin_auto][FATAL] cannot import app.db.session:", e)
     sys.exit(3)
 
+
 # helpers to detect async
 def is_async_callable(obj):
     import inspect
+
     return inspect.iscoroutinefunction(obj) or inspect.isasyncgenfunction(obj)
+
 
 def has_attr(o, name):
     return getattr(o, name, None) is not None
+
 
 # приоритет: get_db (sync generator) -> SessionLocal (sync sessionmaker) -> engine+sessionmaker (sync)
 #            -> get_async_session (async gen) -> AsyncSessionLocal/async_session_maker (async)
@@ -80,7 +103,10 @@ if get_db and isinstance(get_db, types.FunctionType) and not is_async_callable(g
 SessionLocal = getattr(dbs, "SessionLocal", None)
 if not sync_strategy and SessionLocal:
     # важно: игнорировать 'sessionmaker' если это импортированный класс/функция SQLA, а не инстанс
-    if SessionLocal.__class__.__name__ == "sessionmaker" or "sessionmaker" in str(type(SessionLocal)).lower():
+    if (
+        SessionLocal.__class__.__name__ == "sessionmaker"
+        or "sessionmaker" in str(type(SessionLocal)).lower()
+    ):
         sync_strategy = "SessionLocal"
         print("[ensure_admin_auto] will use sync SessionLocal()")
     else:
@@ -98,7 +124,9 @@ if not sync_strategy:
         sa_sessionmaker = None
     if engine and sa_sessionmaker:
         try:
-            SessionLocal2 = sa_sessionmaker(bind=engine, autoflush=False, autocommit=False)
+            SessionLocal2 = sa_sessionmaker(
+                bind=engine, autoflush=False, autocommit=False
+            )
             sync_strategy = "engine_sessionmaker"
             SessionLocal = SessionLocal2
             print("[ensure_admin_auto] built SessionLocal from engine/sessionmaker")
@@ -116,21 +144,30 @@ if not async_strategy and AsyncSessionLocal and callable(AsyncSessionLocal):
     async_strategy = "AsyncSessionLocal"
     print("[ensure_admin_auto] async path available: AsyncSessionLocal()")
 
-async_session_maker = getattr(dbs, "async_session_maker", None) or getattr(dbs, "async_session", None)
+async_session_maker = getattr(dbs, "async_session_maker", None) or getattr(
+    dbs, "async_session", None
+)
 if not async_strategy and async_session_maker and callable(async_session_maker):
     async_strategy = "async_session_maker"
     print("[ensure_admin_auto] async path available: async_session_maker()")
 
 from sqlalchemy import select
 
+
 def upsert_sync(session):
     # догадаемся о поле логина
-    uname_field = "username" if hasattr(UserModel, "username") else ("login" if hasattr(UserModel, "login") else None)
+    uname_field = (
+        "username"
+        if hasattr(UserModel, "username")
+        else ("login" if hasattr(UserModel, "login") else None)
+    )
     if not uname_field:
         uname_field = "username"
     print("[ensure_admin_auto] sync upsert using field:", uname_field)
     try:
-        res = session.execute(select(UserModel).where(getattr(UserModel, uname_field) == ADMIN_USERNAME))
+        res = session.execute(
+            select(UserModel).where(getattr(UserModel, uname_field) == ADMIN_USERNAME)
+        )
         user = res.scalar_one_or_none()
     except Exception:
         traceback.print_exc()
@@ -155,25 +192,39 @@ def upsert_sync(session):
     else:
         print("[ensure_admin_auto] creating new admin (sync)")
         kwargs = {}
-        if "username" in UserModel.__dict__: kwargs["username"] = ADMIN_USERNAME
-        if "login"    in UserModel.__dict__ and "username" not in kwargs: kwargs["login"] = ADMIN_USERNAME
-        if "email"    in UserModel.__dict__: kwargs["email"] = ADMIN_EMAIL
-        if "hashed_password" in UserModel.__dict__: kwargs["hashed_password"] = hashed
-        elif "password" in UserModel.__dict__:      kwargs["password"] = hashed
-        if "is_active"    in UserModel.__dict__: kwargs["is_active"] = True
-        if "is_superuser" in UserModel.__dict__: kwargs["is_superuser"] = True
+        if "username" in UserModel.__dict__:
+            kwargs["username"] = ADMIN_USERNAME
+        if "login" in UserModel.__dict__ and "username" not in kwargs:
+            kwargs["login"] = ADMIN_USERNAME
+        if "email" in UserModel.__dict__:
+            kwargs["email"] = ADMIN_EMAIL
+        if "hashed_password" in UserModel.__dict__:
+            kwargs["hashed_password"] = hashed
+        elif "password" in UserModel.__dict__:
+            kwargs["password"] = hashed
+        if "is_active" in UserModel.__dict__:
+            kwargs["is_active"] = True
+        if "is_superuser" in UserModel.__dict__:
+            kwargs["is_superuser"] = True
         u = UserModel(**kwargs)
         session.add(u)
         session.commit()
         print("[ensure_admin_auto] created (sync)")
 
+
 async def upsert_async(session):
-    uname_field = "username" if hasattr(UserModel, "username") else ("login" if hasattr(UserModel, "login") else None)
+    uname_field = (
+        "username"
+        if hasattr(UserModel, "username")
+        else ("login" if hasattr(UserModel, "login") else None)
+    )
     if not uname_field:
         uname_field = "username"
     print("[ensure_admin_auto] async upsert using field:", uname_field)
     try:
-        res = await session.execute(select(UserModel).where(getattr(UserModel, uname_field) == ADMIN_USERNAME))
+        res = await session.execute(
+            select(UserModel).where(getattr(UserModel, uname_field) == ADMIN_USERNAME)
+        )
         user = res.scalar_one_or_none()
     except Exception:
         traceback.print_exc()
@@ -198,17 +249,25 @@ async def upsert_async(session):
     else:
         print("[ensure_admin_auto] creating new admin (async)")
         kwargs = {}
-        if "username" in UserModel.__dict__: kwargs["username"] = ADMIN_USERNAME
-        if "login"    in UserModel.__dict__ and "username" not in kwargs: kwargs["login"] = ADMIN_USERNAME
-        if "email"    in UserModel.__dict__: kwargs["email"] = ADMIN_EMAIL
-        if "hashed_password" in UserModel.__dict__: kwargs["hashed_password"] = hashed
-        elif "password" in UserModel.__dict__:      kwargs["password"] = hashed
-        if "is_active"    in UserModel.__dict__: kwargs["is_active"] = True
-        if "is_superuser" in UserModel.__dict__: kwargs["is_superuser"] = True
+        if "username" in UserModel.__dict__:
+            kwargs["username"] = ADMIN_USERNAME
+        if "login" in UserModel.__dict__ and "username" not in kwargs:
+            kwargs["login"] = ADMIN_USERNAME
+        if "email" in UserModel.__dict__:
+            kwargs["email"] = ADMIN_EMAIL
+        if "hashed_password" in UserModel.__dict__:
+            kwargs["hashed_password"] = hashed
+        elif "password" in UserModel.__dict__:
+            kwargs["password"] = hashed
+        if "is_active" in UserModel.__dict__:
+            kwargs["is_active"] = True
+        if "is_superuser" in UserModel.__dict__:
+            kwargs["is_superuser"] = True
         u = UserModel(**kwargs)
         session.add(u)
         await session.commit()
         print("[ensure_admin_auto] created (async)")
+
 
 async def main():
     # Сначала пробуем SYNC стратегии
@@ -231,8 +290,10 @@ async def main():
             try:
                 upsert_sync(sess)
             finally:
-                try: sess.close()
-                except: pass
+                try:
+                    sess.close()
+                except:
+                    pass
             return 0
         except Exception:
             traceback.print_exc()
@@ -246,14 +307,21 @@ async def main():
 
     if async_strategy in ("AsyncSessionLocal", "async_session_maker"):
         try:
-            async with (AsyncSessionLocal() if async_strategy=="AsyncSessionLocal" else async_session_maker()) as s:
+            async with (
+                AsyncSessionLocal()
+                if async_strategy == "AsyncSessionLocal"
+                else async_session_maker()
+            ) as s:
                 await upsert_async(s)
             return 0
         except Exception:
             traceback.print_exc()
 
-    print("[ensure_admin_auto][FATAL] no suitable session strategy found. Check app.db.session contents.")
+    print(
+        "[ensure_admin_auto][FATAL] no suitable session strategy found. Check app.db.session contents."
+    )
     return 4
+
 
 if __name__ == "__main__":
     try:

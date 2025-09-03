@@ -115,14 +115,20 @@ def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
     return VisitOut(**row)  # type: ignore[arg-type]
 
 
-@router.get("/visits/{visit_id}", response_model=VisitWithServices, summary="Карточка визита")
+@router.get(
+    "/visits/{visit_id}", response_model=VisitWithServices, summary="Карточка визита"
+)
 def get_visit(visit_id: int, db: Session = Depends(get_db)):
     t = _visits(db)
     s = _vservices(db)
     vrow = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
     if not vrow:
         raise HTTPException(404, "Visit not found")
-    items = db.execute(select(s).where(s.c.visit_id == visit_id).order_by(s.c.id.asc())).mappings().all()
+    items = (
+        db.execute(select(s).where(s.c.visit_id == visit_id).order_by(s.c.id.asc()))
+        .mappings()
+        .all()
+    )
     return VisitWithServices(
         visit=VisitOut(**vrow),  # type: ignore[arg-type]
         services=[VisitServiceIn(**it) for it in items],  # type: ignore[list-item]
@@ -187,7 +193,11 @@ def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
     dependencies=[Depends(require_roles("Admin", "Registrar"))],
     summary="Перенести визит на конкретную дату (new_date в формате YYYY-MM-DD)",
 )
-def reschedule_visit(visit_id: int, new_date: date = Query(..., alias="new_date"), db: Session = Depends(get_db)):
+def reschedule_visit(
+    visit_id: int,
+    new_date: date = Query(..., alias="new_date"),
+    db: Session = Depends(get_db),
+):
     """
     Перенос визита на указанную дату (записывается в planned_date).
     Требует, чтобы в таблице visits была колонка planned_date.
@@ -206,11 +216,17 @@ def reschedule_visit(visit_id: int, new_date: date = Query(..., alias="new_date"
 
     # Запретим перенос, если визит завершён/отменён или уже начат
     if vrow.get("status") in {"closed", "canceled"}:
-        raise HTTPException(status_code=409, detail="Cannot reschedule closed or canceled visit")
+        raise HTTPException(
+            status_code=409, detail="Cannot reschedule closed or canceled visit"
+        )
     if vrow.get("started_at"):
-        raise HTTPException(status_code=409, detail="Cannot reschedule a visit that has been started")
+        raise HTTPException(
+            status_code=409, detail="Cannot reschedule a visit that has been started"
+        )
 
-    upd = t.update().where(t.c.id == visit_id).values(planned_date=new_date).returning(t)
+    upd = (
+        t.update().where(t.c.id == visit_id).values(planned_date=new_date).returning(t)
+    )
     row = db.execute(upd).mappings().first()
     if not row:
         raise HTTPException(404, "Visit not found")
@@ -236,12 +252,18 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Visit not found")
 
     if vrow.get("status") in {"closed", "canceled"}:
-        raise HTTPException(status_code=409, detail="Cannot reschedule closed or canceled visit")
+        raise HTTPException(
+            status_code=409, detail="Cannot reschedule closed or canceled visit"
+        )
     if vrow.get("started_at"):
-        raise HTTPException(status_code=409, detail="Cannot reschedule a visit that has been started")
+        raise HTTPException(
+            status_code=409, detail="Cannot reschedule a visit that has been started"
+        )
 
     tomorrow = date.today() + timedelta(days=1)
-    upd = t.update().where(t.c.id == visit_id).values(planned_date=tomorrow).returning(t)
+    upd = (
+        t.update().where(t.c.id == visit_id).values(planned_date=tomorrow).returning(t)
+    )
     row = db.execute(upd).mappings().first()
     if not row:
         raise HTTPException(404, "Visit not found")

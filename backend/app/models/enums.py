@@ -1,34 +1,37 @@
 """
 Enums для различных статусов в системе
 """
+
 from enum import Enum
 
 
 class AppointmentStatus(str, Enum):
     """
     Статусы записей - жесткий поток: запись → платеж → прием → медкарта → рецепт
-    
+
     Совместимость с существующими статусами:
     - scheduled -> pending (ожидает оплаты)
-    - confirmed -> paid (оплачено)  
+    - confirmed -> paid (оплачено)
     - cancelled -> cancelled (отменено)
     - completed -> completed (завершено)
     """
+
     # Новые статусы жесткого потока
-    PENDING = "pending"      # Запись создана, ожидает оплаты
-    PAID = "paid"           # Оплачено, можно отправлять к врачу
-    IN_VISIT = "in_visit"   # Прием у врача в процессе
-    COMPLETED = "completed" # Прием завершен (EMR + рецепт готовы)
-    CANCELLED = "cancelled" # Отменено
-    NO_SHOW = "no_show"     # Пациент не явился
-    
+    PENDING = "pending"  # Запись создана, ожидает оплаты
+    PAID = "paid"  # Оплачено, можно отправлять к врачу
+    IN_VISIT = "in_visit"  # Прием у врача в процессе
+    COMPLETED = "completed"  # Прием завершен (EMR + рецепт готовы)
+    CANCELLED = "cancelled"  # Отменено
+    NO_SHOW = "no_show"  # Пациент не явился
+
     # Совместимость со старыми статусами
-    SCHEDULED = "scheduled" # Старый статус -> маппится на pending
-    CONFIRMED = "confirmed" # Старый статус -> маппится на paid
+    SCHEDULED = "scheduled"  # Старый статус -> маппится на pending
+    CONFIRMED = "confirmed"  # Старый статус -> маппится на paid
 
 
 class PaymentStatus(str, Enum):
     """Статусы платежей"""
+
     PENDING = "pending"
     PAID = "paid"
     FAILED = "failed"
@@ -37,6 +40,7 @@ class PaymentStatus(str, Enum):
 
 class PaymentMethod(str, Enum):
     """Методы оплаты"""
+
     CASH = "cash"
     CARD = "card"
     ONLINE = "online"
@@ -45,6 +49,7 @@ class PaymentMethod(str, Enum):
 
 class EMRStatus(str, Enum):
     """Статусы ЭМК"""
+
     DRAFT = "draft"
     SAVED = "saved"
     COMPLETED = "completed"
@@ -52,6 +57,7 @@ class EMRStatus(str, Enum):
 
 class PrescriptionStatus(str, Enum):
     """Статусы рецептов"""
+
     DRAFT = "draft"
     SAVED = "saved"
     PRINTED = "printed"
@@ -59,6 +65,7 @@ class PrescriptionStatus(str, Enum):
 
 class QueueStatus(str, Enum):
     """Статусы очереди"""
+
     WAITING = "waiting"
     CALLED = "called"
     IN_PROGRESS = "in_progress"
@@ -81,7 +88,7 @@ def normalize_appointment_status(status: str) -> AppointmentStatus:
     """
     if status in APPOINTMENT_STATUS_MAPPING:
         return APPOINTMENT_STATUS_MAPPING[status]
-    
+
     try:
         return AppointmentStatus(status)
     except ValueError:
@@ -95,15 +102,25 @@ def can_transition_status(from_status: str, to_status: str) -> bool:
     """
     from_normalized = normalize_appointment_status(from_status)
     to_normalized = normalize_appointment_status(to_status)
-    
+
     # Разрешенные переходы
     allowed_transitions = {
-        AppointmentStatus.PENDING: [AppointmentStatus.PAID, AppointmentStatus.CANCELLED],
-        AppointmentStatus.PAID: [AppointmentStatus.IN_VISIT, AppointmentStatus.NO_SHOW, AppointmentStatus.CANCELLED],
-        AppointmentStatus.IN_VISIT: [AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED],
+        AppointmentStatus.PENDING: [
+            AppointmentStatus.PAID,
+            AppointmentStatus.CANCELLED,
+        ],
+        AppointmentStatus.PAID: [
+            AppointmentStatus.IN_VISIT,
+            AppointmentStatus.NO_SHOW,
+            AppointmentStatus.CANCELLED,
+        ],
+        AppointmentStatus.IN_VISIT: [
+            AppointmentStatus.COMPLETED,
+            AppointmentStatus.CANCELLED,
+        ],
         AppointmentStatus.COMPLETED: [],  # Финальный статус
         AppointmentStatus.CANCELLED: [],  # Финальный статус
-        AppointmentStatus.NO_SHOW: [],    # Финальный статус
+        AppointmentStatus.NO_SHOW: [],  # Финальный статус
     }
-    
+
     return to_normalized in allowed_transitions.get(from_normalized, [])

@@ -1,5 +1,6 @@
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -57,7 +58,9 @@ async def get_blood_tests(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения анализов крови: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения анализов крови: {str(e)}"
+        )
 
 
 @router.post("/blood-tests", summary="Создать анализ крови")
@@ -73,7 +76,9 @@ async def create_blood_test(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Анализ крови создан", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания анализа крови: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания анализа крови: {str(e)}"
+        )
 
 
 @router.get("/risk-assessment", summary="Оценка рисков")
@@ -88,4 +93,6 @@ async def get_risk_assessment(
     try:
         return {"message": "Модуль оценки рисков будет доступен в следующей версии"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения оценки рисков: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения оценки рисков: {str(e)}"
+        )

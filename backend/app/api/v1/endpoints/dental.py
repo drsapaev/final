@@ -1,5 +1,6 @@
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -24,7 +25,9 @@ async def get_dental_examinations(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения осмотров: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения осмотров: {str(e)}"
+        )
 
 
 @router.post("/examinations", summary="Создать стоматологический осмотр")
@@ -40,7 +43,9 @@ async def create_dental_examination(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Стоматологический осмотр создан", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания осмотра: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания осмотра: {str(e)}"
+        )
 
 
 @router.get("/treatments", summary="Планы лечения")
@@ -57,7 +62,9 @@ async def get_treatment_plans(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения планов лечения: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения планов лечения: {str(e)}"
+        )
 
 
 @router.post("/treatments", summary="Создать план лечения")
@@ -73,7 +80,9 @@ async def create_treatment_plan(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "План лечения создан", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания плана лечения: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания плана лечения: {str(e)}"
+        )
 
 
 @router.get("/prosthetics", summary="Протезирование")
@@ -90,7 +99,9 @@ async def get_prosthetics(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения протезов: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения протезов: {str(e)}"
+        )
 
 
 @router.post("/prosthetics", summary="Создать протез")
@@ -106,7 +117,9 @@ async def create_prosthetic(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Протез создан", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания протеза: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания протеза: {str(e)}"
+        )
 
 
 @router.get("/xray", summary="Рентгеновские снимки")
@@ -119,6 +132,10 @@ async def get_xray_images(
     Получить рентгеновские снимки пациента
     """
     try:
-        return {"message": "Модуль рентгеновских снимков будет доступен в следующей версии"}
+        return {
+            "message": "Модуль рентгеновских снимков будет доступен в следующей версии"
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения снимков: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения снимков: {str(e)}"
+        )

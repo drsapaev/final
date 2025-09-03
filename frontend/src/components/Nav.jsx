@@ -21,8 +21,8 @@ export default function Nav() {
   // Маршруты приложения — при необходимости синхронизируй с src/App.jsx
   const routes = [
     { key: 'Health',     to: '/',            label: 'Health',       roles: ['Admin','Registrar','Doctor','Lab','Cashier','User'] },
-    { key: 'Doctor',     to: '/doctor',      label: 'Врач',         roles: ['Admin','Doctor'] },
-    { key: 'Cashier',    to: '/cashier',     label: 'Касса',        roles: ['Admin','Cashier'] },
+    { key: 'Doctor',     to: '/doctor-panel',      label: 'Врач',         roles: ['Admin','Doctor'] },
+    { key: 'Cashier',    to: '/cashier-panel',     label: 'Касса',        roles: ['Admin','Cashier'] },
     { key: 'Scheduler',  to: '/scheduler',   label: 'Расписание',   roles: ['Admin','Registrar','Doctor'] },
     { key: 'Admin',      to: '/admin',       label: 'Админ',        roles: ['Admin'] },
     { key: 'RegistrarPanel', to: '/registrar-panel', label: 'Панель регистратора', roles: ['Admin','Registrar'] },

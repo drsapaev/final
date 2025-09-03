@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
-from app.schemas.base import ORMModel
-from typing import Literal, Optional, List
+
+from typing import List, Literal, Optional
+
 from pydantic import Field
 
+from app.schemas.base import ORMModel
 
 ActivationStatusLiteral = Literal["issued", "trial", "active", "expired", "revoked"]
 
@@ -43,6 +45,7 @@ class ActivationStatusOut(ORMModel):
 
 
 # --- Admin list/revoke/extend ---
+
 
 class ActivationListRow(ORMModel):
     key: str

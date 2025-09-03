@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import MetaData, Table, select, inspect
+from sqlalchemy import MetaData, Table, inspect, select
 from sqlalchemy.orm import Session
 
 
@@ -28,7 +28,9 @@ def create_visit(
     row = (
         db.execute(
             t.insert()
-            .values(patient_id=patient_id, doctor_id=doctor_id, status="open", notes=notes)
+            .values(
+                patient_id=patient_id, doctor_id=doctor_id, status="open", notes=notes
+            )
             .returning(t)
         )
         .mappings()
@@ -68,7 +70,11 @@ def set_status(db: Session, visit_id: int, status_new: str) -> Optional[dict]:
 
 def list_services(db: Session, visit_id: int) -> List[dict]:
     s = _vservices(db)
-    rows = db.execute(select(s).where(s.c.visit_id == visit_id).order_by(s.c.id.asc())).mappings().all()
+    rows = (
+        db.execute(select(s).where(s.c.visit_id == visit_id).order_by(s.c.id.asc()))
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -84,7 +90,9 @@ def add_service(
     s = _vservices(db)
     row = (
         db.execute(
-            s.insert().values(visit_id=visit_id, code=code, name=name, price=price, qty=qty).returning(s)
+            s.insert()
+            .values(visit_id=visit_id, code=code, name=name, price=price, qty=qty)
+            .returning(s)
         )
         .mappings()
         .first()

@@ -3,8 +3,10 @@
 Тест админ-панели - создание и управление провайдерами
 """
 
-import httpx
 import json
+
+import httpx
+
 
 def test_admin_panel():
     """Тестируем админ-панель"""
@@ -17,13 +19,11 @@ def test_admin_panel():
             login_data = {
                 "username": "admin",
                 "password": "admin123",
-                "grant_type": "password"
+                "grant_type": "password",
             }
 
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login",
-                data=login_data,
-                timeout=10
+                "http://localhost:8000/api/v1/auth/login", data=login_data, timeout=10
             )
 
             if login_response.status_code != 200:
@@ -33,7 +33,7 @@ def test_admin_panel():
 
             token_data = login_response.json()
             access_token = token_data.get("access_token")
-            
+
             if not access_token:
                 print("❌ В ответе нет access_token")
                 return
@@ -43,11 +43,11 @@ def test_admin_panel():
             # 2. Получаем список провайдеров
             print("\n2. Получаем список провайдеров...")
             headers = {"Authorization": f"Bearer {access_token}"}
-            
+
             providers_response = client.get(
                 "http://localhost:8000/api/v1/admin/providers",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
 
             print(f"Статус: {providers_response.status_code}")
@@ -70,14 +70,14 @@ def test_admin_panel():
                 "secret_key": "test_secret_key_456",
                 "commission_percent": 2,
                 "min_amount": 1000,
-                "max_amount": 1000000
+                "max_amount": 1000000,
             }
 
             create_response = client.post(
                 "http://localhost:8000/api/v1/admin/providers",
                 headers={**headers, "Content-Type": "application/json"},
                 json=test_provider,
-                timeout=10
+                timeout=10,
             )
 
             if create_response.status_code == 200:
@@ -96,23 +96,27 @@ def test_admin_panel():
             providers_response = client.get(
                 "http://localhost:8000/api/v1/admin/providers",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
 
             if providers_response.status_code == 200:
                 providers = providers_response.json()
                 print(f"✅ Теперь провайдеров: {len(providers)}")
                 for provider in providers:
-                    print(f"   - {provider.get('name')} ({provider.get('code')}) - ID: {provider.get('id')}")
+                    print(
+                        f"   - {provider.get('name')} ({provider.get('code')}) - ID: {provider.get('id')}"
+                    )
             else:
-                print(f"❌ Ошибка получения обновленного списка: {providers_response.text}")
+                print(
+                    f"❌ Ошибка получения обновленного списка: {providers_response.text}"
+                )
 
             # 5. Тестируем провайдера
             print(f"\n5. Тестируем провайдера {provider_id}...")
             test_response = client.get(
                 f"http://localhost:8000/api/v1/admin/providers/{provider_id}/test",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
 
             if test_response.status_code == 200:
@@ -127,7 +131,7 @@ def test_admin_panel():
             delete_response = client.delete(
                 f"http://localhost:8000/api/v1/admin/providers/{provider_id}",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
 
             if delete_response.status_code == 200:
@@ -137,6 +141,7 @@ def test_admin_panel():
 
     except Exception as e:
         print(f"❌ Ошибка при тестировании: {e}")
+
 
 if __name__ == "__main__":
     print("🚀 Тестирование админ-панели...")

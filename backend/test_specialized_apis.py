@@ -2,9 +2,11 @@
 """
 Тест новых специализированных API эндпоинтов
 """
-import httpx
-import time
 import json
+import time
+
+import httpx
+
 
 def test_specialized_apis():
     """Тестируем новые специализированные API"""
@@ -31,11 +33,10 @@ def test_specialized_apis():
             login_data = {
                 "username": "admin",
                 "password": "admin123",
-                "grant_type": "password"
+                "grant_type": "password",
             }
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login",
-                data=login_data
+                "http://localhost:8000/api/v1/auth/login", data=login_data
             )
 
             if login_response.status_code != 200:
@@ -65,8 +66,12 @@ def test_specialized_apis():
 
             for method, endpoint in endpoints:
                 try:
-                    response = client.request(method, f"http://localhost:8000{endpoint}", headers=headers)
-                    print(f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}")
+                    response = client.request(
+                        method, f"http://localhost:8000{endpoint}", headers=headers
+                    )
+                    print(
+                        f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
+                    )
                 except Exception as e:
                     print(f"   {method} {endpoint}: Ошибка - {e}")
 
@@ -80,8 +85,12 @@ def test_specialized_apis():
 
             for method, endpoint in endpoints:
                 try:
-                    response = client.request(method, f"http://localhost:8000{endpoint}", headers=headers)
-                    print(f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}")
+                    response = client.request(
+                        method, f"http://localhost:8000{endpoint}", headers=headers
+                    )
+                    print(
+                        f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
+                    )
                 except Exception as e:
                     print(f"   {method} {endpoint}: Ошибка - {e}")
 
@@ -96,8 +105,12 @@ def test_specialized_apis():
 
             for method, endpoint in endpoints:
                 try:
-                    response = client.request(method, f"http://localhost:8000{endpoint}", headers=headers)
-                    print(f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}")
+                    response = client.request(
+                        method, f"http://localhost:8000{endpoint}", headers=headers
+                    )
+                    print(
+                        f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
+                    )
                 except Exception as e:
                     print(f"   {method} {endpoint}: Ошибка - {e}")
 
@@ -113,8 +126,12 @@ def test_specialized_apis():
 
             for method, endpoint in endpoints:
                 try:
-                    response = client.request(method, f"http://localhost:8000{endpoint}", headers=headers)
-                    print(f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}")
+                    response = client.request(
+                        method, f"http://localhost:8000{endpoint}", headers=headers
+                    )
+                    print(
+                        f"   {method} {endpoint}: {response.status_code} {'✅' if response.status_code == 200 else '⚠️'}"
+                    )
                 except Exception as e:
                     print(f"   {method} {endpoint}: Ошибка - {e}")
 
@@ -124,7 +141,10 @@ def test_specialized_apis():
                 # Проверяем, что OPTIONS запросы работают
                 cors_response = client.options(
                     "http://localhost:8000/api/v1/patients",
-                    headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"}
+                    headers={
+                        "Origin": "http://localhost:5173",
+                        "Access-Control-Request-Method": "GET",
+                    },
                 )
                 if cors_response.status_code in [200, 204]:
                     print("   ✅ CORS OPTIONS работает")
@@ -138,7 +158,9 @@ def test_specialized_apis():
     except Exception as e:
         print(f"❌ Общая ошибка тестирования: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     print("🚀 Тестирование специализированных API...")

@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as _dt
 from dataclasses import dataclass
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.online import OnlineDay  # type: ignore[attr-defined]
 from app.models.setting import Setting  # type: ignore[attr-defined]
-from app.core.config import settings
-import datetime as _dt
 
 
 # ЛЕНИВЫЙ импорт менеджера WS, чтобы избежать циклов импорта при старте приложения
 def _ws_manager():
     try:
-        from app.ws.queue_ws import ws_manager  # импорт только в момент использования
+        from app.ws.queue_ws import \
+            ws_manager  # импорт только в момент использования
+
         return ws_manager
     except Exception:
         return None
@@ -35,6 +37,7 @@ class DayStats:
 
 
 # --- helpers for key/value counters stored in settings (category="queue") ---
+
 
 def _k(dep: str, date_str: str, name: str) -> str:
     return f"{dep.strip()}::{date_str.strip()}::{name}"
@@ -79,7 +82,7 @@ def _get_str(db: Session, key: str) -> Optional[str]:
         .scalars()
         .first()
     )
-    return (row.value if row and row.value is not None else None)
+    return row.value if row and row.value is not None else None
 
 
 def _set_str(db: Session, key: str, value: str) -> None:
@@ -109,7 +112,9 @@ def get_or_create_day(
     d = date_str.strip()
     row = (
         db.execute(
-            select(OnlineDay).where(OnlineDay.department == dep, OnlineDay.date_str == d)
+            select(OnlineDay).where(
+                OnlineDay.department == dep, OnlineDay.date_str == d
+            )
         )
         .scalars()
         .first()
@@ -172,20 +177,21 @@ def _broadcast(dep: str, d: str, stats: DayStats) -> None:
     # room format должен совпадать с ws/queue_ws.py
     print(f"🔔 Broadcasting to room: {dep}::{d}")
     print(f"🔔 Payload: {payload}")
-    
+
     mgr = _ws_manager()
     if mgr:
         try:
             print(f"🔔 WSManager получен: {type(mgr)}")
             print(f"🔔 Комнаты в WSManager: {list(mgr.rooms.keys())}")
             print(f"🔔 Целевая комната: {dep}::{d}")
-            
+
             # broadcast - синхронная функция, не нужно create_task
             mgr.broadcast(f"{dep}::{d}", payload)
             print(f"🔔 Broadcast sent successfully")
         except Exception as e:
             print(f"❌ Broadcast error: {e}")
             import traceback
+
             traceback.print_exc()
             # не роняем транзакции/запрос, если рассылка не удалась
             pass
@@ -193,7 +199,9 @@ def _broadcast(dep: str, d: str, stats: DayStats) -> None:
         print(f"⚠️ WSManager not available for broadcast")
 
 
-def issue_next_ticket(db: Session, *, department: str, date_str: str) -> tuple[int, DayStats]:
+def issue_next_ticket(
+    db: Session, *, department: str, date_str: str
+) -> tuple[int, DayStats]:
     dep = department.strip()
     d = date_str.strip()
     day = get_or_create_day(db, department=dep, date_str=d)
@@ -216,6 +224,7 @@ def issue_next_ticket(db: Session, *, department: str, date_str: str) -> tuple[i
 
 
 # --- Business rules for morning online window --------------------------------
+
 
 def _now_local() -> _dt.datetime:
     # простая локализация по системному времени; для точной TZ можно подключить zoneinfo
@@ -244,7 +253,12 @@ def can_issue_more_today(*, db: Session, department: str, date_str: str) -> bool
 
 
 def get_existing_ticket_for_identity(
-    *, db: Session, department: str, date_str: str, phone: Optional[str], tg_id: Optional[str]
+    *,
+    db: Session,
+    department: str,
+    date_str: str,
+    phone: Optional[str],
+    tg_id: Optional[str],
 ) -> Optional[int]:
     dep = department.strip()
     d = date_str.strip()
@@ -268,7 +282,13 @@ def get_existing_ticket_for_identity(
 
 
 def remember_identity_ticket(
-    *, db: Session, department: str, date_str: str, phone: Optional[str], tg_id: Optional[str], ticket: int
+    *,
+    db: Session,
+    department: str,
+    date_str: str,
+    phone: Optional[str],
+    tg_id: Optional[str],
+    ticket: int,
 ) -> None:
     dep = department.strip()
     d = date_str.strip()

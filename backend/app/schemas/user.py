@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
-from app.schemas.base import ORMModel  # <-- новый базовый класс
+
 from pydantic import EmailStr, Field
+
+from app.schemas.base import ORMModel  # <-- новый базовый класс
 
 
 class UserBase(ORMModel):
@@ -17,6 +19,7 @@ class UserOut(UserBase):
     role: str
     is_active: bool = True
 
+
 # --- Create/Update ---
 class UserCreate(UserBase):
     password: str = Field(min_length=6, max_length=128)
@@ -28,4 +31,3 @@ class UserUpdate(ORMModel):
     role: Optional[str] = Field(default=None, max_length=32)
     is_active: Optional[bool] = None
     password: Optional[str] = Field(default=None, min_length=6, max_length=128)
-

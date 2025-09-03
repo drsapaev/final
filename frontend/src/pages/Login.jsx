@@ -15,11 +15,11 @@ export default function Login() {
     { key: 'admin', label: 'Администратор', username: 'admin', route: '/admin' },
     { key: 'registrar', label: 'Регистратура', username: 'registrar', route: '/registrar-panel' },
     { key: 'lab', label: 'Лаборатория', username: 'lab', route: '/lab-panel' },
+    { key: 'doctor', label: 'Врач', username: 'doctor', route: '/doctor-panel' },
+    { key: 'cashier', label: 'Касса', username: 'cashier', route: '/cashier-panel' },
     { key: 'cardio', label: 'Кардиолог', username: 'cardio', route: '/cardiologist' },
     { key: 'derma', label: 'Дерматолог', username: 'derma', route: '/dermatologist' },
     { key: 'dentist', label: 'Стоматолог', username: 'dentist', route: '/dentist' },
-    { key: 'doctor', label: 'Врач', username: 'doctor', route: '/doctor' },
-    { key: 'cashier', label: 'Касса', username: 'cashier', route: '/cashier' },
   ];
 
   const [selectedRoleKey, setSelectedRoleKey] = useState('admin');
@@ -126,22 +126,63 @@ export default function Login() {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) return defaultPath;
-      // профиль сохранён в сторах; берём роль из auth.getState()
+      
+      // ВАЖНО: Получаем роль из актуального профиля после логина
+      // Не полагаемся на кэшированный профиль, который может быть устаревшим
       const state = auth.getState ? auth.getState() : { profile: null };
       const role = String(state?.profile?.role || '').toLowerCase();
-      if (role === 'admin') return '/admin'; // или "/user-select"
+      
+      // Логируем для отладки
+      console.log('pickRouteForRoleCached: role =', role, 'profile =', state?.profile);
+      
+      if (role === 'admin') return '/admin';
       if (role === 'registrar') return '/registrar-panel';
       if (role === 'lab') return '/lab-panel';
       if (role === 'doctor') return '/doctor-panel';
-      if (role === 'cashier') return '/cashier';
+      if (role === 'cashier') return '/cashier-panel';
       if (role === 'cardio') return '/cardiologist';
       if (role === 'derma') return '/dermatologist';
       if (role === 'dentist') return '/dentist';
       return '/search';
-    } catch {
-      // Игнорируем ошибки доступа к localStorage
+    } catch (error) {
+      console.error('pickRouteForRoleCached error:', error);
       return defaultPath;
     }
+  }
+
+  function roleToRoute(roleLower) {
+    switch (roleLower) {
+      case 'admin': return '/admin';
+      case 'registrar': return '/registrar-panel';
+      case 'lab': return '/lab-panel';
+      case 'doctor': return '/doctor-panel';
+      case 'cashier': return '/cashier-panel';
+      case 'cardio': return '/cardiologist';
+      case 'derma': return '/dermatologist';
+      case 'dentist': return '/dentist';
+      default: return '/search';
+    }
+  }
+
+  function resolveRouteFromProfile(profile) {
+    if (!profile) return '/search';
+    const rolesArr = Array.isArray(profile.roles) ? profile.roles.map(r => String(r).toLowerCase()) : [];
+    const roleLower = String(profile.role || profile.role_name || '').toLowerCase();
+    if (rolesArr.includes('admin') || roleLower === 'admin') return '/admin';
+    if (roleLower) return roleToRoute(roleLower);
+    for (const r of rolesArr) {
+      const route = roleToRoute(r);
+      if (route && route !== '/search') return route;
+    }
+    return '/search';
+  }
+
+  function isProtectedPanelPath(pathname) {
+    const prefixes = [
+      '/admin','/registrar-panel','/doctor-panel','/lab-panel','/cashier-panel',
+      '/cardiologist','/dermatologist','/dentist'
+    ];
+    return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
   }
 
   async function onLoginClick(e) {
@@ -151,9 +192,27 @@ export default function Login() {
     setErr('');
     try {
       await performLogin(username, password);
+
+      // Небольшая задержка для обновления профиля в auth store
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const state = auth.getState ? auth.getState() : { profile: null };
+      const profile = state?.profile || null;
+      const computedRoute = resolveRouteFromProfile(profile);
       const fromClean = from || '/';
-      const roleTarget = pickRouteForRoleCached('/search');
-      const target = (fromClean !== '/' && fromClean !== '/login') ? fromClean : roleTarget;
+
+      // Если from ведёт на другой защищённый раздел панели — игнорируем его
+      let target = computedRoute;
+      if (fromClean && fromClean !== '/' && fromClean !== '/login') {
+        if (isProtectedPanelPath(fromClean)) {
+          if (fromClean === computedRoute) target = fromClean;
+        } else {
+          // Нефреймовый/просмотровый маршрут (детали визита и т.п.) — разрешаем возврат
+          target = fromClean;
+        }
+      }
+
+      console.log('Login redirect:', { from: fromClean, computedRoute, target, profile });
       navigate(target, { replace: true });
     } catch (e2) {
       setErr(e2?.message || 'Ошибка входа');

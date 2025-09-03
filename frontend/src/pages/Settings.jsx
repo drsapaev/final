@@ -48,6 +48,12 @@ export default function Settings() {
   const [busyAct, setBusyAct] = useState(false);
   const [errAct, setErrAct] = useState('');
 
+  // payment providers tab
+  const [providers, setProviders] = useState([]);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+  const [showAddProvider, setShowAddProvider] = useState(false);
+  const [editingProvider, setEditingProvider] = useState(null);
+
   async function loadStatus() {
     try {
       const st = await api.get('/activation/status');
@@ -73,7 +79,55 @@ export default function Settings() {
     }
   }
 
+  // Payment providers functions
+  async function loadProviders() {
+    setLoadingProviders(true);
+    try {
+      const response = await api.get('/admin/providers');
+      setProviders(response || []);
+    } catch (error) {
+      console.error('Ошибка загрузки провайдеров:', error);
+    } finally {
+      setLoadingProviders(false);
+    }
+  }
+
+  async function createProvider(providerData) {
+    try {
+      await api.post('/admin/providers', providerData);
+      await loadProviders();
+      setShowAddProvider(false);
+    } catch (error) {
+      console.error('Ошибка создания провайдера:', error);
+      throw error;
+    }
+  }
+
+  async function updateProvider(providerId, providerData) {
+    try {
+      await api.put(`/admin/providers/${providerId}`, providerData);
+      await loadProviders();
+      setEditingProvider(null);
+    } catch (error) {
+      console.error('Ошибка обновления провайдера:', error);
+      throw error;
+    }
+  }
+
+  async function deleteProvider(providerId) {
+    if (!confirm('Вы уверены, что хотите удалить этого провайдера?')) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/providers/${providerId}`);
+      await loadProviders();
+    } catch (error) {
+      console.error('Ошибка удаления провайдера:', error);
+    }
+  }
+
   useEffect(() => { if (tab === 'license') loadStatus(); }, [tab]);
+  useEffect(() => { if (tab === 'payment_providers') loadProviders(); }, [tab]);
 
   // generic category settings (printer / online_queue)
   const [cat, setCat] = useState('printer');
@@ -147,6 +201,7 @@ export default function Settings() {
             <TabButton active={tab==='printer'} onClick={()=>setTab('printer')}>Принтер</TabButton>
             <TabButton active={tab==='online_queue'} onClick={()=>setTab('online_queue')}>Онлайн-очередь</TabButton>
             <TabButton active={tab==='display_board'} onClick={()=>setTab('display_board')}>Табло очереди</TabButton>
+            <TabButton active={tab==='payment_providers'} onClick={()=>setTab('payment_providers')}>Провайдеры оплаты</TabButton>
           </div>
 
           {tab === 'license' && (
@@ -231,10 +286,332 @@ export default function Settings() {
                   </div>
                 </>
               )}
+
+          {tab === 'payment_providers' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontWeight: 700 }}>Провайдеры оплаты</div>
+                  <button 
+                    onClick={() => setShowAddProvider(true)}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'var(--accent-color)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Добавить провайдера
+                  </button>
+                </div>
+
+                {loadingProviders ? (
+                  <div style={{ opacity: 0.7 }}>Загрузка...</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {providers.map((provider) => (
+                      <ProviderCard
+                        key={provider.id}
+                        provider={provider}
+                        onEdit={() => setEditingProvider(provider)}
+                        onDelete={() => deleteProvider(provider.id)}
+                      />
+                    ))}
+                    {providers.length === 0 && (
+                      <div style={{ opacity: 0.7 }}>Провайдеры не найдены</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showAddProvider && (
+            <ProviderModal
+              onClose={() => setShowAddProvider(false)}
+              onSave={createProvider}
+              title="Добавить провайдера"
+            />
+          )}
+
+          {editingProvider && (
+            <ProviderModal
+              provider={editingProvider}
+              onClose={() => setEditingProvider(null)}
+              onSave={(data) => updateProvider(editingProvider.id, data)}
+              title="Редактировать провайдера"
+            />
+          )}
             </div>
           )}
         </div>
       </RoleGate>
+    </div>
+  );
+}
+
+// Компонент карточки провайдера
+function ProviderCard({ provider, onEdit, onDelete }) {
+  return (
+    <div style={{
+      border: '1px solid var(--border-color)',
+      borderRadius: 8,
+      padding: 12,
+      display: 'grid',
+      gap: 8
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontWeight: 600 }}>{provider.name}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={onEdit}
+            style={{
+              padding: '4px 8px',
+              background: 'var(--accent-color)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Редактировать
+          </button>
+          <button
+            onClick={onDelete}
+            style={{
+              padding: '4px 8px',
+              background: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Удалить
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize: '14px', opacity: 0.8 }}>
+        <div>Код: {provider.code}</div>
+        <div>Активен: {provider.is_active ? 'Да' : 'Нет'}</div>
+        {provider.description && <div>Описание: {provider.description}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Модальное окно для добавления/редактирования провайдера
+function ProviderModal({ provider, onClose, onSave, title }) {
+  const [formData, setFormData] = useState({
+    name: provider?.name || '',
+    code: provider?.code || '',
+    description: provider?.description || '',
+    is_active: provider?.is_active ?? true,
+    secret_key: provider?.secret_key || '',
+    webhook_url: provider?.webhook_url || '',
+    api_url: provider?.api_url || ''
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await onSave(formData);
+    } catch (error) {
+      alert('Ошибка сохранения: ' + (error.message || 'Неизвестная ошибка'));
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }}>
+      <div style={{
+        background: 'var(--bg-primary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 12,
+        padding: 24,
+        width: '90%',
+        maxWidth: 500,
+        maxHeight: '90vh',
+        overflow: 'auto'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '20px',
+              cursor: 'pointer',
+              color: 'var(--text-primary)'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Название *</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              required
+              style={{
+                width: '100%',
+                padding: 8,
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Код *</label>
+            <input
+              type="text"
+              value={formData.code}
+              onChange={(e) => setFormData({...formData, code: e.target.value})}
+              required
+              style={{
+                width: '100%',
+                padding: 8,
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Описание</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: 8,
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Секретный ключ *</label>
+            <input
+              type="password"
+              value={formData.secret_key}
+              onChange={(e) => setFormData({...formData, secret_key: e.target.value})}
+              required
+              style={{
+                width: '100%',
+                padding: 8,
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Webhook URL</label>
+            <input
+              type="url"
+              value={formData.webhook_url}
+              onChange={(e) => setFormData({...formData, webhook_url: e.target.value})}
+              style={{
+                width: '100%',
+                padding: 8,
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)'
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>API URL</label>
+            <input
+              type="url"
+              value={formData.api_url}
+              onChange={(e) => setFormData({...formData, api_url: e.target.value})}
+              style={{
+                width: '100%',
+                padding: 8,
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: 'var(--bg-primary)',
+                color: 'var(--text-primary)'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              id="is_active"
+              checked={formData.is_active}
+              onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+            />
+            <label htmlFor="is_active" style={{ fontWeight: 600 }}>Активен</label>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '8px 16px',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 6,
+                cursor: 'pointer'
+              }}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              style={{
+                padding: '8px 16px',
+                background: 'var(--accent-color)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer'
+              }}
+            >
+              Сохранить
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

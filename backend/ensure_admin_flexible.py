@@ -17,10 +17,15 @@ print("ensure_admin_flexible: username=%s" % ADMIN_USERNAME)
 # try passlib
 try:
     from passlib.context import CryptContext
-    pwdctx = CryptContext(schemes=["bcrypt", "sha256_crypt", "pbkdf2_sha256"], deprecated="auto")
+
+    pwdctx = CryptContext(
+        schemes=["bcrypt", "sha256_crypt", "pbkdf2_sha256"], deprecated="auto"
+    )
 except Exception:
     pwdctx = None
-    print("Warning: passlib not available. Install with: pip install 'passlib[bcrypt]'.")
+    print(
+        "Warning: passlib not available. Install with: pip install 'passlib[bcrypt]'."
+    )
 
 candidates_session = [
     "app.db.session.get_async_session",
@@ -42,6 +47,7 @@ candidates_user = [
     "app.db.models.user.User",
 ]
 
+
 def try_import(path):
     try:
         module_path, attr = path.rsplit(".", 1)
@@ -50,25 +56,34 @@ def try_import(path):
     except Exception:
         return None
 
+
 def make_hash(pwd):
     if pwdctx:
         return pwdctx.hash(pwd)
     else:
         import hashlib
+
         return "plain$" + hashlib.sha256(pwd.encode("utf8")).hexdigest()
+
 
 # SYNC helper
 def create_or_update_sync(session, UserModel):
     try:
         from sqlalchemy import select
-        q = select(UserModel).where(getattr(UserModel, "username", UserModel.email) == ADMIN_USERNAME)
+
+        q = select(UserModel).where(
+            getattr(UserModel, "username", UserModel.email) == ADMIN_USERNAME
+        )
         result = session.execute(q)
         user = result.scalar_one_or_none()
     except Exception:
         # try fallback using typical attribute 'username'
         try:
             from sqlalchemy import select
-            q = select(UserModel).where(getattr(UserModel, "username") == ADMIN_USERNAME)
+
+            q = select(UserModel).where(
+                getattr(UserModel, "username") == ADMIN_USERNAME
+            )
             result = session.execute(q)
             user = result.scalar_one_or_none()
         except Exception:
@@ -116,16 +131,27 @@ def create_or_update_sync(session, UserModel):
             traceback.print_exc()
             print("Failed to create user (sync).")
 
+
 # ASYNC helper
 async def create_or_update_async(session, UserModel):
     try:
         from sqlalchemy import select
-        result = await session.execute(select(UserModel).where(getattr(UserModel, "username", UserModel.email) == ADMIN_USERNAME))
+
+        result = await session.execute(
+            select(UserModel).where(
+                getattr(UserModel, "username", UserModel.email) == ADMIN_USERNAME
+            )
+        )
         user = result.scalar_one_or_none()
     except Exception:
         try:
             from sqlalchemy import select
-            result = await session.execute(select(UserModel).where(getattr(UserModel, "username") == ADMIN_USERNAME))
+
+            result = await session.execute(
+                select(UserModel).where(
+                    getattr(UserModel, "username") == ADMIN_USERNAME
+                )
+            )
             user = result.scalar_one_or_none()
         except Exception:
             user = None
@@ -170,6 +196,7 @@ async def create_or_update_async(session, UserModel):
         except Exception:
             traceback.print_exc()
             print("Failed to create user (async).")
+
 
 async def run():
     session_factory = None
@@ -234,7 +261,9 @@ async def run():
                     print("Detected sync sessionmaker: using sync path")
                     # run sync code in threadpool to avoid blocking event loop
                     loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(None, sync_wrapper, session_factory, UserModel)
+                    await loop.run_in_executor(
+                        None, sync_wrapper, session_factory, UserModel
+                    )
                     return 0
                 except Exception:
                     traceback.print_exc()
@@ -251,10 +280,14 @@ async def run():
         except TypeError:
             # session_factory not callable - try to use it directly as sessionmaker instance
             try:
-                print("session_factory is not callable; attempting to use as sessionmaker object")
+                print(
+                    "session_factory is not callable; attempting to use as sessionmaker object"
+                )
                 # try sync path
                 loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, sync_wrapper, session_factory, UserModel)
+                await loop.run_in_executor(
+                    None, sync_wrapper, session_factory, UserModel
+                )
                 return 0
             except Exception:
                 traceback.print_exc()
@@ -263,6 +296,7 @@ async def run():
 
     print("All attempts failed; please inspect session/model locations.")
     return 4
+
 
 def sync_wrapper(session_factory, UserModel):
     """Run sync create/update using sync sessionmaker"""
@@ -273,6 +307,7 @@ def sync_wrapper(session_factory, UserModel):
     except Exception:
         traceback.print_exc()
         raise
+
 
 if __name__ == "__main__":
     try:

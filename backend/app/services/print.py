@@ -20,13 +20,23 @@ def _try_draw_logo(c: canvas.Canvas, x: float, y: float, w: float) -> None:
         return
     try:
         from reportlab.lib.utils import ImageReader  # lazy
+
         img = ImageReader(path)
         iw, ih = img.getSize()
         if iw <= 0 or ih <= 0:
             return
         scale = w / float(iw)
         h = ih * scale
-        c.drawImage(img, x, y, width=w, height=h, mask="auto", preserveAspectRatio=True, anchor="sw")
+        c.drawImage(
+            img,
+            x,
+            y,
+            width=w,
+            height=h,
+            mask="auto",
+            preserveAspectRatio=True,
+            anchor="sw",
+        )
     except Exception:
         # Логотип опционален — не роняем генерацию
         pass
@@ -44,7 +54,9 @@ def build_ticket_pdf(
     отделение, дата/время печати и опциональный футер.
     """
     clinic = clinic_name or settings.APP_NAME
-    footer = settings.PDF_FOOTER_ENABLED if footer_enabled is None else bool(footer_enabled)
+    footer = (
+        settings.PDF_FOOTER_ENABLED if footer_enabled is None else bool(footer_enabled)
+    )
 
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A6)
@@ -94,7 +106,9 @@ def build_invoice_pdf(
     items: список кортежей (name, amount, currency).
     """
     clinic = clinic_name or settings.APP_NAME
-    footer = settings.PDF_FOOTER_ENABLED if footer_enabled is None else bool(footer_enabled)
+    footer = (
+        settings.PDF_FOOTER_ENABLED if footer_enabled is None else bool(footer_enabled)
+    )
 
     rows = list(items or [])
     total = sum(a for _, a, cur in rows if (cur or totals_currency) == totals_currency)

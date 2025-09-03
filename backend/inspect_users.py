@@ -1,5 +1,7 @@
 # inspect_users.py
-import asyncio, traceback
+import asyncio
+import traceback
+
 candidates_session = [
     "app.db.session.get_async_session",
     "app.db.session.async_session_maker",
@@ -15,6 +17,7 @@ candidates_user = [
     "app.models.User",
 ]
 
+
 def try_import(path):
     try:
         module_path, attr = path.rsplit(".", 1)
@@ -22,6 +25,7 @@ def try_import(path):
         return getattr(m, attr)
     except Exception:
         return None
+
 
 async def run_async():
     SessionCandidate = None
@@ -61,7 +65,9 @@ async def run_async():
             traceback.print_exc()
 
     # try sync sessionmaker path in thread
-    import concurrent.futures, inspect
+    import concurrent.futures
+    import inspect
+
     def sync_job():
         try:
             # if SessionCandidate is sessionmaker class
@@ -83,6 +89,7 @@ async def run_async():
 
     with concurrent.futures.ThreadPoolExecutor() as ex:
         await asyncio.get_running_loop().run_in_executor(ex, sync_job)
+
 
 if __name__ == "__main__":
     asyncio.run(run_async())

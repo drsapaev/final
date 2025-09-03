@@ -19,10 +19,16 @@ class Payment(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="UZS")
 
-    method: Mapped[str] = mapped_column(String(16), nullable=False, default="cash")   # cash|card|transfer
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="paid")   # paid|void
+    method: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="cash"
+    )  # cash|card|transfer
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="paid"
+    )  # paid|void
 
     receipt_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )

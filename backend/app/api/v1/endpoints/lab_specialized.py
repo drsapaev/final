@@ -1,5 +1,6 @@
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -24,7 +25,9 @@ async def get_lab_tests(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения исследований: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения исследований: {str(e)}"
+        )
 
 
 @router.post("/tests", summary="Создать лабораторное исследование")
@@ -40,7 +43,9 @@ async def create_lab_test(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Лабораторное исследование создано", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания исследования: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания исследования: {str(e)}"
+        )
 
 
 @router.get("/results", summary="Результаты анализов")
@@ -57,7 +62,9 @@ async def get_lab_results(
         # Пока возвращаем пустой список - можно расширить при наличии модели
         return []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения результатов: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения результатов: {str(e)}"
+        )
 
 
 @router.post("/results", summary="Создать результат анализа")
@@ -73,7 +80,9 @@ async def create_lab_result(
         # Пока возвращаем заглушку - можно расширить при наличии модели
         return {"message": "Результат анализа создан", "id": 1}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка создания результата: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка создания результата: {str(e)}"
+        )
 
 
 @router.get("/reports", summary="Лабораторные отчеты")
@@ -89,7 +98,9 @@ async def get_lab_reports(
     try:
         return {"message": "Модуль отчетов будет доступен в следующей версии"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения отчетов: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения отчетов: {str(e)}"
+        )
 
 
 @router.get("/reference-ranges", summary="Референсные значения")
@@ -105,16 +116,18 @@ async def get_reference_ranges(
             "cbc": {
                 "hemoglobin": {"male": "130-170 g/L", "female": "120-150 g/L"},
                 "leukocytes": "4.0-9.0 × 10⁹/L",
-                "platelets": "150-400 × 10⁹/L"
+                "platelets": "150-400 × 10⁹/L",
             },
             "biochemical": {
                 "glucose": "3.3-5.5 mmol/L",
                 "cholesterol": "<5.0 mmol/L",
-                "creatinine": {"male": "62-106 µmol/L", "female": "44-80 µmol/L"}
-            }
+                "creatinine": {"male": "62-106 µmol/L", "female": "44-80 µmol/L"},
+            },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения референсных значений: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения референсных значений: {str(e)}"
+        )
 
 
 @router.get("/equipment", summary="Лабораторное оборудование")
@@ -128,4 +141,6 @@ async def get_lab_equipment(
     try:
         return {"message": "Модуль оборудования будет доступен в следующей версии"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения статуса оборудования: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения статуса оборудования: {str(e)}"
+        )

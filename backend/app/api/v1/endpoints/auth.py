@@ -12,28 +12,27 @@ import inspect
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.concurrency import run_in_threadpool
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
-
-# Import your project's DB session factory / dependency
-# get_db should be a dependency that yields either an AsyncSession or sync Session
-from app.db.session import get_db
-
-# ORM user model
-from app.models.user import User
 
 # helpers from deps
 from app.api.deps import create_access_token, get_current_user
-
 # password verification helper (assumed present in project)
 from app.core.security import verify_password
+# Import your project's DB session factory / dependency
+# get_db should be a dependency that yields either an AsyncSession or sync Session
+from app.db.session import get_db
+# ORM user model
+from app.models.user import User
 
 router = APIRouter()
 
 
 @router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)) -> Any:
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)
+) -> Any:
     """
     OAuth2 password flow (token endpoint).
 
@@ -69,7 +68,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get
         except Exception:
             user = None
 
-    if not user or not verify_password(form_data.password, getattr(user, "hashed_password", "")):
+    if not user or not verify_password(
+        form_data.password, getattr(user, "hashed_password", "")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

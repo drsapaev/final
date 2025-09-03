@@ -53,7 +53,12 @@ async def list_payments(
     return [_to_out(r) for r in rows]
 
 
-@router.post("", response_model=PaymentOut, status_code=status.HTTP_201_CREATED, summary="Создать платёж")
+@router.post(
+    "",
+    response_model=PaymentOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Создать платёж",
+)
 async def create_payment(
     payload: PaymentCreateIn,
     db: Session = Depends(get_db),

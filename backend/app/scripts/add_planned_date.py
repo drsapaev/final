@@ -1,7 +1,7 @@
 # app/scripts/add_planned_date.py
 
-import sqlite3
 import os
+import sqlite3
 
 DB_PATH = "clinic.db"
 
@@ -20,7 +20,9 @@ if "planned_date" in columns:
     print("ℹ️ Колонка planned_date уже существует")
 else:
     cur.execute("ALTER TABLE visits ADD COLUMN planned_date DATE;")
-    cur.execute("UPDATE visits SET planned_date = DATE('now') WHERE planned_date IS NULL;")
+    cur.execute(
+        "UPDATE visits SET planned_date = DATE('now') WHERE planned_date IS NULL;"
+    )
     print("✅ Колонка planned_date успешно добавлена и заполнена")
 
 db.commit()

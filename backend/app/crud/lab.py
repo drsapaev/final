@@ -17,11 +17,21 @@ def _results(db: Session) -> Table:
 
 
 def create_order(
-    db: Session, *, visit_id: Optional[int] = None, patient_id: Optional[int] = None, notes: Optional[str] = None
+    db: Session,
+    *,
+    visit_id: Optional[int] = None,
+    patient_id: Optional[int] = None,
+    notes: Optional[str] = None,
 ) -> dict:
     t = _orders(db)
     row = (
-        db.execute(t.insert().values(visit_id=visit_id, patient_id=patient_id, status="ordered", notes=notes).returning(t))
+        db.execute(
+            t.insert()
+            .values(
+                visit_id=visit_id, patient_id=patient_id, status="ordered", notes=notes
+            )
+            .returning(t)
+        )
         .mappings()
         .first()
     )
@@ -35,7 +45,9 @@ def set_order_status(db: Session, order_id: int, status_new: str) -> Optional[di
         raise ValueError("invalid status")
     t = _orders(db)
     row = (
-        db.execute(t.update().where(t.c.id == order_id).values(status=status_new).returning(t))
+        db.execute(
+            t.update().where(t.c.id == order_id).values(status=status_new).returning(t)
+        )
         .mappings()
         .first()
     )
@@ -74,5 +86,9 @@ def add_results(db: Session, order_id: int, items: List[dict]) -> List[dict]:
 
 def list_results(db: Session, order_id: int) -> List[dict]:
     r = _results(db)
-    rows = db.execute(select(r).where(r.c.order_id == order_id).order_by(r.c.id.asc())).mappings().all()
+    rows = (
+        db.execute(select(r).where(r.c.order_id == order_id).order_by(r.c.id.asc()))
+        .mappings()
+        .all()
+    )
     return [dict(row) for row in rows]

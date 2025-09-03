@@ -25,7 +25,8 @@ CORS_ALLOW_ALL = os.getenv("CORS_ALLOW_ALL", "0") == "1"
 CORS_ORIGINS = [
     o.strip()
     for o in os.getenv(
-        "CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:3000"
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:3000",
     ).split(",")
     if o.strip()
 ]
@@ -44,7 +45,8 @@ app = FastAPI(
 # -----------------------------------------------------------------------------
 # WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
-from app.ws.queue_ws import router as queue_ws_router, ws_queue  # noqa: E402
+from app.ws.queue_ws import router as queue_ws_router  # noqa: E402
+from app.ws.queue_ws import ws_queue
 
 app.include_router(queue_ws_router)  # /ws/queue
 app.add_api_websocket_route("/ws/dev-queue", ws_queue)
@@ -65,7 +67,8 @@ if not CORS_DISABLE:
 # -----------------------------------------------------------------------------
 _USE_DEV_AUTH_FALLBACK = False
 try:
-    from app.api.deps import create_access_token, get_current_user  # type: ignore  # noqa: E402
+    from app.api.deps import (  # type: ignore  # noqa: E402
+        create_access_token, get_current_user)
 except Exception as e:  # pragma: no cover
     log.error("dev-fallback: cannot import deps auth (%s) -> will use dummy token", e)
     _USE_DEV_AUTH_FALLBACK = True
@@ -97,6 +100,7 @@ if _USE_DEV_AUTH_FALLBACK:
     async def _fallback_me():
         return {"username": "dev", "role": "Admin", "is_active": True}
 
+
 # -----------------------------------------------------------------------------
 # Health
 # -----------------------------------------------------------------------------
@@ -114,6 +118,7 @@ def root():
         "cors_allow_all": CORS_ALLOW_ALL,
         "origins": CORS_ORIGINS,
     }
+
 
 # -----------------------------------------------------------------------------
 # Диагностика подключённых маршрутов
@@ -150,4 +155,6 @@ def _routes():
             }
         )
     return items
+
+
 # --- END app/main.py ---

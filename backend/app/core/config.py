@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import secrets
 from functools import lru_cache
-from pydantic import Field
-from pydantic import field_validator
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,7 +52,9 @@ class Settings(BaseSettings):
     PRINTER_USB_VID: int | None = None
     PRINTER_USB_PID: int | None = None
 
-    @field_validator("PRINTER_USB_VID", "PRINTER_USB_PID", "PRINTER_NET_PORT", mode="before")
+    @field_validator(
+        "PRINTER_USB_VID", "PRINTER_USB_PID", "PRINTER_NET_PORT", mode="before"
+    )
     @classmethod
     def _empty_str_to_none(cls, v):  # type: ignore[no-untyped-def]
         if v is None:
@@ -69,6 +71,7 @@ def get_settings() -> Settings:
     if not s.SECRET_KEY or len(s.SECRET_KEY) < 16:
         s.SECRET_KEY = secrets.token_urlsafe(32)
     return s
+
 
 # --- backward-compat для старых импортов ---
 settings = get_settings()

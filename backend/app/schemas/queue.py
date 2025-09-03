@@ -1,6 +1,8 @@
 ﻿from __future__ import annotations
-from app.schemas.base import ORMModel
+
 from pydantic import Field
+
+from app.schemas.base import ORMModel
 
 
 class QueueStatsOut(ORMModel):

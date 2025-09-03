@@ -2,9 +2,11 @@
 """
 Тест специализированных панелей врачей
 """
-import httpx
 import json
-from datetime import datetime, date
+from datetime import date, datetime
+
+import httpx
+
 
 def test_specialized_panels():
     """Тестируем доступ к специализированным панелям"""
@@ -16,12 +18,10 @@ def test_specialized_panels():
             login_data = {
                 "username": "admin",
                 "password": "admin123",
-                "grant_type": "password"
+                "grant_type": "password",
             }
             login_response = client.post(
-                "http://localhost:8000/api/v1/auth/login",
-                data=login_data,
-                timeout=10
+                "http://localhost:8000/api/v1/auth/login", data=login_data, timeout=10
             )
             if login_response.status_code != 200:
                 print(f"❌ Ошибка логина: {login_response.status_code}")
@@ -44,56 +44,64 @@ def test_specialized_panels():
             cardio_response = client.get(
                 "http://localhost:8000/api/v1/patients?department=Cardio&limit=10",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
             print(f"   Статус: {cardio_response.status_code}")
             if cardio_response.status_code == 200:
                 cardio_data = cardio_response.json()
                 print(f"   ✅ Найдено кардиологических пациентов: {len(cardio_data)}")
             else:
-                print(f"   ⚠️  Доступ к кардиологическим пациентам: {cardio_response.status_code}")
+                print(
+                    f"   ⚠️  Доступ к кардиологическим пациентам: {cardio_response.status_code}"
+                )
 
             # 2.2. Дерматологическая панель
             print("2.2. Дерматологическая панель...")
             derma_response = client.get(
                 "http://localhost:8000/api/v1/patients?department=Derma&limit=10",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
             print(f"   Статус: {derma_response.status_code}")
             if derma_response.status_code == 200:
                 derma_data = derma_response.json()
                 print(f"   ✅ Найдено дерматологических пациентов: {len(derma_data)}")
             else:
-                print(f"   ⚠️  Доступ к дерматологическим пациентам: {derma_response.status_code}")
+                print(
+                    f"   ⚠️  Доступ к дерматологическим пациентам: {derma_response.status_code}"
+                )
 
             # 2.3. Стоматологическая панель
             print("2.3. Стоматологическая панель...")
             dental_response = client.get(
                 "http://localhost:8000/api/v1/patients?department=Dental&limit=10",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
             print(f"   Статус: {dental_response.status_code}")
             if dental_response.status_code == 200:
                 dental_data = dental_response.json()
                 print(f"   ✅ Найдено стоматологических пациентов: {len(dental_data)}")
             else:
-                print(f"   ⚠️  Доступ к стоматологическим пациентам: {dental_response.status_code}")
+                print(
+                    f"   ⚠️  Доступ к стоматологическим пациентам: {dental_response.status_code}"
+                )
 
             # 2.4. Лабораторная панель
             print("2.4. Лабораторная панель...")
             lab_response = client.get(
                 "http://localhost:8000/api/v1/patients?department=Lab&limit=10",
                 headers=headers,
-                timeout=10
+                timeout=10,
             )
             print(f"   Статус: {lab_response.status_code}")
             if lab_response.status_code == 200:
                 lab_data = lab_response.json()
                 print(f"   ✅ Найдено лабораторных пациентов: {len(lab_data)}")
             else:
-                print(f"   ⚠️  Доступ к лабораторным пациентам: {lab_response.status_code}")
+                print(
+                    f"   ⚠️  Доступ к лабораторным пациентам: {lab_response.status_code}"
+                )
 
             # 3. Тестируем специализированные API (если доступны)
             print("\n3. Тестируем специализированные API...")
@@ -104,7 +112,7 @@ def test_specialized_panels():
                 cardio_api_response = client.get(
                     "http://localhost:8000/api/v1/cardio/ecg?limit=5",
                     headers=headers,
-                    timeout=10
+                    timeout=10,
                 )
                 print(f"   ЭКГ API статус: {cardio_api_response.status_code}")
                 if cardio_api_response.status_code == 200:
@@ -118,9 +126,11 @@ def test_specialized_panels():
                 cardio_blood_response = client.get(
                     "http://localhost:8000/api/v1/cardio/blood-tests?limit=5",
                     headers=headers,
-                    timeout=10
+                    timeout=10,
                 )
-                print(f"   Анализы крови API статус: {cardio_blood_response.status_code}")
+                print(
+                    f"   Анализы крови API статус: {cardio_blood_response.status_code}"
+                )
                 if cardio_blood_response.status_code == 200:
                     print("   ✅ API анализов крови доступен")
                 else:
@@ -134,7 +144,7 @@ def test_specialized_panels():
                 derma_exam_response = client.get(
                     "http://localhost:8000/api/v1/derma/examinations?limit=5",
                     headers=headers,
-                    timeout=10
+                    timeout=10,
                 )
                 print(f"   Осмотры кожи API статус: {derma_exam_response.status_code}")
                 if derma_exam_response.status_code == 200:
@@ -148,9 +158,11 @@ def test_specialized_panels():
                 derma_proc_response = client.get(
                     "http://localhost:8000/api/v1/derma/procedures?limit=5",
                     headers=headers,
-                    timeout=10
+                    timeout=10,
                 )
-                print(f"   Косметические процедуры API статус: {derma_proc_response.status_code}")
+                print(
+                    f"   Косметические процедуры API статус: {derma_proc_response.status_code}"
+                )
                 if derma_proc_response.status_code == 200:
                     print("   ✅ API косметических процедур доступен")
                 else:
@@ -160,27 +172,22 @@ def test_specialized_panels():
 
             # 4. Проверяем маршруты
             print("\n4. Проверяем маршруты специализированных панелей...")
-            
+
             routes_to_check = [
                 "/cardiologist",
-                "/dermatologist", 
+                "/dermatologist",
                 "/dentist",
-                "/lab-panel"
+                "/lab-panel",
             ]
-            
+
             for route in routes_to_check:
                 print(f"   Маршрут {route}: ✅ Доступен (добавлен в App.jsx)")
 
             # 5. Проверяем навигацию
             print("\n5. Проверяем навигацию...")
-            
-            nav_items = [
-                "Кардиолог",
-                "Дерматолог",
-                "Стоматолог", 
-                "Лаборатория"
-            ]
-            
+
+            nav_items = ["Кардиолог", "Дерматолог", "Стоматолог", "Лаборатория"]
+
             for item in nav_items:
                 print(f"   Навигация {item}: ✅ Добавлена в Nav.jsx")
 
@@ -189,7 +196,9 @@ def test_specialized_panels():
     except Exception as e:
         print(f"❌ Ошибка при тестировании: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     print("🚀 Тестирование специализированных панелей врачей...")

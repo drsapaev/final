@@ -17,9 +17,15 @@ def _qe(db: Session) -> Table:
     return Table("queue_entries", md, autoload_with=db.get_bind())
 
 
-def get_daily_by_date_department(db: Session, *, d: date, department: str) -> Optional[dict]:
+def get_daily_by_date_department(
+    db: Session, *, d: date, department: str
+) -> Optional[dict]:
     t = _dq(db)
-    row = db.execute(select(t).where(and_(t.c.date == d, t.c.department == department))).mappings().first()
+    row = (
+        db.execute(select(t).where(and_(t.c.date == d, t.c.department == department)))
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
@@ -53,13 +59,17 @@ def next_ticket_and_insert_entry(
 
     # Получим текущий last_ticket
     dq_row = (
-        db.execute(select(dq_t.c.last_ticket).where(dq_t.c.id == daily_queue_id)).mappings().first()
+        db.execute(select(dq_t.c.last_ticket).where(dq_t.c.id == daily_queue_id))
+        .mappings()
+        .first()
         or {}
     )
     current_last = int(dq_row.get("last_ticket", 0) or 0)
     new_no = current_last + 1
 
-    db.execute(dq_t.update().where(dq_t.c.id == daily_queue_id).values(last_ticket=new_no))
+    db.execute(
+        dq_t.update().where(dq_t.c.id == daily_queue_id).values(last_ticket=new_no)
+    )
     created = (
         db.execute(
             qe_t.insert()
@@ -98,7 +108,9 @@ def set_entry_status(
     if status in {"done", "skipped"}:
         values["finished_at"] = now
     row = (
-        db.execute(qe_t.update().where(qe_t.c.id == entry_id).values(**values).returning(qe_t))
+        db.execute(
+            qe_t.update().where(qe_t.c.id == entry_id).values(**values).returning(qe_t)
+        )
         .mappings()
         .first()
     )
@@ -119,7 +131,9 @@ def stats_for_daily(db: Session, *, daily_queue_id: int) -> Tuple[int, int, int,
     dq_t, qe_t = _dq(db), _qe(db)
 
     last_ticket = (
-        db.execute(select(dq_t.c.last_ticket).where(dq_t.c.id == daily_queue_id)).scalar_one_or_none()
+        db.execute(
+            select(dq_t.c.last_ticket).where(dq_t.c.id == daily_queue_id)
+        ).scalar_one_or_none()
         or 0
     )
 
@@ -129,4 +143,9 @@ def stats_for_daily(db: Session, *, daily_queue_id: int) -> Tuple[int, int, int,
         .group_by(qe_t.c.status)
     )
     counts = {row[0]: int(row[1]) for row in db.execute(q).all()}
-    return int(last_ticket), counts.get("waiting", 0), counts.get("serving", 0), counts.get("done", 0)
+    return (
+        int(last_ticket),
+        counts.get("waiting", 0),
+        counts.get("serving", 0),
+        counts.get("done", 0),
+    )
