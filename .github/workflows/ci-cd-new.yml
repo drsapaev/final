@@ -224,12 +224,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Backend Docker image
         run: |
-          cd ops
-          docker build -f backend.Dockerfile -t clinic-backend ../backend
+          docker build -f ops/backend.Dockerfile -t clinic-backend backend
       - name: Build Frontend Docker image
         run: |
-          cd ops
-          docker build -f frontend.Dockerfile -t clinic-frontend ../frontend
+          docker build -f ops/frontend.Dockerfile -t clinic-frontend frontend
       - name: Test Backend run
         run: |
           docker run --rm -d -p 8000:8000 -e DATABASE_URL="sqlite:///./test.db" clinic-backend &
