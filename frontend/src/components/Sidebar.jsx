@@ -16,15 +16,14 @@ export default function Sidebar() {
   const profile = st.profile || st.user || {};
   const role = String(profile?.role || profile?.role_name || '').toLowerCase();
 
-  const common = [
-    { to: '/analytics', label: 'Аналитика' }
-  ];
+  const common = [];
 
   const byRole = [];
   if (role === 'admin') {
     byRole.push(
       { to: '/admin', label: 'Админ' },
       { to: '/user-select', label: 'Пользователи' },
+      { to: '/analytics', label: 'Аналитика' }
     );
   }
   if (role === 'registrar') {

@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ServiceChecklist from '../components/ServiceChecklist';
+import EMRSystem from '../components/EMRSystem';
+import PrescriptionSystem from '../components/PrescriptionSystem';
+import VisitTimeline from '../components/VisitTimeline';
+import QueueIntegration from '../components/QueueIntegration';
+import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 const DermatologistPanel = () => {
   const [activeTab, setActiveTab] = useState('patients');
@@ -10,6 +15,11 @@ const DermatologistPanel = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showExaminationForm, setShowExaminationForm] = useState(false);
   const [showProcedureForm, setShowProcedureForm] = useState(false);
+  
+  // Состояние для жесткого потока
+  const [currentAppointment, setCurrentAppointment] = useState(null);
+  const [emr, setEmr] = useState(null);
+  const [prescription, setPrescription] = useState(null);
 
   // Дерма: выбор услуг и цена от врача
   const [selectedServices, setSelectedServices] = useState([]);
@@ -186,6 +196,109 @@ const DermatologistPanel = () => {
     }
   };
 
+  // Функции для жесткого потока
+  const startVisit = async (appointment) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${appointment.id}/start-visit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        const updatedAppointment = await response.json();
+        setCurrentAppointment(updatedAppointment);
+        alert('Прием начат успешно!');
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Ошибка при начале приема');
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Start visit error:', error);
+      alert('Ошибка при начале приема');
+    }
+  };
+
+  const saveEMR = async (emrData) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/emr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify(emrData)
+      });
+
+      if (response.ok) {
+        const savedEMR = await response.json();
+        setEmr(savedEMR);
+        alert('EMR сохранена успешно!');
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Ошибка при сохранении EMR');
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Save EMR error:', error);
+      alert('Ошибка при сохранении EMR');
+    }
+  };
+
+  const savePrescription = async (prescriptionData) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/prescription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify(prescriptionData)
+      });
+
+      if (response.ok) {
+        const savedPrescription = await response.json();
+        setPrescription(savedPrescription);
+        alert('Рецепт сохранен успешно!');
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Ошибка при сохранении рецепта');
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Save prescription error:', error);
+      alert('Ошибка при сохранении рецепта');
+    }
+  };
+
+  const completeVisit = async () => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        const completedAppointment = await response.json();
+        setCurrentAppointment(completedAppointment);
+        alert('Прием завершен успешно!');
+        // Сброс состояния
+        setCurrentAppointment(null);
+        setEmr(null);
+        setPrescription(null);
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Ошибка при завершении приема');
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Complete visit error:', error);
+      alert('Ошибка при завершении приема');
+    }
+  };
+
   const pageStyle = { padding: '20px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' };
   const cardStyle = { background: '#fff', border: '1px solid #e5e5e5', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' };
   const cardHeaderStyle = { padding: '20px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fd7e14', color: 'white', borderRadius: '8px 8px 0 0' };
@@ -209,6 +322,14 @@ const DermatologistPanel = () => {
       </div>
 
       <div style={tabsStyle}>
+        <button style={activeTab === 'queue' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('queue')}>📋 Очередь</button>
+        <button 
+          style={activeTab === 'visit' ? activeTabStyle : tabStyle} 
+          onClick={() => setActiveTab('visit')}
+          disabled={!currentAppointment}
+        >
+          🩺 Прием
+        </button>
         <button style={activeTab === 'patients' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('patients')}>👥 Пациенты</button>
         <button style={activeTab === 'examinations' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('examinations')}>🔍 Осмотры кожи</button>
         <button style={activeTab === 'procedures' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('procedures')}>✨ Косметические процедуры</button>
@@ -507,6 +628,106 @@ const DermatologistPanel = () => {
                 <button type="button" style={buttonSecondaryStyle} onClick={() => setShowProcedureForm(false)}>Отмена</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Вкладка "Очередь" */}
+      {activeTab === 'queue' && (
+        <div>
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <h2 style={{ margin: 0, fontSize: '18px' }}>📋 Очередь пациентов</h2>
+            </div>
+            <div style={cardContentStyle}>
+              <QueueIntegration
+                department="Derma"
+                onSelectAppointment={(appointment) => {
+                  setCurrentAppointment(appointment);
+                  setActiveTab('visit');
+                }}
+                onStartVisit={startVisit}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Вкладка "Прием" */}
+      {activeTab === 'visit' && currentAppointment && (
+        <div>
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <h2 style={{ margin: 0, fontSize: '18px' }}>
+                🩺 Прием пациента: {currentAppointment.patient_name || 'Не указано'}
+              </h2>
+              <span style={{ fontSize: '14px' }}>
+                Статус: {currentAppointment.status}
+              </span>
+            </div>
+            <div style={cardContentStyle}>
+              {/* Временная шкала приема */}
+              <VisitTimeline
+                appointment={currentAppointment}
+                emr={emr}
+                prescription={prescription}
+              />
+
+              {/* EMR система */}
+              <div style={{ marginTop: '20px' }}>
+                <h3 style={{ color: '#fd7e14', marginBottom: '15px' }}>📋 Электронная медицинская карта</h3>
+                <EMRSystem
+                  appointment={currentAppointment}
+                  emr={emr}
+                  onSave={saveEMR}
+                />
+              </div>
+
+              {/* Система рецептов */}
+              {emr && !emr.is_draft && (
+                <div style={{ marginTop: '20px' }}>
+                  <h3 style={{ color: '#fd7e14', marginBottom: '15px' }}>💊 Рецепт</h3>
+                  <PrescriptionSystem
+                    appointment={currentAppointment}
+                    emr={emr}
+                    prescription={prescription}
+                    onSave={savePrescription}
+                  />
+                </div>
+              )}
+
+              {/* Кнопка завершения приема */}
+              {emr && !emr.is_draft && (
+                <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                  <button 
+                    style={{ ...buttonSuccessStyle, fontSize: '16px', padding: '12px 24px' }}
+                    onClick={completeVisit}
+                  >
+                    ✅ Завершить прием
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Сообщение если нет активного приема */}
+      {activeTab === 'visit' && !currentAppointment && (
+        <div style={cardStyle}>
+          <div style={cardContentStyle}>
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <h3 style={{ color: '#666', marginBottom: '15px' }}>Нет активного приема</h3>
+              <p style={{ color: '#999', marginBottom: '20px' }}>
+                Выберите пациента из очереди для начала приема
+              </p>
+              <button 
+                style={buttonStyle}
+                onClick={() => setActiveTab('queue')}
+              >
+                📋 Перейти к очереди
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -169,6 +169,7 @@ const AdminPanel = () => {
 
   const tabs = [
     { id: 'dashboard', label: 'Панель управления', icon: BarChart3 },
+    { id: 'analytics', label: 'Аналитика', icon: TrendingUp },
     { id: 'users', label: 'Пользователи', icon: Users },
     { id: 'doctors', label: 'Врачи', icon: UserPlus },
     { id: 'patients', label: 'Пациенты', icon: Users },
@@ -386,10 +387,163 @@ const AdminPanel = () => {
     </div>
   );
 
+  const renderAnalytics = () => (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Аналитика и отчеты</h2>
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Экспорт
+            </Button>
+            <Button>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Создать отчет
+            </Button>
+          </div>
+        </div>
+
+        {/* Фильтры */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Период</label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option>Сегодня</option>
+              <option>Неделя</option>
+              <option>Месяц</option>
+              <option>Квартал</option>
+              <option>Год</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Отделение</label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option>Все отделения</option>
+              <option>Кардиология</option>
+              <option>Дерматология</option>
+              <option>Стоматология</option>
+              <option>Общее</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Врач</label>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option>Все врачи</option>
+              <option>Иванов И.И.</option>
+              <option>Петров П.П.</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <Button className="w-full">
+              <Filter className="w-4 h-4 mr-2" />
+              Применить
+            </Button>
+          </div>
+        </div>
+
+        {/* Ключевые метрики */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">Всего записей</p>
+                <p className="text-2xl font-bold text-blue-900">1,247</p>
+              </div>
+              <Calendar className="w-8 h-8 text-blue-500" />
+            </div>
+            <p className="text-xs text-blue-600 mt-1">+12% за месяц</p>
+          </div>
+          
+          <div className="bg-green-50 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600">Доходы</p>
+                <p className="text-2xl font-bold text-green-900">₽2.4M</p>
+              </div>
+              <CreditCard className="w-8 h-8 text-green-500" />
+            </div>
+            <p className="text-xs text-green-600 mt-1">+8% за месяц</p>
+          </div>
+          
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600">Пациенты</p>
+                <p className="text-2xl font-bold text-purple-900">892</p>
+              </div>
+              <Users className="w-8 h-8 text-purple-500" />
+            </div>
+            <p className="text-xs text-purple-600 mt-1">+15% за месяц</p>
+          </div>
+          
+          <div className="bg-orange-50 p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-600">Средний чек</p>
+                <p className="text-2xl font-bold text-orange-900">₽1,925</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-orange-500" />
+            </div>
+            <p className="text-xs text-orange-600 mt-1">+5% за месяц</p>
+          </div>
+        </div>
+
+        {/* Графики */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Динамика записей</h3>
+            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+              <p className="text-gray-500">График записей по дням</p>
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Доходы по отделениям</h3>
+            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
+              <p className="text-gray-500">Круговая диаграмма доходов</p>
+            </div>
+          </Card>
+        </div>
+
+        {/* Топ врачи */}
+        <Card className="p-4 mt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Топ врачи по количеству приемов</h3>
+          <div className="space-y-3">
+            {[
+              { name: 'Иванов И.И.', department: 'Кардиология', patients: 156, revenue: '₽312,000' },
+              { name: 'Петров П.П.', department: 'Дерматология', patients: 134, revenue: '₽268,000' },
+              { name: 'Сидоров С.С.', department: 'Стоматология', patients: 98, revenue: '₽196,000' },
+              { name: 'Козлов К.К.', department: 'Общее', patients: 87, revenue: '₽174,000' }
+            ].map((doctor, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-medium">{index + 1}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{doctor.name}</p>
+                    <p className="text-sm text-gray-600">{doctor.department}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-gray-900">{doctor.patients} пациентов</p>
+                  <p className="text-sm text-gray-600">{doctor.revenue}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </Card>
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return renderDashboard();
+      case 'analytics':
+        return renderAnalytics();
       case 'users':
         return renderUsers();
       default:

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle } from 'lucide-react';
+import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint } from '../design-system/hooks';
+import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 const CashierPanel = () => {
   const { isMobile } = useBreakpoint();
@@ -9,22 +10,113 @@ const CashierPanel = () => {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [payments, setPayments] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
-      await new Promise(r => setTimeout(r, 800));
-      setPayments([
-        { id: 1, time: '09:10', patient: 'Ахмедов Алишер', service: 'Консультация', amount: 120000, method: 'Карта', status: 'paid' },
-        { id: 2, time: '09:30', patient: 'Каримова Зухра',  service: 'Анализы',     amount: 85000,  method: 'Наличные', status: 'paid' },
-        { id: 3, time: '10:05', patient: 'Тошматов Бахтиёр', service: 'ЭхоКГ',       amount: 220000, method: 'Карта', status: 'pending' },
-      ]);
+      
+      // Загружаем записи ожидающие оплаты
+      try {
+        const appointmentsResponse = await fetch('/api/v1/appointments/?status=pending&limit=50', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+        if (appointmentsResponse.ok) {
+          const appointmentsData = await appointmentsResponse.json();
+          setAppointments(appointmentsData);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки записей:', error);
+      }
+
+      // Загружаем историю платежей
+      try {
+        const paymentsResponse = await fetch('/api/v1/payments/?limit=50', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          setPayments(paymentsData);
+        } else {
+          // Fallback данные
+          setPayments([
+            { id: 1, time: '09:10', patient: 'Ахмедов Алишер', service: 'Консультация', amount: 120000, method: 'Карта', status: 'paid' },
+            { id: 2, time: '09:30', patient: 'Каримова Зухра',  service: 'Анализы',     amount: 85000,  method: 'Наличные', status: 'paid' },
+            { id: 3, time: '10:05', patient: 'Тошматов Бахтиёр', service: 'ЭхоКГ',       amount: 220000, method: 'Карта', status: 'pending' },
+          ]);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки платежей:', error);
+        // Fallback данные
+        setPayments([
+          { id: 1, time: '09:10', patient: 'Ахмедов Алишер', service: 'Консультация', amount: 120000, method: 'Карта', status: 'paid' },
+          { id: 2, time: '09:30', patient: 'Каримова Зухра',  service: 'Анализы',     amount: 85000,  method: 'Наличные', status: 'paid' },
+          { id: 3, time: '10:05', patient: 'Тошматов Бахтиёр', service: 'ЭхоКГ',       amount: 220000, method: 'Карта', status: 'pending' },
+        ]);
+      }
+      
       setIsLoading(false);
     };
     load();
   }, []);
 
   const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
+
+  // Функции для работы с оплатами
+  const processPayment = async (appointment, paymentData) => {
+    try {
+      // Сначала создаем платеж
+      const paymentResponse = await fetch('/api/v1/payments/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          appointment_id: appointment.id,
+          amount: paymentData.amount,
+          method: paymentData.method,
+          note: paymentData.note || `Оплата за ${appointment.department || 'услугу'}`
+        })
+      });
+
+      if (paymentResponse.ok) {
+        const payment = await paymentResponse.json();
+        
+        // Затем отмечаем запись как оплаченную
+        const markPaidResponse = await fetch(`/api/v1/appointments/${appointment.id}/mark-paid`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+
+        if (markPaidResponse.ok) {
+          // Обновляем списки
+          setAppointments(prev => prev.filter(apt => apt.id !== appointment.id));
+          setPayments(prev => [payment, ...prev]);
+          setShowPaymentModal(false);
+          setSelectedAppointment(null);
+          alert('Оплата успешно обработана!');
+        } else {
+          throw new Error('Ошибка при обновлении статуса записи');
+        }
+      } else {
+        const error = await paymentResponse.json();
+        throw new Error(error.detail || 'Ошибка при создании платежа');
+      }
+    } catch (error) {
+      console.error('CashierPanel: Payment error:', error);
+      alert('Ошибка при обработке оплаты: ' + error.message);
+    }
+  };
 
   const filtered = payments.filter(p => {
     const matchesText = [p.patient, p.service, p.method].join(' ').toLowerCase().includes(query.toLowerCase());
@@ -75,6 +167,45 @@ const CashierPanel = () => {
           </div>
         </Card>
 
+        {/* Записи ожидающие оплаты */}
+        {appointments.length > 0 && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-orange-500" />
+                Записи ожидающие оплаты ({appointments.length})
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {appointments.map((appointment) => (
+                <div key={appointment.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">
+                      {appointment.patient_name || `Пациент #${appointment.patient_id}`}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {appointment.department} • {appointment.appointment_date} {appointment.appointment_time}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="warning">Ожидает оплаты</Badge>
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        setSelectedAppointment(appointment);
+                        setShowPaymentModal(true);
+                      }}
+                    >
+                      <DollarSign className="w-4 h-4 mr-1" />
+                      Оплатить
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* Table */}
         <Card className="p-0 overflow-hidden">
           {isLoading ? (
@@ -117,6 +248,112 @@ const CashierPanel = () => {
             </div>
           )}
         </Card>
+
+        {/* Модальное окно оплаты */}
+        {showPaymentModal && selectedAppointment && (
+          <PaymentModal
+            appointment={selectedAppointment}
+            onProcessPayment={processPayment}
+            onClose={() => {
+              setShowPaymentModal(false);
+              setSelectedAppointment(null);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Компонент модального окна оплаты
+const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
+  const [paymentData, setPaymentData] = useState({
+    amount: '',
+    method: 'cash',
+    note: ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!paymentData.amount || paymentData.amount <= 0) {
+      alert('Введите корректную сумму');
+      return;
+    }
+    onProcessPayment(appointment, paymentData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Обработка оплаты</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <XCircle className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="font-medium text-gray-900">
+            {appointment.patient_name || `Пациент #${appointment.patient_id}`}
+          </div>
+          <div className="text-sm text-gray-600">
+            {appointment.department} • {appointment.appointment_date} {appointment.appointment_time}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Сумма (сум)
+            </label>
+            <input
+              type="number"
+              value={paymentData.amount}
+              onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Введите сумму"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Способ оплаты
+            </label>
+            <select
+              value={paymentData.method}
+              onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="cash">Наличные</option>
+              <option value="card">Банковская карта</option>
+              <option value="online">Онлайн оплата</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Примечание (необязательно)
+            </label>
+            <textarea
+              value={paymentData.note}
+              onChange={(e) => setPaymentData({ ...paymentData, note: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="2"
+              placeholder="Дополнительная информация"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" className="flex-1">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Обработать оплату
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Отмена
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );

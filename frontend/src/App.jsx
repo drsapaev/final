@@ -106,7 +106,7 @@ export default function App() {
           <Route path="audit"         element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
           <Route path="scheduler"     element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
           <Route path="appointments"  element={<RequireAuth roles={['Admin','Registrar']}><Appointments /></RequireAuth>} />
-          <Route path="analytics"     element={<RequireAuth roles={['Admin','Doctor','Nurse']}><AnalyticsPage /></RequireAuth>} />
+          <Route path="analytics"     element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
           <Route path="visits/:id"    element={<VisitDetails />} />
           <Route path="search"        element={<Search />} />
           <Route path="*"             element={<Navigate to="/" replace />} />
