@@ -243,8 +243,8 @@ def test_public_endpoints():
     public_endpoints = [
         "/api/v1/health",
         "/api/v1/status",
-        "/api/v1/queue/stats",
-        "/api/v1/appointments/stats"
+        "/api/v1/queue/stats?department=general&date=2024-01-01",
+        "/api/v1/appointments/stats?department=general&date=2024-01-01"
     ]
     
     success_count = 0

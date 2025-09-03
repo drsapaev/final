@@ -63,13 +63,43 @@ jobs:
         export CORS_DISABLE="${{ env.CORS_DISABLE }}"
         export WS_DEV_ALLOW="${{ env.WS_DEV_ALLOW }}"
         
-        # Создаём тестовую базу
+        # Создаём тестовую базу и тестовые данные
         python - << 'PY'
+        import sys
+        sys.path.insert(0, '.')
+        
         from app.db.base import Base
-        from app.db.session import engine
+        from app.db.session import engine, SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        
         try:
+            # Создаем таблицы
             Base.metadata.create_all(bind=engine)
             print('✅ База данных создана')
+            
+            # Создаем тестового пользователя admin
+            db = SessionLocal()
+            try:
+                # Проверяем, существует ли уже пользователь admin
+                existing_admin = db.query(User).filter(User.username == "admin").first()
+                if not existing_admin:
+                    admin_user = User(
+                        username="admin",
+                        email="admin@clinic.com",
+                        hashed_password=get_password_hash("admin123"),
+                        role="Admin",
+                        is_active=True,
+                        is_superuser=True
+                    )
+                    db.add(admin_user)
+                    db.commit()
+                    print('✅ Тестовый пользователь admin создан')
+                else:
+                    print('✅ Пользователь admin уже существует')
+            finally:
+                db.close()
+                
         except Exception as e:
             print('⚠️ Ошибка создания БД:', e)
             raise SystemExit(1)

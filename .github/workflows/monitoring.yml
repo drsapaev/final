@@ -21,6 +21,7 @@ jobs:
         cd backend
         echo "📦 Устанавливаем Python зависимости..."
         pip install --no-cache-dir -r requirements.txt
+        pip install --no-cache-dir httpx
         echo "✅ Зависимости установлены"
         
     - name: 🗄️ Проверка базы данных
@@ -30,9 +31,14 @@ jobs:
         
         echo "🗄️ Проверяем состояние базы данных..."
         
-        # Проверяем подключение к базе
+        # Проверяем подключение к базе и создаем тестового пользователя
         python -c "
-        from app.db.session import engine
+        import sys
+        sys.path.insert(0, '.')
+        
+        from app.db.session import engine, SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
         from sqlalchemy import text
         
         try:
@@ -49,6 +55,27 @@ jobs:
                         print(f'   📊 {table}: {count} записей')
                     except:
                         print(f'   ⚠️ {table}: таблица не найдена')
+                        
+            # Создаем тестового пользователя admin если его нет
+            db = SessionLocal()
+            try:
+                existing_admin = db.query(User).filter(User.username == 'admin').first()
+                if not existing_admin:
+                    admin_user = User(
+                        username='admin',
+                        email='admin@clinic.com',
+                        hashed_password=get_password_hash('admin123'),
+                        role='Admin',
+                        is_active=True,
+                        is_superuser=True
+                    )
+                    db.add(admin_user)
+                    db.commit()
+                    print('✅ Тестовый пользователь admin создан')
+                else:
+                    print('✅ Пользователь admin уже существует')
+            finally:
+                db.close()
                         
         except Exception as e:
             print(f'❌ Ошибка подключения к базе: {e}')
@@ -91,8 +118,8 @@ jobs:
         endpoints=(
             "/api/v1/health"
             "/api/v1/status"
-            "/api/v1/queue/stats"
-            "/api/v1/appointments/stats"
+            "/api/v1/queue/stats?department=general&date=2024-01-01"
+            "/api/v1/appointments/stats?department=general&date=2024-01-01"
         )
         
         for endpoint in "${endpoints[@]}"; do
