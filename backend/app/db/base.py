@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401
     audit as _m_audit,
     emr as _m_emr,
     enums as _m_enums,
+    payment_webhook as _m_payment_webhook,
     lab as _m_lab,
     online as _m_online,
     patient as _m_patient,
