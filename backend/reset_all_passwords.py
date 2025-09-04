@@ -29,15 +29,15 @@ def reset_all_passwords():
             if user:
                 # Устанавливаем новый пароль
                 user.hashed_password = get_password_hash(password)
-                print(f"✓ Пароль для {username} сброшен на {password}")
+                print(f"OK: Пароль для {username} сброшен на {password}")
             else:
-                print(f"✗ Пользователь {username} не найден")
+                print(f"ERROR: Пользователь {username} не найден")
         
         db.commit()
-        print("\n✓ Все пароли успешно сброшены!")
+        print("\nOK: Все пароли успешно сброшены!")
         
     except Exception as e:
-        print(f"✗ Ошибка при сбросе паролей: {e}")
+        print(f"ERROR: Ошибка при сбросе паролей: {e}")
         db.rollback()
     finally:
         db.close()
