@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
+from typing import Optional
 
 from fastapi import APIRouter, status, WebSocket, WebSocketDisconnect
 
@@ -107,7 +108,7 @@ ws_manager = WSManager()
 print(f"🔧 WSManager: создан глобальный экземпляр {id(ws_manager)}")
 
 
-def _origin_allowed(origin: str | None) -> bool:
+def _origin_allowed(origin: Optional[str]) -> bool:
     if os.getenv("CORS_DISABLE", "0") == "1":
         return True
     if not origin:
@@ -122,7 +123,7 @@ def _origin_allowed(origin: str | None) -> bool:
     return origin in allowed
 
 
-def _auth_ok(headers, token_qs: str | None) -> bool:
+def _auth_ok(headers, token_qs: Optional[str]) -> bool:
     if os.getenv("WS_DEV_ALLOW", "0") == "1":
         return True
     auth = headers.get("authorization") or headers.get("Authorization")
@@ -153,7 +154,7 @@ async def ws_noauth(websocket: WebSocket):
 # -----------------------------------------------------------------------------
 @router.websocket("/ws/queue")
 async def ws_queue(
-    websocket: WebSocket, department: str, date: str, token: str | None = None
+    websocket: WebSocket, department: str, date: str, token: Optional[str] = None
 ):
     origin = websocket.headers.get("origin")
     log.info(

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import secrets
 from functools import lru_cache
+from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,14 +44,14 @@ class Settings(BaseSettings):
 
     # --- Printing / PDF ---
     PDF_FOOTER_ENABLED: bool = True
-    CLINIC_LOGO_PATH: str | None = None
+    CLINIC_LOGO_PATH: Optional[str] = None
 
     # ESC/POS settings (may be missing in env; safe defaults)
-    PRINTER_TYPE: str | None = None  # none|network|usb
-    PRINTER_NET_HOST: str | None = None
-    PRINTER_NET_PORT: int | None = None
-    PRINTER_USB_VID: int | None = None
-    PRINTER_USB_PID: int | None = None
+    PRINTER_TYPE: Optional[str] = None  # none|network|usb
+    PRINTER_NET_HOST: Optional[str] = None
+    PRINTER_NET_PORT: Optional[int] = None
+    PRINTER_USB_VID: Optional[int] = None
+    PRINTER_USB_PID: Optional[int] = None
 
     @field_validator(
         "PRINTER_USB_VID", "PRINTER_USB_PID", "PRINTER_NET_PORT", mode="before"
