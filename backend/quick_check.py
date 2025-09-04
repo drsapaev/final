@@ -10,18 +10,18 @@ import sys
 
 def run_command(cmd, description):
     """Запускает команду и возвращает результат"""
-    print(f"🔍 {description}...")
+    print(f"Проверка: {description}...")
     try:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         if result.returncode == 0:
-            print(f"✅ {description}: OK")
+            print(f"OK: {description}: OK")
             return True
         else:
-            print(f"❌ {description}: FAILED")
+            print(f"ОШИБКА: {description}: FAILED")
             print(f"   {result.stderr}")
             return False
     except Exception as e:
-        print(f"❌ {description}: ERROR - {e}")
+        print(f"ОШИБКА: {description}: ERROR - {e}")
         return False
 
 
@@ -32,14 +32,14 @@ def main():
 
     # Проверяем, что мы в правильной директории
     if not os.path.exists("clinic.db"):
-        print("❌ База данных не найдена. Запустите из папки backend/")
+        print("ОШИБКА: База данных не найдена. Запустите из папки backend/")
         sys.exit(1)
 
     # Проверяем доступность сервера
     if not run_command(
         "curl -s http://127.0.0.1:8000/api/v1/health", "Проверка сервера"
     ):
-        print("⚠️  Сервер не запущен. Запустите: uvicorn app.main:app --reload")
+        print("ВНИМАНИЕ: Сервер не запущен. Запустите: uvicorn app.main:app --reload")
         sys.exit(1)
 
     # Запускаем тесты
@@ -55,10 +55,10 @@ def main():
 
     print("\n" + "=" * 50)
     if all_passed:
-        print("🎉 ВСЕ ПРОВЕРКИ ПРОШЛИ! Можно коммитить.")
+        print("УСПЕХ: ВСЕ ПРОВЕРКИ ПРОШЛИ! Можно коммитить.")
         sys.exit(0)
     else:
-        print("⚠️  ЕСТЬ ПРОБЛЕМЫ! Исправьте перед коммитом.")
+        print("ВНИМАНИЕ: ЕСТЬ ПРОБЛЕМЫ! Исправьте перед коммитом.")
         sys.exit(1)
 
 

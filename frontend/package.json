@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "http-server . -p 3000 -a 0.0.0.0 -o",
-    "build": "echo 'Build completed'",
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
     "preview": "http-server . -p 3000 -a 0.0.0.0",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
     "lint:check": "eslint src --ext .js,.jsx,.ts,.tsx",

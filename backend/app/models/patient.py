@@ -23,7 +23,9 @@ class Patient(Base):
     )  # M|F|X
 
     phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    document_no: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    doc_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    doc_number: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow

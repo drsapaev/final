@@ -12,7 +12,7 @@ import requests
 
 def check_database_roles():
     """Проверяет роли в базе данных"""
-    print("🔍 Проверка ролей в базе данных...")
+    print("Проверка ролей в базе данных...")
 
     try:
         conn = sqlite3.connect("clinic.db")
@@ -37,27 +37,27 @@ def check_database_roles():
             result = cursor.fetchone()
 
             if not result:
-                print(f"❌ Пользователь {username} не найден в базе данных")
+                print(f"ОШИБКА: Пользователь {username} не найден в базе данных")
                 return False
 
             role, is_active = result
             if not is_active:
-                print(f"❌ Пользователь {username} неактивен")
+                print(f"ОШИБКА: Пользователь {username} неактивен")
                 return False
 
-            print(f"✅ {username}: роль '{role}', активен")
+            print(f"OK: {username}: роль '{role}', активен")
 
         conn.close()
         return True
 
     except Exception as e:
-        print(f"❌ Ошибка при проверке базы данных: {e}")
+        print(f"ОШИБКА: Ошибка при проверке базы данных: {e}")
         return False
 
 
 def check_api_endpoints():
     """Проверяет доступность API endpoints"""
-    print("\n🔍 Проверка API endpoints...")
+    print("\nПроверка API endpoints...")
 
     try:
         # Получаем токен админа
@@ -71,7 +71,7 @@ def check_api_endpoints():
         )
 
         if response.status_code != 200:
-            print("❌ Не удалось получить токен админа")
+            print("ОШИБКА: Не удалось получить токен админа")
             return False
 
         token = response.json().get("access_token")
@@ -91,28 +91,28 @@ def check_api_endpoints():
                     f"http://127.0.0.1:8000{endpoint}", headers=headers
                 )
                 if response.status_code in [200, 404]:  # 404 нормально, если нет данных
-                    print(f"✅ {name}: доступен")
+                    print(f"OK: {name}: доступен")
                 else:
-                    print(f"❌ {name}: ошибка {response.status_code}")
+                    print(f"ОШИБКА: {name}: ошибка {response.status_code}")
                     return False
             except Exception as e:
-                print(f"❌ {name}: исключение {e}")
+                print(f"ОШИБКА: {name}: исключение {e}")
                 return False
 
         return True
 
     except Exception as e:
-        print(f"❌ Ошибка при проверке API: {e}")
+        print(f"ОШИБКА: Ошибка при проверке API: {e}")
         return False
 
 
 def check_frontend_files():
     """Проверяет критические файлы frontend"""
-    print("\n🔍 Проверка файлов frontend...")
+    print("\nПроверка файлов frontend...")
 
     frontend_path = Path("../frontend/src")
     if not frontend_path.exists():
-        print("❌ Папка frontend не найдена")
+        print("ОШИБКА: Папка frontend не найдена")
         return False
 
     critical_files = [
@@ -127,16 +127,16 @@ def check_frontend_files():
     for file_path in critical_files:
         full_path = frontend_path / file_path
         if not full_path.exists():
-            print(f"❌ Файл {file_path} не найден")
+            print(f"ОШИБКА: Файл {file_path} не найден")
             return False
-        print(f"✅ {file_path}: существует")
+        print(f"OK: {file_path}: существует")
 
     return True
 
 
 def check_role_consistency():
     """Проверяет консистентность ролей между frontend и backend"""
-    print("\n🔍 Проверка консистентности ролей...")
+    print("\nПроверка консистентности ролей...")
 
     # Проверяем, что все критические роли определены
     expected_roles = [
@@ -159,18 +159,18 @@ def check_role_consistency():
 
         missing_roles = set(expected_roles) - db_roles
         if missing_roles:
-            print(f"❌ Отсутствующие роли в БД: {missing_roles}")
+            print(f"ОШИБКА: Отсутствующие роли в БД: {missing_roles}")
             return False
 
         extra_roles = db_roles - set(expected_roles)
         if extra_roles:
-            print(f"⚠️  Дополнительные роли в БД: {extra_roles}")
+            print(f"ВНИМАНИЕ: Дополнительные роли в БД: {extra_roles}")
 
-        print("✅ Все критические роли присутствуют в БД")
+        print("OK: Все критические роли присутствуют в БД")
         return True
 
     except Exception as e:
-        print(f"❌ Ошибка при проверке консистентности: {e}")
+        print(f"ОШИБКА: Ошибка при проверке консистентности: {e}")
         return False
 
 
@@ -192,16 +192,16 @@ def main():
             result = check_func()
             results.append((name, result))
         except Exception as e:
-            print(f"❌ Ошибка при проверке {name}: {e}")
+            print(f"ОШИБКА: Ошибка при проверке {name}: {e}")
             results.append((name, False))
 
     # Итоги
-    print("\n📊 РЕЗУЛЬТАТЫ ПРОВЕРКИ:")
+    print("\nРЕЗУЛЬТАТЫ ПРОВЕРКИ:")
     print("=" * 70)
 
     passed = 0
     for name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "PASS" if result else "FAIL"
         print(f"{status} {name}")
         if result:
             passed += 1
@@ -209,10 +209,10 @@ def main():
     print(f"\nИтого: {passed}/{len(results)} проверок прошли успешно")
 
     if passed == len(results):
-        print("🎉 СИСТЕМА ЦЕЛОСТНА! Все проверки прошли успешно.")
+        print("УСПЕХ: СИСТЕМА ЦЕЛОСТНА! Все проверки прошли успешно.")
         return True
     else:
-        print("⚠️  ЕСТЬ ПРОБЛЕМЫ! Требуется исправление перед деплоем.")
+        print("ВНИМАНИЕ: ЕСТЬ ПРОБЛЕМЫ! Требуется исправление перед деплоем.")
         return False
 
 
