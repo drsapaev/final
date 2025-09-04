@@ -12,7 +12,7 @@ BASE_URL = "http://127.0.0.1:8000"
 
 def test_user_login_and_role(username, password, expected_role, expected_redirect=None):
     """Тестирует логин пользователя и проверяет роль"""
-    print(f"🧪 Тестируем пользователя: {username}")
+    print(f"Тестируем пользователя: {username}")
 
     # Логин
     login_url = f"{BASE_URL}/api/v1/auth/login"
@@ -21,13 +21,13 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
     try:
         response = requests.post(login_url, data=login_data)
         if response.status_code != 200:
-            print(f"❌ Логин не удался: {response.status_code}")
+            print(f"ОШИБКА: Логин не удался: {response.status_code}")
             return False
 
         token_data = response.json()
         token = token_data.get("access_token")
         if not token:
-            print("❌ Токен не получен")
+            print("ОШИБКА: Токен не получен")
             return False
 
         # Получение профиля
@@ -36,7 +36,7 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
         profile_response = requests.get(profile_url, headers=headers)
 
         if profile_response.status_code != 200:
-            print(f"❌ Профиль не получен: {profile_response.status_code}")
+            print(f"ОШИБКА: Профиль не получен: {profile_response.status_code}")
             return False
 
         profile = profile_response.json()
@@ -44,21 +44,21 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
 
         if actual_role != expected_role:
             print(
-                f"❌ Неправильная роль: ожидалось '{expected_role}', получено '{actual_role}'"
+                f"ОШИБКА: Неправильная роль: ожидалось '{expected_role}', получено '{actual_role}'"
             )
             return False
 
-        print(f"✅ {username}: роль '{actual_role}' корректна")
+        print(f"OK: {username}: роль '{actual_role}' корректна")
         return True
 
     except Exception as e:
-        print(f"❌ Ошибка при тестировании {username}: {e}")
+        print(f"ОШИБКА: Ошибка при тестировании {username}: {e}")
         return False
 
 
 def test_all_critical_users():
     """Тестирует всех критических пользователей"""
-    print("🔍 Тестирование системы ролей и авторизации")
+    print("Тестирование системы ролей и авторизации")
     print("=" * 60)
 
     # Критические пользователи и их ожидаемые роли
@@ -80,35 +80,35 @@ def test_all_critical_users():
         print()
 
     # Итоги
-    print("📊 РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ:")
+    print("РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ:")
     print("=" * 60)
     passed = sum(1 for _, result in results if result)
     total = len(results)
 
     for username, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "PASS" if result else "FAIL"
         print(f"{status} {username}")
 
     print(f"\nИтого: {passed}/{total} тестов прошли успешно")
 
     if passed == total:
-        print("🎉 Все тесты прошли! Система ролей работает корректно.")
+        print("УСПЕХ: Все тесты прошли! Система ролей работает корректно.")
         return True
     else:
-        print("⚠️  Есть проблемы с системой ролей!")
+        print("ВНИМАНИЕ: Есть проблемы с системой ролей!")
         return False
 
 
 def test_api_endpoints_access():
     """Тестирует доступ к специализированным API endpoints"""
-    print("\n🔍 Тестирование доступа к API endpoints")
+    print("\nТестирование доступа к API endpoints")
     print("=" * 60)
 
     # Получаем токен админа
     login_data = {"username": "admin", "password": "admin123", "grant_type": "password"}
     response = requests.post(f"{BASE_URL}/api/v1/auth/login", data=login_data)
     if response.status_code != 200:
-        print("❌ Не удалось получить токен админа")
+        print("ОШИБКА: Не удалось получить токен админа")
         return False
 
     token = response.json().get("access_token")
@@ -129,11 +129,11 @@ def test_api_endpoints_access():
                 200,
                 404,
             ]:  # 404 тоже нормально, если нет данных
-                print(f"✅ {name}: доступен")
+                print(f"OK: {name}: доступен")
             else:
-                print(f"❌ {name}: ошибка {response.status_code}")
+                print(f"ОШИБКА: {name}: ошибка {response.status_code}")
         except Exception as e:
-            print(f"❌ {name}: исключение {e}")
+            print(f"ОШИБКА: {name}: исключение {e}")
 
     return True
 
@@ -146,10 +146,10 @@ if __name__ == "__main__":
     try:
         response = requests.get(f"{BASE_URL}/api/v1/health")
         if response.status_code != 200:
-            print("❌ Сервер недоступен")
+            print("ОШИБКА: Сервер недоступен")
             sys.exit(1)
     except Exception:
-        print("❌ Сервер недоступен")
+        print("ОШИБКА: Сервер недоступен")
         sys.exit(1)
 
     # Запускаем тесты
@@ -157,8 +157,8 @@ if __name__ == "__main__":
     success2 = test_api_endpoints_access()
 
     if success1 and success2:
-        print("\n🎉 ВСЕ ТЕСТЫ ПРОШЛИ УСПЕШНО!")
+        print("\nУСПЕХ: ВСЕ ТЕСТЫ ПРОШЛИ УСПЕШНО!")
         sys.exit(0)
     else:
-        print("\n⚠️  ЕСТЬ ПРОБЛЕМЫ В СИСТЕМЕ!")
+        print("\nВНИМАНИЕ: ЕСТЬ ПРОБЛЕМЫ В СИСТЕМЕ!")
         sys.exit(1)

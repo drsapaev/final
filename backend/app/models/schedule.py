@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,13 +24,13 @@ class ScheduleTemplate(Base):
     __tablename__ = "schedule_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    department: Mapped[str | None] = mapped_column(
+    department: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, index=True
     )
-    doctor_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    doctor_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
     weekday: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     start_time: Mapped[str] = mapped_column(String(5), nullable=False)
     end_time: Mapped[str] = mapped_column(String(5), nullable=False)
-    room: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    capacity_per_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    capacity_per_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
