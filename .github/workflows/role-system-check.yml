@@ -35,6 +35,7 @@ jobs:
         cd backend
         pip install -r requirements.txt
         pip install requests
+        pip install argon2-cffi
     
     - name: Setup test database
       run: |
@@ -56,17 +57,17 @@ jobs:
         
         try:
             # Создаем таблицы
-            print('🔧 Создаем таблицы для тестов ролей...')
+            print('Создаем таблицы для тестов ролей...')
             Base.metadata.create_all(bind=engine)
-            print('✅ База данных создана')
+            print('OK: База данных создана')
             
             # Проверяем, что таблица users действительно создана
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
                 if not result.fetchone():
-                    print('❌ Таблица users не найдена после создания')
+                    print('ERROR: Таблица users не найдена после создания')
                     raise Exception("Таблица users не создана")
-                print('✅ Таблица users подтверждена')
+                print('OK: Таблица users подтверждена')
             
             # Небольшая задержка для стабилизации
             time.sleep(1)
@@ -97,16 +98,16 @@ jobs:
                             is_superuser=(role == "Admin")
                         )
                         db.add(user)
-                        print(f'✅ Пользователь {username} создан')
+                        print(f'OK: Пользователь {username} создан')
                     else:
-                        print(f'✅ Пользователь {username} уже существует')
+                        print(f'OK: Пользователь {username} уже существует')
                 
                 db.commit()
-                print('✅ Все тестовые пользователи готовы')
+                print('OK: Все тестовые пользователи готовы')
             finally:
                 db.close()
         except Exception as e:
-            print('⚠️ Ошибка создания БД для тестов ролей:', e)
+            print('WARNING: Ошибка создания БД для тестов ролей:', e)
             import traceback
             traceback.print_exc()
             raise SystemExit(1)
@@ -118,18 +119,26 @@ jobs:
         export DATABASE_URL="sqlite:///./test_clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
+        echo "Запуск backend сервера..."
         python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
         sleep 10
+        echo "Проверка доступности сервера..."
+        curl -f http://127.0.0.1:8000/api/v1/health || exit 1
+        echo "Сервер успешно запущен"
     
     - name: Run role system tests
       run: |
         cd backend
+        echo "Запуск тестов системы ролей..."
         python test_role_routing.py
+        echo "Тесты системы ролей завершены"
     
     - name: Check system integrity
       run: |
         cd backend
+        echo "Проверка целостности системы..."
         python check_system_integrity.py
+        echo "Проверка целостности завершена"
     
     - name: Validate role consistency
       run: |
@@ -138,12 +147,12 @@ jobs:
         from app.core.role_validation import validate_critical_user_roles
         if not validate_critical_user_roles():
             exit(1)
-        print('✅ Role validation passed')
+        print('OK: Role validation passed')
         "
     
     - name: Stop backend server
       if: always()
       run: |
-        echo "🛑 Останавливаем сервер..."
+        echo "Останавливаем сервер..."
         pkill -f "uvicorn.*8000" 2>/dev/null || true
-        echo "✅ Сервер остановлен"
+        echo "OK: Сервер остановлен"
