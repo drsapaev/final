@@ -7,8 +7,9 @@ Create Date: 2025-08-17 14:00:00
 
 from __future__ import annotations
 
-import sqlalchemy as sa
 from typing import Optional
+
+import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.

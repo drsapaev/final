@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
-from typing import Optional
 
 from app.db.base_class import Base
 
