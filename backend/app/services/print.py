@@ -46,7 +46,7 @@ def build_ticket_pdf(
     *,
     ticket_number: int,
     department: str,
-    clinic_name: str | None = None,
+    clinic_name: Optional[str] = None,
     footer_enabled: Optional[bool] = None,
 ) -> bytes:
     """
@@ -98,7 +98,7 @@ def build_invoice_pdf(
     visit_id: int,
     items: Sequence[Tuple[str, float, str]] | None = None,
     totals_currency: str = "UZS",
-    clinic_name: str | None = None,
+    clinic_name: Optional[str] = None,
     footer_enabled: Optional[bool] = None,
 ) -> bytes:
     """

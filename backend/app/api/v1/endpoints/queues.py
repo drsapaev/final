@@ -1,5 +1,6 @@
 # --- BEGIN app/api/v1/endpoints/queues.py ---
 from dataclasses import asdict
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -13,8 +14,8 @@ router = APIRouter(tags=["queues"])
 @router.get("/stats")
 def stats(
     department: str,
-    d: str | None = Query(None),
-    date: str | None = Query(None),
+    d: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     date_str = d or date
@@ -29,8 +30,8 @@ def stats(
 @router.post("/next-ticket")
 def next_ticket(
     department: str,
-    d: str | None = Query(None),
-    date: str | None = Query(None),
+    d: Optional[str] = Query(None),
+    date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     date_str = d or date
