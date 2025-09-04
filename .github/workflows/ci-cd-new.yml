@@ -303,14 +303,12 @@ jobs:
       - name: Установка зависимостей Frontend
         run: |
           cd frontend
-          # Удаляем старые зависимости и переустанавливаем для исправления проблем с Rollup
+          # Удаляем старые зависимости и переустанавливаем
           rm -rf node_modules package-lock.json
           # Создаем package-lock.json для стабильной установки
           npm install --package-lock-only
-          # Устанавливаем зависимости с исправлением проблем Rollup
+          # Устанавливаем зависимости без Rollup
           npm ci --no-optional --legacy-peer-deps
-          # Проверяем, что Rollup установлен корректно
-          npm list rollup || npm install rollup@^3.29.4 --save-dev
       - name: Установка Playwright
         run: |
           cd frontend
