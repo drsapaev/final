@@ -52,9 +52,10 @@ def create_test_data():
             first_name="Иван",
             middle_name="Иванович",
             birth_date=datetime(1990, 1, 1).date(),
-            sex="M",  # Это будет автоматически преобразовано в gender
+            sex="M",
             phone="+998901234567",
-            document_no="AA1234567",
+            doc_type="passport",
+            doc_number="AA1234567",
         )
         db.add(patient)
 

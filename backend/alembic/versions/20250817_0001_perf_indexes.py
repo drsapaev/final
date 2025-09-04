@@ -7,6 +7,8 @@ Create Date: 2025-08-17 14:00:00
 
 from __future__ import annotations
 
+from typing import Optional
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -17,7 +19,7 @@ branch_labels = None
 depends_on = None
 
 
-def _ensure_index(conn, table: str, column: str, name: str | None = None):
+def _ensure_index(conn, table: str, column: str, name: Optional[str] = None):
     """
     Create index if table/column exist and index not present.
     Safe for repeated runs (idempotent).

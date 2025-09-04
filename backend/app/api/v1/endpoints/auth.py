@@ -48,6 +48,9 @@ async def login(
 
     Works with both async and sync SQLAlchemy sessions returned by get_db().
     """
+    # DEBUG: Add logging
+    print(f"DEBUG: Login attempt for username: {form_data.username}")
+    
     # build select statement
     stmt = select(User).where(User.username == form_data.username)
 
@@ -71,9 +74,19 @@ async def login(
         except Exception:
             user = None
 
+    # DEBUG: Log user info
+    if user:
+        print(f"DEBUG: User found: {user.username}, active: {user.is_active}")
+        print(f"DEBUG: Hashed password: {user.hashed_password[:50]}...")
+        password_valid = verify_password(form_data.password, user.hashed_password)
+        print(f"DEBUG: Password valid: {password_valid}")
+    else:
+        print(f"DEBUG: User not found for username: {form_data.username}")
+
     if not user or not verify_password(
         form_data.password, getattr(user, "hashed_password", "")
     ):
+        print(f"DEBUG: Authentication failed for {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

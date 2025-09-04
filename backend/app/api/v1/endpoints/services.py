@@ -17,7 +17,7 @@ class ServiceOut(BaseModel):
     code: Optional[str] = None
     name: str
     price: float | None = None
-    currency: str | None = None
+    currency: Optional[str] = None
     active: bool = True
 
 
