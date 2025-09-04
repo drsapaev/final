@@ -10,8 +10,7 @@ WORKDIR /app
 
 # Install deps (no lockfile in repo — install from package.json)
 COPY frontend/package.json /app/package.json
-RUN npm install --no-optional --legacy-peer-deps && \
-    npm install rollup --save-dev
+RUN npm install --no-optional --legacy-peer-deps
 
 # Copy sources (will be overridden by bind mount in docker-compose)
 COPY frontend/ /app/
