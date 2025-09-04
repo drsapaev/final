@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "http-server . -p 3000 -o",
+    "dev": "http-server . -p 3000 -a 0.0.0.0 -o",
     "build": "echo 'Build completed'",
-    "preview": "http-server . -p 3000",
+    "preview": "http-server . -p 3000 -a 0.0.0.0",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
     "lint:check": "eslint src --ext .js,.jsx,.ts,.tsx",
     "storybook": "storybook dev -p 6006",
