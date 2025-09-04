@@ -305,10 +305,8 @@ jobs:
           cd frontend
           # Удаляем старые зависимости и переустанавливаем
           rm -rf node_modules package-lock.json
-          # Устанавливаем зависимости с принудительной установкой нативных зависимостей
-          npm install --force --legacy-peer-deps
-          # Принудительно переустанавливаем Rollup для исправления проблем с нативными зависимостями
-          npm install rollup@^3.29.4 --force --save-dev
+          # Устанавливаем зависимости с упрощенным подходом
+          npm install --legacy-peer-deps
       - name: Установка Playwright
         run: |
           cd frontend
