@@ -21,9 +21,11 @@ export default function Sidebar() {
   const byRole = [];
   if (role === 'admin') {
     byRole.push(
-      { to: '/admin', label: 'Админ' },
-      { to: '/user-select', label: 'Пользователи' },
-      { to: '/analytics', label: 'Аналитика' }
+      { to: '/admin', label: 'Админ: Дашборд' },
+      { to: '/admin/users', label: 'Админ: Пользователи' },
+      { to: '/admin/analytics', label: 'Админ: Аналитика' },
+      { to: '/admin/settings', label: 'Админ: Настройки' },
+      { to: '/admin/security', label: 'Админ: Безопасность' }
     );
   }
   if (role === 'registrar') {
