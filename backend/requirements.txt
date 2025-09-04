@@ -7,7 +7,7 @@ alembic>=1.13,<1.14
 python-jose[cryptography]>=3.3,<4.0
 passlib[argon2]>=1.7,<1.8
 argon2-cffi>=21.3,<22.0
-reportlab>=4.0,<4.3
+reportlab>=4.0,<4.5
 qrcode[pil]>=7.4,<7.5
 pydantic[email]
 pyotp>=2.9,<2.10
