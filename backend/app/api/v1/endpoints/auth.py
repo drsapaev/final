@@ -50,7 +50,7 @@ async def login(
     """
     # DEBUG: Add logging
     print(f"DEBUG: Login attempt for username: {form_data.username}")
-    
+
     # build select statement
     stmt = select(User).where(User.username == form_data.username)
 

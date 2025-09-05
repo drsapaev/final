@@ -53,23 +53,31 @@ def get_admin_stats(
         total_revenue = float(total_revenue_cents) / 100.0
 
         # Записи и визиты за сегодня
-        appointments_today = db.query(Appointment).filter(
-            Appointment.appointment_date == today
-        ).count()
+        appointments_today = (
+            db.query(Appointment).filter(Appointment.appointment_date == today).count()
+        )
 
-        visits_today = db.query(Visit).filter(
-            and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
-        ).count()
+        visits_today = (
+            db.query(Visit)
+            .filter(
+                and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
+            )
+            .count()
+        )
 
         # Ожидающие подтверждения записей
-        pending_approvals = db.query(Appointment).filter(
-            Appointment.status == "pending"
-        ).count()
+        pending_approvals = (
+            db.query(Appointment).filter(Appointment.status == "pending").count()
+        )
 
         # Новые пациенты за сегодня
-        new_patients_today = db.query(Patient).filter(
-            and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
-        ).count()
+        new_patients_today = (
+            db.query(Patient)
+            .filter(
+                and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
+            )
+            .count()
+        )
 
         # Разбивка по ролям
         role_stats: Dict[str, int] = {}
@@ -113,21 +121,33 @@ def get_quick_stats(
         today_start = datetime.combine(today, datetime.min.time())
         today_end = datetime.combine(today, datetime.max.time())
 
-        today_visits = db.query(Visit).filter(
-            and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
-        ).count()
-
-        today_patients = db.query(Patient).filter(
-            and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
-        ).count()
-
-        today_revenue_rows = db.query(PaymentWebhook).filter(
-            and_(
-                PaymentWebhook.status == "success",
-                PaymentWebhook.created_at >= today_start,
-                PaymentWebhook.created_at <= today_end,
+        today_visits = (
+            db.query(Visit)
+            .filter(
+                and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
             )
-        ).all()
+            .count()
+        )
+
+        today_patients = (
+            db.query(Patient)
+            .filter(
+                and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
+            )
+            .count()
+        )
+
+        today_revenue_rows = (
+            db.query(PaymentWebhook)
+            .filter(
+                and_(
+                    PaymentWebhook.status == "success",
+                    PaymentWebhook.created_at >= today_start,
+                    PaymentWebhook.created_at <= today_end,
+                )
+            )
+            .all()
+        )
         today_revenue = sum(float(p.amount) / 100.0 for p in today_revenue_rows)
 
         return {
@@ -140,6 +160,6 @@ def get_quick_stats(
             "generatedAt": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения быстрой статистики: {e}")
-
-
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения быстрой статистики: {e}"
+        )

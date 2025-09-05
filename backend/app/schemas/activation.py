@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from pydantic import Field
 
@@ -11,7 +11,7 @@ ActivationStatusLiteral = Literal["issued", "trial", "active", "expired", "revok
 
 class ActivationIssueIn(ORMModel):
     days: int = Field(365, ge=1, le=3650)
-    status: ActivationStatusLiteral | None = None
+    status: Union[ActivationStatusLiteral, None] = None
     meta: Optional[str] = None
 
 

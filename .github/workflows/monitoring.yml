@@ -78,7 +78,7 @@ jobs:
                 tables = ['users', 'patients', 'visits', 'visit_services', 'payments', 'payment_webhooks', 'payment_transactions', 'payment_providers', 'services', 'service_catalog', 'queue_tickets', 'schedule_templates', 'lab_orders', 'lab_results', 'audit_logs', 'settings', 'appointments', 'online_days', 'emr', 'prescriptions', 'activations', 'notification_templates', 'notification_history', 'notification_settings']
                 for table in tables:
                     try:
-                        result = conn.execute(text(f'SELECT COUNT(*) FROM {table}'))
+                        result = conn.execute(text('SELECT COUNT(*) FROM ' + table))
                         count = result.scalar()
                         print(f'   📊 {table}: {count} записей')
                     except:

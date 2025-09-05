@@ -5,11 +5,12 @@
 
 import sqlite3
 
+
 def check_patients_table():
     """Проверка структуры таблицы patients"""
     conn = sqlite3.connect('clinic.db')
     cursor = conn.cursor()
-    
+
     try:
         cursor.execute("PRAGMA table_info(patients)")
         columns = cursor.fetchall()
@@ -20,6 +21,7 @@ def check_patients_table():
         print(f"Ошибка: {e}")
     finally:
         conn.close()
+
 
 if __name__ == "__main__":
     check_patients_table()
