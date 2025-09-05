@@ -29,7 +29,9 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  Package
+  Package,
+  Brain,
+  MessageSquare
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
@@ -59,6 +61,8 @@ import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import ClinicSettings from '../components/admin/ClinicSettings';
 import QueueSettings from '../components/admin/QueueSettings';
 import ServiceCatalog from '../components/admin/ServiceCatalog';
+import AISettings from '../components/admin/AISettings';
+import TelegramSettings from '../components/admin/TelegramSettings';
 import SecuritySettings from '../components/admin/SecuritySettings';
 import SecurityMonitor from '../components/admin/SecurityMonitor';
 import '../styles/admin.css';
@@ -932,6 +936,8 @@ const AdminPanel = () => {
       items: [
         { to: '/admin/clinic-settings', label: 'Настройки клиники', icon: Building2 },
         { to: '/admin/queue-settings', label: 'Настройки очередей', icon: Clock },
+        { to: '/admin/ai-settings', label: 'AI настройки', icon: Brain },
+        { to: '/admin/telegram-settings', label: 'Telegram', icon: MessageSquare },
         { to: '/admin/finance', label: 'Финансы', icon: CreditCard },
         { to: '/admin/reports', label: 'Отчеты', icon: FileText },
         { to: '/admin/settings', label: 'Настройки', icon: Settings },
@@ -1454,6 +1460,10 @@ const AdminPanel = () => {
         return <QueueSettings />;
       case 'services':
         return <ServiceCatalog />;
+      case 'ai-settings':
+        return <AISettings />;
+      case 'telegram-settings':
+        return <TelegramSettings />;
       case 'settings':
         return renderSettings();
       case 'security':
