@@ -200,25 +200,43 @@ jobs:
     - name: 🐳 Настройка Docker Buildx
       uses: docker/setup-buildx-action@v3
     
+    - name: 🔍 Проверка Dockerfile'ов
+      run: |
+        echo "🔍 Проверяем наличие Dockerfile'ов..."
+        ls -la ops/
+        if [ ! -f "ops/backend.Dockerfile" ]; then
+          echo "❌ Backend Dockerfile не найден"
+          exit 1
+        fi
+        if [ ! -f "ops/frontend.Dockerfile" ]; then
+          echo "❌ Frontend Dockerfile не найден"
+          exit 1
+        fi
+        echo "✅ Все Dockerfile'ы найдены"
+    
     - name: 🏗️ Сборка Backend Docker
       uses: docker/build-push-action@v5
       with:
         context: ./backend
-        file: ./backend/Dockerfile
+        file: ./ops/backend.Dockerfile
         push: false
         tags: clinic-backend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
     
     - name: 🏗️ Сборка Frontend Docker
       uses: docker/build-push-action@v5
       with:
         context: ./frontend
-        file: ./frontend/Dockerfile
+        file: ./ops/frontend.Dockerfile
         push: false
         tags: clinic-frontend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
 
   # --- Интеграционные тесты ---
   integration:
