@@ -1,94 +1,124 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-const useAdminData = (endpoint, options = {}) => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-
+const useAdminData = (url, options = {}) => {
   const {
-    autoFetch = true,
-    refreshInterval = null,
-    onSuccess = null,
-    onError = null
+    refreshInterval = 0,
+    onError = () => {},
+    onSuccess = () => {},
+    initialData = null,
+    enabled = true
   } = options;
 
-  const fetchData = useCallback(async (showRefreshing = false) => {
+  const [data, setData] = useState(initialData);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const intervalRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  // Стабильные ссылки на колбэки
+  const onErrorRef = useRef(onError);
+  const onSuccessRef = useRef(onSuccess);
+
+  // Обновляем ссылки на колбэки
+  useEffect(() => {
+    onErrorRef.current = onError;
+    onSuccessRef.current = onSuccess;
+  });
+
+  const fetchData = useCallback(async (signal) => {
+    if (!enabled || !url || !mountedRef.current) return;
+
     try {
-      if (showRefreshing) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+      setLoading(true);
       setError(null);
 
-      const storedToken = localStorage.getItem('auth_token');
-      const response = await fetch(endpoint, {
+      // Отменяем предыдущий запрос если он есть
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Создаем новый AbortController
+      abortControllerRef.current = new AbortController();
+      const currentSignal = signal || abortControllerRef.current.signal;
+
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': storedToken ? `Bearer ${storedToken}` : undefined
-        }
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        signal: currentSignal
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      setData(result);
       
-      if (onSuccess) {
-        onSuccess(result);
+      if (mountedRef.current) {
+        setData(result);
+        onSuccessRef.current(result);
       }
-      return result;
     } catch (err) {
-      console.error('Admin data fetch error:', err);
-      setError(err);
-      
-      if (onError) {
-        onError(err);
+      if (err.name !== 'AbortError' && mountedRef.current) {
+        setError(err);
+        onErrorRef.current(err);
       }
-      return null;
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, [endpoint, onSuccess, onError]);
+  }, [url, enabled]);
 
   const refresh = useCallback(() => {
-    fetchData(true);
-  }, []); // Убрали зависимость
+    fetchData();
+  }, [fetchData]);
 
-  const retry = useCallback(() => {
-    fetchData(false);
-  }, []); // Убрали зависимость
-
+  // Первоначальная загрузка
   useEffect(() => {
-    if (autoFetch && endpoint) {
+    if (enabled && url) {
       fetchData();
     }
-  }, [autoFetch, endpoint]); // Убрали fetchData из зависимостей
+  }, [enabled, url, fetchData]);
 
+  // Настройка интервала обновления
   useEffect(() => {
-    if (refreshInterval && endpoint) {
-      const interval = setInterval(() => {
-        fetchData(true);
+    if (refreshInterval > 0 && enabled) {
+      intervalRef.current = setInterval(() => {
+        fetchData();
       }, refreshInterval);
 
-      return () => clearInterval(interval);
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
     }
-  }, [refreshInterval, endpoint]); // Убрали fetchData из зависимостей
+  }, [refreshInterval, enabled, fetchData]);
 
+  // Очистка при размонтировании
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
-  return useMemo(() => ({
+  return {
     data,
     loading,
     error,
-    refreshing,
     refresh,
-    retry,
-    setData
-  }), [data, loading, error, refreshing, refresh, retry, setData]);
+    refetch: refresh // Алиас для совместимости
+  };
 };
 
 export default useAdminData;
