@@ -10,7 +10,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  DATABASE_URL: 'sqlite:///./test_clinic.db'
+  DATABASE_URL: 'sqlite:///./clinic.db'
   CORS_DISABLE: '1'
   WS_DEV_ALLOW: '1'
 
@@ -62,7 +62,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov
+          pip install pytest pytest-asyncio pytest-cov pytest-xdist
       - name: Настройка Python path
         run: |
           cd backend
@@ -231,7 +231,7 @@ jobs:
       - name: Test Backend run
         run: |
           # Запускаем контейнер в фоне
-          CONTAINER_ID=$(docker run -d -p 8000:8000 -e DATABASE_URL="sqlite:///./test.db" clinic-backend)
+          CONTAINER_ID=$(docker run -d -p 8000:8000 -e DATABASE_URL="sqlite:///./clinic.db" -e CORS_DISABLE="1" -e WS_DEV_ALLOW="1" clinic-backend)
           echo "Container ID: $CONTAINER_ID"
           
           # Ждем запуска сервера
@@ -316,7 +316,7 @@ jobs:
           cd frontend
           # Запускаем backend в фоне
           cd ../backend
-          export DATABASE_URL="sqlite:///./test.db"
+          export DATABASE_URL="sqlite:///./clinic.db"
           export CORS_DISABLE="1"
           export WS_DEV_ALLOW="1"
           nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
@@ -482,7 +482,7 @@ jobs:
           sleep 10
           
           # Запускаем интеграционные тесты с покрытием
-          python -m pytest test_authentication.py test_queue_system.py test_visit_reschedule.py test_websocket.py test_reports.py test_printing.py test_printing_edge_cases.py --cov=app --cov-report=xml --cov-report=html -v || true
+          python -m pytest test_authentication.py test_queue_system.py test_visit_reschedule.py test_websocket.py test_reports.py test_printing.py test_printing_edge_cases.py --cov=app --cov-report=xml --cov-report=html -v --tb=short || true
           
           # Останавливаем сервер
           if [ -f server.pid ]; then

@@ -11,7 +11,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  DATABASE_URL: 'sqlite:///./test_clinic.db'
+  DATABASE_URL: 'sqlite:///./clinic.db'
   CORS_DISABLE: '1'
   WS_DEV_ALLOW: '1'
 
@@ -57,7 +57,7 @@ jobs:
       run: |
         cd backend
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio
+        pip install pytest pytest-asyncio pytest-xdist
     - name: 🔧 Настройка Python path
       run: |
         cd backend
