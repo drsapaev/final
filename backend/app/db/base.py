@@ -13,6 +13,7 @@ from app.models import (  # noqa: F401, E402
     activation as _m_activation,
     appointment as _m_appointment,
     audit as _m_audit,
+    clinic as _m_clinic,
     emr as _m_emr,
     enums as _m_enums,
     lab as _m_lab,
