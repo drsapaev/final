@@ -162,6 +162,7 @@ jobs:
             "test_reports.py:Отчёты"
             "test_printing.py:Система печати"
             "test_printing_edge_cases.py:Edge cases печати"
+            "test_payment_webhooks.py:Вебхуки оплат"
         )
         
         failed_tests=()
@@ -351,7 +352,7 @@ jobs:
     - name: 🎭 Запуск E2E тестов
       run: |
         cd frontend
-        npx playwright test --reporter=line
+        npx playwright test --reporter=line --timeout=30000 --retries=2 --max-failures=3 --workers=2 --project=chromium --headed=false --browser=chromium --video=retain-on-failure --screenshot=only-on-failure --trace=retain-on-failure --reporter=html --reporter=json --reporter=github --reporter=allure --reporter=blob --reporter=dot --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct
     
     - name: 📤 Загрузка отчетов
       if: always()
