@@ -23,7 +23,7 @@ def reset_all_passwords():
             ("derma", "derma123"),
             ("dentist", "dentist123"),
         ]
-        
+
         for username, password in users_data:
             user = db.query(User).filter(User.username == username).first()
             if user:
@@ -32,10 +32,10 @@ def reset_all_passwords():
                 print(f"OK: Пароль для {username} сброшен на {password}")
             else:
                 print(f"ERROR: Пользователь {username} не найден")
-        
+
         db.commit()
         print("\nOK: Все пароли успешно сброшены!")
-        
+
     except Exception as e:
         print(f"ERROR: Ошибка при сбросе паролей: {e}")
         db.rollback()
