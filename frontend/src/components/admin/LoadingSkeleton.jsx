@@ -1,119 +1,133 @@
 import React from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
 
-const LoadingSkeleton = ({ type = 'card', count = 1, className = '' }) => {
-  const { theme, getColor, getSpacing } = useTheme();
-
-  const skeletonStyle = {
-    background: theme === 'light' 
-      ? 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)'
-      : 'linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%)',
-    backgroundSize: '200% 100%',
-    animation: 'skeleton-loading 1.5s infinite',
-    borderRadius: '12px'
-  };
-
-  const cardSkeletonStyle = {
-    ...skeletonStyle,
-    height: '140px',
-    padding: getSpacing('lg'),
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between'
-  };
-
-  const tableSkeletonStyle = {
-    ...skeletonStyle,
-    height: '60px',
-    marginBottom: getSpacing('sm')
-  };
-
-  const textSkeletonStyle = {
-    ...skeletonStyle,
-    height: '20px',
-    marginBottom: getSpacing('sm')
-  };
-
-  const buttonSkeletonStyle = {
-    ...skeletonStyle,
-    height: '40px',
-    width: '120px',
-    borderRadius: '8px'
-  };
-
-  const renderCardSkeleton = () => (
-    <div style={cardSkeletonStyle} className={className}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ ...textSkeletonStyle, width: '60%', height: '16px', marginBottom: getSpacing('xs') }} />
-          <div style={{ ...textSkeletonStyle, width: '40%', height: '24px' }} />
-        </div>
-        <div style={{ 
-          ...skeletonStyle, 
-          width: '48px', 
-          height: '48px', 
-          borderRadius: '12px',
-          flexShrink: 0
-        }} />
-      </div>
-      <div style={{ ...textSkeletonStyle, width: '30%', height: '16px' }} />
-    </div>
-  );
-
-  const renderTableSkeleton = () => (
-    <div style={tableSkeletonStyle} className={className}>
-      <div style={{ display: 'flex', gap: getSpacing('md'), alignItems: 'center', height: '100%' }}>
-        <div style={{ ...textSkeletonStyle, width: '200px', height: '16px', margin: 0 }} />
-        <div style={{ ...textSkeletonStyle, width: '150px', height: '16px', margin: 0 }} />
-        <div style={{ ...textSkeletonStyle, width: '100px', height: '16px', margin: 0 }} />
-        <div style={{ ...textSkeletonStyle, width: '80px', height: '16px', margin: 0 }} />
-      </div>
-    </div>
-  );
-
-  const renderButtonSkeleton = () => (
-    <div style={buttonSkeletonStyle} className={className} />
-  );
-
-  const renderTextSkeleton = () => (
-    <div style={textSkeletonStyle} className={className} />
-  );
-
+const LoadingSkeleton = ({ 
+  type = 'default', 
+  count = 1, 
+  className = '',
+  width,
+  height,
+  ...props 
+}) => {
   const renderSkeleton = () => {
     switch (type) {
       case 'card':
-        return renderCardSkeleton();
+        return (
+          <div 
+            className={`p-4 rounded-lg animate-pulse ${className}`}
+            style={{ 
+              background: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              width: width || '100%',
+              height: height || '120px'
+            }}
+            {...props}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="h-4 bg-gray-200 rounded w-24" style={{ background: 'var(--bg-secondary)' }}></div>
+              <div className="w-8 h-8 bg-gray-200 rounded" style={{ background: 'var(--bg-secondary)' }}></div>
+            </div>
+            <div className="h-6 bg-gray-200 rounded w-16 mb-2" style={{ background: 'var(--bg-secondary)' }}></div>
+            <div className="h-3 bg-gray-200 rounded w-12" style={{ background: 'var(--bg-secondary)' }}></div>
+          </div>
+        );
+        
       case 'table':
-        return renderTableSkeleton();
-      case 'button':
-        return renderButtonSkeleton();
+        return (
+          <div className={`animate-pulse ${className}`} {...props}>
+            <div className="space-y-3">
+              {Array.from({ length: count }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-3">
+                  <div className="w-8 h-8 bg-gray-200 rounded-full" style={{ background: 'var(--bg-secondary)' }}></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" style={{ background: 'var(--bg-secondary)' }}></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2" style={{ background: 'var(--bg-secondary)' }}></div>
+                  </div>
+                  <div className="h-6 bg-gray-200 rounded w-16" style={{ background: 'var(--bg-secondary)' }}></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        
       case 'text':
-        return renderTextSkeleton();
+        return (
+          <div className={`animate-pulse ${className}`} {...props}>
+            <div className="space-y-2">
+              {Array.from({ length: count }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className="h-4 bg-gray-200 rounded" 
+                  style={{ 
+                    background: 'var(--bg-secondary)',
+                    width: width || (i === count - 1 ? '60%' : '100%')
+                  }}
+                ></div>
+              ))}
+            </div>
+          </div>
+        );
+        
+      case 'button':
+        return (
+          <div 
+            className={`h-10 bg-gray-200 rounded animate-pulse ${className}`}
+            style={{ 
+              background: 'var(--bg-secondary)',
+              width: width || '120px'
+            }}
+            {...props}
+          ></div>
+        );
+        
+      case 'chart':
+        return (
+          <div 
+            className={`animate-pulse ${className}`}
+            style={{ 
+              background: 'var(--bg-secondary)',
+              width: width || '100%',
+              height: height || '200px',
+              borderRadius: '8px'
+            }}
+            {...props}
+          >
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-gray-300 rounded-full mx-auto mb-2" style={{ background: 'var(--bg-primary)' }}></div>
+                <div className="h-4 bg-gray-300 rounded w-24 mx-auto" style={{ background: 'var(--bg-primary)' }}></div>
+              </div>
+            </div>
+          </div>
+        );
+        
       default:
-        return renderCardSkeleton();
+        return (
+          <div 
+            className={`animate-pulse ${className}`}
+            style={{ 
+              background: 'var(--bg-secondary)',
+              width: width || '100%',
+              height: height || '20px',
+              borderRadius: '4px'
+            }}
+            {...props}
+          ></div>
+        );
     }
   };
 
+  if (count === 1) {
+    return renderSkeleton();
+  }
+
   return (
-    <>
-      <style>
-        {`
-          @keyframes skeleton-loading {
-            0% {
-              background-position: -200% 0;
-            }
-            100% {
-              background-position: 200% 0;
-            }
-          }
-        `}
-      </style>
-      {Array.from({ length: count }, (_, index) => (
-        <div key={index}>
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i}>
           {renderSkeleton()}
         </div>
       ))}
-    </>
+    </div>
   );
 };
 
