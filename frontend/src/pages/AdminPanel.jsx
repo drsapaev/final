@@ -27,7 +27,8 @@ import {
   Plus,
   MoreHorizontal,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  RefreshCw
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
@@ -44,7 +45,6 @@ import '../styles/admin.css';
 const AdminPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   
   // Используем новый хук для загрузки данных
   const { 
@@ -53,11 +53,12 @@ const AdminPanel = () => {
     error: statsError, 
     refresh: refreshStats 
   } = useAdminData('/api/v1/admin/stats', {
-    refreshInterval: 30000, // Обновляем каждые 30 секунд
+    refreshInterval: 300000, // Обновляем каждые 5 минут
     onError: (error) => {
       console.error('Ошибка загрузки статистики:', error);
     }
   });
+
   // Статистика по умолчанию (fallback)
   const defaultStats = {
     totalUsers: 0,
@@ -69,6 +70,7 @@ const AdminPanel = () => {
   };
   
   const stats = statsData || defaultStats;
+  const isLoading = statsLoading;
   const [recentActivities, setRecentActivities] = useState([]);
   const [systemAlerts, setSystemAlerts] = useState([]);
   
@@ -88,86 +90,21 @@ const AdminPanel = () => {
   const { isVisible: fadeIn, fadeIn: startFadeIn } = useFade(false);
   const { isVisible: slideIn, slideIn: startSlideIn } = useSlide(false, 'up');
   const { isVisible: scaleIn, scaleIn: startScaleIn } = useScale(false);
+  const [animationsStarted, setAnimationsStarted] = useState(false);
 
   useEffect(() => {
-    // Симуляция загрузки данных
-    const loadData = async () => {
-      setIsLoading(true);
+    // Запуск анимаций только один раз после первой загрузки статистики
+    if (!statsLoading && !animationsStarted && statsData) {
+      const timer = setTimeout(() => {
+        startFadeIn(300);
+        startSlideIn(400);
+        startScaleIn(500);
+        setAnimationsStarted(true);
+      }, 100);
       
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      setStats({
-        totalUsers: 1247,
-        totalDoctors: 23,
-        totalPatients: 8921,
-        totalRevenue: 1250000,
-        appointmentsToday: 156,
-        pendingApprovals: 8
-      });
-      
-      setRecentActivities([
-        {
-          id: 1,
-          type: 'user_registration',
-          message: 'Новый пользователь зарегистрирован',
-          user: 'Ахмедов А.',
-          time: '2 минуты назад',
-          status: 'success'
-        },
-        {
-          id: 2,
-          type: 'appointment_created',
-          message: 'Создана новая запись',
-          user: 'Иванова М.',
-          time: '5 минут назад',
-          status: 'info'
-        },
-        {
-          id: 3,
-          type: 'payment_received',
-          message: 'Получен платеж',
-          user: 'Петров В.',
-          time: '12 минут назад',
-          status: 'success'
-        },
-        {
-          id: 4,
-          type: 'system_alert',
-          message: 'Системное предупреждение',
-          user: 'Система',
-          time: '1 час назад',
-          status: 'warning'
-        }
-      ]);
-      
-      setSystemAlerts([
-        {
-          id: 1,
-          type: 'warning',
-          message: 'База данных требует оптимизации',
-          priority: 'medium',
-          time: '2 часа назад'
-        },
-        {
-          id: 2,
-          type: 'info',
-          message: 'Обновление системы завершено',
-          priority: 'low',
-          time: '1 день назад'
-        }
-      ]);
-      
-      setIsLoading(false);
-      
-      // Запуск анимаций
-      startFadeIn(500);
-      startSlideIn(600);
-      startScaleIn(700);
-    };
-    
-    loadData();
-  }, [startFadeIn, startSlideIn, startScaleIn]);
+      return () => clearTimeout(timer);
+    }
+  }, [statsLoading, animationsStarted, statsData, startFadeIn, startSlideIn, startScaleIn]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('ru-RU', {
