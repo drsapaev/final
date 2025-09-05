@@ -1,0 +1,379 @@
+/* 
+ * Улучшенная темная тема для админ панели
+ * Соответствует современным стандартам UI/UX
+ */
+
+/* Основные переменные темной темы */
+:root[data-theme="dark"],
+.dark {
+  /* Цвета фона */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-hover: #475569;
+  
+  /* Цвета текста */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #1e293b;
+  
+  /* Цвета границ */
+  --border-color: #334155;
+  --border-light: #475569;
+  --border-focus: #3b82f6;
+  
+  /* Акцентные цвета */
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --info-color: #06b6d4;
+  
+  /* Тени */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+  
+  /* Специальные цвета для админ панели */
+  --admin-sidebar-bg: #1e293b;
+  --admin-header-bg: #0f172a;
+  --admin-card-bg: #1e293b;
+  --admin-input-bg: #334155;
+  --admin-table-header-bg: #334155;
+  --admin-table-row-hover: #475569;
+}
+
+/* Глобальные стили для темной темы */
+.dark {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: var(--text-primary) !important;
+}
+
+.dark p, .dark span, .dark div {
+  color: var(--text-primary);
+}
+
+.dark label {
+  color: var(--text-secondary) !important;
+}
+
+/* Улучшения для карточек */
+.dark .admin-card {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+}
+
+.dark .admin-card:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Улучшения для форм */
+.dark .admin-input {
+  background: var(--admin-input-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.dark .admin-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.dark .admin-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Улучшения для таблиц */
+.dark .admin-table {
+  background: var(--admin-card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.dark .admin-table thead {
+  background: var(--admin-table-header-bg);
+}
+
+.dark .admin-table tbody tr:hover {
+  background: var(--admin-table-row-hover);
+}
+
+/* Принудительные стили для всех кнопок в темной теме */
+.dark button,
+.dark .admin-button-primary,
+.dark [role="button"],
+.dark input[type="button"],
+.dark input[type="submit"] {
+  background: #3b82f6 !important;
+  border: 1px solid #3b82f6 !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  text-shadow: none !important;
+}
+
+.dark button *,
+.dark .admin-button-primary *,
+.dark [role="button"] * {
+  color: inherit !important;
+}
+
+.dark button:hover,
+.dark .admin-button-primary:hover,
+.dark [role="button"]:hover {
+  background: var(--accent-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.dark button[variant="outline"],
+.dark .admin-button-secondary,
+.dark button.outline {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+  transition: all 0.2s ease;
+}
+
+.dark button[variant="outline"]:hover,
+.dark .admin-button-secondary:hover,
+.dark button.outline:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-light) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Специальные стили для кнопок навигации */
+.dark .navigation-button {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border: 1px solid rgba(59, 130, 246, 0.4) !important;
+  color: #93c5fd !important;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dark .navigation-button * {
+  color: #93c5fd !important;
+}
+
+.dark .navigation-button:hover {
+  background: rgba(59, 130, 246, 0.25) !important;
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  color: #bfdbfe !important;
+  transform: translateY(-1px);
+}
+
+.dark .navigation-button:hover * {
+  color: #bfdbfe !important;
+}
+
+.dark .navigation-button.active {
+  background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.dark .navigation-button.active * {
+  color: white !important;
+}
+
+/* Статусные индикаторы */
+.dark .status-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success-color);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.dark .status-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning-color);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.dark .status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error-color);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.dark .status-info {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--info-color);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+/* Анимации для темной темы */
+.dark .admin-fade-in {
+  animation: admin-dark-fade-in 0.3s ease-out;
+}
+
+@keyframes admin-dark-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dark .admin-slide-in {
+  animation: admin-dark-slide-in 0.3s ease-out;
+}
+
+@keyframes admin-dark-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Улучшения для скроллбара */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-hover);
+}
+
+/* Улучшения для модальных окон */
+.dark .admin-modal {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-xl);
+}
+
+.dark .admin-modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+/* Улучшения для уведомлений */
+.dark .admin-notification {
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+}
+
+.dark .admin-notification-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--success-color);
+}
+
+.dark .admin-notification-error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--error-color);
+}
+
+/* Улучшения для загрузочных состояний */
+.dark .admin-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+  animation: admin-skeleton-loading 1.5s infinite;
+}
+
+@keyframes admin-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Специальные улучшения для графиков и диаграмм */
+.dark .admin-chart-container {
+  background: var(--admin-card-bg);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+/* Улучшения для drag & drop */
+.dark .admin-dropzone {
+  border: 2px dashed var(--border-color);
+  background: var(--bg-secondary);
+  transition: all 0.2s ease;
+}
+
+.dark .admin-dropzone:hover,
+.dark .admin-dropzone.dragover {
+  border-color: var(--accent-color);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+/* Улучшения для фокуса (accessibility) */
+.dark .admin-focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Адаптивные размеры шрифтов */
+@media (max-width: 640px) {
+  .dark .admin-mobile-text-sm {
+    font-size: 0.875rem;
+  }
+  
+  .dark .admin-mobile-text-base {
+    font-size: 1rem;
+  }
+  
+  .dark .admin-mobile-text-lg {
+    font-size: 1.125rem;
+  }
+}
+
+/* Улучшения для печати */
+@media print {
+  .dark {
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .dark .admin-no-print {
+    display: none !important;
+  }
+}
