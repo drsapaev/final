@@ -50,25 +50,30 @@ const AdminNavigation = ({ sections = [] }) => {
               
               return (
                 <NavLink key={item.to} to={item.to}>
-                  <Button
-                    variant={active ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex items-center space-x-2 transition-all duration-200 ${
+                  <button
+                    className={`navigation-button ${active ? 'active' : ''} flex items-center space-x-2 transition-all duration-200 ${
                       active 
                         ? 'shadow-md transform scale-105' 
                         : 'hover:shadow-sm hover:transform hover:scale-102'
                     }`}
                     style={{
                       background: active 
-                        ? 'linear-gradient(135deg, var(--accent-color) 0%, #1d4ed8 100%)'
-                        : undefined,
-                      borderColor: active ? 'var(--accent-color)' : 'var(--border-color)',
-                      color: active ? 'white' : 'var(--text-primary)'
+                        ? '#3b82f6'
+                        : 'rgba(59, 130, 246, 0.1)',
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      borderColor: active ? '#3b82f6' : 'rgba(59, 130, 246, 0.3)',
+                      color: active ? 'white' : '#60a5fa',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      fontSize: '14px'
                     }}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="font-medium">{item.label}</span>
-                  </Button>
+                  </button>
                 </NavLink>
               );
             })}

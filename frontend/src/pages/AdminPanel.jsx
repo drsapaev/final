@@ -33,7 +33,14 @@ import {
   Brain,
   MessageSquare,
   Monitor,
-  Key
+  Key,
+  DollarSign,
+  Receipt,
+  X,
+  TrendingDown,
+  XCircle,
+  Globe,
+  AlertCircle
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
@@ -69,11 +76,54 @@ import DisplayBoardSettings from '../components/admin/DisplayBoardSettings';
 import ActivationSystem from '../components/admin/ActivationSystem';
 import SecuritySettings from '../components/admin/SecuritySettings';
 import SecurityMonitor from '../components/admin/SecurityMonitor';
+import { useAdminHotkeys } from '../hooks/useHotkeys';
+import { HotkeysModal } from '../components/admin/HelpTooltip';
+import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
 import '../styles/admin.css';
+import '../styles/admin-dark-theme.css';
 
 const AdminPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const screenSize = useScreenSize();
+  
+  // Состояние для UX улучшений
+  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Обработчики горячих клавиш
+  const hotkeyHandlers = {
+    save: () => {
+      // Логика сохранения для текущего раздела
+      console.log('Сохранение через горячую клавишу');
+    },
+    search: () => {
+      // Фокус на поле поиска
+      const searchInput = document.querySelector('input[placeholder*="поиск" i], input[placeholder*="search" i]');
+      if (searchInput) {
+        searchInput.focus();
+      }
+    },
+    refresh: async () => {
+      setIsRefreshing(true);
+      try {
+        await refreshStats();
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    dashboard: () => navigate('/admin'),
+    users: () => navigate('/admin/users'),
+    doctors: () => navigate('/admin/doctors'),
+    services: () => navigate('/admin/services'),
+    settings: () => navigate('/admin/clinic-settings'),
+    shortcuts: () => setShowHotkeysModal(true),
+    closeModal: () => setShowHotkeysModal(false),
+    help: () => setShowHotkeysModal(true)
+  };
+  
+  // Активируем горячие клавиши
+  useAdminHotkeys(hotkeyHandlers);
   
   // Используем новый хук для загрузки данных
   const { 
@@ -535,6 +585,18 @@ const AdminPanel = () => {
       console.error('Ошибка экспорта логов:', error);
       alert('Ошибка при экспорте логов безопасности');
     }
+  };
+
+  const getReportTypeLabel = (type) => {
+    const typeLabels = {
+      'financial': 'Финансовый',
+      'medical': 'Медицинский', 
+      'operational': 'Операционный',
+      'analytics': 'Аналитический',
+      'security': 'Безопасность',
+      'audit': 'Аудит'
+    };
+    return typeLabels[type] || type;
   };
 
   const getStatusIcon = (status) => {
@@ -2939,10 +3001,23 @@ const AdminPanel = () => {
         {/* Навигация */}
         <AdminNavigation sections={navigationSections} />
 
+        {/* Мобильная навигация */}
+        <MobileNavigation 
+          sections={navigationSections}
+          currentSection={current}
+          onNavigate={(path) => navigate(path)}
+        />
+
         {/* Основной контент */}
         <div style={{ opacity: fadeIn ? 1 : 0, transform: slideIn ? 'translateY(0)' : 'translateY(20px)' }}>
           {renderContent()}
         </div>
+        
+        {/* Модальное окно горячих клавиш */}
+        <HotkeysModal 
+          isOpen={showHotkeysModal} 
+          onClose={() => setShowHotkeysModal(false)} 
+        />
       </div>
     </div>
   );
