@@ -4,8 +4,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
@@ -29,6 +29,15 @@ class Service(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    
+    # Новые поля для админ панели
+    category_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("service_categories.id"), nullable=True)
+    duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, default=30, nullable=True)
+    doctor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("doctors.id"), nullable=True)
+    
+    # Relationships
+    category = relationship("ServiceCategory", back_populates="services")
+    doctor = relationship("Doctor", back_populates="services")
 
 
 class ServiceCatalog(Base):

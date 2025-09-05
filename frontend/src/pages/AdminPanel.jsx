@@ -28,7 +28,8 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
-  RefreshCw
+  RefreshCw,
+  Package
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
@@ -44,10 +45,22 @@ import useUsers from '../hooks/useUsers';
 import useDoctors from '../hooks/useDoctors';
 import usePatients from '../hooks/usePatients';
 import useAppointments from '../hooks/useAppointments';
+import useFinance from '../hooks/useFinance';
+import useReports from '../hooks/useReports';
+import useSettings from '../hooks/useSettings';
+import useSecurity from '../hooks/useSecurity';
 import UserModal from '../components/admin/UserModal';
 import DoctorModal from '../components/admin/DoctorModal';
 import PatientModal from '../components/admin/PatientModal';
 import AppointmentModal from '../components/admin/AppointmentModal';
+import FinanceModal from '../components/admin/FinanceModal';
+import ReportGenerator from '../components/admin/ReportGenerator';
+import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
+import ClinicSettings from '../components/admin/ClinicSettings';
+import QueueSettings from '../components/admin/QueueSettings';
+import ServiceCatalog from '../components/admin/ServiceCatalog';
+import SecuritySettings from '../components/admin/SecuritySettings';
+import SecurityMonitor from '../components/admin/SecurityMonitor';
 import '../styles/admin.css';
 
 const AdminPanel = () => {
@@ -175,6 +188,107 @@ const AdminPanel = () => {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [appointmentModalLoading, setAppointmentModalLoading] = useState(false);
   
+  // Хук для управления финансами
+  const {
+    transactions,
+    loading: financeLoading,
+    error: financeError,
+    searchTerm: financeSearchTerm,
+    setSearchTerm: setFinanceSearchTerm,
+    filterType,
+    setFilterType,
+    filterCategory,
+    setFilterCategory,
+    filterDateRange,
+    setFilterDateRange,
+    filterStatus: financeFilterStatus,
+    setFilterStatus: setFinanceFilterStatus,
+    createTransaction,
+    updateTransaction,
+    deleteTransaction,
+    getFinancialStats,
+    getCategoryStats,
+    getDailyStats
+  } = useFinance();
+  
+  // Состояние модального окна финансов
+  const [showFinanceModal, setShowFinanceModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [financeModalLoading, setFinanceModalLoading] = useState(false);
+  
+  // Хук для управления отчетами
+  const {
+    reports,
+    loading: reportsLoading,
+    error: reportsError,
+    searchTerm: reportsSearchTerm,
+    setSearchTerm: setReportsSearchTerm,
+    filterType: reportFilterType,
+    setFilterType: setReportFilterType,
+    filterStatus: reportFilterStatus,
+    setFilterStatus: setReportFilterStatus,
+    filterDateRange: reportFilterDateRange,
+    setFilterDateRange: setReportFilterDateRange,
+    generateReport,
+    downloadReport,
+    deleteReport,
+    regenerateReport,
+    getReportStats,
+    getReportTypes,
+    getStatusLabel,
+    getStatusVariant,
+    formatDateRange
+  } = useReports();
+  
+  // Состояние для генератора отчетов
+  const [reportDateRange, setReportDateRange] = useState({ start: '', end: '' });
+  const [selectedReportType, setSelectedReportType] = useState('');
+  const [showReportGenerator, setShowReportGenerator] = useState(false);
+  
+  // Хук для управления настройками
+  const {
+    settings,
+    loading: settingsLoading,
+    error: settingsError,
+    activeTab: settingsActiveTab,
+    setActiveTab: setSettingsActiveTab,
+    saveSettings,
+    resetSettings,
+    exportSettings,
+    importSettings,
+    getSettingsStats,
+    validateSettings
+  } = useSettings();
+  
+  // Состояние для настроек
+  const [settingsSubTab, setSettingsSubTab] = useState('general');
+  
+  // Хук для управления безопасностью
+  const {
+    securityData,
+    loading: securityLoading,
+    error: securityError,
+    searchTerm: securitySearchTerm,
+    setSearchTerm: setSecuritySearchTerm,
+    filterStatus: securityFilterStatus,
+    setFilterStatus: setSecurityFilterStatus,
+    filterSeverity: securityFilterSeverity,
+    setFilterSeverity: setSecurityFilterSeverity,
+    filterDateRange: securityFilterDateRange,
+    setFilterDateRange: setSecurityFilterDateRange,
+    filteredThreats,
+    filteredLogs,
+    loadSecurityData,
+    blockIP,
+    unblockIP,
+    terminateSession,
+    terminateAllOtherSessions,
+    updateThreatStatus,
+    exportSecurityLogs,
+    getSecurityStats,
+    getSecurityTrends
+  } = useSecurity();
+  
   // Моковые данные для демонстрации
   const [recentActivities] = useState([
     {
@@ -268,6 +382,153 @@ const AdminPanel = () => {
     }).format(amount);
   };
 
+  // Обработчики для отчетов
+  const handleGenerateReport = async (reportConfig) => {
+    try {
+      await generateReport(reportConfig);
+      setShowReportGenerator(false);
+    } catch (error) {
+      console.error('Ошибка генерации отчета:', error);
+      alert('Ошибка при генерации отчета');
+    }
+  };
+
+  const handleDownloadReport = async (reportId) => {
+    try {
+      await downloadReport(reportId);
+    } catch (error) {
+      console.error('Ошибка скачивания отчета:', error);
+      alert('Ошибка при скачивании отчета');
+    }
+  };
+
+  const handleDeleteReport = async (reportId) => {
+    if (window.confirm('Вы уверены, что хотите удалить этот отчет?')) {
+      try {
+        await deleteReport(reportId);
+      } catch (error) {
+        console.error('Ошибка удаления отчета:', error);
+        alert('Ошибка при удалении отчета');
+      }
+    }
+  };
+
+  const handleRegenerateReport = async (reportId) => {
+    try {
+      await regenerateReport(reportId);
+    } catch (error) {
+      console.error('Ошибка повторной генерации отчета:', error);
+      alert('Ошибка при повторной генерации отчета');
+    }
+  };
+
+  const handleOpenReportGenerator = () => {
+    setShowReportGenerator(true);
+    // Устанавливаем период по умолчанию (последний месяц)
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    setReportDateRange({
+      start: lastMonth.toISOString().split('T')[0],
+      end: today.toISOString().split('T')[0]
+    });
+  };
+
+  // Обработчики для настроек
+  const handleSaveSettings = async (settingsData) => {
+    try {
+      await saveSettings(settingsData);
+    } catch (error) {
+      console.error('Ошибка сохранения настроек:', error);
+      throw error;
+    }
+  };
+
+  const handleResetSettings = async () => {
+    if (window.confirm('Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?')) {
+      try {
+        await resetSettings();
+      } catch (error) {
+        console.error('Ошибка сброса настроек:', error);
+        alert('Ошибка при сбросе настроек');
+      }
+    }
+  };
+
+  const handleExportSettings = async () => {
+    try {
+      await exportSettings();
+    } catch (error) {
+      console.error('Ошибка экспорта настроек:', error);
+      alert('Ошибка при экспорте настроек');
+    }
+  };
+
+  const handleImportSettings = async (file) => {
+    try {
+      await importSettings(file);
+    } catch (error) {
+      console.error('Ошибка импорта настроек:', error);
+      alert('Ошибка при импорте настроек');
+    }
+  };
+
+  // Обработчики для безопасности
+  const handleBlockIP = async (ip, reason) => {
+    try {
+      await blockIP(ip, reason);
+    } catch (error) {
+      console.error('Ошибка блокировки IP:', error);
+      alert('Ошибка при блокировке IP адреса');
+    }
+  };
+
+  const handleUnblockIP = async (ipId) => {
+    try {
+      await unblockIP(ipId);
+    } catch (error) {
+      console.error('Ошибка разблокировки IP:', error);
+      alert('Ошибка при разблокировке IP адреса');
+    }
+  };
+
+  const handleTerminateSession = async (sessionId) => {
+    try {
+      await terminateSession(sessionId);
+    } catch (error) {
+      console.error('Ошибка завершения сессии:', error);
+      alert('Ошибка при завершении сессии');
+    }
+  };
+
+  const handleTerminateAllOtherSessions = async () => {
+    if (window.confirm('Вы уверены, что хотите завершить все остальные сессии?')) {
+      try {
+        await terminateAllOtherSessions();
+      } catch (error) {
+        console.error('Ошибка завершения сессий:', error);
+        alert('Ошибка при завершении сессий');
+      }
+    }
+  };
+
+  const handleUpdateThreatStatus = async (threatId, newStatus) => {
+    try {
+      await updateThreatStatus(threatId, newStatus);
+    } catch (error) {
+      console.error('Ошибка обновления статуса угрозы:', error);
+      alert('Ошибка при обновлении статуса угрозы');
+    }
+  };
+
+  const handleExportSecurityLogs = async (format = 'json') => {
+    try {
+      await exportSecurityLogs(format);
+    } catch (error) {
+      console.error('Ошибка экспорта логов:', error);
+      alert('Ошибка при экспорте логов безопасности');
+    }
+  };
+
   const getStatusIcon = (status) => {
     const colorMap = {
       success: 'var(--success-color)',
@@ -338,14 +599,6 @@ const AdminPanel = () => {
     return roleMap[role] || role;
   };
 
-  const getStatusLabel = (status) => {
-    const statusMap = {
-      active: 'Активен',
-      inactive: 'Неактивен',
-      blocked: 'Заблокирован'
-    };
-    return statusMap[status] || status;
-  };
 
   const getStatusColor = (status) => {
     const colorMap = {
@@ -574,6 +827,87 @@ const AdminPanel = () => {
     return variantMap[status] || 'secondary';
   };
 
+  // Обработчики для финансов
+  const handleCreateTransaction = () => {
+    setSelectedTransaction(null);
+    setShowFinanceModal(true);
+  };
+
+  const handleEditTransaction = (transaction) => {
+    setSelectedTransaction(transaction);
+    setShowFinanceModal(true);
+  };
+
+  const handleDeleteTransaction = async (transaction) => {
+    if (window.confirm(`Вы уверены, что хотите удалить транзакцию "${transaction.description}"?`)) {
+      try {
+        await deleteTransaction(transaction.id);
+      } catch (error) {
+        console.error('Ошибка удаления транзакции:', error);
+        alert('Ошибка при удалении транзакции');
+      }
+    }
+  };
+
+  const handleSaveTransaction = async (transactionData) => {
+    setFinanceModalLoading(true);
+    try {
+      if (selectedTransaction) {
+        await updateTransaction(selectedTransaction.id, transactionData);
+      } else {
+        await createTransaction(transactionData);
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения транзакции:', error);
+      throw error;
+    } finally {
+      setFinanceModalLoading(false);
+    }
+  };
+
+  const handleCloseFinanceModal = () => {
+    setShowFinanceModal(false);
+    setSelectedTransaction(null);
+  };
+
+  const getTransactionTypeLabel = (type) => {
+    const typeMap = {
+      income: 'Доход',
+      expense: 'Расход'
+    };
+    return typeMap[type] || type;
+  };
+
+  const getTransactionStatusLabel = (status) => {
+    const statusMap = {
+      pending: 'Ожидает',
+      completed: 'Завершена',
+      cancelled: 'Отменена',
+      refunded: 'Возврат'
+    };
+    return statusMap[status] || status;
+  };
+
+  const getTransactionStatusVariant = (status) => {
+    const variantMap = {
+      pending: 'warning',
+      completed: 'success',
+      cancelled: 'error',
+      refunded: 'info'
+    };
+    return variantMap[status] || 'secondary';
+  };
+
+  const getPaymentMethodLabel = (method) => {
+    const methodMap = {
+      cash: 'Наличные',
+      card: 'Карта',
+      transfer: 'Перевод',
+      mobile: 'Мобильный'
+    };
+    return methodMap[method] || method;
+  };
+
   // Новая структура навигации
   const navigationSections = [
     {
@@ -588,6 +922,7 @@ const AdminPanel = () => {
       items: [
         { to: '/admin/users', label: 'Пользователи', icon: Users },
         { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
+        { to: '/admin/services', label: 'Услуги', icon: Package },
         { to: '/admin/patients', label: 'Пациенты', icon: Users },
         { to: '/admin/appointments', label: 'Записи', icon: Calendar }
       ]
@@ -595,6 +930,8 @@ const AdminPanel = () => {
     {
       title: 'Система',
       items: [
+        { to: '/admin/clinic-settings', label: 'Настройки клиники', icon: Building2 },
+        { to: '/admin/queue-settings', label: 'Настройки очередей', icon: Clock },
         { to: '/admin/finance', label: 'Финансы', icon: CreditCard },
         { to: '/admin/reports', label: 'Отчеты', icon: FileText },
         { to: '/admin/settings', label: 'Настройки', icon: Settings },
@@ -1111,6 +1448,12 @@ const AdminPanel = () => {
         return renderFinance();
       case 'reports':
         return renderReports();
+      case 'clinic-settings':
+        return <ClinicSettings />;
+      case 'queue-settings':
+        return <QueueSettings />;
+      case 'services':
+        return <ServiceCatalog />;
       case 'settings':
         return renderSettings();
       case 'security':
@@ -1753,61 +2096,764 @@ const AdminPanel = () => {
     );
   };
 
-  const renderFinance = () => (
-    <EmptyState
-      type="creditcard"
-      title="Финансовый учет"
-      description="Здесь будет интерфейс для управления финансами клиники"
-      action={
-        <Button variant="primary">
-          <CreditCard className="w-4 h-4 mr-2" />
-          Создать транзакцию
-        </Button>
-      }
-    />
-  );
+  const renderFinance = () => {
+    const financialStats = getFinancialStats();
+    const categoryStats = getCategoryStats();
+    const dailyStats = getDailyStats(7);
 
-  const renderReports = () => (
-    <EmptyState
-      type="filetext"
-      title="Отчеты и аналитика"
-      description="Здесь будет интерфейс для создания и просмотра отчетов"
-      action={
-        <Button variant="primary">
-          <FileText className="w-4 h-4 mr-2" />
-          Создать отчет
-        </Button>
-      }
-    />
-  );
+    return (
+      <div className="space-y-6">
+        {/* Финансовая статистика */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Общий доход</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--success-color)' }}>
+                  {formatCurrency(financialStats.totalIncome)}
+                </p>
+              </div>
+              <DollarSign className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Общие расходы</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>
+                  {formatCurrency(financialStats.totalExpense)}
+                </p>
+              </div>
+              <CreditCard className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Чистая прибыль</p>
+                <p className="text-2xl font-bold" style={{ 
+                  color: financialStats.netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)' 
+                }}>
+                  {formatCurrency(financialStats.netProfit)}
+                </p>
+              </div>
+              <Calendar className="w-8 h-8" style={{ 
+                color: financialStats.netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)' 
+              }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего транзакций</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {financialStats.transactionCount}
+                </p>
+              </div>
+              <Receipt className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+            </div>
+          </Card>
+        </div>
 
-  const renderSettings = () => (
-    <EmptyState
-      type="settings"
-      title="Настройки системы"
-      description="Здесь будут настройки конфигурации системы"
-      action={
-        <Button variant="primary">
-          <Settings className="w-4 h-4 mr-2" />
-          Открыть настройки
-        </Button>
-      }
-    />
-  );
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Финансовый учет</h2>
+            <Button onClick={handleCreateTransaction}>
+              <Plus className="w-4 h-4 mr-2" />
+              Добавить транзакцию
+            </Button>
+          </div>
+          
+          {/* Поиск и фильтры */}
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              <input
+                type="text"
+                placeholder="Поиск транзакций..."
+                value={financeSearchTerm}
+                onChange={(e) => setFinanceSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
+                style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все типы</option>
+              <option value="income">Доходы</option>
+              <option value="expense">Расходы</option>
+            </select>
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все категории</option>
+              <option value="Консультация врача">Консультация врача</option>
+              <option value="Диагностика">Диагностика</option>
+              <option value="Лечение">Лечение</option>
+              <option value="Анализы">Анализы</option>
+              <option value="Процедуры">Процедуры</option>
+              <option value="Зарплата персонала">Зарплата персонала</option>
+              <option value="Коммунальные услуги">Коммунальные услуги</option>
+              <option value="Медикаменты">Медикаменты</option>
+            </select>
+            <select
+              value={filterDateRange}
+              onChange={(e) => setFilterDateRange(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все время</option>
+              <option value="today">Сегодня</option>
+              <option value="week">Неделя</option>
+              <option value="month">Месяц</option>
+              <option value="year">Год</option>
+            </select>
+            <select
+              value={financeFilterStatus}
+              onChange={(e) => setFinanceFilterStatus(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все статусы</option>
+              <option value="pending">Ожидает</option>
+              <option value="completed">Завершена</option>
+              <option value="cancelled">Отменена</option>
+              <option value="refunded">Возврат</option>
+            </select>
+          </div>
 
-  const renderSecurity = () => (
-    <EmptyState
-      type="shield"
-      title="Безопасность"
-      description="Здесь будут настройки безопасности и доступа"
-      action={
-        <Button variant="primary">
-          <Shield className="w-4 h-4 mr-2" />
-          Настроить безопасность
-        </Button>
-      }
-    />
-  );
+          {/* Таблица транзакций */}
+          <div className="overflow-x-auto">
+            {financeLoading ? (
+              <LoadingSkeleton type="table" count={5} />
+            ) : financeError ? (
+              <EmptyState
+                type="error"
+                title="Ошибка загрузки транзакций"
+                description="Не удалось загрузить список транзакций"
+                action={
+                  <Button onClick={() => window.location.reload()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Обновить
+                  </Button>
+                }
+              />
+            ) : transactions.length === 0 ? (
+              <EmptyState
+                type="creditcard"
+                title="Транзакции не найдены"
+                description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus 
+                  ? "Попробуйте изменить параметры поиска" 
+                  : "В системе пока нет транзакций"
+                }
+                action={
+                  <Button onClick={handleCreateTransaction}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Добавить первую транзакцию
+                  </Button>
+                }
+              />
+            ) : (
+              <table className="w-full" role="table" aria-label="Таблица транзакций">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Тип</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Категория</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Сумма</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Описание</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Дата</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((transaction) => (
+                    <tr key={transaction.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
+                      <td className="py-3 px-4">
+                        <Badge variant={transaction.type === 'income' ? 'success' : 'error'}>
+                          {getTransactionTypeLabel(transaction.type)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{transaction.category}</p>
+                          {transaction.patientName && (
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{transaction.patientName}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="font-medium" style={{ 
+                          color: transaction.type === 'income' ? 'var(--success-color)' : 'var(--danger-color)' 
+                        }}>
+                          {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        </p>
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          {getPaymentMethodLabel(transaction.paymentMethod)}
+                        </p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          {transaction.description.length > 50 
+                            ? `${transaction.description.substring(0, 50)}...` 
+                            : transaction.description
+                          }
+                        </p>
+                        {transaction.reference && (
+                          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            {transaction.reference}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        {new Date(transaction.transactionDate).toLocaleDateString('ru-RU')}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={getTransactionStatusVariant(transaction.status)}>
+                          {getTransactionStatusLabel(transaction.status)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-2">
+                          <button 
+                            onClick={() => handleEditTransaction(transaction)}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors" 
+                            style={{ color: 'var(--text-secondary)' }}
+                            title="Редактировать"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteTransaction(transaction)}
+                            className="p-1 hover:bg-red-100 rounded transition-colors" 
+                            style={{ color: 'var(--danger-color)' }}
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Card>
+
+        {/* Модальное окно транзакции */}
+        <FinanceModal
+          isOpen={showFinanceModal}
+          onClose={handleCloseFinanceModal}
+          transaction={selectedTransaction}
+          onSave={handleSaveTransaction}
+          loading={financeModalLoading}
+          patients={patients}
+          doctors={doctors}
+        />
+      </div>
+    );
+  };
+
+  const renderReports = () => {
+    const reportStats = getReportStats();
+    const reportTypes = getReportTypes();
+
+    return (
+      <div className="space-y-6">
+        {/* Статистика отчетов */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего отчетов</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{reportStats.total}</p>
+              </div>
+              <FileText className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Завершено</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--success-color)' }}>{reportStats.completed}</p>
+              </div>
+              <CheckCircle className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Генерируется</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--warning-color)' }}>{reportStats.generating}</p>
+              </div>
+              <Clock className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Ошибки</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>{reportStats.failed}</p>
+              </div>
+              <AlertCircle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Скачиваний</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{reportStats.totalDownloads}</p>
+              </div>
+              <Download className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+            </div>
+          </Card>
+        </div>
+
+        {/* Кнопки действий */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button onClick={handleOpenReportGenerator}>
+              <Plus className="w-4 h-4 mr-2" />
+              Создать отчет
+            </Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Обновить
+            </Button>
+          </div>
+        </div>
+
+        {/* Аналитическая панель */}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Аналитическая панель
+          </h3>
+          <AnalyticsDashboard 
+            data={{}}
+            loading={false}
+            dateRange={reportDateRange}
+          />
+        </Card>
+
+        {/* Список отчетов */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Отчеты</h2>
+          </div>
+          
+          {/* Поиск и фильтры */}
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              <input
+                type="text"
+                placeholder="Поиск отчетов..."
+                value={reportsSearchTerm}
+                onChange={(e) => setReportsSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
+                style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            <select
+              value={reportFilterType}
+              onChange={(e) => setReportFilterType(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все типы</option>
+              {reportTypes.map(type => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={reportFilterStatus}
+              onChange={(e) => setReportFilterStatus(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все статусы</option>
+              <option value="completed">Завершен</option>
+              <option value="generating">Генерируется</option>
+              <option value="failed">Ошибка</option>
+              <option value="pending">Ожидает</option>
+            </select>
+            <select
+              value={reportFilterDateRange}
+              onChange={(e) => setReportFilterDateRange(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все время</option>
+              <option value="today">Сегодня</option>
+              <option value="week">Неделя</option>
+              <option value="month">Месяц</option>
+            </select>
+          </div>
+
+          {/* Таблица отчетов */}
+          <div className="overflow-x-auto">
+            {reportsLoading ? (
+              <LoadingSkeleton type="table" count={5} />
+            ) : reportsError ? (
+              <EmptyState
+                type="error"
+                title="Ошибка загрузки отчетов"
+                description="Не удалось загрузить список отчетов"
+                action={
+                  <Button onClick={() => window.location.reload()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Обновить
+                  </Button>
+                }
+              />
+            ) : reports.length === 0 ? (
+              <EmptyState
+                type="filetext"
+                title="Отчеты не найдены"
+                description={reportsSearchTerm || reportFilterType || reportFilterStatus || reportFilterDateRange 
+                  ? "Попробуйте изменить параметры поиска" 
+                  : "В системе пока нет отчетов"
+                }
+                action={
+                  <Button onClick={handleOpenReportGenerator}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Создать первый отчет
+                  </Button>
+                }
+              />
+            ) : (
+              <table className="w-full" role="table" aria-label="Таблица отчетов">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Название</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Тип</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Период</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Размер</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Скачиваний</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((report) => (
+                    <tr key={report.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{report.name}</p>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{report.description}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant="info">
+                          {getReportTypeLabel(report.type)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={getStatusVariant(report.status)}>
+                          {getStatusLabel(report.status)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        {formatDateRange(report.dateRange)}
+                      </td>
+                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        {report.fileSize || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        {report.downloadCount}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-2">
+                          {report.status === 'completed' && (
+                            <button 
+                              onClick={() => handleDownloadReport(report.id)}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors" 
+                              style={{ color: 'var(--text-secondary)' }}
+                              title="Скачать"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                          {report.status === 'failed' && (
+                            <button 
+                              onClick={() => handleRegenerateReport(report.id)}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors" 
+                              style={{ color: 'var(--warning-color)' }}
+                              title="Повторить генерацию"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleDeleteReport(report.id)}
+                            className="p-1 hover:bg-red-100 rounded transition-colors" 
+                            style={{ color: 'var(--danger-color)' }}
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Card>
+
+        {/* Генератор отчетов */}
+        {showReportGenerator && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Генератор отчетов
+              </h2>
+              <button
+                onClick={() => setShowReportGenerator(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <ReportGenerator
+              onGenerateReport={handleGenerateReport}
+              loading={reportsLoading}
+              reportTypes={reportTypes.map(t => t.value)}
+              dateRange={reportDateRange}
+              onDateRangeChange={setReportDateRange}
+              selectedReportType={selectedReportType}
+              onReportTypeChange={setSelectedReportType}
+            />
+          </Card>
+        )}
+      </div>
+    );
+  };
+
+  const renderSettings = () => {
+    const settingsStats = getSettingsStats();
+
+    return (
+      <div className="space-y-6">
+        {/* Статистика настроек */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего настроек</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{settingsStats.totalSettings}</p>
+              </div>
+              <Settings className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Настроено</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--success-color)' }}>{settingsStats.configuredSettings}</p>
+              </div>
+              <CheckCircle className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Завершенность</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--info-color)' }}>{settingsStats.configurationPercentage}%</p>
+              </div>
+              <BarChart3 className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Безопасность</p>
+                <p className="text-2xl font-bold" style={{ color: settingsStats.securityEnabled ? 'var(--success-color)' : 'var(--warning-color)' }}>
+                  {settingsStats.securityEnabled ? 'Вкл' : 'Выкл'}
+                </p>
+              </div>
+              <Shield className="w-8 h-8" style={{ color: settingsStats.securityEnabled ? 'var(--success-color)' : 'var(--warning-color)' }} />
+            </div>
+          </Card>
+        </div>
+
+        {/* Кнопки действий */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button onClick={() => setSettingsSubTab('general')}>
+              <Settings className="w-4 h-4 mr-2" />
+              Общие настройки
+            </Button>
+            <Button onClick={() => setSettingsSubTab('security')}>
+              <Shield className="w-4 h-4 mr-2" />
+              Безопасность
+            </Button>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" onClick={handleExportSettings}>
+              <Download className="w-4 h-4 mr-2" />
+              Экспорт
+            </Button>
+            <input
+              type="file"
+              accept=".json"
+              onChange={(e) => e.target.files[0] && handleImportSettings(e.target.files[0])}
+              className="hidden"
+              id="import-settings"
+            />
+            <Button variant="outline" onClick={() => document.getElementById('import-settings').click()}>
+              <Upload className="w-4 h-4 mr-2" />
+              Импорт
+            </Button>
+            <Button variant="outline" onClick={handleResetSettings}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Сбросить
+            </Button>
+          </div>
+        </div>
+
+        {/* Настройки клиники */}
+        {settingsSubTab === 'general' && (
+          <ClinicSettings
+            settings={settings}
+            onSave={handleSaveSettings}
+            loading={settingsLoading}
+          />
+        )}
+
+        {/* Настройки безопасности */}
+        {settingsSubTab === 'security' && (
+          <SecuritySettings
+            settings={settings}
+            onSave={handleSaveSettings}
+            loading={settingsLoading}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderSecurity = () => {
+    const securityStats = getSecurityStats();
+    const securityTrends = getSecurityTrends();
+
+    return (
+      <div className="space-y-6">
+        {/* Статистика безопасности */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего угроз</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{securityStats.totalThreats}</p>
+                <div className="flex items-center mt-1">
+                  {securityTrends.threats.change > 0 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" style={{ color: 'var(--danger-color)' }} />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 mr-1" style={{ color: 'var(--success-color)' }} />
+                  )}
+                  <span className="text-xs" style={{ color: securityTrends.threats.change > 0 ? 'var(--danger-color)' : 'var(--success-color)' }}>
+                    {Math.abs(securityTrends.threats.change).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              <AlertTriangle className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Критические</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>{securityStats.criticalThreats}</p>
+              </div>
+              <XCircle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Заблокированные IP</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{securityStats.blockedIPs}</p>
+                <div className="flex items-center mt-1">
+                  {securityTrends.blockedIPs.change > 0 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" style={{ color: 'var(--danger-color)' }} />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 mr-1" style={{ color: 'var(--success-color)' }} />
+                  )}
+                  <span className="text-xs" style={{ color: securityTrends.blockedIPs.change > 0 ? 'var(--danger-color)' : 'var(--success-color)' }}>
+                    {Math.abs(securityTrends.blockedIPs.change).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              <Globe className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Оценка безопасности</p>
+                <p className="text-2xl font-bold" style={{ color: securityStats.securityScore >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }}>
+                  {securityStats.securityScore}%
+                </p>
+                <div className="flex items-center mt-1">
+                  {securityTrends.securityScore.change > 0 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" style={{ color: 'var(--success-color)' }} />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 mr-1" style={{ color: 'var(--danger-color)' }} />
+                  )}
+                  <span className="text-xs" style={{ color: securityTrends.securityScore.change > 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
+                    {Math.abs(securityTrends.securityScore.change).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+              <Shield className="w-8 h-8" style={{ color: securityStats.securityScore >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }} />
+            </div>
+          </Card>
+        </div>
+
+        {/* Кнопки действий */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button onClick={() => loadSecurityData()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Обновить данные
+            </Button>
+            <Button variant="outline" onClick={() => handleExportSecurityLogs('json')}>
+              <Download className="w-4 h-4 mr-2" />
+              Экспорт JSON
+            </Button>
+            <Button variant="outline" onClick={() => handleExportSecurityLogs('csv')}>
+              <Download className="w-4 h-4 mr-2" />
+              Экспорт CSV
+            </Button>
+          </div>
+        </div>
+
+        {/* Монитор безопасности */}
+        <SecurityMonitor
+          data={securityData}
+          loading={securityLoading}
+          onRefresh={loadSecurityData}
+        />
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (

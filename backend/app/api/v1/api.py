@@ -6,6 +6,8 @@ from fastapi import APIRouter
 # подключаем router из каждого модуля
 from app.api.v1.endpoints import (
     activation as activation_ep,
+    admin_clinic,
+    admin_doctors,
     admin_providers,
     admin_stats,
     admin_users,
@@ -51,6 +53,8 @@ api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
 api_router.include_router(reports_ep.router, tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
+api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_doctors.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_providers.router, tags=["admin"])
 api_router.include_router(admin_stats.router, tags=["admin"])
 api_router.include_router(admin_users.router)
