@@ -402,7 +402,7 @@ jobs:
       run: |
         cd frontend
         mkdir -p playwright-report
-        npx playwright test --reporter=line --reporter=html --output-dir=playwright-report --config=playwright.config.js --timeout=30000 --retries=2 --max-failures=3 --workers=2 --project=chromium --headed=false --browser=chromium --video=retain-on-failure --screenshot=only-on-failure --trace=retain-on-failure --reporter=json --reporter=github --reporter=allure --reporter=blob --reporter=dot --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct
+        npx playwright test --reporter=line --reporter=html --output-dir=playwright-report --config=playwright.config.js --timeout=30000 --retries=2 --max-failures=3 --workers=2 --project=chromium --headed=false --browser=chromium --video=retain-on-failure --screenshot=only-on-failure --trace=retain-on-failure --reporter=json --reporter=github --reporter=allure --reporter=blob --reporter=dot --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct
     - name: 📤 Артефакты Playwright
       if: always()
       uses: actions/upload-artifact@v4
