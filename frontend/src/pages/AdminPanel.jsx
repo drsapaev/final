@@ -42,8 +42,12 @@ import EmptyState from '../components/admin/EmptyState';
 import useAdminData from '../hooks/useAdminData';
 import useUsers from '../hooks/useUsers';
 import useDoctors from '../hooks/useDoctors';
+import usePatients from '../hooks/usePatients';
+import useAppointments from '../hooks/useAppointments';
 import UserModal from '../components/admin/UserModal';
 import DoctorModal from '../components/admin/DoctorModal';
+import PatientModal from '../components/admin/PatientModal';
+import AppointmentModal from '../components/admin/AppointmentModal';
 import '../styles/admin.css';
 
 const AdminPanel = () => {
@@ -120,6 +124,56 @@ const AdminPanel = () => {
   const [showDoctorModal, setShowDoctorModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [doctorModalLoading, setDoctorModalLoading] = useState(false);
+  
+  // Хук для управления пациентами
+  const {
+    patients,
+    loading: patientsLoading,
+    error: patientsError,
+    searchTerm: patientsSearchTerm,
+    setSearchTerm: setPatientsSearchTerm,
+    filterGender,
+    setFilterGender,
+    filterAgeRange,
+    setFilterAgeRange,
+    filterBloodType,
+    setFilterBloodType,
+    createPatient,
+    updatePatient,
+    deletePatient,
+    calculateAge
+  } = usePatients();
+  
+  // Состояние модального окна пациентов
+  const [showPatientModal, setShowPatientModal] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [patientModalLoading, setPatientModalLoading] = useState(false);
+  
+  // Хук для управления записями
+  const {
+    appointments,
+    loading: appointmentsLoading,
+    error: appointmentsError,
+    searchTerm: appointmentsSearchTerm,
+    setSearchTerm: setAppointmentsSearchTerm,
+    filterStatus: appointmentFilterStatus,
+    setFilterStatus: setAppointmentFilterStatus,
+    filterDate: appointmentFilterDate,
+    setFilterDate: setAppointmentFilterDate,
+    filterDoctor: appointmentFilterDoctor,
+    setFilterDoctor: setAppointmentFilterDoctor,
+    createAppointment,
+    updateAppointment,
+    deleteAppointment,
+    getStatusStats,
+    getTodayAppointments,
+    getTomorrowAppointments
+  } = useAppointments();
+  
+  // Состояние модального окна записей
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [appointmentModalLoading, setAppointmentModalLoading] = useState(false);
   
   // Моковые данные для демонстрации
   const [recentActivities] = useState([
@@ -374,6 +428,150 @@ const AdminPanel = () => {
       on_leave: 'var(--info-color)'
     };
     return colorMap[status] || 'var(--text-tertiary)';
+  };
+
+  // Обработчики для пациентов
+  const handleCreatePatient = () => {
+    setSelectedPatient(null);
+    setShowPatientModal(true);
+  };
+
+  const handleEditPatient = (patient) => {
+    setSelectedPatient(patient);
+    setShowPatientModal(true);
+  };
+
+  const handleDeletePatient = async (patient) => {
+    if (window.confirm(`Вы уверены, что хотите удалить пациента "${patient.firstName} ${patient.lastName}"?`)) {
+      try {
+        await deletePatient(patient.id);
+      } catch (error) {
+        console.error('Ошибка удаления пациента:', error);
+        alert('Ошибка при удалении пациента');
+      }
+    }
+  };
+
+  const handleSavePatient = async (patientData) => {
+    setPatientModalLoading(true);
+    try {
+      if (selectedPatient) {
+        await updatePatient(selectedPatient.id, patientData);
+      } else {
+        await createPatient(patientData);
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения пациента:', error);
+      throw error;
+    } finally {
+      setPatientModalLoading(false);
+    }
+  };
+
+  const handleClosePatientModal = () => {
+    setShowPatientModal(false);
+    setSelectedPatient(null);
+  };
+
+  const getGenderLabel = (gender) => {
+    const genderMap = {
+      male: 'Мужской',
+      female: 'Женский'
+    };
+    return genderMap[gender] || gender;
+  };
+
+  const getAgeRangeLabel = (ageRange) => {
+    const ageRangeMap = {
+      '0-18': '0-18 лет',
+      '19-35': '19-35 лет',
+      '36-50': '36-50 лет',
+      '51-65': '51-65 лет',
+      '65+': '65+ лет'
+    };
+    return ageRangeMap[ageRange] || ageRange;
+  };
+
+  // Обработчики для записей
+  const handleCreateAppointment = () => {
+    setSelectedAppointment(null);
+    setShowAppointmentModal(true);
+  };
+
+  const handleEditAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowAppointmentModal(true);
+  };
+
+  const handleDeleteAppointment = async (appointment) => {
+    if (window.confirm(`Вы уверены, что хотите удалить запись "${appointment.patientName} - ${appointment.doctorName}"?`)) {
+      try {
+        await deleteAppointment(appointment.id);
+      } catch (error) {
+        console.error('Ошибка удаления записи:', error);
+        alert('Ошибка при удалении записи');
+      }
+    }
+  };
+
+  const handleSaveAppointment = async (appointmentData) => {
+    setAppointmentModalLoading(true);
+    try {
+      if (selectedAppointment) {
+        await updateAppointment(selectedAppointment.id, appointmentData);
+      } else {
+        await createAppointment(appointmentData);
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения записи:', error);
+      throw error;
+    } finally {
+      setAppointmentModalLoading(false);
+    }
+  };
+
+  const handleCloseAppointmentModal = () => {
+    setShowAppointmentModal(false);
+    setSelectedAppointment(null);
+  };
+
+  const getAppointmentStatusLabel = (status) => {
+    const statusMap = {
+      pending: 'Ожидает',
+      confirmed: 'Подтверждена',
+      paid: 'Оплачена',
+      in_visit: 'На приеме',
+      completed: 'Завершена',
+      cancelled: 'Отменена',
+      no_show: 'Не явился'
+    };
+    return statusMap[status] || status;
+  };
+
+  const getAppointmentStatusColor = (status) => {
+    const colorMap = {
+      pending: 'var(--warning-color)',
+      confirmed: 'var(--info-color)',
+      paid: 'var(--success-color)',
+      in_visit: 'var(--accent-color)',
+      completed: 'var(--success-color)',
+      cancelled: 'var(--danger-color)',
+      no_show: 'var(--text-tertiary)'
+    };
+    return colorMap[status] || 'var(--text-tertiary)';
+  };
+
+  const getAppointmentStatusVariant = (status) => {
+    const variantMap = {
+      pending: 'warning',
+      confirmed: 'info',
+      paid: 'success',
+      in_visit: 'primary',
+      completed: 'success',
+      cancelled: 'error',
+      no_show: 'secondary'
+    };
+    return variantMap[status] || 'secondary';
   };
 
   // Новая структура навигации
@@ -1118,32 +1316,442 @@ const AdminPanel = () => {
   );
 
   const renderPatients = () => (
-    <EmptyState
-      type="users"
-      title="Управление пациентами"
-      description="Здесь будет интерфейс для управления пациентами"
-      action={
-        <Button variant="primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Добавить пациента
-        </Button>
-      }
-    />
+    <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление пациентами</h2>
+          <Button onClick={handleCreatePatient}>
+            <Plus className="w-4 h-4 mr-2" />
+            Добавить пациента
+          </Button>
+        </div>
+        
+        {/* Поиск и фильтры */}
+        <div className="flex items-center space-x-4 mb-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+            <input
+              type="text"
+              placeholder="Поиск пациентов..."
+              value={patientsSearchTerm}
+              onChange={(e) => setPatientsSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            />
+          </div>
+          <select
+            value={filterGender}
+            onChange={(e) => setFilterGender(e.target.value)}
+            className="px-3 py-2 rounded-lg border focus:ring-2"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Все полы</option>
+            <option value="male">Мужской</option>
+            <option value="female">Женский</option>
+          </select>
+          <select
+            value={filterAgeRange}
+            onChange={(e) => setFilterAgeRange(e.target.value)}
+            className="px-3 py-2 rounded-lg border focus:ring-2"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Все возрасты</option>
+            <option value="0-18">0-18 лет</option>
+            <option value="19-35">19-35 лет</option>
+            <option value="36-50">36-50 лет</option>
+            <option value="51-65">51-65 лет</option>
+            <option value="65+">65+ лет</option>
+          </select>
+          <select
+            value={filterBloodType}
+            onChange={(e) => setFilterBloodType(e.target.value)}
+            className="px-3 py-2 rounded-lg border focus:ring-2"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Все группы крови</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
+
+        {/* Таблица пациентов */}
+        <div className="overflow-x-auto">
+          {patientsLoading ? (
+            <LoadingSkeleton type="table" count={5} />
+          ) : patientsError ? (
+            <EmptyState
+              type="error"
+              title="Ошибка загрузки пациентов"
+              description="Не удалось загрузить список пациентов"
+              action={
+                <Button onClick={() => window.location.reload()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Обновить
+                </Button>
+              }
+            />
+          ) : patients.length === 0 ? (
+            <EmptyState
+              type="users"
+              title="Пациенты не найдены"
+              description={patientsSearchTerm || filterGender || filterAgeRange || filterBloodType 
+                ? "Попробуйте изменить параметры поиска" 
+                : "В системе пока нет пациентов"
+              }
+              action={
+                <Button onClick={handleCreatePatient}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Добавить первого пациента
+                </Button>
+              }
+            />
+          ) : (
+            <table className="w-full" role="table" aria-label="Таблица пациентов">
+              <thead>
+                <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пациент</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Возраст</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пол</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Телефон</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Группа крови</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Последний визит</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Визиты</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((patient) => (
+                  <tr key={patient.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
+                          <span className="text-white text-sm font-medium">
+                            {patient.firstName[0]}{patient.lastName[0]}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {patient.lastName} {patient.firstName} {patient.middleName}
+                          </p>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            {patient.email || 'Email не указан'}
+                          </p>
+                          {patient.address && (
+                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              {patient.address}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {calculateAge(patient.birthDate)} лет
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant={patient.gender === 'male' ? 'info' : 'success'}>
+                        {getGenderLabel(patient.gender)}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {patient.phone}
+                    </td>
+                    <td className="py-3 px-4">
+                      {patient.bloodType ? (
+                        <Badge variant="warning">
+                          {patient.bloodType}
+                        </Badge>
+                      ) : (
+                        <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Не указано</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('ru-RU') : 'Нет визитов'}
+                    </td>
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {patient.visitsCount} визитов
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => handleEditPatient(patient)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors" 
+                          style={{ color: 'var(--text-secondary)' }}
+                          title="Редактировать"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeletePatient(patient)}
+                          className="p-1 hover:bg-red-100 rounded transition-colors" 
+                          style={{ color: 'var(--danger-color)' }}
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Card>
+
+      {/* Модальное окно пациента */}
+      <PatientModal
+        isOpen={showPatientModal}
+        onClose={handleClosePatientModal}
+        patient={selectedPatient}
+        onSave={handleSavePatient}
+        loading={patientModalLoading}
+      />
+    </div>
   );
 
-  const renderAppointments = () => (
-    <EmptyState
-      type="calendar"
-      title="Управление записями"
-      description="Здесь будет интерфейс для управления записями на прием"
-      action={
-        <Button variant="primary">
-          <Calendar className="w-4 h-4 mr-2" />
-          Создать запись
-        </Button>
-      }
-    />
-  );
+  const renderAppointments = () => {
+    const statusStats = getStatusStats();
+    const todayAppointments = getTodayAppointments();
+    const tomorrowAppointments = getTomorrowAppointments();
+
+    return (
+      <div className="space-y-6">
+        {/* Статистика записей */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего записей</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{appointments.length}</p>
+              </div>
+              <Calendar className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>На сегодня</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{todayAppointments.length}</p>
+              </div>
+              <Clock className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>На завтра</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{tomorrowAppointments.length}</p>
+              </div>
+              <Calendar className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Ожидают</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{statusStats.pending}</p>
+              </div>
+              <Clock className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
+            </div>
+          </Card>
+        </div>
+
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление записями</h2>
+            <Button onClick={handleCreateAppointment}>
+              <Plus className="w-4 h-4 mr-2" />
+              Создать запись
+            </Button>
+          </div>
+          
+          {/* Поиск и фильтры */}
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              <input
+                type="text"
+                placeholder="Поиск записей..."
+                value={appointmentsSearchTerm}
+                onChange={(e) => setAppointmentsSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
+                style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            <select
+              value={appointmentFilterStatus}
+              onChange={(e) => setAppointmentFilterStatus(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все статусы</option>
+              <option value="pending">Ожидает</option>
+              <option value="confirmed">Подтверждена</option>
+              <option value="paid">Оплачена</option>
+              <option value="in_visit">На приеме</option>
+              <option value="completed">Завершена</option>
+              <option value="cancelled">Отменена</option>
+              <option value="no_show">Не явился</option>
+            </select>
+            <input
+              type="date"
+              value={appointmentFilterDate}
+              onChange={(e) => setAppointmentFilterDate(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            />
+            <select
+              value={appointmentFilterDoctor}
+              onChange={(e) => setAppointmentFilterDoctor(e.target.value)}
+              className="px-3 py-2 rounded-lg border focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="">Все врачи</option>
+              {doctors.map(doctor => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Таблица записей */}
+          <div className="overflow-x-auto">
+            {appointmentsLoading ? (
+              <LoadingSkeleton type="table" count={5} />
+            ) : appointmentsError ? (
+              <EmptyState
+                type="error"
+                title="Ошибка загрузки записей"
+                description="Не удалось загрузить список записей"
+                action={
+                  <Button onClick={() => window.location.reload()}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Обновить
+                  </Button>
+                }
+              />
+            ) : appointments.length === 0 ? (
+              <EmptyState
+                type="calendar"
+                title="Записи не найдены"
+                description={appointmentsSearchTerm || appointmentFilterStatus || appointmentFilterDate || appointmentFilterDoctor 
+                  ? "Попробуйте изменить параметры поиска" 
+                  : "В системе пока нет записей"
+                }
+                action={
+                  <Button onClick={handleCreateAppointment}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Создать первую запись
+                  </Button>
+                }
+              />
+            ) : (
+              <table className="w-full" role="table" aria-label="Таблица записей">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пациент</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Врач</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Дата и время</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Причина</th>
+                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.map((appointment) => (
+                    <tr key={appointment.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
+                            <span className="text-white text-sm font-medium">
+                              {appointment.patientName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{appointment.patientName}</p>
+                            {appointment.phone && (
+                              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{appointment.phone}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{appointment.doctorName}</p>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{appointment.doctorSpecialization}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {new Date(appointment.appointmentDate).toLocaleDateString('ru-RU')}
+                          </p>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                            {appointment.appointmentTime} ({appointment.duration} мин)
+                          </p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant={getAppointmentStatusVariant(appointment.status)}>
+                          {getAppointmentStatusLabel(appointment.status)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          {appointment.reason.length > 50 
+                            ? `${appointment.reason.substring(0, 50)}...` 
+                            : appointment.reason
+                          }
+                        </p>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center space-x-2">
+                          <button 
+                            onClick={() => handleEditAppointment(appointment)}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors" 
+                            style={{ color: 'var(--text-secondary)' }}
+                            title="Редактировать"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteAppointment(appointment)}
+                            className="p-1 hover:bg-red-100 rounded transition-colors" 
+                            style={{ color: 'var(--danger-color)' }}
+                            title="Удалить"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Card>
+
+        {/* Модальное окно записи */}
+        <AppointmentModal
+          isOpen={showAppointmentModal}
+          onClose={handleCloseAppointmentModal}
+          appointment={selectedAppointment}
+          onSave={handleSaveAppointment}
+          loading={appointmentModalLoading}
+          doctors={doctors}
+          patients={patients}
+        />
+      </div>
+    );
+  };
 
   const renderFinance = () => (
     <EmptyState
