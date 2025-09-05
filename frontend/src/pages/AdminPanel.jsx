@@ -41,7 +41,9 @@ import LoadingSkeleton from '../components/admin/LoadingSkeleton';
 import EmptyState from '../components/admin/EmptyState';
 import useAdminData from '../hooks/useAdminData';
 import useUsers from '../hooks/useUsers';
+import useDoctors from '../hooks/useDoctors';
 import UserModal from '../components/admin/UserModal';
+import DoctorModal from '../components/admin/DoctorModal';
 import '../styles/admin.css';
 
 const AdminPanel = () => {
@@ -95,6 +97,29 @@ const AdminPanel = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userModalLoading, setUserModalLoading] = useState(false);
+  
+  // Хук для управления врачами
+  const {
+    doctors,
+    loading: doctorsLoading,
+    error: doctorsError,
+    searchTerm: doctorsSearchTerm,
+    setSearchTerm: setDoctorsSearchTerm,
+    filterSpecialization,
+    setFilterSpecialization,
+    filterDepartment,
+    setFilterDepartment,
+    filterStatus: doctorsFilterStatus,
+    setFilterStatus: setDoctorsFilterStatus,
+    createDoctor,
+    updateDoctor,
+    deleteDoctor
+  } = useDoctors();
+  
+  // Состояние модального окна врачей
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [doctorModalLoading, setDoctorModalLoading] = useState(false);
   
   // Моковые данные для демонстрации
   const [recentActivities] = useState([
@@ -273,6 +298,80 @@ const AdminPanel = () => {
       active: 'var(--success-color)',
       inactive: 'var(--warning-color)',
       blocked: 'var(--danger-color)'
+    };
+    return colorMap[status] || 'var(--text-tertiary)';
+  };
+
+  // Обработчики для врачей
+  const handleCreateDoctor = () => {
+    setSelectedDoctor(null);
+    setShowDoctorModal(true);
+  };
+
+  const handleEditDoctor = (doctor) => {
+    setSelectedDoctor(doctor);
+    setShowDoctorModal(true);
+  };
+
+  const handleDeleteDoctor = async (doctor) => {
+    if (window.confirm(`Вы уверены, что хотите удалить врача "${doctor.name}"?`)) {
+      try {
+        await deleteDoctor(doctor.id);
+      } catch (error) {
+        console.error('Ошибка удаления врача:', error);
+        alert('Ошибка при удалении врача');
+      }
+    }
+  };
+
+  const handleSaveDoctor = async (doctorData) => {
+    setDoctorModalLoading(true);
+    try {
+      if (selectedDoctor) {
+        await updateDoctor(selectedDoctor.id, doctorData);
+      } else {
+        await createDoctor(doctorData);
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения врача:', error);
+      throw error;
+    } finally {
+      setDoctorModalLoading(false);
+    }
+  };
+
+  const handleCloseDoctorModal = () => {
+    setShowDoctorModal(false);
+    setSelectedDoctor(null);
+  };
+
+  const getDepartmentLabel = (department) => {
+    const departmentMap = {
+      cardiology: 'Кардиология',
+      dermatology: 'Дерматология',
+      dentistry: 'Стоматология',
+      general: 'Общее',
+      surgery: 'Хирургия',
+      pediatrics: 'Педиатрия',
+      neurology: 'Неврология'
+    };
+    return departmentMap[department] || department;
+  };
+
+  const getDoctorStatusLabel = (status) => {
+    const statusMap = {
+      active: 'Активен',
+      inactive: 'Неактивен',
+      on_leave: 'В отпуске'
+    };
+    return statusMap[status] || status;
+  };
+
+  const getDoctorStatusColor = (status) => {
+    const colorMap = {
+      active: 'var(--success-color)',
+      inactive: 'var(--warning-color)',
+      on_leave: 'var(--info-color)'
     };
     return colorMap[status] || 'var(--text-tertiary)';
   };
@@ -834,17 +933,188 @@ const AdminPanel = () => {
 
   // Заглушки для остальных разделов
   const renderDoctors = () => (
-    <EmptyState
-      type="users"
-      title="Управление врачами"
-      description="Здесь будет интерфейс для управления врачами клиники"
-      action={
-        <Button variant="primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Добавить врача
-        </Button>
-      }
-    />
+    <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление врачами</h2>
+          <Button onClick={handleCreateDoctor}>
+            <Plus className="w-4 h-4 mr-2" />
+            Добавить врача
+          </Button>
+        </div>
+        
+        {/* Поиск и фильтры */}
+        <div className="flex items-center space-x-4 mb-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+            <input
+              type="text"
+              placeholder="Поиск врачей..."
+              value={doctorsSearchTerm}
+              onChange={(e) => setDoctorsSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
+              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+            />
+          </div>
+          <input
+            type="text"
+            placeholder="Специализация..."
+            value={filterSpecialization}
+            onChange={(e) => setFilterSpecialization(e.target.value)}
+            className="px-3 py-2 rounded-lg border focus:ring-2"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          />
+          <select
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+            className="px-3 py-2 rounded-lg border focus:ring-2"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Все отделения</option>
+            <option value="cardiology">Кардиология</option>
+            <option value="dermatology">Дерматология</option>
+            <option value="dentistry">Стоматология</option>
+            <option value="general">Общее</option>
+            <option value="surgery">Хирургия</option>
+            <option value="pediatrics">Педиатрия</option>
+            <option value="neurology">Неврология</option>
+          </select>
+          <select
+            value={doctorsFilterStatus}
+            onChange={(e) => setDoctorsFilterStatus(e.target.value)}
+            className="px-3 py-2 rounded-lg border focus:ring-2"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="">Все статусы</option>
+            <option value="active">Активен</option>
+            <option value="inactive">Неактивен</option>
+            <option value="on_leave">В отпуске</option>
+          </select>
+        </div>
+
+        {/* Таблица врачей */}
+        <div className="overflow-x-auto">
+          {doctorsLoading ? (
+            <LoadingSkeleton type="table" count={5} />
+          ) : doctorsError ? (
+            <EmptyState
+              type="error"
+              title="Ошибка загрузки врачей"
+              description="Не удалось загрузить список врачей"
+              action={
+                <Button onClick={() => window.location.reload()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Обновить
+                </Button>
+              }
+            />
+          ) : doctors.length === 0 ? (
+            <EmptyState
+              type="users"
+              title="Врачи не найдены"
+              description={doctorsSearchTerm || filterSpecialization || filterDepartment || doctorsFilterStatus 
+                ? "Попробуйте изменить параметры поиска" 
+                : "В системе пока нет врачей"
+              }
+              action={
+                <Button onClick={handleCreateDoctor}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Добавить первого врача
+                </Button>
+              }
+            />
+          ) : (
+            <table className="w-full" role="table" aria-label="Таблица врачей">
+              <thead>
+                <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Врач</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Специализация</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Отделение</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Опыт</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пациенты</th>
+                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doctors.map((doctor) => (
+                  <tr key={doctor.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
+                          <span className="text-white text-sm font-medium">
+                            {doctor.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{doctor.name}</p>
+                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{doctor.email}</p>
+                          {doctor.phone && (
+                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{doctor.phone}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant="info">
+                        {doctor.specialization}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge variant="success">
+                        {getDepartmentLabel(doctor.department)}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {doctor.experience} лет
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge 
+                        variant={doctor.status === 'active' ? 'success' : doctor.status === 'inactive' ? 'warning' : 'info'}
+                      >
+                        {getDoctorStatusLabel(doctor.status)}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {doctor.patientsCount} пациентов
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => handleEditDoctor(doctor)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors" 
+                          style={{ color: 'var(--text-secondary)' }}
+                          title="Редактировать"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteDoctor(doctor)}
+                          className="p-1 hover:bg-red-100 rounded transition-colors" 
+                          style={{ color: 'var(--danger-color)' }}
+                          title="Удалить"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Card>
+
+      {/* Модальное окно врача */}
+      <DoctorModal
+        isOpen={showDoctorModal}
+        onClose={handleCloseDoctorModal}
+        doctor={selectedDoctor}
+        onSave={handleSaveDoctor}
+        loading={doctorModalLoading}
+      />
+    </div>
   );
 
   const renderPatients = () => (
