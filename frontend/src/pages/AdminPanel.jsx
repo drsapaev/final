@@ -31,7 +31,9 @@ import {
   RefreshCw,
   Package,
   Brain,
-  MessageSquare
+  MessageSquare,
+  Monitor,
+  Key
 } from 'lucide-react';
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
@@ -63,6 +65,8 @@ import QueueSettings from '../components/admin/QueueSettings';
 import ServiceCatalog from '../components/admin/ServiceCatalog';
 import AISettings from '../components/admin/AISettings';
 import TelegramSettings from '../components/admin/TelegramSettings';
+import DisplayBoardSettings from '../components/admin/DisplayBoardSettings';
+import ActivationSystem from '../components/admin/ActivationSystem';
 import SecuritySettings from '../components/admin/SecuritySettings';
 import SecurityMonitor from '../components/admin/SecurityMonitor';
 import '../styles/admin.css';
@@ -938,6 +942,8 @@ const AdminPanel = () => {
         { to: '/admin/queue-settings', label: 'Настройки очередей', icon: Clock },
         { to: '/admin/ai-settings', label: 'AI настройки', icon: Brain },
         { to: '/admin/telegram-settings', label: 'Telegram', icon: MessageSquare },
+        { to: '/admin/display-settings', label: 'Управление табло', icon: Monitor },
+        { to: '/admin/activation', label: 'Система активации', icon: Key },
         { to: '/admin/finance', label: 'Финансы', icon: CreditCard },
         { to: '/admin/reports', label: 'Отчеты', icon: FileText },
         { to: '/admin/settings', label: 'Настройки', icon: Settings },
@@ -1464,6 +1470,10 @@ const AdminPanel = () => {
         return <AISettings />;
       case 'telegram-settings':
         return <TelegramSettings />;
+      case 'display-settings':
+        return <DisplayBoardSettings />;
+      case 'activation':
+        return <ActivationSystem />;
       case 'settings':
         return renderSettings();
       case 'security':
