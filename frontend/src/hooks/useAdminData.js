@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const useAdminData = (endpoint, options = {}) => {
   const [data, setData] = useState(null);
@@ -22,10 +22,11 @@ const useAdminData = (endpoint, options = {}) => {
       }
       setError(null);
 
+      const storedToken = localStorage.getItem('auth_token');
       const response = await fetch(endpoint, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': storedToken ? `Bearer ${storedToken}` : undefined
         }
       });
 
@@ -39,6 +40,7 @@ const useAdminData = (endpoint, options = {}) => {
       if (onSuccess) {
         onSuccess(result);
       }
+      return result;
     } catch (err) {
       console.error('Admin data fetch error:', err);
       setError(err);
@@ -46,6 +48,7 @@ const useAdminData = (endpoint, options = {}) => {
       if (onError) {
         onError(err);
       }
+      return null;
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -54,17 +57,17 @@ const useAdminData = (endpoint, options = {}) => {
 
   const refresh = useCallback(() => {
     fetchData(true);
-  }, [fetchData]);
+  }, []); // Убрали зависимость
 
   const retry = useCallback(() => {
     fetchData(false);
-  }, [fetchData]);
+  }, []); // Убрали зависимость
 
   useEffect(() => {
     if (autoFetch && endpoint) {
       fetchData();
     }
-  }, [autoFetch, endpoint, fetchData]);
+  }, [autoFetch, endpoint]); // Убрали fetchData из зависимостей
 
   useEffect(() => {
     if (refreshInterval && endpoint) {
@@ -74,9 +77,10 @@ const useAdminData = (endpoint, options = {}) => {
 
       return () => clearInterval(interval);
     }
-  }, [refreshInterval, endpoint, fetchData]);
+  }, [refreshInterval, endpoint]); // Убрали fetchData из зависимостей
 
-  return {
+
+  return useMemo(() => ({
     data,
     loading,
     error,
@@ -84,7 +88,7 @@ const useAdminData = (endpoint, options = {}) => {
     refresh,
     retry,
     setData
-  };
+  }), [data, loading, error, refreshing, refresh, retry, setData]);
 };
 
 export default useAdminData;

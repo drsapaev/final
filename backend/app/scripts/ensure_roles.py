@@ -6,13 +6,13 @@ from app.models.user import User
 
 USERS = [
     ("admin", "Admin", "admin@ex.com", "admin123"),
-    ("registrar", "Registrar", "reg@ex.com", "reg123"),
+    ("registrar", "Registrar", "reg@ex.com", "registrar123"),
     ("lab", "Lab", "lab@ex.com", "lab123"),
-    ("doctor", "Doctor", "doc@ex.com", "doc123"),
-    ("cardio", "Doctor", "cardio@ex.com", "doc123"),
-    ("derma", "Doctor", "derma@ex.com", "doc123"),
-    ("dentist", "Doctor", "dentist@ex.com", "doc123"),
-    ("cashier", "Cashier", "cash@ex.com", "cash123"),
+    ("doctor", "Doctor", "doc@ex.com", "doctor123"),
+    ("cardio", "cardio", "cardio@ex.com", "cardio123"),
+    ("derma", "derma", "derma@ex.com", "derma123"),
+    ("dentist", "dentist", "dentist@ex.com", "dentist123"),
+    ("cashier", "Cashier", "cash@ex.com", "cashier123"),
 ]
 
 
@@ -32,6 +32,9 @@ def upsert_users():
             else:
                 u.role = role
                 u.email = email
+                # Всегда обновляем пароль и активируем пользователя
+                u.hashed_password = get_password_hash(pwd)
+                u.is_active = True
             db.commit()
         print("ok")
     finally:

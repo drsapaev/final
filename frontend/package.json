@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3000",
+    "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "preview": "http-server . -p 3000 -a 0.0.0.0",
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
     "lint:check": "eslint src --ext .js,.jsx,.ts,.tsx",
     "storybook": "storybook dev -p 6006",
