@@ -183,14 +183,14 @@ jobs:
         
         # Список тестов для выполнения
         tests=(
-            "test_payment_webhooks.py:Вебхуки оплат"
+            "test_authentication.py:Аутентификация"
             "test_queue_system.py:Система очередей"
             "test_visit_reschedule.py:Перенос визитов"
             "test_websocket.py:WebSocket"
-            "test_authentication.py:Аутентификация"
             "test_reports.py:Отчёты"
             "test_printing.py:Система печати"
             "test_printing_edge_cases.py:Edge cases печати"
+            "test_payment_webhooks.py:Вебхуки оплат"
         )
         
         failed_tests=()
@@ -401,13 +401,15 @@ jobs:
     - name: 🎭 Запуск E2E тестов
       run: |
         cd frontend
-        npx playwright test --reporter=line
+        mkdir -p playwright-report
+        npx playwright test --reporter=line --reporter=html --output-dir=playwright-report --config=playwright.config.js --timeout=30000 --retries=2 --max-failures=3 --workers=2 --project=chromium --headed=false --browser=chromium --video=retain-on-failure --screenshot=only-on-failure --trace=retain-on-failure --reporter=json --reporter=github --reporter=allure --reporter=blob --reporter=dot --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct --reporter=experimental-ct
     - name: 📤 Артефакты Playwright
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: playwright-report
         path: frontend/playwright-report
+        if-no-files-found: warn
     - name: 🛑 Остановка backend
       if: always()
       run: |

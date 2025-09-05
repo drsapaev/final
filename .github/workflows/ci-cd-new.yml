@@ -159,7 +159,7 @@ jobs:
           sleep 10
           
           # Запускаем тесты с покрытием
-          python -m pytest test_authentication.py test_queue_system.py test_visit_reschedule.py test_websocket.py test_reports.py test_printing.py test_printing_edge_cases.py --cov=app --cov-report=xml --cov-report=html -v || true
+          python -m pytest test_authentication.py test_queue_system.py test_visit_reschedule.py test_websocket.py test_reports.py test_printing.py test_printing_edge_cases.py test_payment_webhooks.py --cov=app --cov-report=xml --cov-report=html -v || true
           
           # Останавливаем сервер
           if [ -f server.pid ]; then
@@ -482,7 +482,7 @@ jobs:
           sleep 10
           
           # Запускаем интеграционные тесты с покрытием
-          python -m pytest test_authentication.py test_queue_system.py test_visit_reschedule.py test_websocket.py test_reports.py test_printing.py test_printing_edge_cases.py --cov=app --cov-report=xml --cov-report=html -v --tb=short || true
+          python -m pytest test_authentication.py test_queue_system.py test_visit_reschedule.py test_websocket.py test_reports.py test_printing.py test_printing_edge_cases.py test_payment_webhooks.py --cov=app --cov-report=xml --cov-report=html -v --tb=short || true
           
           # Останавливаем сервер
           if [ -f server.pid ]; then
