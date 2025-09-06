@@ -42,7 +42,7 @@ jobs:
         
         # Импортируем все модели через __init__.py чтобы избежать проблем с отсутствующими моделями
         try:
-            from app.models import *
+            import app.models
         except ImportError as e:
             print(f'⚠️ Ошибка импорта моделей: {e}')
             # Импортируем только базовые модели
