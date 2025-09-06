@@ -10,7 +10,6 @@ import Sidebar from './components/Sidebar.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
-// import Doctor from './pages/Doctor.jsx';
 import CashierPanel from './pages/CashierPanel.jsx';
 import Settings from './pages/Settings.jsx';
 import Audit from './pages/Audit.jsx';
@@ -28,7 +27,7 @@ import UserSelect from './pages/UserSelect.jsx';
 import Search from './pages/Search.jsx';
 import PatientPanel from './pages/PatientPanel.jsx';
 import QueueBoard from './pages/QueueBoard.jsx';
-import DisplayBoardPage from './pages/DisplayBoardPage.jsx';
+import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 
 import auth from './stores/auth.js';
@@ -117,9 +116,9 @@ export default function App() {
           <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
           <Route path="lab-panel"     element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
           <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
-          <Route path="queue-board"   element={<QueueBoard />} />
-          <Route path="display-board" element={<DisplayBoardPage />} />
-          <Route path="display-board/:role" element={<DisplayBoardPage />} />
+          <Route path="queue-board"   element={<DisplayBoardUnified />} />
+          <Route path="display-board" element={<DisplayBoardUnified />} />
+          <Route path="display-board/:role" element={<DisplayBoardUnified />} />
           <Route path="settings"      element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
           <Route path="audit"         element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
           <Route path="scheduler"     element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
