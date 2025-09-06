@@ -4,6 +4,7 @@ import EMRSystem from '../components/EMRSystem';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import QueueIntegration from '../components/QueueIntegration';
+import AIAssistant from '../components/ai/AIAssistant';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 const DermatologistPanel = () => {
@@ -333,6 +334,7 @@ const DermatologistPanel = () => {
         <button style={activeTab === 'patients' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('patients')}>👥 Пациенты</button>
         <button style={activeTab === 'examinations' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('examinations')}>🔍 Осмотры кожи</button>
         <button style={activeTab === 'procedures' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('procedures')}>✨ Косметические процедуры</button>
+        <button style={activeTab === 'ai' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('ai')}>🧠 AI Помощник</button>
       </div>
 
       {activeTab === 'patients' && (
@@ -708,6 +710,24 @@ const DermatologistPanel = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Помощник */}
+      {activeTab === 'ai' && (
+        <div style={cardStyle}>
+          <div style={cardContentStyle}>
+            <AIAssistant
+              specialty="dermatology"
+              onSuggestionSelect={(type, suggestion) => {
+                if (type === 'icd10') {
+                  console.log('AI предложил МКБ-10:', suggestion);
+                } else if (type === 'diagnosis') {
+                  console.log('AI предложил диагноз:', suggestion);
+                }
+              }}
+            />
           </div>
         </div>
       )}

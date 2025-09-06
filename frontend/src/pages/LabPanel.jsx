@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AIAssistant from '../components/ai/AIAssistant';
 
 const LabPanel = () => {
   const [activeTab, setActiveTab] = useState('tests');
@@ -135,6 +136,7 @@ const LabPanel = () => {
         <button style={activeTab === 'results' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('results')}>📊 Результаты</button>
         <button style={activeTab === 'patients' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('patients')}>👥 Пациенты</button>
         <button style={activeTab === 'reports' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('reports')}>📋 Отчеты</button>
+        <button style={activeTab === 'ai' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('ai')}>🧠 AI Анализ</button>
       </div>
 
       {activeTab === 'tests' && (
@@ -348,6 +350,24 @@ const LabPanel = () => {
                 <button type="button" style={buttonSecondaryStyle} onClick={() => setShowResultForm(false)}>Отмена</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Анализ */}
+      {activeTab === 'ai' && (
+        <div style={cardStyle}>
+          <div style={cardContentStyle}>
+            <AIAssistant
+              specialty="laboratory"
+              onSuggestionSelect={(type, suggestion) => {
+                if (type === 'interpretation') {
+                  console.log('AI интерпретация анализов:', suggestion);
+                } else if (type === 'anomaly') {
+                  console.log('AI обнаружил аномалию:', suggestion);
+                }
+              }}
+            />
           </div>
         </div>
       )}
