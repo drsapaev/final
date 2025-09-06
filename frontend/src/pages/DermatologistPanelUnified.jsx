@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Camera, 
   Activity, 
@@ -18,7 +18,9 @@ import {
   TestTube,
   Image as ImageIcon,
   Scissors,
-  Sparkles
+  Sparkles,
+  DollarSign,
+  Clock
 } from 'lucide-react';
 import { Card, Button, Badge } from '../design-system/components';
 import { useTheme } from '../contexts/ThemeContext';
@@ -26,6 +28,12 @@ import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
+import ServiceChecklist from '../components/ServiceChecklist';
+import EMRSystem from '../components/EMRSystem';
+import PrescriptionSystem from '../components/PrescriptionSystem';
+import VisitTimeline from '../components/VisitTimeline';
+import QueueIntegration from '../components/QueueIntegration';
+import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 /**
  * Унифицированная панель дерматолога
@@ -73,11 +81,39 @@ const DermatologistPanelUnified = () => {
   const [showCosmeticForm, setShowCosmeticForm] = useState(false);
   const [skinExaminations, setSkinExaminations] = useState([]);
   const [cosmeticProcedures, setCosmeticProcedures] = useState([]);
+  
+  // Дополнительные состояния из старого файла
+  const [patients, setPatients] = useState([]);
+  const [currentAppointment, setCurrentAppointment] = useState(null);
+  const [emr, setEmr] = useState(null);
+  const [prescription, setPrescription] = useState(null);
+  const [doctorPrice, setDoctorPrice] = useState('');
+  
+  // Локальный справочник цен для дерма/косметологии
+  const dermaPriceMap = useMemo(() => ({
+    derma_consultation: 50000,
+    derma_biopsy: 150000,
+    cosm_cleaning: 80000,
+    cosm_botox: 300000,
+    cosm_laser: 250000,
+  }), []);
+
+  const servicesSubtotal = useMemo(() => {
+    return selectedServices.reduce((sum, id) => sum + (dermaPriceMap[id] || 0), 0);
+  }, [selectedServices, dermaPriceMap]);
+
+  const doctorPriceNum = useMemo(() => {
+    const n = Number(String(doctorPrice).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  }, [doctorPrice]);
+
+  const totalCost = useMemo(() => servicesSubtotal + doctorPriceNum, [servicesSubtotal, doctorPriceNum]);
 
   // Вкладки панели
   const tabs = [
     { id: 'queue', label: 'Очередь', icon: Users, color: 'text-blue-600' },
     { id: 'visit', label: 'Прием', icon: Stethoscope, color: 'text-orange-600' },
+    { id: 'patients', label: 'Пациенты', icon: User, color: 'text-green-600' },
     { id: 'photos', label: 'Фото', icon: Camera, color: 'text-purple-600' },
     { id: 'skin', label: 'Осмотр кожи', icon: Activity, color: 'text-green-600' },
     { id: 'cosmetic', label: 'Косметология', icon: Sparkles, color: 'text-pink-600' },
@@ -87,10 +123,65 @@ const DermatologistPanelUnified = () => {
   ];
 
   useEffect(() => {
+    loadPatients();
+    loadSkinExaminations();
+    loadCosmeticProcedures();
+  }, []);
+
+  useEffect(() => {
     if (selectedPatient) {
       loadPatientData();
     }
   }, [selectedPatient]);
+
+  const authHeader = () => ({
+    Authorization: `Bearer ${localStorage.getItem('auth_token') || localStorage.getItem('token') || ''}`,
+  });
+
+  const loadPatients = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/v1/patients?department=Derma&limit=100', {
+        headers: authHeader(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setPatients(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки пациентов:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSkinExaminations = async () => {
+    try {
+      const response = await fetch('/api/v1/derma/examinations?limit=100', {
+        headers: authHeader(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSkinExaminations(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      // эндпоинт может отсутствовать
+    }
+  };
+
+  const loadCosmeticProcedures = async () => {
+    try {
+      const response = await fetch('/api/v1/derma/procedures?limit=100', {
+        headers: authHeader(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCosmeticProcedures(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      // эндпоинт может отсутствовать
+    }
+  };
 
   const loadPatientData = async () => {
     if (!selectedPatient?.patient?.id) return;
@@ -115,6 +206,109 @@ const DermatologistPanelUnified = () => {
       }
     } catch (error) {
       console.error('Ошибка загрузки данных пациента:', error);
+    }
+  };
+
+  // Функции EMR системы из старого файла
+  const startVisit = async (appointment) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${appointment.id}/start-visit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        const updatedAppointment = await response.json();
+        setCurrentAppointment(updatedAppointment);
+        setMessage({ type: 'success', text: 'Прием начат успешно!' });
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.detail || 'Ошибка при начале приема' });
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Start visit error:', error);
+      setMessage({ type: 'error', text: 'Ошибка при начале приема' });
+    }
+  };
+
+  const saveEMR = async (emrData) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/emr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify(emrData)
+      });
+
+      if (response.ok) {
+        const savedEMR = await response.json();
+        setEmr(savedEMR);
+        setMessage({ type: 'success', text: 'EMR сохранена успешно!' });
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.detail || 'Ошибка при сохранении EMR' });
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Save EMR error:', error);
+      setMessage({ type: 'error', text: 'Ошибка при сохранении EMR' });
+    }
+  };
+
+  const savePrescription = async (prescriptionData) => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/prescription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify(prescriptionData)
+      });
+
+      if (response.ok) {
+        const savedPrescription = await response.json();
+        setPrescription(savedPrescription);
+        setMessage({ type: 'success', text: 'Рецепт сохранен успешно!' });
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.detail || 'Ошибка при сохранении рецепта' });
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Save prescription error:', error);
+      setMessage({ type: 'error', text: 'Ошибка при сохранении рецепта' });
+    }
+  };
+
+  const completeVisit = async () => {
+    try {
+      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      });
+
+      if (response.ok) {
+        const completedAppointment = await response.json();
+        setCurrentAppointment(completedAppointment);
+        setMessage({ type: 'success', text: 'Прием завершен успешно!' });
+        // Сброс состояния
+        setCurrentAppointment(null);
+        setEmr(null);
+        setPrescription(null);
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.detail || 'Ошибка при завершении приема' });
+      }
+    } catch (error) {
+      console.error('DermatologistPanel: Complete visit error:', error);
+      setMessage({ type: 'error', text: 'Ошибка при завершении приема' });
     }
   };
 
@@ -359,14 +553,178 @@ const DermatologistPanelUnified = () => {
       <div>
         {/* Очередь пациентов */}
         {activeTab === 'queue' && (
-          <DoctorQueuePanel
-            specialty="dermatology"
-            onPatientSelect={handlePatientSelect}
-          />
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center">
+                <Users size={20} className="mr-2 text-blue-600" />
+                Очередь пациентов
+              </h3>
+              <QueueIntegration
+                department="Derma"
+                onSelectAppointment={(appointment) => {
+                  setCurrentAppointment(appointment);
+                  setActiveTab('visit');
+                }}
+                onStartVisit={startVisit}
+              />
+            </Card>
+          </div>
         )}
 
-        {/* Прием пациента */}
-        {activeTab === 'visit' && selectedPatient && (
+        {/* Список пациентов */}
+        {activeTab === 'patients' && (
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium flex items-center">
+                  <User size={20} className="mr-2 text-green-600" />
+                  Дерматологические пациенты
+                </h3>
+                <Badge variant="info">Всего: {patients.length} пациентов</Badge>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8">
+                  <RefreshCw size={32} className="animate-spin mx-auto mb-4 text-gray-400" />
+                  <p className="text-gray-500">Загрузка пациентов...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {patients.map((patient) => (
+                    <div key={patient.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center mb-2">
+                            <h4 className="font-medium text-lg">
+                              {patient.last_name} {patient.first_name} {patient.middle_name}
+                            </h4>
+                            <Badge variant="success" className="ml-3">Дерматология</Badge>
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <div className="flex items-center">
+                              <Phone size={14} className="mr-2" />
+                              {patient.phone}
+                            </div>
+                            <div className="flex items-center">
+                              <Calendar size={14} className="mr-2" />
+                              {patient.birth_date}
+                            </div>
+                            <div className="flex items-center">
+                              <User size={14} className="mr-2" />
+                              ID: {patient.id}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              setSkinExamination({ ...skinExamination, patient_id: patient.id });
+                              setShowSkinForm(true);
+                            }}
+                          >
+                            <Activity size={16} className="mr-1" />
+                            Осмотр
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              setCosmeticProcedure({ ...cosmeticProcedure, patient_id: patient.id });
+                              setShowCosmeticForm(true);
+                            }}
+                          >
+                            <Sparkles size={16} className="mr-1" />
+                            Процедура
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedPatient(patient)}
+                          >
+                            <User size={16} className="mr-1" />
+                            Просмотр
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* Прием пациента - EMR система */}
+        {activeTab === 'visit' && currentAppointment && (
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium flex items-center">
+                  <Stethoscope size={20} className="mr-2 text-orange-600" />
+                  Прием пациента: {currentAppointment.patient_name || 'Не указано'}
+                </h3>
+                <Badge variant="info">
+                  Статус: {currentAppointment.status}
+                </Badge>
+              </div>
+
+              {/* Временная шкала приема */}
+              <VisitTimeline
+                appointment={currentAppointment}
+                emr={emr}
+                prescription={prescription}
+              />
+
+              {/* EMR система */}
+              <div className="mt-6">
+                <h4 className="text-lg font-medium mb-4 flex items-center">
+                  <FileText size={20} className="mr-2 text-blue-600" />
+                  Электронная медицинская карта
+                </h4>
+                <EMRSystem
+                  appointment={currentAppointment}
+                  emr={emr}
+                  onSave={saveEMR}
+                />
+              </div>
+
+              {/* Система рецептов */}
+              {emr && !emr.is_draft && (
+                <div className="mt-6">
+                  <h4 className="text-lg font-medium mb-4 flex items-center">
+                    <TestTube size={20} className="mr-2 text-green-600" />
+                    Рецепт
+                  </h4>
+                  <PrescriptionSystem
+                    appointment={currentAppointment}
+                    emr={emr}
+                    prescription={prescription}
+                    onSave={savePrescription}
+                  />
+                </div>
+              )}
+
+              {/* Кнопка завершения приема */}
+              {emr && !emr.is_draft && (
+                <div className="mt-6 text-center">
+                  <Button
+                    onClick={completeVisit}
+                    className="bg-green-600 hover:bg-green-700 text-lg px-8 py-3"
+                  >
+                    <CheckCircle size={20} className="mr-2" />
+                    Завершить прием
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* Прием пациента - простая версия */}
+        {activeTab === 'visit' && selectedPatient && !currentAppointment && (
           <div className="space-y-6">
             {/* Информация о пациенте */}
             <Card className="p-6">
@@ -466,6 +824,37 @@ const DermatologistPanelUnified = () => {
               canEditPrices={true}
             />
 
+            {/* EMR система */}
+            {currentAppointment && (
+              <Card className="p-6">
+                <h3 className="text-lg font-medium mb-4 flex items-center">
+                  <FileText size={20} className="mr-2 text-blue-600" />
+                  Электронная медицинская карта
+                </h3>
+                <EMRSystem
+                  appointment={currentAppointment}
+                  emr={emr}
+                  onSave={saveEMR}
+                />
+              </Card>
+            )}
+
+            {/* Система рецептов */}
+            {currentAppointment && emr && !emr.is_draft && (
+              <Card className="p-6">
+                <h3 className="text-lg font-medium mb-4 flex items-center">
+                  <TestTube size={20} className="mr-2 text-green-600" />
+                  Рецепт
+                </h3>
+                <PrescriptionSystem
+                  appointment={currentAppointment}
+                  emr={emr}
+                  prescription={prescription}
+                  onSave={savePrescription}
+                />
+              </Card>
+            )}
+
             {/* Действия */}
             <Card className="p-6">
               <div className="flex justify-end space-x-3">
@@ -478,17 +867,27 @@ const DermatologistPanelUnified = () => {
                 >
                   Отменить
                 </Button>
-                <Button
-                  onClick={handleSaveVisit}
-                  disabled={loading || !visitData.complaint}
-                >
-                  {loading ? (
-                    <RefreshCw size={16} className="animate-spin mr-2" />
-                  ) : (
-                    <Save size={16} className="mr-2" />
-                  )}
-                  Завершить прием
-                </Button>
+                {currentAppointment && emr && !emr.is_draft ? (
+                  <Button
+                    onClick={completeVisit}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle size={16} className="mr-2" />
+                    Завершить прием
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSaveVisit}
+                    disabled={loading || !visitData.complaint}
+                  >
+                    {loading ? (
+                      <RefreshCw size={16} className="animate-spin mr-2" />
+                    ) : (
+                      <Save size={16} className="mr-2" />
+                    )}
+                    Завершить прием
+                  </Button>
+                )}
               </div>
             </Card>
           </div>
@@ -825,25 +1224,147 @@ const DermatologistPanelUnified = () => {
 
         {/* Управление услугами */}
         {activeTab === 'services' && (
-          <DoctorServiceSelector
-            specialty="dermatology"
-            selectedServices={[]}
-            onServicesChange={() => {}}
-            canEditPrices={false}
-          />
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center">
+                <Scissors size={20} className="mr-2 text-orange-600" />
+                Услуги дерматологии и косметологии
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Выбор услуг
+                  </label>
+                  <ServiceChecklist
+                    value={selectedServices}
+                    onChange={setSelectedServices}
+                    department="derma"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Стоимость от врача (UZS)
+                    </label>
+                    <div className="relative">
+                      <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        value={doctorPrice}
+                        onChange={(e) => setDoctorPrice(e.target.value)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        placeholder="Например: 50000"
+                        inputMode="numeric"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Итого к оплате
+                    </label>
+                    <div className="flex items-center h-10 px-3 border-2 border-dashed border-gray-300 rounded-md bg-gray-50 dark:bg-gray-800 dark:border-gray-600">
+                      <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {totalCost.toLocaleString()} UZS
+                      </span>
+                      <span className="ml-2 text-sm text-gray-500">
+                        (услуги: {servicesSubtotal.toLocaleString()} UZS
+                        {doctorPriceNum ? `, врач: ${doctorPriceNum.toLocaleString()} UZS` : ''})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                    💡 Справочник цен
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-blue-800 dark:text-blue-200">
+                    <div>• Консультация: 50,000 UZS</div>
+                    <div>• Биопсия: 150,000 UZS</div>
+                    <div>• Чистка лица: 80,000 UZS</div>
+                    <div>• Ботокс: 300,000 UZS</div>
+                    <div>• Лазер: 250,000 UZS</div>
+                    <div>• + стоимость от врача</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         )}
 
-        {/* История (заглушка) */}
+        {/* История */}
         {activeTab === 'history' && (
-          <Card className="p-8 text-center">
-            <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              История приемов
-            </h3>
-            <p className="text-gray-500">
-              Функция в разработке
-            </p>
-          </Card>
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="text-lg font-medium mb-4 flex items-center">
+                <Calendar size={20} className="mr-2 text-gray-600" />
+                История приемов и процедур
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* История осмотров кожи */}
+                <div>
+                  <h4 className="font-medium mb-3 flex items-center">
+                    <Activity size={16} className="mr-2 text-green-600" />
+                    Осмотры кожи ({skinExaminations.length})
+                  </h4>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {skinExaminations.map((exam) => (
+                      <div key={exam.id} className="border border-gray-200 rounded-lg p-3 text-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium">#{exam.id}</span>
+                          <Badge variant="info" className="text-xs">{exam.examination_date}</Badge>
+                        </div>
+                        <div className="text-gray-600 space-y-1">
+                          <div>🧴 {exam.skin_type} • {exam.skin_condition}</div>
+                          <div>🎯 {exam.lesions}</div>
+                          {exam.diagnosis && <div>📋 {exam.diagnosis}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* История косметических процедур */}
+                <div>
+                  <h4 className="font-medium mb-3 flex items-center">
+                    <Sparkles size={16} className="mr-2 text-pink-600" />
+                    Косметические процедуры ({cosmeticProcedures.length})
+                  </h4>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {cosmeticProcedures.map((procedure) => (
+                      <div key={procedure.id} className="border border-gray-200 rounded-lg p-3 text-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium">#{procedure.id}</span>
+                          <Badge variant="info" className="text-xs">{procedure.procedure_date}</Badge>
+                        </div>
+                        <div className="text-gray-600 space-y-1">
+                          <div>✨ {procedure.procedure_type}</div>
+                          <div>📍 {procedure.area_treated}</div>
+                          {procedure.results && <div>📊 {procedure.results}</div>}
+                          {procedure.total_cost && (
+                            <div className="font-medium text-green-600">
+                              💰 {Number(procedure.total_cost).toLocaleString()} UZS
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {skinExaminations.length === 0 && cosmeticProcedures.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar size={48} className="mx-auto mb-4 text-gray-300" />
+                  <p>Нет данных о приемах и процедурах</p>
+                </div>
+              )}
+            </Card>
+          </div>
         )}
       </div>
     </div>

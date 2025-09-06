@@ -119,8 +119,8 @@ def check_frontend_files():
         "App.jsx",
         "pages/Login.jsx",
         "pages/UserSelect.jsx",
-        "pages/CardiologistPanel.jsx",
-        "pages/DermatologistPanel.jsx",
+        "pages/CardiologistPanelUnified.jsx",
+        "pages/DermatologistPanelUnified.jsx",
         "pages/DentistPanel.jsx",
     ]
 
