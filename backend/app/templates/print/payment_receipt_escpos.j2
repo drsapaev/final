@@ -1,0 +1,76 @@
+{% comment %}
+Шаблон чека об оплате для ESC/POS принтеров
+Основа: detail.md стр. 3721-3888
+{% endcomment %}
+{% raw %}
+{{ '\x1b\x40' }}{{ '\x1b\x61\x01' }}
+========================================
+      {{ clinic_name | upper }}
+========================================
+{{ '\x1b\x45\x01' }}ЧЕК ОБ ОПЛАТЕ{{ '\x1b\x45\x00' }}
+
+№ {{ payment.number }}
+Дата: {{ payment.date | strftime('%d.%m.%Y') }}
+Время: {{ payment.time | strftime('%H:%M:%S') }}
+
+----------------------------------------
+ПАЦИЕНТ:
+{{ patient.full_name }}
+{% if patient.phone %}Тел: {{ patient.phone }}{% endif %}
+
+----------------------------------------
+ВРАЧ: {{ doctor.full_name }}
+СПЕЦИАЛЬНОСТЬ: {{ doctor.specialty_name }}
+{% if doctor.cabinet %}КАБИНЕТ: {{ doctor.cabinet }}{% endif %}
+
+----------------------------------------
+{{ '\x1b\x45\x01' }}ОПЛАЧЕННЫЕ УСЛУГИ:{{ '\x1b\x45\x00' }}
+
+{% for service in payment.services %}
+{{ loop.index }}. {{ service.name }}
+{% if service.quantity > 1 %}   {{ service.quantity }} x {{ service.price }} {{ service.currency }}{% endif %}
+   {{ service.total | number_format }} {{ service.currency }}
+{% endfor %}
+
+----------------------------------------
+{% if payment.discount > 0 %}
+Подытог: {{ payment.subtotal | number_format }} UZS
+Скидка: {{ payment.discount | number_format }} UZS
+{% endif %}
+
+{{ '\x1b\x21\x30' }}ИТОГО К ОПЛАТЕ:{{ '\x1b\x21\x00' }}
+{{ '\x1b\x21\x88' }}{{ payment.total | number_format }} UZS{{ '\x1b\x21\x00' }}
+
+----------------------------------------
+СПОСОБ ОПЛАТЫ: {{ payment.method_name }}
+
+{% if payment.method == 'card' %}
+Карта: **** **** **** {{ payment.card_last4 }}
+{% if payment.transaction_id %}ID транзакции: {{ payment.transaction_id }}{% endif %}
+{% elif payment.method == 'cash' %}
+Наличные: {{ payment.paid_amount | number_format }} UZS
+{% if payment.change > 0 %}Сдача: {{ payment.change | number_format }} UZS{% endif %}
+{% elif payment.method == 'payme' %}
+PayMe ID: {{ payment.payme_transaction_id }}
+{% elif payment.method == 'click' %}
+Click ID: {{ payment.click_transaction_id }}
+{% endif %}
+
+----------------------------------------
+{% if cashier %}
+Кассир: {{ cashier.full_name }}
+{% endif %}
+
+{{ '\x1b\x45\x01' }}СТАТУС: {{ payment.status | upper }}{{ '\x1b\x45\x00' }}
+
+----------------------------------------
+{{ '\x1b\x61\x01' }}СПАСИБО ЗА ОБРАЩЕНИЕ!{{ '\x1b\x61\x00' }}
+
+Справки: {{ clinic_phone }}
+{{ clinic_address }}
+
+{% if clinic_website %}{{ clinic_website }}{% endif %}
+
+{{ '\x1b\x64\x03' }}
+{{ '\x1d\x56\x00' }}
+{% endraw %}
