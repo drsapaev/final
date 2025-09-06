@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AIAssistant from '../components/ai/AIAssistant';
 
 const DentistPanel = () => {
   const [activeTab, setActiveTab] = useState('patients');
@@ -174,6 +175,7 @@ const DentistPanel = () => {
         <button style={activeTab === 'examinations' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('examinations')}>🔍 Осмотры</button>
         <button style={activeTab === 'treatments' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('treatments')}>🦷 Лечение</button>
         <button style={activeTab === 'prosthetics' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('prosthetics')}>🦿 Протезирование</button>
+        <button style={activeTab === 'ai' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('ai')}>🧠 AI Помощник</button>
       </div>
 
       {activeTab === 'patients' && (
@@ -585,6 +587,24 @@ const DentistPanel = () => {
                 <button type="button" style={buttonSecondaryStyle} onClick={() => setShowProstheticForm(false)}>Отмена</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Помощник */}
+      {activeTab === 'ai' && (
+        <div style={cardStyle}>
+          <div style={cardContentStyle}>
+            <AIAssistant
+              specialty="stomatology"
+              onSuggestionSelect={(type, suggestion) => {
+                if (type === 'icd10') {
+                  console.log('AI предложил МКБ-10 для стоматологии:', suggestion);
+                } else if (type === 'diagnosis') {
+                  console.log('AI предложил стоматологический диагноз:', suggestion);
+                }
+              }}
+            />
           </div>
         </div>
       )}

@@ -10,6 +10,7 @@ import {
   useTouchDevice
 } from '../design-system';
 import { useTheme } from '../contexts/ThemeContext';
+import AIAssistant from '../components/ai/AIAssistant';
 import { 
   User, 
   Calendar, 
@@ -17,10 +18,10 @@ import {
   Stethoscope, 
   FileText, 
   Pill, 
-  Activity, 
+  Activity,
+  Brain, 
   Heart,
   Eye,
-  Brain,
   Zap,
   Search,
   Filter,
@@ -464,6 +465,26 @@ const DoctorPanel = () => {
           >
             <Calendar size={isMobile ? 16 : 20} />
             {!isMobile && <span>Записи</span>}
+          </button>
+          
+          <button
+            style={activeTab === 'ai' ? activeTabStyle : tabStyle}
+            onClick={() => setActiveTab('ai')}
+            onMouseEnter={(e) => {
+              if (activeTab !== 'ai') {
+                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                e.target.style.transform = 'translateY(-2px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== 'ai') {
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.transform = 'translateY(0)';
+              }
+            }}
+          >
+            <Brain size={isMobile ? 16 : 20} />
+            {!isMobile && <span>AI Помощник</span>}
           </button>
           
           <button
@@ -972,6 +993,31 @@ const DoctorPanel = () => {
                     </tbody>
                   </table>
                 )}
+              </Card.Content>
+            </Card>
+          </AnimatedTransition>
+        )}
+
+        {activeTab === 'ai' && (
+          <AnimatedTransition type="fade" delay={100}>
+            <Card>
+              <Card.Header>
+                <h2 style={{ 
+                  fontSize: getFontSize('xl'), 
+                  fontWeight: '700',
+                  color: getColor('secondary', 800),
+                  margin: 0
+                }}>
+                  AI Помощник врача
+                </h2>
+              </Card.Header>
+              <Card.Content>
+                <AIAssistant
+                  specialty="general"
+                  onSuggestionSelect={(type, suggestion) => {
+                    console.log('AI предложение для общего врача:', type, suggestion);
+                  }}
+                />
               </Card.Content>
             </Card>
           </AnimatedTransition>
