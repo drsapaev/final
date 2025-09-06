@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401, E402
     appointment as _m_appointment,
     audit as _m_audit,
     clinic as _m_clinic,
+    online_queue as _m_online_queue,
     emr as _m_emr,
     enums as _m_enums,
     lab as _m_lab,

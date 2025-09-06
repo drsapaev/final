@@ -20,6 +20,7 @@ from .setting import Setting
 from .activation import Activation
 from .online import OnlineDay
 from .clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
+from .online_queue import DailyQueue, QueueEntry, QueueToken
 
 # Make sure all models are available
 __all__ = [
@@ -51,4 +52,7 @@ __all__ = [
     "Doctor",
     "Schedule",
     "ServiceCategory",
+    "DailyQueue",
+    "QueueEntry", 
+    "QueueToken",
 ]
