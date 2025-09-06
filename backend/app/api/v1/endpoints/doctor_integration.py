@@ -184,8 +184,28 @@ def call_patient(
         db.commit()
         db.refresh(queue_entry)
         
-        # Здесь будет отправка события в WebSocket для табло
-        # TODO: Добавить WebSocket уведомление
+        # Отправляем событие в WebSocket для табло
+        try:
+            import asyncio
+            from app.services.display_websocket import get_display_manager
+            
+            async def send_to_display():
+                manager = get_display_manager()
+                doctor_name = doctor.user.full_name if doctor.user else f"Врач #{doctor.id}"
+                cabinet = doctor.cabinet
+                
+                await manager.broadcast_patient_call(
+                    queue_entry=queue_entry,
+                    doctor_name=doctor_name,
+                    cabinet=cabinet
+                )
+            
+            # Запускаем асинхронную отправку в фоне
+            asyncio.create_task(send_to_display())
+            
+        except Exception as ws_error:
+            # Не прерываем основной процесс если WebSocket не работает
+            print(f"Предупреждение: не удалось отправить на табло: {ws_error}")
         
         return {
             "success": True,

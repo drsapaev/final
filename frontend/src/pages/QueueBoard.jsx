@@ -1,292 +1,581 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Monitor, Volume2, VolumeX, Wifi, WifiOff, Users, Clock, AlertCircle } from 'lucide-react';
-import { Card, Badge } from '../design-system/components';
-import { useTheme } from '../contexts/ThemeContext';
+import { 
+  Volume2, 
+  VolumeX, 
+  Settings, 
+  Wifi, 
+  WifiOff,
+  Monitor,
+  Clock,
+  Users,
+  Activity
+} from 'lucide-react';
 
+/**
+ * Табло очереди с WebSocket подключением
+ * Основа: passport.md стр. 2571-3324, detail.md стр. 1567-1789
+ */
 const QueueBoard = () => {
-  const { theme } = useTheme();
-  const [isConnected, setIsConnected] = useState(false);
-  const [queue, setQueue] = useState([]);
+  const [connected, setConnected] = useState(false);
+  const [queueData, setQueueData] = useState([]);
   const [currentCall, setCurrentCall] = useState(null);
-  const [lastCalls, setLastCalls] = useState([]);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [announcements, setAnnouncements] = useState([]);
+  const [boardSettings, setBoardSettings] = useState({
+    theme: 'light',
+    showPatientNames: 'initials',
+    soundEnabled: true,
+    voiceEnabled: false,
+    displayCount: 5
+  });
+  const [lastUpdate, setLastUpdate] = useState(null);
+
   const wsRef = useRef(null);
   const audioRef = useRef(null);
 
+  // Получаем board_id из URL или используем default
+  const boardId = new URLSearchParams(window.location.search).get('board') || 'main_board';
+
   useEffect(() => {
-    // WebSocket подключение к табло очереди
-    const connectWebSocket = () => {
-      const wsUrl = `ws://localhost:8000/ws/queue-board`;
-      wsRef.current = new WebSocket(wsUrl);
-
-      wsRef.current.onopen = () => {
-        console.log('QueueBoard: WebSocket connected');
-        setIsConnected(true);
-      };
-
-      wsRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
-      };
-
-      wsRef.current.onclose = () => {
-        console.log('QueueBoard: WebSocket disconnected');
-        setIsConnected(false);
-        // Переподключение через 3 секунды
-        setTimeout(connectWebSocket, 3000);
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('QueueBoard: WebSocket error:', error);
-      };
-    };
-
     connectWebSocket();
-
+    
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, []);
+  }, [boardId]);
 
-  const handleWebSocketMessage = (data) => {
-    switch (data.type) {
-      case 'queue_update':
-        setQueue(data.queue || []);
-        break;
-      case 'call_patient':
-        setCurrentCall(data.call);
-        setLastCalls(prev => [data.call, ...prev.slice(0, 4)]);
-        if (soundEnabled) {
-          playCallSound();
+  const connectWebSocket = () => {
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/v1/display/ws/board/${boardId}`;
+      
+      wsRef.current = new WebSocket(wsUrl);
+      
+      wsRef.current.onopen = () => {
+        console.log('WebSocket подключен к табло');
+        setConnected(true);
+        
+        // Отправляем ping каждые 30 секунд
+        setInterval(() => {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 30000);
+      };
+      
+      wsRef.current.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          handleWebSocketMessage(message);
+        } catch (error) {
+          console.error('Ошибка парсинга WebSocket сообщения:', error);
+        }
+      };
+      
+      wsRef.current.onclose = () => {
+        console.log('WebSocket отключен');
+        setConnected(false);
+        
+        // Переподключение через 5 секунд
+        setTimeout(() => {
+          connectWebSocket();
+        }, 5000);
+      };
+      
+      wsRef.current.onerror = (error) => {
+        console.error('Ошибка WebSocket:', error);
+        setConnected(false);
+      };
+      
+    } catch (error) {
+      console.error('Ошибка подключения WebSocket:', error);
+    }
+  };
+
+  const handleWebSocketMessage = (message) => {
+    console.log('Получено WebSocket сообщение:', message);
+    
+    switch (message.type) {
+      case 'initial_state':
+        if (message.data) {
+          setQueueData(message.data.queue_entries || []);
+          setCurrentCall(message.data.current_call || null);
+          setAnnouncements(message.data.announcements || []);
         }
         break;
-      case 'clear_call':
-        setCurrentCall(null);
+        
+      case 'patient_call':
+        setCurrentCall(message.data);
+        playCallSound(message);
+        
+        // Автоматически убираем вызов через указанное время
+        setTimeout(() => {
+          setCurrentCall(null);
+        }, (message.display_duration || 30) * 1000);
         break;
+        
+      case 'queue_update':
+        setQueueData(message.data.queue_entries || []);
+        break;
+        
+      case 'announcement':
+        setAnnouncements(prev => [message.data, ...prev.slice(0, 4)]); // Последние 5
+        playAnnouncementSound(message);
+        
+        // Убираем объявление через указанное время
+        setTimeout(() => {
+          setAnnouncements(prev => prev.filter(a => a.created_at !== message.data.created_at));
+        }, (message.display_duration || 60) * 1000);
+        break;
+        
+      case 'pong':
+        setLastUpdate(new Date());
+        break;
+        
       default:
-        console.log('QueueBoard: Unknown message type:', data.type);
+        console.log('Неизвестный тип сообщения:', message.type);
     }
   };
 
-  const playCallSound = () => {
-    if (audioRef.current) {
-      audioRef.current.play().catch(e => {
-        console.log('QueueBoard: Cannot play sound:', e);
-      });
+  const playCallSound = (message) => {
+    if (!boardSettings.soundEnabled) return;
+    
+    try {
+      // Звуковой сигнал вызова
+      const audio = new Audio('/sounds/call-beep.mp3'); // Нужно добавить звук
+      audio.volume = 0.7;
+      audio.play().catch(console.error);
+      
+      // Голосовое объявление
+      if (boardSettings.voiceEnabled && message.voice_text) {
+        setTimeout(() => {
+          playVoiceAnnouncement(message.voice_text);
+        }, 1000);
+      }
+      
+    } catch (error) {
+      console.error('Ошибка воспроизведения звука:', error);
     }
   };
 
-  const getSpecialistColor = (specialist) => {
+  const playAnnouncementSound = (message) => {
+    if (!boardSettings.soundEnabled) return;
+    
+    try {
+      let soundFile = '/sounds/info-beep.mp3';
+      
+      if (message.data.announcement_type === 'warning') {
+        soundFile = '/sounds/warning-beep.mp3';
+      } else if (message.data.announcement_type === 'emergency') {
+        soundFile = '/sounds/emergency-beep.mp3';
+      }
+      
+      const audio = new Audio(soundFile);
+      audio.volume = 0.8;
+      audio.play().catch(console.error);
+      
+      // Голосовое объявление для критических сообщений
+      if (boardSettings.voiceEnabled && message.voice_text) {
+        setTimeout(() => {
+          playVoiceAnnouncement(message.voice_text);
+        }, 2000);
+      }
+      
+    } catch (error) {
+      console.error('Ошибка воспроизведения звука объявления:', error);
+    }
+  };
+
+  const playVoiceAnnouncement = (text) => {
+    if (!boardSettings.voiceEnabled) return;
+    
+    try {
+      // Используем Web Speech API для синтеза речи
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ru-RU';
+        utterance.rate = 0.8;
+        utterance.volume = 0.7;
+        
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (error) {
+      console.error('Ошибка голосового объявления:', error);
+    }
+  };
+
+  const getStatusColor = (status) => {
     const colors = {
-      'Кардиолог': 'bg-red-500',
-      'Дерматолог': 'bg-green-500',
-      'Стоматолог': 'bg-blue-500',
-      'Лаборатория': 'bg-purple-500',
-      'Педиатр': 'bg-yellow-500',
-      'Терапевт': 'bg-gray-500'
+      waiting: '#3b82f6',    // Синий
+      called: '#f59e0b',     // Оранжевый  
+      in_progress: '#10b981', // Зеленый
+      served: '#6b7280'      // Серый
     };
-    return colors[specialist] || 'bg-gray-400';
+    return colors[status] || '#6b7280';
   };
 
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit'
+  const getStatusText = (status) => {
+    const texts = {
+      waiting: 'Ожидает',
+      called: 'Вызван',
+      in_progress: 'На приеме',
+      served: 'Принят'
+    };
+    return texts[status] || status;
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleTimeString('ru-RU', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
     });
   };
 
-  return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'} p-4`}>
-      {/* Звуковой файл */}
-      <audio ref={audioRef} preload="auto">
-        <source src="/sounds/call-beep.mp3" type="audio/mpeg" />
-        <source src="/sounds/call-beep.wav" type="audio/wav" />
-      </audio>
+  // Стили для разных тем
+  const themes = {
+    light: {
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      cardBg: '#ffffff',
+      textPrimary: '#1a202c',
+      textSecondary: '#4a5568',
+      border: '#e2e8f0'
+    },
+    dark: {
+      background: 'linear-gradient(135deg, #1a202c 0%, #2d3748 100%)',
+      cardBg: '#2d3748',
+      textPrimary: '#f7fafc',
+      textSecondary: '#a0aec0',
+      border: '#4a5568'
+    },
+    medical: {
+      background: 'linear-gradient(135deg, #f0fff4 0%, #dcfce7 100%)',
+      cardBg: '#ffffff',
+      textPrimary: '#065f46',
+      textSecondary: '#047857',
+      border: '#a7f3d0'
+    }
+  };
 
-      <div className="max-w-7xl mx-auto">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Monitor className="w-8 h-8 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Табло очереди</h1>
-              <p className="text-gray-600">Клиника - Электронная очередь</p>
-            </div>
+  const currentTheme = themes[boardSettings.theme] || themes.light;
+
+  const pageStyle = {
+    background: currentTheme.background,
+    minHeight: '100vh',
+    padding: '20px',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+  };
+
+  const headerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '30px',
+    padding: '20px',
+    background: currentTheme.cardBg,
+    borderRadius: '12px',
+    border: `1px solid ${currentTheme.border}`,
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+  };
+
+  const callCardStyle = {
+    background: currentCall ? 'linear-gradient(135deg, #dc3545 0%, #e74c3c 100%)' : currentTheme.cardBg,
+    color: currentCall ? '#ffffff' : currentTheme.textPrimary,
+    padding: '40px',
+    borderRadius: '16px',
+    textAlign: 'center',
+    marginBottom: '30px',
+    border: currentCall ? 'none' : `1px solid ${currentTheme.border}`,
+    boxShadow: currentCall ? '0 8px 16px rgba(220, 53, 69, 0.3)' : '0 4px 6px rgba(0, 0, 0, 0.1)',
+    transform: currentCall ? 'scale(1.02)' : 'scale(1)',
+    transition: 'all 0.3s ease',
+    animation: currentCall ? 'pulse 2s infinite' : 'none'
+  };
+
+  const queueGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '20px',
+    marginBottom: '30px'
+  };
+
+  return (
+    <div style={pageStyle}>
+      {/* Заголовок табло */}
+      <div style={headerStyle}>
+        <div>
+          <h1 style={{ 
+            fontSize: '2.5rem', 
+            fontWeight: 'bold', 
+            margin: 0,
+            color: currentTheme.textPrimary
+          }}>
+            📺 Табло очереди
+          </h1>
+          <p style={{ 
+            color: currentTheme.textSecondary, 
+            margin: '5px 0 0 0',
+            fontSize: '1.1rem'
+          }}>
+            Медицинский центр
+          </p>
+        </div>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          {/* Статус подключения */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {connected ? (
+              <>
+                <Wifi size={24} style={{ color: '#10b981' }} />
+                <span style={{ color: '#10b981', fontWeight: '500' }}>Онлайн</span>
+              </>
+            ) : (
+              <>
+                <WifiOff size={24} style={{ color: '#ef4444' }} />
+                <span style={{ color: '#ef4444', fontWeight: '500' }}>Офлайн</span>
+              </>
+            )}
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* Статус подключения */}
-            <div className="flex items-center gap-2">
-              {isConnected ? (
-                <><Wifi className="w-5 h-5 text-green-500" />
-                <span className="text-green-600">Онлайн</span></>
-              ) : (
-                <><WifiOff className="w-5 h-5 text-red-500" />
-                <span className="text-red-600">Офлайн</span></>
-              )}
+          {/* Время последнего обновления */}
+          {lastUpdate && (
+            <div style={{ 
+              color: currentTheme.textSecondary,
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}>
+              <Clock size={16} />
+              {lastUpdate.toLocaleTimeString('ru-RU')}
             </div>
-            
-            {/* Переключатель звука */}
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
-            >
-              {soundEnabled ? (
-                <Volume2 className="w-5 h-5 text-blue-600" />
-              ) : (
-                <VolumeX className="w-5 h-5 text-gray-400" />
-              )}
-            </button>
-            
-            {/* Текущее время */}
-            <div className="text-right">
-              <div className="text-lg font-mono font-bold">
-                {new Date().toLocaleTimeString('ru-RU')}
-              </div>
-              <div className="text-sm text-gray-500">
-                {new Date().toLocaleDateString('ru-RU')}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Текущий вызов */}
-        {currentCall && (
-          <Card className="mb-6 p-6 border-2 border-blue-500 bg-blue-50 animate-pulse">
-            <div className="text-center">
-              <div className="text-6xl font-bold text-blue-600 mb-2">
-                №{currentCall.number}
-              </div>
-              <div className="text-xl font-semibold text-gray-800 mb-2">
-                {currentCall.patient_name}
-              </div>
-              <div className="flex items-center justify-center gap-4">
-                <Badge variant="info" className="text-lg px-4 py-2">
-                  {currentCall.specialist}
-                </Badge>
-                <Badge variant="warning" className="text-lg px-4 py-2">
-                  Кабинет {currentCall.room}
-                </Badge>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Живая очередь */}
-          <div className="lg:col-span-2">
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Users className="w-6 h-6 text-blue-600" />
-                <h2 className="text-xl font-semibold">Очередь на сегодня</h2>
-                <Badge variant="info">{queue.length}</Badge>
-              </div>
-              
-              {queue.length === 0 ? (
-                <div className="text-center py-12">
-                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Очередь пуста</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {queue.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center justify-between p-4 rounded-lg border ${
-                        index === 0 ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${
-                          index === 0 ? 'bg-blue-500' : 'bg-gray-400'
-                        }`}>
-                          {item.number}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {item.patient_name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {item.type} • {formatTime(item.created_at)}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <div className={`inline-block w-3 h-3 rounded-full ${getSpecialistColor(item.specialist)}`}></div>
-                        <div className="text-sm font-medium mt-1">{item.specialist}</div>
-                        <div className="text-xs text-gray-500">Каб. {item.room}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-
-          {/* Последние вызовы */}
-          <div>
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Clock className="w-6 h-6 text-green-600" />
-                <h2 className="text-xl font-semibold">Последние вызовы</h2>
-              </div>
-              
-              {lastCalls.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">Пока нет вызовов</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {lastCalls.map((call, index) => (
-                    <div
-                      key={`${call.number}-${call.timestamp}`}
-                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-bold">
-                          {call.number}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium">{call.patient_name}</div>
-                          <div className="text-xs text-gray-500">{call.specialist}</div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatTime(call.timestamp)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Статистика дня */}
-            <Card className="p-6 mt-6">
-              <h3 className="text-lg font-semibold mb-4">Статистика дня</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Всего талонов:</span>
-                  <span className="font-semibold">{queue.length + lastCalls.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Обслужено:</span>
-                  <span className="font-semibold text-green-600">{lastCalls.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">В очереди:</span>
-                  <span className="font-semibold text-blue-600">{queue.length}</span>
-                </div>
-              </div>
-            </Card>
-          </div>
+          )}
+          
+          {/* Звук */}
+          <button
+            onClick={() => setBoardSettings(prev => ({ ...prev, soundEnabled: !prev.soundEnabled }))}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: currentTheme.textSecondary,
+              padding: '8px'
+            }}
+          >
+            {boardSettings.soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+          </button>
         </div>
       </div>
+
+      {/* Текущий вызов */}
+      <div style={callCardStyle}>
+        {currentCall ? (
+          <div>
+            <div style={{ fontSize: '1.2rem', marginBottom: '10px', opacity: 0.9 }}>
+              ВЫЗЫВАЕТСЯ ПАЦИЕНТ
+            </div>
+            <div style={{ fontSize: '4rem', fontWeight: 'bold', marginBottom: '20px' }}>
+              № {currentCall.queue_number}
+            </div>
+            <div style={{ fontSize: '1.8rem', marginBottom: '10px' }}>
+              {currentCall.patient_name}
+            </div>
+            <div style={{ fontSize: '1.4rem', opacity: 0.9 }}>
+              👨‍⚕️ {currentCall.doctor_name}
+            </div>
+            {currentCall.cabinet && (
+              <div style={{ fontSize: '1.6rem', marginTop: '15px', fontWeight: 'bold' }}>
+                🚪 {currentCall.cabinet}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <Monitor size={64} style={{ color: currentTheme.textSecondary, marginBottom: '20px' }} />
+            <div style={{ fontSize: '1.5rem', color: currentTheme.textSecondary }}>
+              Ожидание вызова пациента
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Объявления */}
+      {announcements.length > 0 && (
+        <div style={{ marginBottom: '30px' }}>
+          {announcements.map((announcement, index) => (
+            <div
+              key={announcement.created_at}
+              style={{
+                background: announcement.announcement_type === 'emergency' 
+                  ? 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)'
+                  : announcement.announcement_type === 'warning'
+                  ? 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)'
+                  : 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
+                color: '#ffffff',
+                padding: '20px',
+                borderRadius: '12px',
+                marginBottom: '10px',
+                fontSize: '1.3rem',
+                textAlign: 'center',
+                animation: 'slideInDown 0.5s ease'
+              }}
+            >
+              📢 {announcement.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Очередь пациентов */}
+      <div style={queueGridStyle}>
+        {queueData.slice(0, boardSettings.displayCount).map(entry => (
+          <div
+            key={entry.number}
+            style={{
+              background: currentTheme.cardBg,
+              border: `2px solid ${getStatusColor(entry.status)}`,
+              borderRadius: '12px',
+              padding: '20px',
+              textAlign: 'center',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {/* Номер в очереди */}
+            <div style={{
+              fontSize: '3rem',
+              fontWeight: 'bold',
+              color: getStatusColor(entry.status),
+              marginBottom: '10px'
+            }}>
+              {entry.number}
+            </div>
+            
+            {/* Имя пациента */}
+            {boardSettings.showPatientNames !== 'none' && (
+              <div style={{
+                fontSize: '1.3rem',
+                fontWeight: '500',
+                color: currentTheme.textPrimary,
+                marginBottom: '8px'
+              }}>
+                {entry.patient_name}
+              </div>
+            )}
+            
+            {/* Статус */}
+            <div style={{
+              background: getStatusColor(entry.status),
+              color: '#ffffff',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              display: 'inline-block',
+              marginBottom: '8px'
+            }}>
+              {getStatusText(entry.status)}
+            </div>
+            
+            {/* Время */}
+            <div style={{
+              color: currentTheme.textSecondary,
+              fontSize: '0.9rem'
+            }}>
+              {entry.status === 'called' && entry.called_at ? (
+                `Вызван: ${formatTime(entry.called_at)}`
+              ) : (
+                `Записан: ${formatTime(entry.created_at)}`
+              )}
+            </div>
+            
+            {/* Источник записи */}
+            <div style={{
+              color: currentTheme.textSecondary,
+              fontSize: '0.8rem',
+              marginTop: '5px'
+            }}>
+              {entry.source === 'online' ? '📱 Онлайн' : '🏥 Регистратура'}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Статистика очереди */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '20px',
+        marginTop: '30px'
+      }}>
+        <div style={{
+          background: currentTheme.cardBg,
+          padding: '20px',
+          borderRadius: '12px',
+          textAlign: 'center',
+          border: `1px solid ${currentTheme.border}`
+        }}>
+          <Users size={32} style={{ color: '#3b82f6', marginBottom: '10px' }} />
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+            {queueData.length}
+          </div>
+          <div style={{ color: currentTheme.textSecondary }}>Всего в очереди</div>
+        </div>
+        
+        <div style={{
+          background: currentTheme.cardBg,
+          padding: '20px',
+          borderRadius: '12px',
+          textAlign: 'center',
+          border: `1px solid ${currentTheme.border}`
+        }}>
+          <Activity size={32} style={{ color: '#10b981', marginBottom: '10px' }} />
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+            {queueData.filter(e => e.status === 'waiting').length}
+          </div>
+          <div style={{ color: currentTheme.textSecondary }}>Ожидают</div>
+        </div>
+        
+        <div style={{
+          background: currentTheme.cardBg,
+          padding: '20px',
+          borderRadius: '12px',
+          textAlign: 'center',
+          border: `1px solid ${currentTheme.border}`
+        }}>
+          <Clock size={32} style={{ color: '#f59e0b', marginBottom: '10px' }} />
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: currentTheme.textPrimary }}>
+            {new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div style={{ color: currentTheme.textSecondary }}>Текущее время</div>
+        </div>
+      </div>
+
+      {/* CSS анимации */}
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1.02); }
+          50% { transform: scale(1.05); }
+        }
+        
+        @keyframes slideInDown {
+          from {
+            transform: translateY(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        
+        .queue-board {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+      `}</style>
     </div>
   );
 };
 
 export default QueueBoard;
-
