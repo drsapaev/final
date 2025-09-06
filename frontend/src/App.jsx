@@ -20,9 +20,8 @@ import VisitDetails from './pages/VisitDetails.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
 import RegistrarPanel from './pages/RegistrarPanel.jsx';
 import DoctorPanel from './pages/DoctorPanel.jsx';
-import CardiologistPanel from './pages/CardiologistPanel.jsx';
-import CardiologistPanelIntegrated from './pages/CardiologistPanelIntegrated.jsx';
-import DermatologistPanel from './pages/DermatologistPanel.jsx';
+import CardiologistPanelUnified from './pages/CardiologistPanelUnified.jsx';
+import DermatologistPanelUnified from './pages/DermatologistPanelUnified.jsx';
 import DentistPanel from './pages/DentistPanel.jsx';
 import LabPanel from './pages/LabPanel.jsx';
 import UserSelect from './pages/UserSelect.jsx';
@@ -113,8 +112,8 @@ export default function App() {
           <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
           <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
-          <Route path="cardiologist"  element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanelIntegrated /></RequireAuth>} />
-          <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanel /></RequireAuth>} />
+          <Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanelUnified /></RequireAuth>} />
+          <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanelUnified /></RequireAuth>} />
           <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
           <Route path="lab-panel"     element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
           <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
