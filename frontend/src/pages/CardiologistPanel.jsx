@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { Heart, Activity, FileText, User, Settings } from 'lucide-react';
+import { Card, Button, Badge } from '../design-system/components';
+import { useTheme } from '../contexts/ThemeContext';
+import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
+import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 
 const CardiologistPanel = () => {
-  const [activeTab, setActiveTab] = useState('patients');
-  const [patients, setPatients] = useState([]);
-  const [ecgResults, setEcgResults] = useState([]);
-  const [bloodTests, setBloodTests] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { theme, isDark, getColor } = useTheme();
+  
+  const [activeTab, setActiveTab] = useState('queue');
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [showEcgForm, setShowEcgForm] = useState(false);
-  const [showBloodTestForm, setShowBloodTestForm] = useState(false);
+  const [selectedServices, setSelectedServices] = useState([]);
+  const [visitData, setVisitData] = useState({
+    complaint: '',
+    diagnosis: '',
+    icd10: '',
+    notes: ''
+  });
+  const [loading, setLoading] = useState(false);
 
   // Состояния для кардиологических данных
   const [ecgForm, setEcgForm] = useState({
