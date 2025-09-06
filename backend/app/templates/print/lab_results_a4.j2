@@ -1,0 +1,279 @@
+{% comment %}
+Шаблон результатов лабораторных анализов для печати на A4
+Основа: passport.md стр. 1925-2063
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты анализов № {{ lab_order.number }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 12pt;
+            line-height: 1.4;
+            margin: 0;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .clinic-name {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .clinic-details {
+            font-size: 10pt;
+            margin-bottom: 10px;
+        }
+        
+        .results-title {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        
+        .order-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            font-size: 11pt;
+        }
+        
+        .patient-info {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #000;
+            background-color: #f9f9f9;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .info-item {
+            display: flex;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            min-width: 120px;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        .results-table th,
+        .results-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .results-table th {
+            background-color: #e9ecef;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .parameter-name {
+            font-weight: bold;
+        }
+        
+        .result-normal {
+            color: #28a745;
+        }
+        
+        .result-abnormal {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .result-critical {
+            color: #dc3545;
+            font-weight: bold;
+            background-color: #fff5f5;
+        }
+        
+        .reference-range {
+            font-size: 10pt;
+            color: #6c757d;
+        }
+        
+        .interpretation {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        
+        .interpretation-title {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            border-top: 1px solid #000;
+            padding-top: 15px;
+        }
+        
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        
+        .signature-block {
+            width: 45%;
+        }
+        
+        .signature-line {
+            border-bottom: 1px solid #000;
+            height: 25px;
+            margin-bottom: 5px;
+        }
+        
+        .notes {
+            margin-top: 20px;
+            font-size: 10pt;
+            color: #6c757d;
+        }
+        
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="clinic-name">{{ clinic.name }}</div>
+        <div class="clinic-details">
+            Лицензия: {{ clinic.license_number }}<br>
+            {{ clinic.address }}<br>
+            Тел: {{ clinic.phone }} | Email: {{ clinic.email }}
+        </div>
+        <div class="results-title">РЕЗУЛЬТАТЫ ЛАБОРАТОРНЫХ ИССЛЕДОВАНИЙ</div>
+    </div>
+
+    <div class="order-info">
+        <div>
+            <strong>№ заказа:</strong> {{ lab_order.number }}<br>
+            <strong>Дата забора:</strong> {{ lab_order.collection_date | strftime('%d.%m.%Y %H:%M') }}<br>
+            <strong>Дата готовности:</strong> {{ lab_order.ready_date | strftime('%d.%m.%Y %H:%M') }}
+        </div>
+        <div>
+            <strong>Лаборатория:</strong> {{ lab_order.laboratory_name }}<br>
+            <strong>Тип исследования:</strong> {{ lab_order.study_type }}<br>
+            <strong>Срочность:</strong> {{ lab_order.urgency_name }}
+        </div>
+    </div>
+
+    <div class="patient-info">
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Пациент:</div>
+                <div>{{ patient.full_name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Дата рождения:</div>
+                <div>{{ patient.birth_date | strftime('%d.%m.%Y') }} ({{ patient.age }} лет)</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Пол:</div>
+                <div>{{ patient.gender_name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Направил врач:</div>
+                <div>{{ referring_doctor.full_name }} ({{ referring_doctor.specialty_name }})</div>
+            </div>
+        </div>
+    </div>
+
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th style="width: 40%;">Показатель</th>
+                <th style="width: 20%;">Результат</th>
+                <th style="width: 15%;">Единицы</th>
+                <th style="width: 25%;">Референсные значения</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in lab_results %}
+            <tr>
+                <td class="parameter-name">{{ result.parameter_name }}</td>
+                <td class="{% if result.is_critical %}result-critical{% elif result.is_abnormal %}result-abnormal{% else %}result-normal{% endif %}">
+                    {{ result.value }}
+                    {% if result.is_critical %} ⚠️{% elif result.is_abnormal %} ⚡{% endif %}
+                </td>
+                <td>{{ result.unit }}</td>
+                <td class="reference-range">{{ result.reference_range }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if lab_order.interpretation %}
+    <div class="interpretation">
+        <div class="interpretation-title">ИНТЕРПРЕТАЦИЯ РЕЗУЛЬТАТОВ:</div>
+        <div>{{ lab_order.interpretation | nl2br }}</div>
+    </div>
+    {% endif %}
+
+    {% if lab_order.recommendations %}
+    <div class="interpretation">
+        <div class="interpretation-title">РЕКОМЕНДАЦИИ:</div>
+        <div>{{ lab_order.recommendations | nl2br }}</div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <div class="signatures">
+            <div class="signature-block">
+                <div>Врач-лаборант</div>
+                <div class="signature-line"></div>
+                <div>{{ lab_doctor.full_name }}</div>
+                <div style="font-size: 10pt;">Лицензия: {{ lab_doctor.license_number }}</div>
+            </div>
+            
+            <div class="signature-block">
+                <div>Заведующий лабораторией</div>
+                <div class="signature-line"></div>
+                <div>{{ lab_head.full_name }}</div>
+                <div style="font-size: 10pt; text-align: center;">М.П.</div>
+            </div>
+        </div>
+
+        <div class="notes">
+            <strong>Примечания:</strong><br>
+            • Результаты исследования относятся только к исследованному материалу<br>
+            • Интерпретация результатов должна проводиться лечащим врачом с учетом клинической картины<br>
+            • При отклонениях от нормы рекомендуется консультация специалиста<br>
+            {% if lab_order.storage_conditions %}
+            • Условия хранения образца: {{ lab_order.storage_conditions }}<br>
+            {% endif %}
+            • Результаты действительны в течение 30 дней с даты выдачи
+        </div>
+    </div>
+</body>
+</html>

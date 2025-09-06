@@ -3,97 +3,58 @@ CRUD операции для системы печати
 """
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc
-from datetime import datetime, timedelta
+from sqlalchemy import and_
 
 from app.models.print_config import PrinterConfig, PrintTemplate, PrintJob
 from app.schemas.print_config import (
     PrinterConfigCreate, PrinterConfigUpdate,
-    PrintTemplateCreate, PrintTemplateUpdate
+    PrintTemplateCreate, PrintTemplateUpdate,
+    PrintJobCreate, PrintJobUpdate
 )
-
 
 # ===================== ПРИНТЕРЫ =====================
 
-def get_printers(
+def get_printer_config(db: Session, printer_id: int) -> Optional[PrinterConfig]:
+    """Получить конфигурацию принтера по ID"""
+    return db.query(PrinterConfig).filter(PrinterConfig.id == printer_id).first()
+
+def get_printer_by_name(db: Session, name: str) -> Optional[PrinterConfig]:
+    """Получить принтер по имени"""
+    return db.query(PrinterConfig).filter(PrinterConfig.name == name).first()
+
+def get_printer_configs(
     db: Session, 
     skip: int = 0, 
     limit: int = 100,
-    active_only: bool = False,
-    printer_type: Optional[str] = None
+    active_only: bool = False
 ) -> List[PrinterConfig]:
     """Получить список принтеров"""
     query = db.query(PrinterConfig)
     
     if active_only:
         query = query.filter(PrinterConfig.active == True)
-    if printer_type:
-        query = query.filter(PrinterConfig.printer_type == printer_type)
     
     return query.offset(skip).limit(limit).all()
 
-
-def get_printer_by_id(db: Session, printer_id: int) -> Optional[PrinterConfig]:
-    """Получить принтер по ID"""
-    return db.query(PrinterConfig).filter(PrinterConfig.id == printer_id).first()
-
-
-def get_printer_by_name(db: Session, name: str) -> Optional[PrinterConfig]:
-    """Получить принтер по имени"""
-    return db.query(PrinterConfig).filter(PrinterConfig.name == name).first()
-
-
-def get_default_printer(db: Session, printer_type: Optional[str] = None) -> Optional[PrinterConfig]:
-    """Получить принтер по умолчанию"""
-    query = db.query(PrinterConfig).filter(
-        and_(PrinterConfig.is_default == True, PrinterConfig.active == True)
-    )
-    
-    if printer_type:
-        query = query.filter(PrinterConfig.printer_type == printer_type)
-    
-    return query.first()
-
-
-def create_printer(db: Session, printer: PrinterConfigCreate) -> PrinterConfig:
-    """Создать принтер"""
-    # Если это первый активный принтер данного типа, делаем его по умолчанию
-    if printer.active and not get_default_printer(db, printer.printer_type):
-        printer.is_default = True
-    
-    # Если делаем принтер по умолчанию, убираем флаг у других того же типа
-    if printer.is_default:
-        db.query(PrinterConfig).filter(
-            and_(
-                PrinterConfig.printer_type == printer.printer_type,
-                PrinterConfig.is_default == True
-            )
-        ).update({"is_default": False})
-    
-    db_printer = PrinterConfig(**printer.model_dump())
+def create_printer_config(db: Session, printer_data: PrinterConfigCreate) -> PrinterConfig:
+    """Создать конфигурацию принтера"""
+    db_printer = PrinterConfig(**printer_data.dict())
     db.add(db_printer)
     db.commit()
     db.refresh(db_printer)
     return db_printer
 
-
-def update_printer(db: Session, printer_id: int, printer: PrinterConfigUpdate) -> Optional[PrinterConfig]:
-    """Обновить принтер"""
-    db_printer = get_printer_by_id(db, printer_id)
+def update_printer_config(
+    db: Session, 
+    printer_id: int, 
+    printer_data: PrinterConfigUpdate
+) -> Optional[PrinterConfig]:
+    """Обновить конфигурацию принтера"""
+    db_printer = get_printer_config(db, printer_id)
     if not db_printer:
         return None
     
-    update_data = printer.model_dump(exclude_unset=True)
-    
-    # Если делаем принтер по умолчанию, убираем флаг у других того же типа
-    if update_data.get("is_default"):
-        db.query(PrinterConfig).filter(
-            and_(
-                PrinterConfig.printer_type == db_printer.printer_type,
-                PrinterConfig.id != printer_id
-            )
-        ).update({"is_default": False})
-    
+    update_data = printer_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_printer, field, value)
     
@@ -101,260 +62,164 @@ def update_printer(db: Session, printer_id: int, printer: PrinterConfigUpdate) -
     db.refresh(db_printer)
     return db_printer
 
-
-def delete_printer(db: Session, printer_id: int) -> bool:
-    """Удалить принтер"""
-    db_printer = get_printer_by_id(db, printer_id)
+def delete_printer_config(db: Session, printer_id: int) -> bool:
+    """Удалить конфигурацию принтера"""
+    db_printer = get_printer_config(db, printer_id)
     if not db_printer:
         return False
     
-    # Если это принтер по умолчанию, назначаем другой
-    if db_printer.is_default:
-        other_printer = db.query(PrinterConfig).filter(
-            and_(
-                PrinterConfig.printer_type == db_printer.printer_type,
-                PrinterConfig.id != printer_id,
-                PrinterConfig.active == True
-            )
-        ).first()
-        if other_printer:
-            other_printer.is_default = True
-    
-    db_printer.active = False
+    db.delete(db_printer)
     db.commit()
     return True
 
+def get_default_printer_for_type(db: Session, document_type: str) -> Optional[PrinterConfig]:
+    """Получить принтер по умолчанию для типа документа"""
+    # Пока возвращаем первый активный принтер
+    # В будущем можно добавить логику сопоставления типов документов и принтеров
+    return db.query(PrinterConfig).filter(
+        and_(PrinterConfig.active == True, PrinterConfig.is_default == True)
+    ).first()
 
-# ===================== ШАБЛОНЫ ПЕЧАТИ =====================
+# ===================== ШАБЛОНЫ =====================
 
-def get_print_templates(
-    db: Session,
-    printer_id: Optional[int] = None,
-    template_type: Optional[str] = None,
-    language: str = "ru",
-    active_only: bool = True
-) -> List[PrintTemplate]:
-    """Получить шаблоны печати"""
-    query = db.query(PrintTemplate)
-    
-    if printer_id:
-        query = query.filter(PrintTemplate.printer_id == printer_id)
-    if template_type:
-        query = query.filter(PrintTemplate.template_type == template_type)
-    if language:
-        query = query.filter(PrintTemplate.language == language)
-    if active_only:
-        query = query.filter(PrintTemplate.active == True)
-    
-    return query.all()
-
-
-def get_print_template_by_id(db: Session, template_id: int) -> Optional[PrintTemplate]:
+def get_print_template(db: Session, template_id: int) -> Optional[PrintTemplate]:
     """Получить шаблон по ID"""
     return db.query(PrintTemplate).filter(PrintTemplate.id == template_id).first()
 
+def get_print_templates(
+    db: Session,
+    template_type: Optional[str] = None,
+    language: Optional[str] = None,
+    active_only: bool = True,
+    skip: int = 0,
+    limit: int = 100
+) -> List[PrintTemplate]:
+    """Получить список шаблонов"""
+    query = db.query(PrintTemplate)
+    
+    if template_type:
+        query = query.filter(PrintTemplate.template_type == template_type)
+    
+    if language:
+        query = query.filter(PrintTemplate.language == language)
+    
+    if active_only:
+        query = query.filter(PrintTemplate.active == True)
+    
+    return query.offset(skip).limit(limit).all()
 
-def create_print_template(db: Session, template: PrintTemplateCreate) -> PrintTemplate:
+def create_print_template(db: Session, template_data: PrintTemplateCreate) -> PrintTemplate:
     """Создать шаблон печати"""
-    db_template = PrintTemplate(**template.model_dump())
+    db_template = PrintTemplate(**template_data.dict())
     db.add(db_template)
     db.commit()
     db.refresh(db_template)
     return db_template
 
-
 def update_print_template(
-    db: Session, 
-    template_id: int, 
-    template: PrintTemplateUpdate
+    db: Session,
+    template_id: int,
+    template_data: PrintTemplateUpdate
 ) -> Optional[PrintTemplate]:
     """Обновить шаблон печати"""
-    db_template = get_print_template_by_id(db, template_id)
+    db_template = get_print_template(db, template_id)
     if not db_template:
         return None
     
-    for field, value in template.model_dump(exclude_unset=True).items():
+    update_data = template_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(db_template, field, value)
     
     db.commit()
     db.refresh(db_template)
     return db_template
 
-
 def delete_print_template(db: Session, template_id: int) -> bool:
     """Удалить шаблон печати"""
-    db_template = get_print_template_by_id(db, template_id)
+    db_template = get_print_template(db, template_id)
     if not db_template:
         return False
     
-    db_template.active = False
+    db.delete(db_template)
     db.commit()
     return True
 
+def get_template_by_type_and_printer(
+    db: Session,
+    template_type: str,
+    printer_id: int
+) -> Optional[PrintTemplate]:
+    """Получить шаблон по типу и принтеру"""
+    # Сначала ищем шаблон для конкретного принтера
+    template = db.query(PrintTemplate).filter(
+        and_(
+            PrintTemplate.template_type == template_type,
+            PrintTemplate.printer_id == printer_id,
+            PrintTemplate.active == True
+        )
+    ).first()
+    
+    # Если не найден, ищем любой активный шаблон этого типа
+    if not template:
+        template = db.query(PrintTemplate).filter(
+            and_(
+                PrintTemplate.template_type == template_type,
+                PrintTemplate.active == True
+            )
+        ).first()
+    
+    return template
 
 # ===================== ЗАДАНИЯ ПЕЧАТИ =====================
 
-def create_print_job(
-    db: Session,
-    user_id: Optional[int],
-    printer_id: int,
-    document_type: str,
-    print_data: Dict[str, Any],
-    template_id: Optional[int] = None,
-    document_id: Optional[str] = None
-) -> PrintJob:
-    """Создать задание печати"""
-    job = PrintJob(
-        user_id=user_id,
-        printer_id=printer_id,
-        template_id=template_id,
-        document_type=document_type,
-        document_id=document_id,
-        print_data=print_data,
-        status="pending"
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    return job
-
-
-def update_print_job_status(
-    db: Session,
-    job_id: int,
-    status: str,
-    error_message: Optional[str] = None
-) -> Optional[PrintJob]:
-    """Обновить статус задания печати"""
-    job = db.query(PrintJob).filter(PrintJob.id == job_id).first()
-    if not job:
-        return None
-    
-    job.status = status
-    if error_message:
-        job.error_message = error_message
-    if status in ["completed", "failed"]:
-        job.completed_at = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(job)
-    return job
-
+def get_print_job(db: Session, job_id: int) -> Optional[PrintJob]:
+    """Получить задание печати по ID"""
+    return db.query(PrintJob).filter(PrintJob.id == job_id).first()
 
 def get_print_jobs(
     db: Session,
+    status_filter: Optional[str] = None,
+    document_type: Optional[str] = None,
+    user_id: Optional[int] = None,
     skip: int = 0,
-    limit: int = 100,
-    status: Optional[str] = None,
-    printer_id: Optional[int] = None,
-    user_id: Optional[int] = None
+    limit: int = 100
 ) -> List[PrintJob]:
-    """Получить задания печати"""
+    """Получить список заданий печати"""
     query = db.query(PrintJob)
     
-    if status:
-        query = query.filter(PrintJob.status == status)
-    if printer_id:
-        query = query.filter(PrintJob.printer_id == printer_id)
+    if status_filter:
+        query = query.filter(PrintJob.status == status_filter)
+    
+    if document_type:
+        query = query.filter(PrintJob.document_type == document_type)
+    
     if user_id:
         query = query.filter(PrintJob.user_id == user_id)
     
-    return query.order_by(desc(PrintJob.created_at)).offset(skip).limit(limit).all()
+    return query.order_by(PrintJob.created_at.desc()).offset(skip).limit(limit).all()
 
+def create_print_job(db: Session, job_data: Dict[str, Any]) -> PrintJob:
+    """Создать задание печати"""
+    db_job = PrintJob(**job_data)
+    db.add(db_job)
+    db.commit()
+    db.refresh(db_job)
+    return db_job
 
-# ===================== СТАТИСТИКА =====================
-
-def get_print_stats(
+def update_print_job(
     db: Session,
-    days_back: int = 30,
-    printer_id: Optional[int] = None
-) -> Dict[str, Any]:
-    """Получить статистику печати"""
-    start_date = datetime.utcnow() - timedelta(days=days_back)
+    job_id: int,
+    job_data: Dict[str, Any]
+) -> Optional[PrintJob]:
+    """Обновить задание печати"""
+    db_job = get_print_job(db, job_id)
+    if not db_job:
+        return None
     
-    query = db.query(PrintJob).filter(PrintJob.created_at >= start_date)
+    for field, value in job_data.items():
+        if hasattr(db_job, field):
+            setattr(db_job, field, value)
     
-    if printer_id:
-        query = query.filter(PrintJob.printer_id == printer_id)
-    
-    jobs = query.all()
-    
-    total_jobs = len(jobs)
-    successful_jobs = len([j for j in jobs if j.status == "completed"])
-    failed_jobs = len([j for j in jobs if j.status == "failed"])
-    pending_jobs = len([j for j in jobs if j.status == "pending"])
-    
-    # Статистика по типам документов
-    by_document_type = {}
-    for job in jobs:
-        doc_type = job.document_type
-        if doc_type not in by_document_type:
-            by_document_type[doc_type] = {"total": 0, "successful": 0, "failed": 0}
-        
-        by_document_type[doc_type]["total"] += 1
-        if job.status == "completed":
-            by_document_type[doc_type]["successful"] += 1
-        elif job.status == "failed":
-            by_document_type[doc_type]["failed"] += 1
-    
-    # Статистика по принтерам
-    by_printer = {}
-    for job in jobs:
-        printer_name = job.printer.name if job.printer else "unknown"
-        if printer_name not in by_printer:
-            by_printer[printer_name] = {"total": 0, "successful": 0, "failed": 0}
-        
-        by_printer[printer_name]["total"] += 1
-        if job.status == "completed":
-            by_printer[printer_name]["successful"] += 1
-        elif job.status == "failed":
-            by_printer[printer_name]["failed"] += 1
-    
-    return {
-        "total_jobs": total_jobs,
-        "successful_jobs": successful_jobs,
-        "failed_jobs": failed_jobs,
-        "pending_jobs": pending_jobs,
-        "by_document_type": by_document_type,
-        "by_printer": by_printer,
-        "period_start": start_date,
-        "period_end": datetime.utcnow()
-    }
-
-
-# ===================== НАСТРОЙКИ СИСТЕМЫ =====================
-
-def get_print_system_settings(db: Session) -> Dict[str, Any]:
-    """Получить настройки системы печати"""
-    from app.crud.clinic import get_settings_by_category
-    
-    print_settings = get_settings_by_category(db, "print")
-    
-    result = {
-        "enabled": True,
-        "default_language": "ru",
-        "auto_print_tickets": True,
-        "auto_print_receipts": True,
-        "print_quality": "normal",
-        "color_printing": False,
-        "backup_failed_jobs": True,
-        "retry_failed_jobs": True,
-        "max_retries": 3
-    }
-    
-    # Применяем сохраненные настройки
-    for setting in print_settings:
-        if setting.key in result:
-            result[setting.key] = setting.value
-    
-    return result
-
-
-def update_print_system_settings(db: Session, settings: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-    """Обновить настройки системы печати"""
-    from app.crud.clinic import update_settings_batch
-    
-    # Сохраняем настройки в категории "print"
-    update_settings_batch(db, "print", settings, user_id)
-    
-    return get_print_system_settings(db)
+    db.commit()
+    db.refresh(db_job)
+    return db_job

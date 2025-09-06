@@ -1,0 +1,259 @@
+{% comment %}
+Шаблон медицинской справки для печати на A4
+Основа: passport.md стр. 1925-2063
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Медицинская справка № {{ certificate.number }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 14pt;
+            line-height: 1.5;
+            margin: 0;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 15px;
+        }
+        
+        .clinic-name {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .clinic-details {
+            font-size: 12pt;
+            margin-bottom: 10px;
+        }
+        
+        .certificate-title {
+            font-size: 20pt;
+            font-weight: bold;
+            margin-top: 20px;
+            text-transform: uppercase;
+        }
+        
+        .certificate-number {
+            font-size: 14pt;
+            margin-top: 10px;
+        }
+        
+        .content {
+            margin: 40px 0;
+            text-align: justify;
+        }
+        
+        .patient-info {
+            margin: 30px 0;
+            padding: 15px;
+            border: 1px solid #000;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: baseline;
+        }
+        
+        .info-label {
+            min-width: 150px;
+            font-weight: bold;
+        }
+        
+        .info-value {
+            flex: 1;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+            margin-left: 10px;
+        }
+        
+        .diagnosis-section {
+            margin: 30px 0;
+        }
+        
+        .diagnosis-title {
+            font-weight: bold;
+            font-size: 16pt;
+            margin-bottom: 15px;
+        }
+        
+        .diagnosis-text {
+            padding: 15px;
+            border: 1px solid #000;
+            min-height: 60px;
+        }
+        
+        .recommendations {
+            margin: 30px 0;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        
+        .doctor-signature {
+            width: 45%;
+        }
+        
+        .signature-line {
+            border-bottom: 1px solid #000;
+            height: 30px;
+            margin-bottom: 10px;
+        }
+        
+        .stamp-area {
+            width: 45%;
+            text-align: center;
+            border: 1px dashed #666;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+        }
+        
+        .validity {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 12pt;
+            border-top: 1px solid #000;
+            padding-top: 15px;
+        }
+        
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="clinic-name">{{ clinic.name }}</div>
+        <div class="clinic-details">
+            Лицензия: {{ clinic.license_number }}<br>
+            {{ clinic.address }}<br>
+            Телефон: {{ clinic.phone }} | Email: {{ clinic.email }}
+        </div>
+        <div class="certificate-title">Медицинская справка</div>
+        <div class="certificate-number">№ {{ certificate.number }}</div>
+    </div>
+
+    <div class="patient-info">
+        <div class="info-row">
+            <div class="info-label">Фамилия, имя, отчество:</div>
+            <div class="info-value">{{ patient.full_name }}</div>
+        </div>
+        
+        <div class="info-row">
+            <div class="info-label">Дата рождения:</div>
+            <div class="info-value">{{ patient.birth_date | strftime('%d.%m.%Y') }}</div>
+        </div>
+        
+        <div class="info-row">
+            <div class="info-label">Адрес проживания:</div>
+            <div class="info-value">{{ patient.address or 'Не указан' }}</div>
+        </div>
+        
+        <div class="info-row">
+            <div class="info-label">Документ:</div>
+            <div class="info-value">{{ patient.passport_series }} {{ patient.passport_number }}</div>
+        </div>
+        
+        <div class="info-row">
+            <div class="info-label">Дата обращения:</div>
+            <div class="info-value">{{ visit.date | strftime('%d.%m.%Y') }}</div>
+        </div>
+    </div>
+
+    <div class="content">
+        <p>Настоящая справка выдана в том, что вышеуказанный гражданин(ка) действительно 
+        {{ certificate.purpose_text | lower }} и по состоянию здоровья 
+        {% if certificate.certificate_type == 'fitness' %}
+        <strong>ГОДЕН(НА)</strong>
+        {% elif certificate.certificate_type == 'unfitness' %}
+        <strong>НЕ ГОДЕН(НА)</strong>
+        {% elif certificate.certificate_type == 'sick_leave' %}
+        <strong>НУЖДАЕТСЯ В ОСВОБОЖДЕНИИ ОТ РАБОТЫ/УЧЕБЫ</strong>
+        {% endif %}
+        {% if certificate.period_from and certificate.period_to %}
+        на период с {{ certificate.period_from | strftime('%d.%m.%Y') }} 
+        по {{ certificate.period_to | strftime('%d.%m.%Y') }}
+        {% endif %}.</p>
+    </div>
+
+    {% if visit.diagnosis or certificate.medical_findings %}
+    <div class="diagnosis-section">
+        <div class="diagnosis-title">МЕДИЦИНСКИЕ ДАННЫЕ:</div>
+        <div class="diagnosis-text">
+            {% if visit.diagnosis %}
+            <strong>Диагноз:</strong> {{ visit.diagnosis }}
+            {% if visit.icd10 %} ({{ visit.icd10 }}){% endif %}<br><br>
+            {% endif %}
+            
+            {% if certificate.medical_findings %}
+            <strong>Объективные данные:</strong><br>
+            {{ certificate.medical_findings | nl2br }}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if certificate.recommendations %}
+    <div class="recommendations">
+        <div class="diagnosis-title">РЕКОМЕНДАЦИИ:</div>
+        <div class="diagnosis-text">
+            {{ certificate.recommendations | nl2br }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if certificate.restrictions %}
+    <div class="recommendations">
+        <div class="diagnosis-title">ОГРАНИЧЕНИЯ:</div>
+        <div class="diagnosis-text">
+            {{ certificate.restrictions | nl2br }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <div class="doctor-signature">
+            <div>Врач {{ doctor.specialty_name }}</div>
+            <div class="signature-line"></div>
+            <div>{{ doctor.full_name }}</div>
+            <div style="font-size: 12pt; margin-top: 5px;">
+                Лицензия: {{ doctor.license_number }}
+            </div>
+        </div>
+        
+        <div class="stamp-area">
+            М.П.
+        </div>
+    </div>
+
+    <div class="validity">
+        Справка выдана {{ certificate.issue_date | strftime('%d.%m.%Y') }}
+        {% if certificate.valid_until %}
+        и действительна до {{ certificate.valid_until | strftime('%d.%m.%Y') }}
+        {% endif %}
+        <br>
+        <strong>Справка подлежит возврату по истечении срока действия</strong>
+    </div>
+</body>
+</html>

@@ -12,6 +12,8 @@ import ResponsiveNavigation from '../components/ResponsiveNavigation';
 import { Button, Card, Badge, Skeleton, AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
 import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
+import PrintButton from '../components/print/PrintButton';
+import PrintDialog from '../components/print/PrintDialog';
 import { 
   Hospital, 
   Calendar, 
@@ -48,6 +50,9 @@ const RegistrarPanel = () => {
 
   // Основные состояния
   const [activeTab, setActiveTab] = useState('welcome');
+  
+  // Состояния для печати
+  const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
   const [appointments, setAppointments] = useState([
     // Тестовые данные для демонстрации кнопок
     {

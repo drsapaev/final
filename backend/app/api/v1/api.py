@@ -32,6 +32,8 @@ from app.api.v1.endpoints import (
     patients,
     registrar_integration,
     doctor_integration,
+    print_templates,
+    print_api,
     payment_webhook,
     payments,
     print as print_ep,
@@ -58,6 +60,8 @@ api_router.include_router(online_queue.router, tags=["online-queue"])
 api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
 api_router.include_router(registrar_integration.router, tags=["registrar"])
 api_router.include_router(doctor_integration.router, tags=["doctor-integration"])
+api_router.include_router(print_templates.router, prefix="/print/templates", tags=["print-templates"])
+api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
 api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
 api_router.include_router(reports_ep.router, tags=["reports"])
