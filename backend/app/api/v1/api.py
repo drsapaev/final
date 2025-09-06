@@ -28,6 +28,7 @@ from app.api.v1.endpoints import (
     lab_specialized,
     notifications,
     online_queue,
+    online_queue_new,
     patients,
     payment_webhook,
     payments,
@@ -52,6 +53,7 @@ api_router.include_router(payments.router, prefix="/payments", tags=["payments"]
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
 api_router.include_router(online_queue.router, tags=["online-queue"])
+api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
 api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
 api_router.include_router(reports_ep.router, tags=["reports"])
