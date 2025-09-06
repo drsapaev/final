@@ -11,12 +11,15 @@ import {
   AlertCircle,
   CheckCircle,
   Stethoscope,
-  Calendar
+  Calendar,
+  Brain,
+  Phone
 } from 'lucide-react';
 import { Card, Button, Badge } from '../design-system/components';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
+import AIAssistant from '../components/ai/AIAssistant';
 
 /**
  * Интегрированная панель кардиолога
@@ -41,6 +44,7 @@ const CardiologistPanelIntegrated = () => {
   const tabs = [
     { id: 'queue', label: 'Очередь', icon: Users, color: 'text-blue-600' },
     { id: 'visit', label: 'Прием пациента', icon: Heart, color: 'text-red-600' },
+    { id: 'ai', label: 'AI Помощник', icon: Brain, color: 'text-purple-600' },
     { id: 'services', label: 'Услуги', icon: Activity, color: 'text-green-600' },
     { id: 'history', label: 'История', icon: FileText, color: 'text-gray-600' }
   ];
@@ -50,6 +54,17 @@ const CardiologistPanelIntegrated = () => {
     setSelectedPatient(patient);
     setActiveTab('visit');
     setMessage({ type: 'info', text: `Выбран пациент: ${patient.patient_name}` });
+  };
+
+  // Обработка AI предложений
+  const handleAISuggestion = (type, suggestion) => {
+    if (type === 'icd10') {
+      setVisitData({ ...visitData, icd10: suggestion });
+      setMessage({ type: 'success', text: 'Код МКБ-10 добавлен из AI предложения' });
+    } else if (type === 'diagnosis') {
+      setVisitData({ ...visitData, diagnosis: suggestion });
+      setMessage({ type: 'success', text: 'Диагноз добавлен из AI предложения' });
+    }
   };
 
   // Обработка сохранения визита
@@ -339,6 +354,14 @@ const CardiologistPanelIntegrated = () => {
               </div>
             </Card>
           </div>
+        )}
+
+        {/* AI Помощник */}
+        {activeTab === 'ai' && (
+          <AIAssistant
+            specialty="cardiology"
+            onSuggestionSelect={handleAISuggestion}
+          />
         )}
 
         {/* Управление услугами */}
