@@ -35,6 +35,7 @@ from app.api.v1.endpoints import (
     print_templates,
     print_api,
     ai_integration,
+    telegram_integration,
     payment_webhook,
     payments,
     print as print_ep,
@@ -64,6 +65,7 @@ api_router.include_router(doctor_integration.router, tags=["doctor-integration"]
 api_router.include_router(print_templates.router, prefix="/print/templates", tags=["print-templates"])
 api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
 api_router.include_router(ai_integration.router, prefix="/ai", tags=["ai-integration"])
+api_router.include_router(telegram_integration.router, prefix="/telegram", tags=["telegram-integration"])
 api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
 api_router.include_router(reports_ep.router, tags=["reports"])
