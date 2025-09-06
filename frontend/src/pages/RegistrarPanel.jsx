@@ -3,6 +3,9 @@ import InputMask from 'react-input-mask';
 import { Toaster, toast } from 'react-hot-toast';
 import AppointmentsTable from '../components/AppointmentsTable';
 import ServiceChecklist from '../components/ServiceChecklist';
+import IntegratedServiceSelector from '../components/registrar/IntegratedServiceSelector';
+import IntegratedDoctorSelector from '../components/registrar/IntegratedDoctorSelector';
+import OnlineQueueManager from '../components/registrar/OnlineQueueManager';
 import AppointmentFlow from '../components/AppointmentFlow';
 import ResponsiveTable from '../components/ResponsiveTable';
 import ResponsiveNavigation from '../components/ResponsiveNavigation';
@@ -144,6 +147,14 @@ const RegistrarPanel = () => {
     visit: {},
     payment: {}
   });
+  
+  // Новые состояния для интеграции с админ панелью
+  const [doctors, setDoctors] = useState([]);
+  const [services, setServices] = useState({});
+  const [queueSettings, setQueueSettings] = useState({});
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [selectedServices, setSelectedServices] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Язык (тема теперь централизована)
   const [language, setLanguage] = useState(() => localStorage.getItem('ui_lang') || 'ru');
@@ -435,7 +446,48 @@ const RegistrarPanel = () => {
     transform: 'translateY(-2px)'
   };
 
-  // Загрузка данных
+  // Загрузка данных из админ панели
+  const loadIntegratedData = async () => {
+    try {
+      setAppointmentsLoading(true);
+      
+      // Загружаем врачей, услуги и настройки очередей из админ панели
+      const [doctorsRes, servicesRes, queueRes] = await Promise.all([
+        fetch('/api/v1/registrar/doctors', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        }),
+        fetch('/api/v1/registrar/services', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        }),
+        fetch('/api/v1/registrar/queue-settings', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        })
+      ]);
+
+      if (doctorsRes.ok) {
+        const doctorsData = await doctorsRes.json();
+        setDoctors(doctorsData.doctors);
+      }
+
+      if (servicesRes.ok) {
+        const servicesData = await servicesRes.json();
+        setServices(servicesData.services_by_group);
+      }
+
+      if (queueRes.ok) {
+        const queueData = await queueRes.json();
+        setQueueSettings(queueData);
+      }
+
+    } catch (error) {
+      console.error('Ошибка загрузки интегрированных данных:', error);
+      toast.error('Ошибка загрузки данных из админ панели');
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  // Загрузка записей (старая функция)
   const loadAppointments = async () => {
     try {
       setAppointmentsLoading(true);
@@ -457,6 +509,7 @@ const RegistrarPanel = () => {
 
   useEffect(() => {
     loadAppointments();
+    loadIntegratedData(); // Загружаем данные из админ панели
   }, []);
 
   // Функции для жесткого потока
@@ -824,6 +877,20 @@ const RegistrarPanel = () => {
                 </div>
               </AnimatedTransition>
 
+              {/* Онлайн-очередь */}
+              <AnimatedTransition type="fade" delay={800}>
+                <div style={{ marginBottom: '32px' }}>
+                  <h2 style={{ fontSize: '24px', marginBottom: '20px', color: accentColor }}>
+                    📱 Онлайн-очередь
+                  </h2>
+                  <OnlineQueueManager
+                    selectedDoctorId={selectedDoctor?.id}
+                    selectedDate={selectedDate}
+                    onQueueUpdate={loadIntegratedData}
+                  />
+                </div>
+              </AnimatedTransition>
+
               {/* Быстрый старт */}
               <AnimatedTransition type="fade" delay={1000}>
                 <div style={{ marginBottom: '32px' }}>
@@ -1146,13 +1213,31 @@ const RegistrarPanel = () => {
                 <h3 style={{ marginBottom: '16px', color: accentColor }}>📋 {t('details')}</h3>
                 <div style={{ display: 'grid', gap: '16px' }}>
                   <div>
+                    <label style={labelStyle}>Врач</label>
+                    <IntegratedDoctorSelector
+                      selectedDoctorId={selectedDoctor?.id}
+                      onDoctorChange={(doctor) => {
+                        setSelectedDoctor(doctor);
+                        setWizardData({
+                          ...wizardData,
+                          visit: { ...wizardData.visit, doctor_id: doctor.id }
+                        });
+                      }}
+                      showSchedule={true}
+                    />
+                  </div>
+                  <div>
                     <label style={labelStyle}>Услуги</label>
-                    <ServiceChecklist
-                      selectedServices={wizardData.visit.services || []}
-                      onServicesChange={(services) => setWizardData({
-                        ...wizardData,
-                        visit: { ...wizardData.visit, services }
-                      })}
+                    <IntegratedServiceSelector
+                      selectedServices={selectedServices}
+                      onServicesChange={(services) => {
+                        setSelectedServices(services);
+                        setWizardData({
+                          ...wizardData,
+                          visit: { ...wizardData.visit, services }
+                        });
+                      }}
+                      specialty={selectedDoctor?.specialty}
                     />
                   </div>
                   <div>
