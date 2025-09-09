@@ -7,7 +7,7 @@ import {
   Clock, 
   Globe, 
   Upload,
-  Save,
+  Save, 
   RefreshCw,
   AlertCircle,
   CheckCircle,
@@ -196,15 +196,15 @@ const ClinicSettings = () => {
     <div className="space-y-6">
       {/* Заголовок */}
       <div className="flex items-center justify-between">
-        <div>
+                <div>
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Настройки клиники
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
             Основная информация о медицинском учреждении
           </p>
-        </div>
-        
+                </div>
+
         <div className="flex gap-3">
           <Button variant="outline" onClick={loadSettings} disabled={loading}>
             <RefreshCw size={16} className="mr-2" />
@@ -218,8 +218,8 @@ const ClinicSettings = () => {
             )}
             Сохранить
           </Button>
-        </div>
-      </div>
+                </div>
+              </div>
 
       {/* Сообщения */}
       {message.text && (
@@ -234,7 +234,7 @@ const ClinicSettings = () => {
             <AlertCircle size={20} className="mr-2" />
           )}
           {message.text}
-        </div>
+                  </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -246,77 +246,77 @@ const ClinicSettings = () => {
           </h3>
           
           <div className="space-y-4">
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Название клиники
-              </label>
-              <input
-                type="text"
+                  </label>
+                  <input
+                    type="text"
                 value={settings.clinic_name || ''}
                 onChange={(e) => handleInputChange('clinic_name', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="Название медицинского учреждения"
-              />
-            </div>
+                  />
+                </div>
 
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <MapPin size={16} className="inline mr-1" />
                 Адрес
-              </label>
+                  </label>
               <textarea
                 value={settings.address || ''}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="Полный адрес клиники"
-              />
-            </div>
+                  />
+                </div>
 
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Phone size={16} className="inline mr-1" />
                 Телефон
-              </label>
-              <input
-                type="tel"
+                  </label>
+                    <input
+                      type="tel"
                 value={settings.phone || ''}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="+998 (90) 123-45-67"
               />
-            </div>
+              </div>
 
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Mail size={16} className="inline mr-1" />
                 Email
-              </label>
-              <input
-                type="email"
+                  </label>
+                    <input
+                      type="email"
                 value={settings.email || ''}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="info@clinic.com"
-              />
-            </div>
-          </div>
-        </Card>
+                          />
+                        </div>
+              </div>
+            </Card>
 
         {/* Системные настройки */}
-        <Card className="p-6">
+            <Card className="p-6">
           <h3 className="text-lg font-medium mb-4 flex items-center">
             <Globe size={20} className="mr-2 text-green-600" />
-            Системные настройки
-          </h3>
+                Системные настройки
+              </h3>
           
           <div className="space-y-4">
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Clock size={16} className="inline mr-1" />
-                Часовой пояс
-              </label>
-              <select
+                    Часовой пояс
+                  </label>
+                  <select
                 value={settings.timezone || 'Asia/Tashkent'}
                 onChange={(e) => handleInputChange('timezone', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -326,18 +326,18 @@ const ClinicSettings = () => {
                     {tz.label}
                   </option>
                 ))}
-              </select>
+                  </select>
               <p className="text-sm text-gray-500 mt-1">
                 Используется для расписания и онлайн-очереди
               </p>
-            </div>
+                </div>
 
             {/* Логотип */}
-            <div>
+                <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Image size={16} className="inline mr-1" />
                 Логотип клиники
-              </label>
+                  </label>
               
               {/* Текущий логотип */}
               {(settings.logo_url || logoPreview) && (
@@ -347,8 +347,8 @@ const ClinicSettings = () => {
                       src={logoPreview || settings.logo_url}
                       alt="Логотип клиники"
                       className="max-w-full max-h-full object-contain"
-                    />
-                  </div>
+                  />
+                </div>
                   {logoPreview && (
                     <Button 
                       variant="outline" 
@@ -359,33 +359,33 @@ const ClinicSettings = () => {
                       Отменить
                     </Button>
                   )}
-                </div>
-              )}
-
+                    </div>
+                  )}
+                  
               {/* Загрузка логотипа */}
               <div className="flex items-center">
-                <input
-                  type="file"
-                  accept="image/*"
+                    <input
+                      type="file"
+                      accept="image/*"
                   onChange={handleLogoSelect}
-                  className="hidden"
+                      className="hidden"
                   id="logo-upload"
-                />
-                <label
-                  htmlFor="logo-upload"
+                    />
+                    <label
+                      htmlFor="logo-upload"
                   className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-                >
+                    >
                   <Upload size={16} className="mr-2" />
                   Выбрать файл
-                </label>
+                    </label>
               </div>
               <p className="text-sm text-gray-500 mt-1">
                 Поддерживаются форматы: JPG, PNG, GIF. Максимальный размер: 5MB
               </p>
-            </div>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
-      </div>
     </div>
   );
 };
