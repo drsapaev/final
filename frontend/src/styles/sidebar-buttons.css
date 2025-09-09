@@ -1,0 +1,76 @@
+/* Единые стили для всех кнопок сайдбара */
+
+/* Базовые стили для всех кнопок */
+aside .sidebar-theme-button,
+aside .sidebar-language-button,
+aside .sidebar-toggle-button,
+aside .logout-button,
+.dark aside .sidebar-theme-button,
+.dark aside .sidebar-language-button,
+.dark aside .sidebar-toggle-button,
+.dark aside .logout-button {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  outline: none !important;
+  color: inherit !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-shadow: none !important;
+  border-radius: 12px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Единые hover эффекты для всех кнопок */
+aside .sidebar-theme-button:hover,
+aside .sidebar-language-button:hover,
+aside .sidebar-toggle-button:hover,
+aside .logout-button:hover,
+.dark aside .sidebar-theme-button:hover,
+.dark aside .sidebar-language-button:hover,
+.dark aside .sidebar-toggle-button:hover,
+.dark aside .logout-button:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Убираем все focus обводки */
+aside .sidebar-theme-button:focus,
+aside .sidebar-language-button:focus,
+aside .sidebar-toggle-button:focus,
+aside .logout-button:focus,
+.dark aside .sidebar-theme-button:focus,
+.dark aside .sidebar-language-button:focus,
+.dark aside .sidebar-toggle-button:focus,
+.dark aside .logout-button:focus {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Единые active эффекты для всех кнопок */
+aside .sidebar-theme-button:active,
+aside .sidebar-language-button:active,
+aside .sidebar-toggle-button:active,
+aside .logout-button:active,
+.dark aside .sidebar-theme-button:active,
+.dark aside .sidebar-language-button:active,
+.dark aside .sidebar-toggle-button:active,
+.dark aside .logout-button:active {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+}

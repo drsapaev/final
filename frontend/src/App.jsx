@@ -21,7 +21,7 @@ import RegistrarPanel from './pages/RegistrarPanel.jsx';
 import DoctorPanel from './pages/DoctorPanel.jsx';
 import CardiologistPanelUnified from './pages/CardiologistPanelUnified.jsx';
 import DermatologistPanelUnified from './pages/DermatologistPanelUnified.jsx';
-import DentistPanel from './pages/DentistPanel.jsx';
+import DentistPanelUnified from './pages/DentistPanelUnified.jsx';
 import LabPanel from './pages/LabPanel.jsx';
 import UserSelect from './pages/UserSelect.jsx';
 import Search from './pages/Search.jsx';
@@ -29,6 +29,7 @@ import PatientPanel from './pages/PatientPanel.jsx';
 import QueueBoard from './pages/QueueBoard.jsx';
 import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
+import MediLabDemo from './pages/MediLabDemo.jsx';
 
 import auth from './stores/auth.js';
 
@@ -87,6 +88,11 @@ export default function App() {
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Landing />} />
+      <Route path="/medilab-demo" element={<MediLabDemo />} />
+      <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
+      <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
+      <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
+      <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
       <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
@@ -113,7 +119,7 @@ export default function App() {
           <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
           <Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanelUnified /></RequireAuth>} />
           <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanelUnified /></RequireAuth>} />
-          <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanel /></RequireAuth>} />
+          <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanelUnified /></RequireAuth>} />
           <Route path="lab-panel"     element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
           <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
           <Route path="queue-board"   element={<DisplayBoardUnified />} />
