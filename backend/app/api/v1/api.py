@@ -35,6 +35,7 @@ from app.api.v1.endpoints import (
     analytics_export,
     analytics_visualization,
     two_factor_auth,
+    authentication,
     online_queue,
     online_queue_new,
     patients,
@@ -118,3 +119,4 @@ api_router.include_router(
 )
 api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(activation_ep.router, tags=["activation"])
+api_router.include_router(authentication.router, prefix="/auth", tags=["authentication"])

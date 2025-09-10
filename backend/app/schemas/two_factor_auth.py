@@ -73,7 +73,7 @@ class TwoFactorRecoveryBase(BaseModel):
     """Базовая схема восстановления 2FA"""
     model_config = ConfigDict(protected_namespaces=())
     
-    recovery_type: str = Field(..., regex="^(email|phone|backup_code)$")
+    recovery_type: str = Field(..., pattern="^(email|phone|backup_code)$")
     recovery_value: str = Field(..., max_length=255)
     recovery_token: Optional[str] = None
 
@@ -113,7 +113,7 @@ class TwoFactorSessionBase(BaseModel):
     session_token: str = Field(..., min_length=32, max_length=64)
     device_fingerprint: Optional[str] = None
     two_factor_verified: bool = False
-    two_factor_method: Optional[str] = Field(None, regex="^(totp|backup_code|recovery)$")
+    two_factor_method: Optional[str] = Field(None, pattern="^(totp|backup_code|recovery)$")
 
 
 class TwoFactorSessionCreate(TwoFactorSessionBase):
@@ -145,7 +145,7 @@ class TwoFactorDeviceBase(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     
     device_name: str = Field(..., min_length=1, max_length=100)
-    device_type: str = Field(..., regex="^(mobile|desktop|tablet)$")
+    device_type: str = Field(..., pattern="^(mobile|desktop|tablet)$")
     device_fingerprint: str = Field(..., min_length=32, max_length=64)
     trusted: bool = False
     active: bool = True
@@ -180,7 +180,7 @@ class TwoFactorSetupRequest(BaseModel):
     recovery_email: Optional[str] = Field(None, max_length=255)
     recovery_phone: Optional[str] = Field(None, max_length=20)
     device_name: Optional[str] = Field(None, max_length=100)
-    device_type: Optional[str] = Field(None, regex="^(mobile|desktop|tablet)$")
+    device_type: Optional[str] = Field(None, pattern="^(mobile|desktop|tablet)$")
 
 
 class TwoFactorVerifyRequest(BaseModel):
@@ -207,7 +207,7 @@ class TwoFactorRecoveryRequest(BaseModel):
     """Запрос на восстановление 2FA"""
     model_config = ConfigDict(protected_namespaces=())
     
-    recovery_type: str = Field(..., regex="^(email|phone|backup_code)$")
+    recovery_type: str = Field(..., pattern="^(email|phone|backup_code)$")
     recovery_value: str = Field(..., max_length=255)
     device_fingerprint: Optional[str] = None
 

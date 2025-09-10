@@ -15,6 +15,7 @@ from .schedule import ScheduleTemplate
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate, EMRVersion
 from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
+from .authentication import RefreshToken, UserSession, PasswordResetToken, EmailVerificationToken, LoginAttempt, UserActivity, SecurityEvent
 from .lab import LabOrder, LabResult
 from .audit import AuditLog
 from .notification import NotificationTemplate, NotificationHistory, NotificationSettings
@@ -48,6 +49,13 @@ __all__ = [
     "TwoFactorRecovery",
     "TwoFactorSession",
     "TwoFactorDevice",
+    "RefreshToken",
+    "UserSession",
+    "PasswordResetToken",
+    "EmailVerificationToken",
+    "LoginAttempt",
+    "UserActivity",
+    "SecurityEvent",
     "LabOrder",
     "LabResult",
     "AuditLog",
