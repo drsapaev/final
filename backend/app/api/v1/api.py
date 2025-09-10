@@ -34,6 +34,7 @@ from app.api.v1.endpoints import (
     advanced_analytics,
     analytics_export,
     analytics_visualization,
+    two_factor_auth,
     online_queue,
     online_queue_new,
     patients,
@@ -94,6 +95,7 @@ api_router.include_router(emr_export.router, prefix="/emr/export", tags=["emr-ex
 api_router.include_router(advanced_analytics.router, prefix="/analytics/advanced", tags=["advanced-analytics"])
 api_router.include_router(analytics_export.router, prefix="/analytics/export", tags=["analytics-export"])
 api_router.include_router(analytics_visualization.router, prefix="/analytics/visualization", tags=["analytics-visualization"])
+api_router.include_router(two_factor_auth.router, prefix="/2fa", tags=["two-factor-auth"])
 api_router.include_router(schedule.router, tags=["schedule"])
 api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
 api_router.include_router(cardio.router, tags=["cardio"])
