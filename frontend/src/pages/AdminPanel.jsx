@@ -68,6 +68,7 @@ import FinanceModal from '../components/admin/FinanceModal';
 import ReportGenerator from '../components/admin/ReportGenerator';
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import ClinicSettings from '../components/admin/ClinicSettings';
+import ClinicManagement from '../components/admin/ClinicManagement';
 import QueueSettings from '../components/admin/QueueSettings';
 import ServiceCatalog from '../components/admin/ServiceCatalog';
 import AISettings from '../components/admin/AISettings';
@@ -1000,7 +1001,8 @@ const AdminPanel = () => {
     {
       title: 'Система',
       items: [
-        { to: '/admin/clinic-settings', label: 'Настройки клиники', icon: Building2 },
+        { to: '/admin/clinic-management', label: 'Управление клиникой', icon: Building2 },
+        { to: '/admin/clinic-settings', label: 'Настройки клиники', icon: Settings },
         { to: '/admin/queue-settings', label: 'Настройки очередей', icon: Clock },
         { to: '/admin/ai-settings', label: 'AI настройки', icon: Brain },
         { to: '/admin/telegram-settings', label: 'Telegram', icon: MessageSquare },
@@ -1522,6 +1524,8 @@ const AdminPanel = () => {
         return renderFinance();
       case 'reports':
         return renderReports();
+      case 'clinic-management':
+        return <ClinicManagement />;
       case 'clinic-settings':
         return <ClinicSettings />;
       case 'queue-settings':

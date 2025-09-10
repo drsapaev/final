@@ -1,5 +1,7 @@
 from .appointment import *  # noqa: F403
 from .audit import *  # noqa: F403
+from .emr_version import *  # noqa: F403
+from .lab_result import *  # noqa: F403
 from .patient import *  # noqa: F403
 from .payment import *  # noqa: F403
 from .schedule import *  # noqa: F403

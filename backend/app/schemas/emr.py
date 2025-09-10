@@ -20,6 +20,24 @@ class EMRBase(ORMModel):
     recommendations: Optional[str] = Field(None, max_length=5000)
     procedures: Optional[List[Dict[str, Any]]] = None
     attachments: Optional[List[Dict[str, Any]]] = None
+    
+    # Расширенные поля для специализаций
+    vital_signs: Optional[Dict[str, Any]] = None  # Жизненные показатели
+    lab_results: Optional[Dict[str, Any]] = None  # Результаты анализов
+    imaging_results: Optional[Dict[str, Any]] = None  # Результаты исследований
+    medications: Optional[Dict[str, Any]] = None  # Назначенные препараты
+    allergies: Optional[Dict[str, Any]] = None  # Аллергии
+    family_history: Optional[Dict[str, Any]] = None  # Семейный анамнез
+    social_history: Optional[Dict[str, Any]] = None  # Социальный анамнез
+    
+    # AI поля
+    ai_suggestions: Optional[Dict[str, Any]] = None  # AI предложения
+    ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)  # Уверенность AI
+    
+    # Шаблоны и специализация
+    template_id: Optional[int] = None  # ID шаблона
+    specialty: Optional[str] = Field(None, max_length=100)  # Специализация
+    
     is_draft: bool = True
 
 
@@ -40,6 +58,24 @@ class EMRUpdate(ORMModel):
     recommendations: Optional[str] = Field(None, max_length=5000)
     procedures: Optional[List[Dict[str, Any]]] = None
     attachments: Optional[List[Dict[str, Any]]] = None
+    
+    # Расширенные поля для специализаций
+    vital_signs: Optional[Dict[str, Any]] = None
+    lab_results: Optional[Dict[str, Any]] = None
+    imaging_results: Optional[Dict[str, Any]] = None
+    medications: Optional[Dict[str, Any]] = None
+    allergies: Optional[Dict[str, Any]] = None
+    family_history: Optional[Dict[str, Any]] = None
+    social_history: Optional[Dict[str, Any]] = None
+    
+    # AI поля
+    ai_suggestions: Optional[Dict[str, Any]] = None
+    ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    
+    # Шаблоны и специализация
+    template_id: Optional[int] = None
+    specialty: Optional[str] = Field(None, max_length=100)
+    
     is_draft: Optional[bool] = None
 
 
