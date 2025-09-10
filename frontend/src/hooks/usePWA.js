@@ -1,189 +1,129 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { initializePWA, isPWAInstalled, getConnectionInfo } from '../utils/pwa';
 
+/**
+ * Хук для работы с PWA функциями
+ */
 export const usePWA = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [connectionInfo, setConnectionInfo] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
+  // Инициализация PWA
   useEffect(() => {
-    const isProd = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.PROD;
-
-    // В режиме разработки полностью отключаем SW и чистим возможные старые кеши,
-    // чтобы не было "разных версий" страниц и проблем с обновлениями.
-    if (!isProd) {
+    const init = async () => {
       try {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations?.().then((regs) => {
-            regs?.forEach((r) => r.unregister());
-          });
-        }
-        if (typeof caches !== 'undefined' && caches?.keys) {
-          caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
-        }
-      } catch (e) {
-        console.warn('PWA(dev): cleanup failed', e);
+        await initializePWA();
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('Ошибка инициализации PWA:', error);
       }
-
-      // Отключаем установку/подсказки в dev
-      setIsInstallable(false);
-      setIsInstalled(false);
-      setDeferredPrompt(null);
-
-      // Подписки на online/offline оставляем
-      const handleOnline = () => setIsOnline(true);
-      const handleOffline = () => setIsOnline(false);
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }
-
-    // Проверка установки PWA
-    const checkIfInstalled = () => {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const isInWebAppiOS = window.navigator.standalone === true;
-      setIsInstalled(isStandalone || isInWebAppiOS);
     };
 
-    checkIfInstalled();
+    init();
+  }, []);
 
-    // Обработчик события beforeinstallprompt
-    const handleBeforeInstallPrompt = (e) => {
-      console.log('PWA: beforeinstallprompt event fired');
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setIsInstallable(true);
+  // Проверка установки PWA
+  useEffect(() => {
+    const checkInstallation = () => {
+      setIsInstalled(isPWAInstalled());
     };
 
-    // Обработчик события appinstalled
-    const handleAppInstalled = () => {
-      console.log('PWA: App was installed');
-      setIsInstalled(true);
-      setIsInstallable(false);
-      setDeferredPrompt(null);
+    checkInstallation();
+    
+    // Проверяем при изменении размера окна (может измениться режим отображения)
+    window.addEventListener('resize', checkInstallation);
+    
+    return () => {
+      window.removeEventListener('resize', checkInstallation);
     };
+  }, []);
 
-    // Обработчики онлайн/офлайн
+  // Отслеживание статуса подключения
+  useEffect(() => {
     const handleOnline = () => {
-      console.log('PWA: App is online');
       setIsOnline(true);
+      setConnectionInfo(getConnectionInfo());
     };
 
     const handleOffline = () => {
-      console.log('PWA: App is offline');
       setIsOnline(false);
+      setConnectionInfo(null);
     };
 
-    // Добавляем слушатели событий
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Регистрация Service Worker (только в production)
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('PWA: Service Worker registered successfully:', registration);
-        })
-        .catch((error) => {
-          console.log('PWA: Service Worker registration failed:', error);
-        });
-    }
+    // Инициальная проверка
+    setConnectionInfo(getConnectionInfo());
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  const installApp = async () => {
-    if (!deferredPrompt) {
-      console.log('PWA: No deferred prompt available');
-      return false;
-    }
+  // Функция для проверки поддержки функций
+  const checkSupport = useCallback(() => {
+    return {
+      serviceWorker: 'serviceWorker' in navigator,
+      pushManager: 'PushManager' in window,
+      notification: 'Notification' in window,
+      backgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+      cache: 'caches' in window,
+      indexedDB: 'indexedDB' in window,
+      installPrompt: 'onbeforeinstallprompt' in window
+    };
+  }, []);
 
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      console.log(`PWA: User response to install prompt: ${outcome}`);
-      
-      if (outcome === 'accepted') {
-        setIsInstallable(false);
-        setDeferredPrompt(null);
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('PWA: Error during installation:', error);
-      return false;
-    }
-  };
+  // Функция для получения информации о подключении
+  const getConnectionDetails = useCallback(() => {
+    return {
+      isOnline,
+      connectionInfo,
+      effectiveType: connectionInfo?.effectiveType || 'unknown',
+      downlink: connectionInfo?.downlink || 0,
+      rtt: connectionInfo?.rtt || 0,
+      saveData: connectionInfo?.saveData || false
+    };
+  }, [isOnline, connectionInfo]);
 
-  const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) {
-      console.log('PWA: This browser does not support notifications');
-      return false;
-    }
+  // Функция для проверки, нужно ли показывать промпт установки
+  const shouldShowInstallPrompt = useCallback(() => {
+    if (isInstalled) return false;
+    
+    // Проверяем, не отклонил ли пользователь ранее
+    const wasDismissed = localStorage.getItem('pwa-install-dismissed');
+    if (wasDismissed) return false;
+    
+    return true;
+  }, [isInstalled]);
 
-    if (Notification.permission === 'granted') {
-      return true;
-    }
+  // Функция для отметки промпта как отклоненного
+  const dismissInstallPrompt = useCallback(() => {
+    localStorage.setItem('pwa-install-dismissed', 'true');
+  }, []);
 
-    if (Notification.permission !== 'denied') {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-    }
-
-    return false;
-  };
-
-  const showNotification = (title, options = {}) => {
-    if (Notification.permission === 'granted') {
-      new Notification(title, {
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
-        ...options
-      });
-    }
-  };
-
-  const registerForPushNotifications = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('PWA: Push notifications are not supported');
-      return null;
-    }
-
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: null // Здесь должен быть ваш VAPID ключ
-      });
-
-      console.log('PWA: Push subscription:', subscription);
-      return subscription;
-    } catch (error) {
-      console.error('PWA: Failed to subscribe for push notifications:', error);
-      return null;
-    }
-  };
+  // Функция для сброса статуса отклонения промпта
+  const resetInstallPrompt = useCallback(() => {
+    localStorage.removeItem('pwa-install-dismissed');
+  }, []);
 
   return {
-    isInstallable,
+    // Состояние
     isInstalled,
     isOnline,
-    installApp,
-    requestNotificationPermission,
-    showNotification,
-    registerForPushNotifications
+    isInitialized,
+    connectionInfo,
+    
+    // Функции
+    checkSupport,
+    getConnectionDetails,
+    shouldShowInstallPrompt,
+    dismissInstallPrompt,
+    resetInstallPrompt
   };
 };
 
+export default usePWA;

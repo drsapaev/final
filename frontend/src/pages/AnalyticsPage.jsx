@@ -4,6 +4,10 @@ import { api } from '../api/client';
 import AnalyticsChart from '../components/AnalyticsChart';
 import AnalyticsMetrics from '../components/AnalyticsMetrics';
 import AnalyticsCharts from '../components/AnalyticsCharts';
+import AdvancedCharts from '../components/analytics/AdvancedCharts';
+import KPIMetrics from '../components/analytics/KPIMetrics';
+import DataExporter from '../components/analytics/DataExporter';
+import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import { 
   Calendar, 
   TrendingUp, 
@@ -13,7 +17,8 @@ import {
   Download,
   Filter,
   RefreshCw,
-  BarChart3
+  BarChart3,
+  Target
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
@@ -30,7 +35,9 @@ export default function AnalyticsPage() {
     appointments: null,
     revenue: null,
     providers: null,
-    visualization: null
+    visualization: null,
+    kpi: null,
+    predictive: null
   });
 
   const loadAnalytics = async (tab = activeTab) => {
@@ -61,6 +68,12 @@ export default function AnalyticsPage() {
           break;
         case 'visualization':
           response = await api.get(`/analytics/visualization/comprehensive?${params}`);
+          break;
+        case 'kpi':
+          response = await api.get(`/analytics/kpi-metrics?${params}`);
+          break;
+        case 'predictive':
+          response = await api.get(`/analytics/predictive?${params}`);
           break;
         default:
           response = await api.get(`/analytics/dashboard?${params}`);
@@ -510,7 +523,9 @@ export default function AnalyticsPage() {
           { id: 'appointments', label: 'Записи', icon: <Calendar size={16} /> },
           { id: 'revenue', label: 'Доходы', icon: <DollarSign size={16} /> },
           { id: 'providers', label: 'Провайдеры', icon: <TrendingUp size={16} /> },
-          { id: 'visualization', label: 'Графики', icon: <BarChart3 size={16} /> }
+          { id: 'visualization', label: 'Графики', icon: <BarChart3 size={16} /> },
+          { id: 'kpi', label: 'KPI', icon: <Target size={16} /> },
+          { id: 'predictive', label: 'Прогнозы', icon: <TrendingUp size={16} /> }
         ].map(tab => (
           <button
             key={tab.id}
@@ -554,12 +569,28 @@ export default function AnalyticsPage() {
           {activeTab === 'revenue' && renderRevenueTab()}
           {activeTab === 'providers' && renderProvidersTab()}
           {activeTab === 'visualization' && (
-            <AnalyticsCharts
+            <AdvancedCharts
               data={data.visualization}
               loading={loading}
               onRefresh={() => loadAnalytics('visualization')}
               onExport={() => exportData('json')}
               title="Интерактивные графики аналитики"
+            />
+          )}
+          {activeTab === 'kpi' && (
+            <KPIMetrics
+              data={data.kpi}
+              loading={loading}
+              onRefresh={() => loadAnalytics('kpi')}
+              onExport={() => exportData('json')}
+            />
+          )}
+          {activeTab === 'predictive' && (
+            <PredictiveAnalytics
+              data={data.predictive}
+              loading={loading}
+              onRefresh={() => loadAnalytics('predictive')}
+              onExport={() => exportData('json')}
             />
           )}
         </>

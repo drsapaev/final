@@ -16,6 +16,8 @@ from app.api.v1.endpoints import (
     admin_telegram,
     admin_users,
     analytics,
+    analytics_kpi,
+    analytics_predictive,
     api_documentation,
     appointment_flow,
     appointments,
@@ -116,6 +118,8 @@ api_router.include_router(
     appointment_flow.router, prefix="/appointments", tags=["appointment_flow"]
 )
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(analytics_kpi.router, prefix="/analytics", tags=["analytics-kpi"])
+api_router.include_router(analytics_predictive.router, prefix="/analytics", tags=["analytics-predictive"])
 api_router.include_router(
     notifications.router, prefix="/notifications", tags=["notifications"]
 )

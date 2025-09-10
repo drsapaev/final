@@ -9,6 +9,14 @@
   "orientation": "portrait-primary",
   "categories": ["medical", "productivity", "business"],
   "lang": "ru",
+  "scope": "/",
+  "id": "clinic-management-system",
+  "version": "1.0.0",
+  "dir": "ltr",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
