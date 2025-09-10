@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Optional, List
 
-from sqlalchemy import Boolean, Integer, String
+from sqlalchemy import Boolean, Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from app.db.base_class import Base
 
@@ -19,6 +20,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="Admin")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Метаданные
+    created_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[DateTime]] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # 2FA связи
     two_factor_auth: Mapped[Optional["TwoFactorAuth"]] = relationship("TwoFactorAuth", back_populates="user", uselist=False)

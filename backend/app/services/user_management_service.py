@@ -412,10 +412,11 @@ class UserManagementService:
                 User.two_factor_auth.has(totp_enabled=True)
             ).count()
             
-            # Недавние регистрации (30 дней) - используем ID как приблизительный индикатор
+            # Недавние регистрации (30 дней)
             thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-            # Поскольку у User нет created_at, используем приблизительную оценку
-            recent_registrations = 0  # TODO: Добавить created_at в модель User
+            recent_registrations = db.query(User).filter(
+                User.created_at >= thirty_days_ago
+            ).count()
             
             # Недавние входы (24 часа)
             twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
