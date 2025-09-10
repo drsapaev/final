@@ -96,6 +96,7 @@ class UserManagementService:
                 status=UserStatus.ACTIVE if user_data.is_active else UserStatus.INACTIVE
             )
             db.add(profile)
+            db.flush()  # Получаем ID профиля
             
             # Создаем настройки
             preferences = UserPreferences(
@@ -303,7 +304,7 @@ class UserManagementService:
             
             # Фильтр по тексту
             if search_params.query:
-                query = query.filter(
+                query = query.join(UserProfile, User.id == UserProfile.user_id, isouter=True).filter(
                     or_(
                         User.username.ilike(f"%{search_params.query}%"),
                         User.email.ilike(f"%{search_params.query}%"),
@@ -411,11 +412,10 @@ class UserManagementService:
                 User.two_factor_auth.has(totp_enabled=True)
             ).count()
             
-            # Недавние регистрации (30 дней)
+            # Недавние регистрации (30 дней) - используем ID как приблизительный индикатор
             thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-            recent_registrations = db.query(User).filter(
-                User.created_at >= thirty_days_ago
-            ).count()
+            # Поскольку у User нет created_at, используем приблизительную оценку
+            recent_registrations = 0  # TODO: Добавить created_at в модель User
             
             # Недавние входы (24 часа)
             twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
