@@ -45,6 +45,7 @@ def main():
     # Запускаем тесты
     checks = [
         ("python test_role_routing.py", "Тесты системы ролей"),
+        ("python quick_user_management_check.py", "Система управления пользователями"),
         ("python check_system_integrity.py", "Проверка целостности"),
     ]
 
