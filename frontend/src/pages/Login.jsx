@@ -96,10 +96,10 @@ export default function Login() {
 
   async function performLogin(u, p) {
     try {
-      const response = await fetch('/api/v1/auth/login', {
+        const response = await fetch('http://localhost:8000/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ username: u, password: p, grant_type: 'password' }).toString(),
+        body: new URLSearchParams({ username: u, password: p }).toString(),
       });
       if (!response.ok) {
         const errorText = await response.text();
@@ -110,7 +110,7 @@ export default function Login() {
       if (!token) throw new Error('В ответе не найден access_token');
       setToken(token);
       try {
-        const meRes = await fetch('/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } });
+        const meRes = await fetch('http://localhost:8000/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } });
         if (meRes.ok) setProfile(await meRes.json()); else setProfile(null);
       } catch {
         // Игнорируем ошибки получения профиля
@@ -168,8 +168,15 @@ export default function Login() {
     if (!profile) return '/search';
     const rolesArr = Array.isArray(profile.roles) ? profile.roles.map(r => String(r).toLowerCase()) : [];
     const roleLower = String(profile.role || profile.role_name || '').toLowerCase();
+    
+    console.log('Profile data:', { profile, rolesArr, roleLower });
+    
     if (rolesArr.includes('admin') || roleLower === 'admin') return '/admin';
-    if (roleLower) return roleToRoute(roleLower);
+    if (roleLower) {
+      const route = roleToRoute(roleLower);
+      console.log('Route for role:', roleLower, '->', route);
+      return route;
+    }
     for (const r of rolesArr) {
       const route = roleToRoute(r);
       if (route && route !== '/search') return route;

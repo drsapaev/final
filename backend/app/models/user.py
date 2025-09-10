@@ -31,3 +31,16 @@ class User(Base):
     login_attempts: Mapped[List["LoginAttempt"]] = relationship("LoginAttempt", back_populates="user", cascade="all, delete-orphan")
     user_activities: Mapped[List["UserActivity"]] = relationship("UserActivity", back_populates="user", cascade="all, delete-orphan")
     security_events: Mapped[List["SecurityEvent"]] = relationship("SecurityEvent", foreign_keys="SecurityEvent.user_id", back_populates="user", cascade="all, delete-orphan")
+    
+    # Профиль и настройки
+    profile: Mapped[Optional["UserProfile"]] = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    preferences: Mapped[Optional["UserPreferences"]] = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    notification_settings: Mapped[Optional["UserNotificationSettings"]] = relationship("UserNotificationSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
+    # Роли и группы
+    # user_role: Mapped[Optional["UserRole"]] = relationship("UserRole", back_populates="users")  # Временно отключено - нет внешнего ключа
+    # groups: Mapped[List["UserGroup"]] = relationship("UserGroup", secondary="user_group_members", back_populates="users")  # Временно отключено
+    # group_memberships: Mapped[List["UserGroupMember"]] = relationship("UserGroupMember", back_populates="user", cascade="all, delete-orphan")  # Временно отключено
+    
+    # Аудит
+    audit_logs: Mapped[List["UserAuditLog"]] = relationship("UserAuditLog", back_populates="user", cascade="all, delete-orphan")
