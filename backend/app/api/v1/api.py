@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     activation as activation_ep,
     admin_ai,
     admin_clinic,
+    clinic_management,
     admin_display,
     admin_doctors,
     admin_providers,
@@ -30,6 +31,9 @@ from app.api.v1.endpoints import (
     notifications,
     emr_templates,
     emr_ai,
+    emr_ai_enhanced,
+    emr_versioning_enhanced,
+    emr_lab_integration,
     emr_export,
     advanced_analytics,
     analytics_export,
@@ -84,6 +88,7 @@ api_router.include_router(reports_ep.router, tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
+api_router.include_router(clinic_management.router, prefix="/clinic", tags=["clinic-management"])
 api_router.include_router(admin_display.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_doctors.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_providers.router, tags=["admin"])
@@ -93,6 +98,9 @@ api_router.include_router(admin_users.router)
 api_router.include_router(mobile_api.router, prefix="/mobile", tags=["mobile"])
 api_router.include_router(emr_templates.router, prefix="/emr", tags=["emr-templates"])
 api_router.include_router(emr_ai.router, prefix="/emr/ai", tags=["emr-ai"])
+api_router.include_router(emr_ai_enhanced.router, prefix="/emr/ai-enhanced", tags=["emr-ai-enhanced"])
+api_router.include_router(emr_versioning_enhanced.router, prefix="/emr/versions", tags=["emr-versioning"])
+api_router.include_router(emr_lab_integration.router, prefix="/emr/lab", tags=["emr-lab-integration"])
 api_router.include_router(emr_export.router, prefix="/emr/export", tags=["emr-export"])
 api_router.include_router(advanced_analytics.router, prefix="/analytics/advanced", tags=["advanced-analytics"])
 api_router.include_router(analytics_export.router, prefix="/analytics/export", tags=["analytics-export"])

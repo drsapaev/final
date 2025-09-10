@@ -49,6 +49,7 @@ class LabResult(Base):
     unit: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     ref_range: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     abnormal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

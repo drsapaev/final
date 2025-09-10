@@ -1,41 +1,72 @@
-﻿from __future__ import annotations
-
-from datetime import datetime
+﻿"""
+Схемы для лабораторных данных
+"""
 from typing import Optional
-
-from pydantic import Field
-
-from app.schemas.base import ORMModel
+from datetime import datetime
+from pydantic import BaseModel, Field
 
 
-# --- Orders ---
-class LabOrderCreate(ORMModel):
-    visit_id: Optional[int] = None
-    patient_id: Optional[int] = None
-    notes: Optional[str] = Field(default=None, max_length=1000)
+class LabResultBase(BaseModel):
+    """Базовая схема лабораторного результата"""
+    test_code: Optional[str] = Field(None, max_length=64)
+    test_name: str = Field(..., max_length=255)
+    value: Optional[str] = Field(None, max_length=128)
+    unit: Optional[str] = Field(None, max_length=32)
+    ref_range: Optional[str] = Field(None, max_length=64)
+    abnormal: bool = Field(False)
+    notes: Optional[str] = Field(None, max_length=1000)
 
 
-class LabOrderOut(ORMModel):
-    id: int
-    visit_id: Optional[int] = None
-    patient_id: Optional[int] = None
-    status: str = Field(max_length=16)  # ordered|in_progress|done|canceled
-    notes: Optional[str] = Field(default=None, max_length=1000)
-    created_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+class LabResultCreate(LabResultBase):
+    """Схема для создания лабораторного результата"""
+    order_id: int
 
 
-# --- Results ---
-class LabResultIn(ORMModel):
-    test_code: Optional[str] = Field(default=None, max_length=64)
-    test_name: str = Field(max_length=255)
-    value: Optional[str] = Field(default=None, max_length=128)
-    unit: Optional[str] = Field(default=None, max_length=32)
-    ref_range: Optional[str] = Field(default=None, max_length=64)
-    abnormal: bool = False
+class LabResultUpdate(BaseModel):
+    """Схема для обновления лабораторного результата"""
+    test_code: Optional[str] = Field(None, max_length=64)
+    test_name: Optional[str] = Field(None, max_length=255)
+    value: Optional[str] = Field(None, max_length=128)
+    unit: Optional[str] = Field(None, max_length=32)
+    ref_range: Optional[str] = Field(None, max_length=64)
+    abnormal: Optional[bool] = None
+    notes: Optional[str] = Field(None, max_length=1000)
 
 
-class LabResultOut(LabResultIn):
+class LabResultOut(LabResultBase):
+    """Схема для вывода лабораторного результата"""
     id: int
     order_id: int
-    created_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_orm = True
+
+
+class LabOrderBase(BaseModel):
+    """Базовая схема лабораторного заказа"""
+    patient_id: Optional[int] = None
+    status: str = Field("ordered", max_length=16)
+    notes: Optional[str] = Field(None, max_length=1000)
+
+
+class LabOrderCreate(LabOrderBase):
+    """Схема для создания лабораторного заказа"""
+    pass
+
+
+class LabOrderUpdate(BaseModel):
+    """Схема для обновления лабораторного заказа"""
+    status: Optional[str] = Field(None, max_length=16)
+    notes: Optional[str] = Field(None, max_length=1000)
+
+
+class LabOrderOut(LabOrderBase):
+    """Схема для вывода лабораторного заказа"""
+    id: int
+    visit_id: Optional[int] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_orm = True

@@ -13,7 +13,8 @@ from .appointment import Appointment
 from .queue import QueueTicket
 from .schedule import ScheduleTemplate
 from .emr import EMR, Prescription
-from .emr_template import EMRTemplate, EMRVersion
+from .emr_template import EMRTemplate
+from .emr_version import EMRVersion
 from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
 from .authentication import RefreshToken, UserSession, PasswordResetToken, EmailVerificationToken, LoginAttempt, UserActivity, SecurityEvent
 from .user_profile import (
@@ -26,7 +27,12 @@ from .notification import NotificationTemplate, NotificationHistory, Notificatio
 from .setting import Setting
 from .activation import Activation
 from .online import OnlineDay
-from .clinic import ClinicSettings, Doctor, Schedule, ServiceCategory
+from .clinic import (
+    ClinicSettings, Doctor, Schedule, ServiceCategory, Branch, BranchStatus,
+    Equipment, EquipmentStatus, EquipmentType, EquipmentMaintenance,
+    License, LicenseStatus, LicenseType, LicenseActivation,
+    Backup, BackupStatus, BackupType, SystemInfo
+)
 from .online_queue import DailyQueue, QueueEntry, QueueToken
 
 # Make sure all models are available
@@ -82,6 +88,20 @@ __all__ = [
     "Doctor",
     "Schedule",
     "ServiceCategory",
+    "Branch",
+    "BranchStatus",
+    "Equipment",
+    "EquipmentStatus",
+    "EquipmentType",
+    "EquipmentMaintenance",
+    "License",
+    "LicenseStatus",
+    "LicenseType",
+    "LicenseActivation",
+    "Backup",
+    "BackupStatus",
+    "BackupType",
+    "SystemInfo",
     "DailyQueue",
     "QueueEntry", 
     "QueueToken",
