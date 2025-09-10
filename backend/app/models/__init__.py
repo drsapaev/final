@@ -13,6 +13,7 @@ from .appointment import Appointment
 from .queue import QueueTicket
 from .schedule import ScheduleTemplate
 from .emr import EMR, Prescription
+from .emr_template import EMRTemplate, EMRVersion
 from .lab import LabOrder, LabResult
 from .audit import AuditLog
 from .notification import NotificationTemplate, NotificationHistory, NotificationSettings

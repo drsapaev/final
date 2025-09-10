@@ -40,6 +40,17 @@ import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
  * Объединяет: очередь + фото до/после + косметология + AI
  */
 const DermatologistPanelUnified = () => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('DermatologistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
+  
   const { theme, isDark, getColor } = useTheme();
   
   const [activeTab, setActiveTab] = useState('queue');

@@ -28,6 +28,17 @@ const DoctorServiceSelector = ({
   canEditPrices = true,
   className = ''
 }) => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('DoctorServiceSelector: Skipping render in demo mode');
+    return null;
+  }
+  
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState({});
   const [error, setError] = useState('');
@@ -59,6 +70,16 @@ const DoctorServiceSelector = ({
   }, [specialty]);
 
   const loadServices = async () => {
+    // Проверяем демо-режим еще раз
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
+    
+    if (isDemoMode) {
+      console.log('Skipping loadServices in demo mode');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');

@@ -121,7 +121,7 @@ def check_frontend_files():
         "pages/UserSelect.jsx",
         "pages/CardiologistPanelUnified.jsx",
         "pages/DermatologistPanelUnified.jsx",
-        "pages/DentistPanel.jsx",
+        "pages/DentistPanelUnified.jsx",
     ]
 
     for file_path in critical_files:

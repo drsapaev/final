@@ -29,6 +29,17 @@ import AIAssistant from '../components/ai/AIAssistant';
  * Объединяет: очередь + специализированные функции + AI
  */
 const CardiologistPanelUnified = () => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('CardiologistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
+  
   const { theme, isDark, getColor } = useTheme();
   
   const [activeTab, setActiveTab] = useState('queue');

@@ -69,6 +69,17 @@ import '../styles/animations.css';
  * - Современный UI
  */
 const DentistPanelUnified = () => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('DentistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
+  
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const isTouch = useTouchDevice();
   const [authState, setAuthState] = useState(auth.getState());

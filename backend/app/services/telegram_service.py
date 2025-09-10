@@ -16,6 +16,7 @@ except ImportError:
     TELEGRAM_AVAILABLE = False
     Bot = None
     Application = None
+    Update = None
 
 from app.models.telegram_config import TelegramConfig, TelegramTemplate, TelegramUser, TelegramMessage
 from app.crud import telegram_config as crud_telegram
@@ -95,7 +96,7 @@ class TelegramService:
         # Контакты (для регистрации по номеру телефона)
         self.application.add_handler(MessageHandler(filters.CONTACT, self._handle_contact))
 
-    async def _handle_start(self, update: Update, context) -> None:
+    async def _handle_start(self, update, context) -> None:
         """Обработчик команды /start"""
         try:
             chat_id = update.effective_chat.id
@@ -164,7 +165,7 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Ошибка обработки /start: {e}")
 
-    async def _handle_help(self, update: Update, context) -> None:
+    async def _handle_help(self, update, context) -> None:
         """Обработчик команды /help"""
         help_text = """
 🤖 <b>Помощь по боту клиники</b>
@@ -187,7 +188,7 @@ class TelegramService:
         
         await update.message.reply_text(help_text, parse_mode='HTML')
 
-    async def _handle_queue(self, update: Update, context) -> None:
+    async def _handle_queue(self, update, context) -> None:
         """Обработчик команды /queue"""
         try:
             chat_id = update.effective_chat.id
@@ -226,7 +227,7 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Ошибка обработки /queue: {e}")
 
-    async def _handle_callback(self, update: Update, context) -> None:
+    async def _handle_callback(self, update, context) -> None:
         """Обработчик inline кнопок"""
         try:
             query = update.callback_query
@@ -254,7 +255,7 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Ошибка обработки callback: {e}")
 
-    async def _handle_message(self, update: Update, context) -> None:
+    async def _handle_message(self, update, context) -> None:
         """Обработчик текстовых сообщений"""
         try:
             message_text = update.message.text
@@ -279,7 +280,7 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Ошибка обработки сообщения: {e}")
 
-    async def _handle_contact(self, update: Update, context) -> None:
+    async def _handle_contact(self, update, context) -> None:
         """Обработчик контактов (регистрация по телефону)"""
         try:
             contact = update.message.contact

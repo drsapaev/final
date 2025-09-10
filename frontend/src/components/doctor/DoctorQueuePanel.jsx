@@ -24,6 +24,17 @@ const DoctorQueuePanel = ({
   onPatientSelect,
   className = ''
 }) => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('DoctorQueuePanel: Skipping render in demo mode');
+    return null;
+  }
+  
   const [loading, setLoading] = useState(true);
   const [queueData, setQueueData] = useState(null);
   const [doctorInfo, setDoctorInfo] = useState(null);
@@ -46,20 +57,75 @@ const DoctorQueuePanel = ({
   };
 
   useEffect(() => {
-    loadDoctorData();
-    loadQueueData();
+    // Проверяем, не находимся ли мы в демо-режиме
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
     
-    // Обновляем каждые 30 секунд
-    const interval = setInterval(() => {
+    console.log('DoctorQueuePanel useEffect:', {
+      pathname: window.location.pathname,
+      isDemoMode,
+      specialty
+    });
+    
+    if (isDemoMode) {
+      // В демо-режиме используем моковые данные
+      console.log('Setting demo data for DoctorQueuePanel');
+      setDoctorInfo({
+        id: 1,
+        name: 'Dr. Demo',
+        specialty: specialty,
+        department: 'Demo Department'
+      });
+      
+      setQueueData({
+        queue_exists: true,
+        entries: [
+          {
+            id: 1,
+            patient_name: 'Иван Иванов',
+            ticket_number: 'A001',
+            status: 'waiting',
+            source: 'online',
+            created_at: '2024-01-15T09:00:00Z'
+          },
+          {
+            id: 2,
+            patient_name: 'Мария Петрова',
+            ticket_number: 'A002',
+            status: 'waiting',
+            source: 'desk',
+            created_at: '2024-01-15T09:15:00Z'
+          }
+        ]
+      });
+    } else {
+      console.log('Loading real data for DoctorQueuePanel');
+      loadDoctorData();
       loadQueueData();
-    }, 30000);
-    
-    return () => clearInterval(interval);
+      
+      // Обновляем каждые 30 секунд
+      const interval = setInterval(() => {
+        loadQueueData();
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
   }, [specialty]);
 
   const loadDoctorData = async () => {
+    // Проверяем демо-режим еще раз
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
+    
+    if (isDemoMode) {
+      console.log('Skipping loadDoctorData in demo mode');
+      return;
+    }
+    
     try {
-      const response = await fetch('/api/v1/doctor/my-info', {
+      const response = await fetch('http://127.0.0.1:8000/api/v1/doctor/my-info', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
 
@@ -73,10 +139,20 @@ const DoctorQueuePanel = ({
   };
 
   const loadQueueData = async () => {
+    // Проверяем демо-режим еще раз
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
+    
+    if (isDemoMode) {
+      console.log('Skipping loadQueueData in demo mode');
+      return;
+    }
+    
     try {
       setLoading(true);
       
-      const response = await fetch(`/api/v1/doctor/${specialty}/queue/today`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/${specialty}/queue/today`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
 
@@ -96,8 +172,18 @@ const DoctorQueuePanel = ({
   };
 
   const handleCallPatient = async (entryId) => {
+    // Проверяем демо-режим
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
+    
+    if (isDemoMode) {
+      setMessage({ type: 'success', text: 'Пациент вызван (демо)' });
+      return;
+    }
+    
     try {
-      const response = await fetch(`/api/v1/doctor/queue/${entryId}/call`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/call`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
@@ -117,8 +203,18 @@ const DoctorQueuePanel = ({
   };
 
   const handleStartVisit = async (entryId) => {
+    // Проверяем демо-режим
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
+    
+    if (isDemoMode) {
+      setMessage({ type: 'success', text: 'Прием начат (демо)' });
+      return;
+    }
+    
     try {
-      const response = await fetch(`/api/v1/doctor/queue/${entryId}/start-visit`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/start-visit`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
@@ -138,8 +234,18 @@ const DoctorQueuePanel = ({
   };
 
   const handleCompleteVisit = async (entryId) => {
+    // Проверяем демо-режим
+    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                      window.location.hostname === 'localhost' && 
+                      window.location.port === '5173';
+    
+    if (isDemoMode) {
+      setMessage({ type: 'success', text: 'Прием завершен (демо)' });
+      return;
+    }
+    
     try {
-      const response = await fetch(`/api/v1/doctor/queue/${entryId}/complete`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/doctor/queue/${entryId}/complete`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('token')}`,

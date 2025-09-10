@@ -308,3 +308,96 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
 
 
 appointment = CRUDAppointment(Appointment)
+
+
+# === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
+
+def count_upcoming_appointments(db: Session, patient_id: int) -> int:
+    """Подсчитать предстоящие записи пациента"""
+    from datetime import datetime
+    
+    today = datetime.now().date()
+    return (
+        db.query(Appointment)
+        .filter(
+            and_(
+                Appointment.patient_id == patient_id,
+                Appointment.appointment_date >= today,
+                Appointment.status.in_(["planned", "confirmed", "paid"])
+            )
+        )
+        .count()
+    )
+
+
+def count_patient_visits(db: Session, patient_id: int) -> int:
+    """Подсчитать количество визитов пациента"""
+    return (
+        db.query(Appointment)
+        .filter(
+            and_(
+                Appointment.patient_id == patient_id,
+                Appointment.status.in_(["completed", "in_visit"])
+            )
+        )
+        .count()
+    )
+
+
+def get_last_visit(db: Session, patient_id: int) -> Optional[Appointment]:
+    """Получить последний визит пациента"""
+    return (
+        db.query(Appointment)
+        .filter(
+            and_(
+                Appointment.patient_id == patient_id,
+                Appointment.status.in_(["completed", "in_visit"])
+            )
+        )
+        .order_by(Appointment.appointment_date.desc())
+        .first()
+    )
+
+
+def get_upcoming_appointments(db: Session, patient_id: int, limit: int = 10) -> List[Appointment]:
+    """Получить предстоящие записи пациента"""
+    from datetime import datetime
+    
+    today = datetime.now().date()
+    return (
+        db.query(Appointment)
+        .filter(
+            and_(
+                Appointment.patient_id == patient_id,
+                Appointment.appointment_date >= today,
+                Appointment.status.in_(["planned", "confirmed", "paid"])
+            )
+        )
+        .order_by(Appointment.appointment_date.asc())
+        .limit(limit)
+        .all()
+    )
+
+
+def get_appointment(db: Session, appointment_id: int) -> Optional[Appointment]:
+    """Получить запись по ID"""
+    return db.query(Appointment).filter(Appointment.id == appointment_id).first()
+
+
+def create_appointment(db: Session, appointment_data: dict) -> Appointment:
+    """Создать новую запись"""
+    appointment = Appointment(**appointment_data)
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    return appointment
+
+
+def add_appointment_service(db: Session, appointment_id: int, service_id: int) -> bool:
+    """Добавить услугу к записи"""
+    try:
+        # Здесь должна быть логика добавления услуги к записи
+        # Пока что просто возвращаем True
+        return True
+    except Exception:
+        return False

@@ -79,6 +79,17 @@ def create_or_update_emr(
     existing_emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
 
     if existing_emr:
+        # Создаем версию перед обновлением
+        from app.crud.emr_template import emr_version
+        emr_version.create_version(
+            db,
+            emr_id=existing_emr.id,
+            version_data=existing_emr.__dict__,
+            change_type="updated",
+            change_description="Обновление EMR",
+            changed_by=current_user.id
+        )
+        
         # Обновляем существующий EMR
         emr_update = EMRUpdate(**emr_data.dict(exclude={"appointment_id"}))
         updated_emr = crud_emr.emr.update(db, db_obj=existing_emr, obj_in=emr_update)
@@ -87,6 +98,18 @@ def create_or_update_emr(
         # Создаем новый EMR
         emr_data.appointment_id = appointment_id
         new_emr = crud_emr.emr.create(db, obj_in=emr_data)
+        
+        # Создаем первую версию
+        from app.crud.emr_template import emr_version
+        emr_version.create_version(
+            db,
+            emr_id=new_emr.id,
+            version_data=new_emr.__dict__,
+            change_type="created",
+            change_description="Создание EMR",
+            changed_by=current_user.id
+        )
+        
         return new_emr
 
 

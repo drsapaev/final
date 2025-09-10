@@ -231,3 +231,44 @@ class CRUDNotificationSettings(
 crud_notification_template = CRUDNotificationTemplate(NotificationTemplate)
 crud_notification_history = CRUDNotificationHistory(NotificationHistory)
 crud_notification_settings = CRUDNotificationSettings(NotificationSettings)
+
+
+# === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
+
+def create_notification(db: Session, notification_data: dict) -> NotificationHistory:
+    """Создать новое уведомление"""
+    notification = NotificationHistory(**notification_data)
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return notification
+
+
+def get_user_notifications(db: Session, user_id: int, limit: int = 50) -> List[NotificationHistory]:
+    """Получить уведомления пользователя"""
+    return (
+        db.query(NotificationHistory)
+        .filter(NotificationHistory.user_id == user_id)
+        .order_by(NotificationHistory.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def get_notification(db: Session, notification_id: int) -> Optional[NotificationHistory]:
+    """Получить уведомление по ID"""
+    return db.query(NotificationHistory).filter(NotificationHistory.id == notification_id).first()
+
+
+def count_unread_notifications_by_user(db: Session, user_id: int) -> int:
+    """Подсчитать количество непрочитанных уведомлений пользователя"""
+    return (
+        db.query(NotificationHistory)
+        .filter(
+            and_(
+                NotificationHistory.user_id == user_id,
+                NotificationHistory.is_read == False
+            )
+        )
+        .count()
+    )

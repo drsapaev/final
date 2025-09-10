@@ -97,3 +97,10 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
 
 
 patient = CRUDPatient(Patient)
+
+
+# === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
+
+def get_patient_by_user_id(db: Session, user_id: int) -> Optional[Patient]:
+    """Получить пациента по ID пользователя"""
+    return db.query(Patient).filter(Patient.user_id == user_id).first()

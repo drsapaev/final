@@ -26,7 +26,14 @@ from app.api.v1.endpoints import (
     docs,
     health as health_ep,
     lab_specialized,
+    mobile_api,
     notifications,
+    emr_templates,
+    emr_ai,
+    emr_export,
+    advanced_analytics,
+    analytics_export,
+    analytics_visualization,
     online_queue,
     online_queue_new,
     patients,
@@ -80,6 +87,13 @@ api_router.include_router(admin_providers.router, tags=["admin"])
 api_router.include_router(admin_telegram.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_stats.router, tags=["admin"])
 api_router.include_router(admin_users.router)
+api_router.include_router(mobile_api.router, prefix="/mobile", tags=["mobile"])
+api_router.include_router(emr_templates.router, prefix="/emr", tags=["emr-templates"])
+api_router.include_router(emr_ai.router, prefix="/emr/ai", tags=["emr-ai"])
+api_router.include_router(emr_export.router, prefix="/emr/export", tags=["emr-export"])
+api_router.include_router(advanced_analytics.router, prefix="/analytics/advanced", tags=["advanced-analytics"])
+api_router.include_router(analytics_export.router, prefix="/analytics/export", tags=["analytics-export"])
+api_router.include_router(analytics_visualization.router, prefix="/analytics/visualization", tags=["analytics-visualization"])
 api_router.include_router(schedule.router, tags=["schedule"])
 api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
 api_router.include_router(cardio.router, tags=["cardio"])
