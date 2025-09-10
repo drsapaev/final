@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
-import PWAInstallPrompt from './components/PWAInstallPrompt.jsx';
+import PWAInstallPrompt from './components/mobile/PWAInstallPrompt.jsx';
+import OfflineIndicator from './components/mobile/OfflineIndicator.jsx';
+import { usePWA } from './hooks/usePWA.js';
 import './styles/theme.css';
 
 import Header from './components/Header.jsx';
@@ -82,9 +84,12 @@ function AppShell() {
 }
 
 export default function App() {
+  const { shouldShowInstallPrompt } = usePWA();
+
   return (
     <ThemeProvider>
-      <PWAInstallPrompt />
+      <OfflineIndicator />
+      {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Landing />} />

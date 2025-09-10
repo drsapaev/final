@@ -20,4 +20,23 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // PWA оптимизации
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['lucide-react']
+        }
+      }
+    },
+    // Увеличиваем лимит для больших файлов
+    chunkSizeWarningLimit: 1000
+  },
+  // PWA настройки
+  define: {
+    // Переменные окружения для PWA
+    'process.env.REACT_APP_VAPID_PUBLIC_KEY': JSON.stringify(process.env.REACT_APP_VAPID_PUBLIC_KEY || ''),
+  }
 });
