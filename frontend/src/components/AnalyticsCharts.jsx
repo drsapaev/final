@@ -1,19 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Button } from './ui/button';
+import Card from './ui/Card';
+import Button from './ui/Button';
 import { Download, RefreshCw, BarChart3, PieChart, TrendingUp, Activity } from 'lucide-react';
+import { Chart, registerables } from 'chart.js';
 
-// Динамический импорт Chart.js для оптимизации
-let Chart = null;
-const loadChart = async () => {
-  if (!Chart) {
-    const { Chart: ChartJS, registerables } = await import('chart.js');
-    ChartJS.register(...registerables);
-    Chart = ChartJS;
-  }
-  return Chart;
-};
+// Регистрируем все компоненты Chart.js
+Chart.register(...registerables);
 
 const AnalyticsCharts = ({ 
   data, 
@@ -24,20 +16,15 @@ const AnalyticsCharts = ({
 }) => {
   const chartRefs = useRef({});
   const [activeTab, setActiveTab] = useState('overview');
-  const [chartsLoaded, setChartsLoaded] = useState(false);
 
   useEffect(() => {
-    loadChart().then(() => setChartsLoaded(true));
-  }, []);
-
-  useEffect(() => {
-    if (chartsLoaded && data?.charts) {
+    if (data?.charts) {
       renderCharts();
     }
-  }, [chartsLoaded, data, activeTab]);
+  }, [data, activeTab]);
 
-  const renderCharts = async () => {
-    if (!Chart || !data?.charts) return;
+  const renderCharts = () => {
+    if (!data?.charts) return;
 
     // Уничтожаем существующие графики
     Object.values(chartRefs.current).forEach(chart => {
@@ -58,12 +45,13 @@ const AnalyticsCharts = ({
   };
 
   const getChartIcon = (chartType) => {
+    const iconStyle = { width: '16px', height: '16px' };
     switch (chartType) {
-      case 'line': return <TrendingUp className="w-4 h-4" />;
-      case 'bar': return <BarChart3 className="w-4 h-4" />;
-      case 'doughnut': return <PieChart className="w-4 h-4" />;
-      case 'radar': return <Activity className="w-4 h-4" />;
-      default: return <BarChart3 className="w-4 h-4" />;
+      case 'line': return <TrendingUp style={iconStyle} />;
+      case 'bar': return <BarChart3 style={iconStyle} />;
+      case 'doughnut': return <PieChart style={iconStyle} />;
+      case 'radar': return <Activity style={iconStyle} />;
+      default: return <BarChart3 style={iconStyle} />;
     }
   };
 
@@ -71,18 +59,30 @@ const AnalyticsCharts = ({
     const canvasId = `chart-${chartName}`;
     
     return (
-      <Card key={chartName} className="w-full">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+      <Card key={chartName} style={{ width: '100%' }}>
+        <Card.Header style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: '8px'
+        }}>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
             {getChartIcon(chartConfig.type)}
             {chartConfig.options?.plugins?.title?.text || chartName}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 w-full">
+          </div>
+        </Card.Header>
+        <Card.Content>
+          <div style={{ height: '256px', width: '100%' }}>
             <canvas id={canvasId}></canvas>
           </div>
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   };
@@ -93,7 +93,11 @@ const AnalyticsCharts = ({
     const charts = Object.entries(tabData.charts);
     
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: '16px'
+      }}>
         {charts.map(([chartName, chartConfig]) => 
           renderChartCard(chartName, chartConfig)
         )}
@@ -103,110 +107,200 @@ const AnalyticsCharts = ({
 
   if (loading) {
     return (
-      <Card className="w-full">
-        <CardContent className="flex items-center justify-center h-64">
-          <div className="flex items-center space-x-2">
-            <RefreshCw className="w-4 h-4 animate-spin" />
+      <Card style={{ width: '100%' }}>
+        <Card.Content style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '256px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <RefreshCw style={{ width: '16px', height: '16px' }} className="animate-spin" />
             <span>Загрузка графиков...</span>
           </div>
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   }
 
   if (!data || !data.charts) {
     return (
-      <Card className="w-full">
-        <CardContent className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <BarChart3 className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-500">Нет данных для отображения</p>
+      <Card style={{ width: '100%' }}>
+        <Card.Content style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '256px'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <BarChart3 style={{ 
+              width: '48px', 
+              height: '48px', 
+              margin: '0 auto 16px auto',
+              color: 'var(--text-secondary)'
+            }} />
+            <p style={{ color: 'var(--text-secondary)' }}>Нет данных для отображения</p>
           </div>
-        </CardContent>
+        </Card.Content>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">{title}</h2>
-        <div className="flex space-x-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <h2 style={{
+          fontSize: '24px',
+          fontWeight: '700',
+          color: 'var(--text-primary)'
+        }}>{title}</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <Button
-            variant="outline"
-            size="sm"
             onClick={onRefresh}
             disabled={loading}
+            style={{
+              padding: '8px 16px',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '6px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw style={{ width: '16px', height: '16px' }} className={loading ? 'animate-spin' : ''} />
             Обновить
           </Button>
           <Button
-            variant="outline"
-            size="sm"
             onClick={onExport}
+            style={{
+              padding: '8px 16px',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
-            <Download className="w-4 h-4 mr-2" />
+            <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
           </Button>
         </div>
       </div>
 
       {data.summary && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
+        }}>
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{data.summary.total_charts}</div>
-              <p className="text-sm text-gray-500">Всего графиков</p>
-            </CardContent>
+            <Card.Content style={{ padding: '16px' }}>
+              <div style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: 'var(--text-primary)'
+              }}>{data.summary.total_charts}</div>
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--text-secondary)',
+                margin: '4px 0 0 0'
+              }}>Всего графиков</p>
+            </Card.Content>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">{data.summary.chart_types?.length || 0}</div>
-              <p className="text-sm text-gray-500">Типов графиков</p>
-            </CardContent>
+            <Card.Content style={{ padding: '16px' }}>
+              <div style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: 'var(--text-primary)'
+              }}>{data.summary.chart_types?.length || 0}</div>
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--text-secondary)',
+                margin: '4px 0 0 0'
+              }}>Типов графиков</p>
+            </Card.Content>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold">
+            <Card.Content style={{ padding: '16px' }}>
+              <div style={{
+                fontSize: '24px',
+                fontWeight: '700',
+                color: 'var(--text-primary)'
+              }}>
                 {data.period ? 
                   `${new Date(data.period.start_date).toLocaleDateString()} - ${new Date(data.period.end_date).toLocaleDateString()}` 
                   : 'N/A'
                 }
               </div>
-              <p className="text-sm text-gray-500">Период анализа</p>
-            </CardContent>
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--text-secondary)',
+                margin: '4px 0 0 0'
+              }}>Период анализа</p>
+            </Card.Content>
           </Card>
         </div>
       )}
 
       {Object.keys(data.charts).length > 1 ? (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Обзор</TabsTrigger>
-            <TabsTrigger value="kpi">KPI</TabsTrigger>
-            <TabsTrigger value="doctors">Врачи</TabsTrigger>
-            <TabsTrigger value="revenue">Доходы</TabsTrigger>
-          </TabsList>
+        <div>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '24px',
+            borderBottom: '1px solid var(--border-color)'
+          }}>
+            {[
+              { id: 'overview', label: 'Обзор' },
+              { id: 'kpi', label: 'KPI' },
+              { id: 'doctors', label: 'Врачи' },
+              { id: 'revenue', label: 'Доходы' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '12px 20px',
+                  background: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
+                  color: activeTab === tab.id ? 'white' : 'var(--text-primary)',
+                  border: 'none',
+                  borderRadius: '8px 8px 0 0',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           
-          <TabsContent value="overview">
-            {renderTabContent(data.charts.overview || data, 'overview')}
-          </TabsContent>
-          
-          <TabsContent value="kpi">
-            {renderTabContent(data.charts.kpi, 'kpi')}
-          </TabsContent>
-          
-          <TabsContent value="doctors">
-            {renderTabContent(data.charts.doctors, 'doctors')}
-          </TabsContent>
-          
-          <TabsContent value="revenue">
-            {renderTabContent(data.charts.revenue, 'revenue')}
-          </TabsContent>
-        </Tabs>
+          {activeTab === 'overview' && renderTabContent(data.charts.overview || data, 'overview')}
+          {activeTab === 'kpi' && renderTabContent(data.charts.kpi, 'kpi')}
+          {activeTab === 'doctors' && renderTabContent(data.charts.doctors, 'doctors')}
+          {activeTab === 'revenue' && renderTabContent(data.charts.revenue, 'revenue')}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '16px'
+        }}>
           {Object.entries(data.charts).map(([chartName, chartConfig]) => 
             renderChartCard(chartName, chartConfig)
           )}
