@@ -16,6 +16,10 @@ from .emr import EMR, Prescription
 from .emr_template import EMRTemplate, EMRVersion
 from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
 from .authentication import RefreshToken, UserSession, PasswordResetToken, EmailVerificationToken, LoginAttempt, UserActivity, SecurityEvent
+from .user_profile import (
+    UserProfile, UserPreferences, UserNotificationSettings, UserRole, UserPermission,
+    RolePermission, UserGroup, UserGroupMember, UserAuditLog
+)
 from .lab import LabOrder, LabResult
 from .audit import AuditLog
 from .notification import NotificationTemplate, NotificationHistory, NotificationSettings
@@ -56,6 +60,15 @@ __all__ = [
     "LoginAttempt",
     "UserActivity",
     "SecurityEvent",
+    "UserProfile",
+    "UserPreferences",
+    "UserNotificationSettings",
+    "UserRole",
+    "UserPermission",
+    "RolePermission",
+    "UserGroup",
+    "UserGroupMember",
+    "UserAuditLog",
     "LabOrder",
     "LabResult",
     "AuditLog",

@@ -93,6 +93,7 @@ if _USE_DEV_AUTH_FALLBACK:
 
     @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
     async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
+        log.info("Using DEV fallback login for user: %s", form.username)
         token = create_access_token(form.username)
         return {"access_token": token, "token_type": "bearer"}
 
