@@ -18,11 +18,12 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, HTTPBearer
 from jose import jwt, JWTError
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 try:
@@ -50,6 +51,13 @@ try:
     from app.models.user import User  # type: ignore
 except Exception:
     # If import fails the project is misconfigured; leave User unresolved to raise early.
+    User = None  # type: ignore
+
+# import authentication service
+try:
+    from app.services.authentication_service import get_authentication_service  # type: ignore
+except Exception:
+    get_authentication_service = None  # type: ignore
     User = Any  # type: ignore
 
 # Correct tokenUrl to point to our /auth/login
@@ -195,3 +203,128 @@ def require_roles(*roles: str) -> Callable[..., Any]:
         return current_user
 
     return _dep
+
+
+def get_current_user_from_request(request: Request) -> Optional[User]:
+    """Получить текущего пользователя из состояния запроса (для middleware)"""
+    user_id = getattr(request.state, 'user_id', None)
+    if not user_id:
+        return None
+    
+    # Получаем сессию БД
+    db = next(get_db())
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        return user
+    finally:
+        db.close()
+
+
+def get_current_user_id(request: Request) -> Optional[int]:
+    """Получить ID текущего пользователя из состояния запроса"""
+    return getattr(request.state, 'user_id', None)
+
+
+def get_current_user_role(request: Request) -> Optional[str]:
+    """Получить роль текущего пользователя из состояния запроса"""
+    return getattr(request.state, 'role', None)
+
+
+def require_authentication(request: Request) -> User:
+    """Требует аутентификации пользователя"""
+    user = get_current_user_from_request(request)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется аутентификация"
+        )
+    return user
+
+
+def require_active_user(request: Request) -> User:
+    """Требует активного пользователя"""
+    user = require_authentication(request)
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь деактивирован"
+        )
+    return user
+
+
+def require_superuser(request: Request) -> User:
+    """Требует суперпользователя"""
+    user = require_active_user(request)
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права суперпользователя"
+        )
+    return user
+
+
+def require_admin(request: Request) -> User:
+    """Требует администратора"""
+    user = require_active_user(request)
+    if user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права администратора"
+        )
+    return user
+
+
+def require_doctor_or_admin(request: Request) -> User:
+    """Требует врача или администратора"""
+    user = require_active_user(request)
+    if user.role not in ["Admin", "Doctor"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права врача или администратора"
+        )
+    return user
+
+
+def require_staff(request: Request) -> User:
+    """Требует сотрудника клиники"""
+    user = require_active_user(request)
+    if user.role not in ["Admin", "Doctor", "Nurse", "Receptionist"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Требуются права сотрудника клиники"
+        )
+    return user
+
+
+def get_optional_user(request: Request) -> Optional[User]:
+    """Получить пользователя, если он аутентифицирован (опционально)"""
+    return get_current_user_from_request(request)
+
+
+def validate_token(token: str, db: Session) -> Optional[dict]:
+    """Валидирует JWT токен"""
+    if not get_authentication_service:
+        return None
+    
+    try:
+        auth_service = get_authentication_service()
+        payload = auth_service.verify_token(token, "access")
+        return payload
+    except Exception:
+        return None
+
+
+def get_user_from_token(token: str, db: Session) -> Optional[User]:
+    """Получить пользователя по токену"""
+    payload = validate_token(token, db)
+    if not payload:
+        return None
+    
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+    
+    try:
+        return db.query(User).filter(User.id == int(user_id)).first()
+    except (ValueError, TypeError):
+        return None
