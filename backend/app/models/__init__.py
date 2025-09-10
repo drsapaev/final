@@ -14,6 +14,7 @@ from .queue import QueueTicket
 from .schedule import ScheduleTemplate
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate, EMRVersion
+from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
 from .lab import LabOrder, LabResult
 from .audit import AuditLog
 from .notification import NotificationTemplate, NotificationHistory, NotificationSettings
@@ -40,6 +41,13 @@ __all__ = [
     "ScheduleTemplate",
     "EMR",
     "Prescription",
+    "EMRTemplate",
+    "EMRVersion",
+    "TwoFactorAuth",
+    "TwoFactorBackupCode", 
+    "TwoFactorRecovery",
+    "TwoFactorSession",
+    "TwoFactorDevice",
     "LabOrder",
     "LabResult",
     "AuditLog",
