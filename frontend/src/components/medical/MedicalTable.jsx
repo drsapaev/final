@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
@@ -62,8 +62,8 @@ const MedicalTable = ({
     if (!sortable || sortField !== field) return null;
     
     return sortDirection === 'asc' ? 
-      <ChevronUp className="h-4 w-4" /> : 
-      <ChevronDown className="h-4 w-4" />;
+      <Icon name="ChevronUp" size={16} /> : 
+      <Icon name="ChevronDown" size={16} />;
   };
 
   const renderActionButtons = (row, index) => {
@@ -77,7 +77,7 @@ const MedicalTable = ({
           className="p-2 text-green-600 hover:bg-green-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
           title="View details"
         >
-          <Eye className="h-4 w-4" />
+          <Icon name="Eye" size={16} />
         </button>
       );
     }
@@ -90,7 +90,7 @@ const MedicalTable = ({
           className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
           title="Edit"
         >
-          <Edit className="h-4 w-4" />
+          <Icon name="Edit" size={16} />
         </button>
       );
     }
@@ -103,7 +103,7 @@ const MedicalTable = ({
           className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors interactive-element hover-scale ripple-effect magnetic-hover focus-ring"
           title="Delete"
         >
-          <Trash2 className="h-4 w-4" />
+          <Icon name="Trash2" size={16} />
         </button>
       );
     }

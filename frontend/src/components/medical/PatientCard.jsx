@@ -1,6 +1,6 @@
 import React from 'react';
-import { Eye, Edit, Trash2, User } from 'lucide-react';
 import MedicalCard from './MedicalCard';
+import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
@@ -61,7 +61,7 @@ const PatientCard = ({
               backgroundPosition: 'center'
             }}
           >
-            {!avatar && <User size={24} />}
+            {!avatar && <Icon name="User" size={24} />}
           </div>
           
           <div className="flex-1 min-w-0">
@@ -124,7 +124,7 @@ const PatientCard = ({
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
             title="View details"
           >
-            <Eye size={16} />
+            <Icon name="Eye" size={16} />
             View
           </button>
           
@@ -133,7 +133,7 @@ const PatientCard = ({
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
             title="Edit patient"
           >
-            <Edit size={16} />
+            <Icon name="Edit" size={16} />
             Edit
           </button>
           
@@ -142,7 +142,7 @@ const PatientCard = ({
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-sm interactive-element hover-lift ripple-effect action-button-hover focus-ring"
             title="Delete patient"
           >
-            <Trash2 size={16} />
+            <Icon name="Trash2" size={16} />
             Delete
           </button>
         </div>

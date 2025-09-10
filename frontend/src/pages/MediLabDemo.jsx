@@ -8,6 +8,8 @@ import { MedicalCard, PatientCard, MetricCard, MedicalTable } from '../component
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/full-width.css';
 import '../styles/cursor-effects.css';
+import '../styles/animations.css';
+import '../styles/responsive.css';
 
 /**
  * Демонстрационная страница нового дизайна MediLab
@@ -206,7 +208,7 @@ const MediLabDemo = () => {
       </div>
 
       {/* Объединенная сетка - метрики и контент */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 flex-1 min-h-0 w-full">
+      <div className="responsive-grid flex-1 min-h-0 w-full">
         {/* Метрики */}
         {dashboardMetrics.map((metric, index) => (
           <MetricCard
@@ -217,7 +219,7 @@ const MediLabDemo = () => {
             iconName={metric.iconName}
             color={metric.color}
             compact={true}
-            className="h-16"
+            className={`h-16 animate-fade-in-up animate-delay-${(index + 1) * 100} metric-card-responsive`}
           />
         ))}
         
@@ -230,8 +232,8 @@ const MediLabDemo = () => {
         ></div>
         
          {/* Recent Activity */}
-         <MedicalCard className="h-48">
-           <h3 className="text-base font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+         <MedicalCard className="h-48 animate-fade-in-left animate-delay-200 card-responsive">
+           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
              Recent Activity
            </h3>
            <div className="space-y-3">
@@ -265,7 +267,7 @@ const MediLabDemo = () => {
                  iconColor: '#ffffff'
                }
              ].map((item, index) => (
-               <div key={index} className="flex items-center gap-3">
+               <div key={index} className={`flex items-center gap-3 animate-fade-in-left animate-delay-${(index + 1) * 100}`}>
                  <div 
                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                    style={{
@@ -293,8 +295,8 @@ const MediLabDemo = () => {
          </MedicalCard>
 
          {/* Quick Actions */}
-         <MedicalCard className="h-48">
-           <h3 className="text-base font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+         <MedicalCard className="h-48 animate-fade-in-right animate-delay-300 card-responsive">
+           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
              Quick Actions
            </h3>
            <div className="grid grid-cols-2 gap-3">
@@ -326,7 +328,7 @@ const MediLabDemo = () => {
              ].map((action, index) => (
                <button
                  key={index}
-                 className="p-4 rounded-xl text-white transition-all duration-200 text-center h-16 flex flex-col items-center justify-center hover:scale-105"
+                 className={`p-4 rounded-xl text-white transition-all duration-200 text-center h-16 flex flex-col items-center justify-center hover:scale-105 animate-fade-in-scale animate-delay-${(index + 1) * 100} button-responsive`}
                  style={{
                    backgroundColor: action.bgColor,
                    boxShadow: `0 2px 8px ${action.bgColor}40`
@@ -353,24 +355,24 @@ const MediLabDemo = () => {
          </MedicalCard>
 
          {/* Today's Summary */}
-         <MedicalCard className="h-48">
-           <h3 className="text-base font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+         <MedicalCard className="h-48 animate-fade-in-scale animate-delay-400 card-responsive">
+           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
              Today's Summary
            </h3>
            <div className="space-y-3">
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-left animate-delay-100">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Appointments</span>
                <span className="text-base font-semibold" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>24</span>
              </div>
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-left animate-delay-200">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Completed</span>
                <span className="text-base font-semibold text-green-600">18</span>
              </div>
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-left animate-delay-300">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Pending</span>
                <span className="text-base font-semibold text-yellow-600">6</span>
              </div>
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-left animate-delay-400">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Revenue</span>
                <span className="text-base font-semibold text-green-600">$12,450</span>
              </div>
@@ -378,24 +380,24 @@ const MediLabDemo = () => {
          </MedicalCard>
 
          {/* Additional Stats */}
-         <MedicalCard className="h-48">
-           <h3 className="text-base font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
+         <MedicalCard className="h-48 animate-fade-in-left animate-delay-500 card-responsive">
+           <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
              Performance
            </h3>
            <div className="space-y-3">
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-right animate-delay-100">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Efficiency</span>
                <span className="text-base font-semibold text-green-600">94%</span>
              </div>
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-right animate-delay-200">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Satisfaction</span>
                <span className="text-base font-semibold text-blue-600">4.8/5</span>
              </div>
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-right animate-delay-300">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Wait Time</span>
                <span className="text-base font-semibold text-orange-600">12 min</span>
              </div>
-             <div className="flex justify-between items-center">
+             <div className="flex justify-between items-center animate-fade-in-right animate-delay-400">
                <span className="text-base" style={{ color: isDark ? '#cbd5e1' : '#64748b' }}>Capacity</span>
                <span className="text-base font-semibold text-purple-600">78%</span>
              </div>

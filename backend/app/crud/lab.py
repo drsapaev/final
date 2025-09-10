@@ -92,3 +92,26 @@ def list_results(db: Session, order_id: int) -> List[dict]:
         .all()
     )
     return [dict(row) for row in rows]
+
+
+# === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
+
+def get_patient_lab_results(db: Session, patient_id: int, limit: int = 50) -> List[dict]:
+    """Получить результаты анализов пациента"""
+    r = _results(db)
+    o = _orders(db)
+    
+    # Получаем результаты через заказы пациента
+    rows = (
+        db.execute(
+            select(r, o)
+            .join(o, r.c.order_id == o.c.id)
+            .where(o.c.patient_id == patient_id)
+            .order_by(r.c.id.desc())
+            .limit(limit)
+        )
+        .mappings()
+        .all()
+    )
+    
+    return [dict(row) for row in rows]

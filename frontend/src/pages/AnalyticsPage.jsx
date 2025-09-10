@@ -3,6 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
 import AnalyticsChart from '../components/AnalyticsChart';
 import AnalyticsMetrics from '../components/AnalyticsMetrics';
+import AnalyticsCharts from '../components/AnalyticsCharts';
 import { 
   Calendar, 
   TrendingUp, 
@@ -11,7 +12,8 @@ import {
   Activity,
   Download,
   Filter,
-  RefreshCw
+  RefreshCw,
+  BarChart3
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
@@ -27,7 +29,8 @@ export default function AnalyticsPage() {
     overview: null,
     appointments: null,
     revenue: null,
-    providers: null
+    providers: null,
+    visualization: null
   });
 
   const loadAnalytics = async (tab = activeTab) => {
@@ -56,6 +59,9 @@ export default function AnalyticsPage() {
         case 'providers':
           response = await api.get(`/analytics/payment-providers?${params}`);
           break;
+        case 'visualization':
+          response = await api.get(`/analytics/visualization/comprehensive?${params}`);
+          break;
         default:
           response = await api.get(`/analytics/dashboard?${params}`);
       }
@@ -79,15 +85,38 @@ export default function AnalyticsPage() {
     }
   };
 
-  const exportData = () => {
-    const csvData = JSON.stringify(data, null, 2);
-    const blob = new Blob([csvData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analytics_${dateRange.start}_${dateRange.end}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportData = async (format = 'json') => {
+    try {
+      const params = new URLSearchParams({
+        start_date: dateRange.start,
+        end_date: dateRange.end,
+        format: format
+      });
+      
+      if (department) {
+        params.append('department', department);
+      }
+
+      const response = await api.get(`/analytics/export/comprehensive/export/${format}?${params}`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response], { 
+        type: format === 'json' ? 'application/json' : 
+              format === 'csv' ? 'text/csv' :
+              format === 'pdf' ? 'application/pdf' :
+              'application/octet-stream'
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analytics_${dateRange.start}_${dateRange.end}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Ошибка экспорта:', error);
+    }
   };
 
   const renderOverviewTab = () => {
@@ -480,7 +509,8 @@ export default function AnalyticsPage() {
           { id: 'overview', label: 'Обзор', icon: <Activity size={16} /> },
           { id: 'appointments', label: 'Записи', icon: <Calendar size={16} /> },
           { id: 'revenue', label: 'Доходы', icon: <DollarSign size={16} /> },
-          { id: 'providers', label: 'Провайдеры', icon: <TrendingUp size={16} /> }
+          { id: 'providers', label: 'Провайдеры', icon: <TrendingUp size={16} /> },
+          { id: 'visualization', label: 'Графики', icon: <BarChart3 size={16} /> }
         ].map(tab => (
           <button
             key={tab.id}
@@ -523,6 +553,15 @@ export default function AnalyticsPage() {
           {activeTab === 'appointments' && renderAppointmentsTab()}
           {activeTab === 'revenue' && renderRevenueTab()}
           {activeTab === 'providers' && renderProvidersTab()}
+          {activeTab === 'visualization' && (
+            <AnalyticsCharts
+              data={data.visualization}
+              loading={loading}
+              onRefresh={() => loadAnalytics('visualization')}
+              onExport={() => exportData('json')}
+              title="Интерактивные графики аналитики"
+            />
+          )}
         </>
       )}
     </div>

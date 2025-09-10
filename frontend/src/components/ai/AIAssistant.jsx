@@ -22,6 +22,17 @@ const AIAssistant = ({
   onSuggestionSelect,
   className = ''
 }) => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('AIAssistant: Skipping render in demo mode');
+    return null;
+  }
+  
   const [activeTab, setActiveTab] = useState('complaints');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);

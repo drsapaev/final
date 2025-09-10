@@ -59,26 +59,26 @@ const ReportsAndAnalytics = ({
 
   // Моковые данные для демонстрации
   const [analyticsData, setAnalyticsData] = useState({
-    overview: {
-      totalPatients: 1247,
-      totalAppointments: 3421,
+      overview: {
+        totalPatients: 1247,
+        totalAppointments: 3421,
       totalRevenue: 2847500,
       averageRating: 4.8,
       growthRate: 12.5
-    },
-    patients: {
+      },
+      patients: {
       newPatients: 89,
       returningPatients: 1158,
       ageGroups: [
-        { age: '0-18', count: 234, percentage: 18.8 },
-        { age: '19-35', count: 456, percentage: 36.6 },
-        { age: '36-50', count: 312, percentage: 25.0 },
-        { age: '51-65', count: 189, percentage: 15.2 },
-        { age: '65+', count: 56, percentage: 4.5 }
-      ],
+          { age: '0-18', count: 234, percentage: 18.8 },
+          { age: '19-35', count: 456, percentage: 36.6 },
+          { age: '36-50', count: 312, percentage: 25.0 },
+          { age: '51-65', count: 189, percentage: 15.2 },
+          { age: '65+', count: 56, percentage: 4.5 }
+        ],
       genderDistribution: [
-        { gender: 'Мужчины', count: 623, percentage: 50.0 },
-        { gender: 'Женщины', count: 624, percentage: 50.0 }
+          { gender: 'Мужчины', count: 623, percentage: 50.0 },
+          { gender: 'Женщины', count: 624, percentage: 50.0 }
       ]
     },
     doctors: [
@@ -208,28 +208,28 @@ const ReportsAndAnalytics = ({
 
   // Рендер обзорной вкладки
   const renderOverviewTab = () => (
-    <div className="space-y-6">
+      <div className="space-y-6">
       {/* Основные метрики */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {renderMetricCard(
-          'Всего пациентов',
+            'Всего пациентов',
           analyticsData.overview.totalPatients.toLocaleString(),
           analyticsData.overview.growthRate,
-          <Users className="h-6 w-6" />,
-          'blue'
-        )}
+            <Users className="h-6 w-6" />,
+            'blue'
+          )}
         {renderMetricCard(
-          'Записей на прием',
+            'Записей на прием',
           analyticsData.overview.totalAppointments.toLocaleString(),
           8.2,
-          <Calendar className="h-6 w-6" />,
-          'green'
-        )}
+            <Calendar className="h-6 w-6" />,
+            'green'
+          )}
         {renderMetricCard(
-          'Выручка',
+            'Выручка',
           `${(analyticsData.overview.totalRevenue / 1000000).toFixed(1)}М ₽`,
           15.7,
-          <DollarSign className="h-6 w-6" />,
+            <DollarSign className="h-6 w-6" />,
           'purple'
         )}
         {renderMetricCard(
@@ -237,12 +237,12 @@ const ReportsAndAnalytics = ({
           analyticsData.overview.averageRating,
           0.3,
           <Star className="h-6 w-6" />,
-          'orange'
-        )}
-      </div>
+            'orange'
+          )}
+        </div>
 
-      {/* Графики */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Графики */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* График выручки */}
         <div className="bg-white rounded-lg p-6 shadow-sm border">
           <h3 className="text-lg font-semibold mb-4">Выручка по месяцам</h3>
@@ -254,10 +254,10 @@ const ReportsAndAnalytics = ({
                   style={{ height: `${(item.revenue / 350000) * 200}px` }}
                 ></div>
                 <span className="text-xs text-gray-600">{item.month}</span>
-              </div>
+        </div>
             ))}
           </div>
-        </div>
+      </div>
 
         {/* Распределение по категориям */}
         <div className="bg-white rounded-lg p-6 shadow-sm border">
@@ -273,16 +273,16 @@ const ReportsAndAnalytics = ({
                     'bg-orange-500'
                   }`}></div>
                   <span className="text-sm font-medium">{item.category}</span>
-                </div>
+        </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold">{item.percentage}%</div>
                   <div className="text-xs text-gray-600">{item.revenue.toLocaleString()} ₽</div>
-                </div>
-              </div>
+            </div>
+            </div>
             ))}
-          </div>
         </div>
       </div>
+          </div>
 
       {/* Статистика записей */}
       <div className="bg-white rounded-lg p-6 shadow-sm border">
@@ -293,12 +293,12 @@ const ReportsAndAnalytics = ({
               <div className="text-2xl font-bold text-gray-900">{item.count}</div>
               <div className="text-sm text-gray-600">{item.status}</div>
               <div className="text-xs text-gray-500">{item.percentage}%</div>
-            </div>
+          </div>
           ))}
-        </div>
       </div>
-    </div>
-  );
+          </div>
+      </div>
+    );
 
   // Рендер вкладки пациентов
   const renderPatientsTab = () => (
@@ -311,16 +311,16 @@ const ReportsAndAnalytics = ({
             {analyticsData.patients.ageGroups.map((group, index) => (
               <div key={index} className="flex items-center justify-between">
                 <span className="text-sm font-medium">{group.age} лет</span>
-                <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
                   <div className="w-32 bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-500 h-2 rounded-full"
                       style={{ width: `${group.percentage}%` }}
                     ></div>
-                  </div>
+          </div>
                   <span className="text-sm text-gray-600 w-12 text-right">{group.count}</span>
-                </div>
-              </div>
+        </div>
+            </div>
             ))}
           </div>
         </div>
@@ -335,19 +335,19 @@ const ReportsAndAnalytics = ({
                     index === 0 ? 'bg-blue-500' : 'bg-pink-500'
                   }`}></div>
                   <span className="text-sm font-medium">{item.gender}</span>
-                </div>
+              </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold">{item.count}</div>
                   <div className="text-xs text-gray-600">{item.percentage}%</div>
-                </div>
-              </div>
-            ))}
-          </div>
+            </div>
         </div>
+            ))}
+      </div>
+    </div>
       </div>
 
       {/* Новые и возвращающиеся пациенты */}
-      <div className="bg-white rounded-lg p-6 shadow-sm border">
+    <div className="bg-white rounded-lg p-6 shadow-sm border">
         <h3 className="text-lg font-semibold mb-4">Типы пациентов</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="text-center">
@@ -355,13 +355,13 @@ const ReportsAndAnalytics = ({
               {analyticsData.patients.newPatients}
             </div>
             <div className="text-sm text-gray-600">Новые пациенты</div>
-          </div>
+        </div>
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-600 mb-2">
               {analyticsData.patients.returningPatients}
-            </div>
+        </div>
             <div className="text-sm text-gray-600">Возвращающиеся пациенты</div>
-          </div>
+      </div>
         </div>
       </div>
     </div>
@@ -373,11 +373,11 @@ const ReportsAndAnalytics = ({
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="px-6 py-4 border-b">
           <h3 className="text-lg font-semibold">Статистика врачей</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Врач
                 </th>
@@ -399,20 +399,20 @@ const ReportsAndAnalytics = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Эффективность
                 </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
               {analyticsData.doctors.map((doctor) => (
                 <tr key={doctor.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <User className="h-4 w-4 text-blue-600" />
-                      </div>
+      </div>
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">{doctor.name}</div>
-                      </div>
-                    </div>
+    </div>
+        </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{doctor.specialty}</div>
@@ -430,7 +430,7 @@ const ReportsAndAnalytics = ({
                     <div className="flex items-center">
                       <Star className="h-4 w-4 text-yellow-400 mr-1" />
                       <span className="text-sm text-gray-900">{doctor.rating}</span>
-                    </div>
+        </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -439,30 +439,30 @@ const ReportsAndAnalytics = ({
                           className="bg-green-500 h-2 rounded-full"
                           style={{ width: `${doctor.efficiency}%` }}
                         ></div>
-                      </div>
+          </div>
                       <span className="text-sm text-gray-900">{doctor.efficiency}%</span>
-                    </div>
+      </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   // Рендер вкладки процедур
   const renderProceduresTab = () => (
-    <div className="space-y-6">
+      <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="px-6 py-4 border-b">
           <h3 className="text-lg font-semibold">Статистика процедур</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Процедура
                 </th>
@@ -475,11 +475,11 @@ const ReportsAndAnalytics = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Рост
                 </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
               {analyticsData.procedures.map((procedure, index) => (
-                <tr key={index} className="hover:bg-gray-50">
+              <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -496,11 +496,11 @@ const ReportsAndAnalytics = ({
                           index === 3 ? 'text-purple-600' :
                           'text-orange-600'
                         }`} />
-                      </div>
+      </div>
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">{procedure.name}</div>
-                      </div>
-                    </div>
+    </div>
+        </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{procedure.count}</div>
@@ -518,16 +518,16 @@ const ReportsAndAnalytics = ({
                         <TrendingDown className="h-4 w-4 mr-1" />
                       )}
                       <span className="text-sm font-medium">{Math.abs(procedure.growth)}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
+                  </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
-  );
+      </div>
+    );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -580,7 +580,7 @@ const ReportsAndAnalytics = ({
               { id: 'doctors', label: 'Врачи', icon: User },
               { id: 'procedures', label: 'Процедуры', icon: Scissors }
             ].map((tab) => (
-              <button
+            <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
@@ -591,7 +591,7 @@ const ReportsAndAnalytics = ({
               >
                 <tab.icon className="h-4 w-4" />
                 {tab.label}
-              </button>
+            </button>
             ))}
           </nav>
         </div>

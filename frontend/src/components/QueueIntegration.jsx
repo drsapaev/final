@@ -4,6 +4,17 @@ import { Card, Button, Badge } from '../design-system/components';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../constants/appointmentStatus';
 
 const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect }) => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('QueueIntegration: Skipping render in demo mode');
+    return null;
+  }
+  
   const [queue, setQueue] = useState([]);
   const [currentCall, setCurrentCall] = useState(null);
   const [loading, setLoading] = useState(false);

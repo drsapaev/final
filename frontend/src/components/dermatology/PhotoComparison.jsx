@@ -29,6 +29,17 @@ const PhotoComparison = ({
   onPhotosChange,
   className = '' 
 }) => {
+  // Проверяем демо-режим в самом начале
+  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
+                    window.location.hostname === 'localhost' && 
+                    window.location.port === '5173';
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('PhotoComparison: Skipping render in demo mode');
+    return null;
+  }
+  
   const [photos, setPhotos] = useState({
     before: [],
     after: [],
