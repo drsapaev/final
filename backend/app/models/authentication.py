@@ -42,7 +42,7 @@ class UserSession(Base):
     """Модель для пользовательских сессий"""
     __tablename__ = "user_sessions"
     __table_args__ = (
-        Index('idx_user_sessions_user_active', 'user_id', 'is_active'),
+        Index('idx_user_sessions_user_active', 'user_id', 'revoked'),
         Index('idx_user_sessions_expires', 'expires_at'),
         {'extend_existing': True}
     )
@@ -50,21 +50,15 @@ class UserSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
-    # Сессия
-    session_id = Column(String(64), unique=True, nullable=False, index=True)
-    session_token = Column(String(255), unique=True, nullable=False, index=True)
+    # Сессия (соответствует реальной схеме БД)
+    refresh_token = Column(String(128), nullable=True)  # Соответствует БД
+    user_agent = Column(String(512), nullable=True)     # Соответствует БД
+    ip = Column(String(64), nullable=True)              # Соответствует БД
     
     # Метаданные
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    last_activity = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
-    is_active = Column(Boolean, default=True)
-    
-    # IP и устройство
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(Text, nullable=True)
-    device_fingerprint = Column(String(64), nullable=True)
-    device_name = Column(String(100), nullable=True)
+    revoked = Column(Boolean, default=False)            # Соответствует БД
     
     # Связи
     user = relationship("User", back_populates="user_sessions")
