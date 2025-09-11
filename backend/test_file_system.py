@@ -105,7 +105,7 @@ def test_file_stats(token):
     headers = {'Authorization': f'Bearer {token}'}
     
     try:
-        response = requests.get(f"{BASE_URL}/api/v1/files/stats", headers=headers)
+        response = requests.get(f"{BASE_URL}/api/v1/files/statistics", headers=headers)
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Статистика получена:")

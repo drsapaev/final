@@ -66,7 +66,7 @@ async def upload_file(
         service = get_file_system_service()
         
         # Загружаем файл
-        uploaded_file = await service.upload_file(db, file, file_data, current_user.id)
+        uploaded_file = service.upload_file(db, file, file_data, current_user.id)
         
         return FileOut.from_orm(uploaded_file)
         
@@ -76,6 +76,25 @@ async def upload_file(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка загрузки файла: {str(e)}"
+        )
+
+
+@router.get("/statistics", response_model=FileStats)
+async def get_file_statistics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Nurse", "Receptionist"))
+):
+    """Получить статистику файлов"""
+    try:
+        service = get_file_system_service()
+        stats = service.get_file_statistics(db, current_user.id)
+        
+        return FileStats(**stats)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения статистики: {str(e)}"
         )
 
 
@@ -488,23 +507,6 @@ async def import_files(
         )
 
 
-@router.get("/stats", response_model=FileStats)
-async def get_file_statistics(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "Nurse", "Receptionist"))
-):
-    """Получить статистику файлов"""
-    try:
-        service = get_file_system_service()
-        stats = service.get_file_statistics(db, current_user.id)
-        
-        return FileStats(**stats)
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}"
-        )
 
 
 @router.post("/cleanup")

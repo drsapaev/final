@@ -47,6 +47,9 @@ from app.api.v1.endpoints import (
     telegram_notifications,
     email_sms_enhanced,
     file_system,
+    file_upload_simple,
+    file_upload_json,
+    file_test,
     authentication,
     user_management,
     online_queue,
@@ -120,6 +123,9 @@ api_router.include_router(telegram_webhook.router, prefix="/telegram", tags=["te
 api_router.include_router(telegram_notifications.router, prefix="/telegram", tags=["telegram-notifications"])
 api_router.include_router(email_sms_enhanced.router, prefix="/email-sms", tags=["email-sms-enhanced"])
 api_router.include_router(file_system.router, prefix="/files", tags=["file-system"])
+api_router.include_router(file_upload_simple.router, prefix="/files", tags=["file-upload-simple"])
+api_router.include_router(file_upload_json.router, prefix="/files", tags=["file-upload-json"])
+api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(schedule.router, tags=["schedule"])
 api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
 api_router.include_router(cardio.router, tags=["cardio"])

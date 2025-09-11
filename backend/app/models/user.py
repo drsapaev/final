@@ -42,6 +42,9 @@ class User(Base):
     preferences: Mapped[Optional["UserPreferences"]] = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
     notification_settings: Mapped[Optional["UserNotificationSettings"]] = relationship("UserNotificationSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
     
+    # Связь с пациентом
+    patient: Mapped[Optional["Patient"]] = relationship("Patient", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
     # Роли и группы
     # user_role: Mapped[Optional["UserRole"]] = relationship("UserRole", back_populates="users")  # Временно отключено - нет внешнего ключа
     # groups: Mapped[List["UserGroup"]] = relationship("UserGroup", secondary="user_group_members", back_populates="users")  # Временно отключено

@@ -27,10 +27,18 @@ from app.schemas.file_system import (
 class CRUDFile:
     """CRUD операции для файлов"""
     
+    def __init__(self):
+        self.model = File
+    
     def create(self, db: Session, *, obj_in: FileCreate, owner_id: int) -> File:
         """Создать файл"""
+        # Преобразуем tags в JSON строку если это список
+        file_data = obj_in.dict()
+        if 'tags' in file_data and isinstance(file_data['tags'], list):
+            file_data['tags'] = json.dumps(file_data['tags'])
+        
         db_obj = File(
-            **obj_in.dict(),
+            **file_data,
             owner_id=owner_id,
             status=FileStatus.UPLOADING
         )

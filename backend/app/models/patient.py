@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, DateTime, Integer, String, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
@@ -13,6 +13,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, unique=True)
     last_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     middle_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -30,6 +31,9 @@ class Patient(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
+
+    # Связь с пользователем
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="patient")
 
     def short_name(self) -> str:
         mid = f" {self.middle_name}" if self.middle_name else ""
