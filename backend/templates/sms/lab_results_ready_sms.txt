@@ -1,0 +1,1 @@
+Programma Clinic: Результаты {{ test_type }} готовы! Скачать: {{ download_link }}. {% if has_abnormalities %}⚠️ Есть отклонения - обратитесь к врачу.{% endif %} Тел: {{ clinic_phone }}

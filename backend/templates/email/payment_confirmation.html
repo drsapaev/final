@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение платежа - Programma Clinic</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .payment-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .payment-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+        .info-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            color: #28a745;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+            margin-right: 5px;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .amount-highlight {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .amount-highlight h3 {
+            margin: 0 0 10px 0;
+            color: #155724;
+            font-size: 18px;
+        }
+        .amount-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+        }
+        .receipt-section {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .receipt-section h3 {
+            margin: 0 0 15px 0;
+            color: #0066cc;
+            font-size: 18px;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 10px;
+        }
+        .cta-button:hover {
+            background-color: #218838;
+        }
+        .cta-button.secondary {
+            background-color: #6c757d;
+        }
+        .cta-button.secondary:hover {
+            background-color: #5a6268;
+        }
+        .success-message {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .success-message h3 {
+            margin: 0 0 10px 0;
+            color: #155724;
+            font-size: 16px;
+        }
+        .success-message p {
+            margin: 0;
+            color: #155724;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .footer p {
+            margin: 5px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #28a745;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 600px) {
+            .payment-info {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💳 Programma Clinic</h1>
+            <p>Подтверждение платежа</p>
+        </div>
+        
+        <div class="content">
+            <h2>Здравствуйте, {{ patient_name }}!</h2>
+            
+            <div class="success-message">
+                <h3>✅ Платеж успешно получен!</h3>
+                <p>Спасибо за оплату услуг клиники. Ваш платеж обработан и подтвержден.</p>
+            </div>
+            
+            <div class="amount-highlight">
+                <h3>Сумма платежа</h3>
+                <div class="amount-value">{{ formatted_amount }}</div>
+            </div>
+            
+            <div class="payment-card">
+                <div class="payment-info">
+                    <div class="info-item">
+                        <span class="info-icon">💳</span>
+                        <span class="info-label">Способ оплаты:</span>
+                        <span class="info-value">{{ payment_method }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">📅</span>
+                        <span class="info-label">Дата оплаты:</span>
+                        <span class="info-value">{{ payment_date }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">🔢</span>
+                        <span class="info-label">ID транзакции:</span>
+                        <span class="info-value">{{ transaction_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">💰</span>
+                        <span class="info-label">Валюта:</span>
+                        <span class="info-value">{{ currency }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="receipt-section">
+                <h3>📄 Получить чек</h3>
+                <p>Вы можете скачать электронный чек для ваших записей:</p>
+                <a href="{{ receipt_link }}" class="cta-button">📄 Скачать чек</a>
+                <a href="tel:{{ clinic_phone }}" class="cta-button secondary">📞 Связаться с нами</a>
+            </div>
+            
+            <p><strong>Важно:</strong> Сохраните этот чек для ваших записей. При возникновении вопросов обращайтесь в нашу службу поддержки.</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Programma Clinic</strong></p>
+            <p>{{ clinic_address }}</p>
+            <p>Телефон: <a href="tel:{{ clinic_phone }}">{{ clinic_phone }}</a></p>
+            <p>Email: <a href="mailto:info@programma-clinic.uz">info@programma-clinic.uz</a></p>
+            <p style="margin-top: 20px; font-size: 12px; color: #adb5bd;">
+                Это автоматическое сообщение. Пожалуйста, не отвечайте на это письмо.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -45,6 +45,7 @@ from app.api.v1.endpoints import (
     two_factor_devices,
     telegram_webhook,
     telegram_notifications,
+    email_sms_enhanced,
     authentication,
     user_management,
     online_queue,
@@ -116,6 +117,7 @@ api_router.include_router(two_factor_sms_email.router, prefix="/2fa", tags=["two
 api_router.include_router(two_factor_devices.router, prefix="/2fa", tags=["two-factor-devices"])
 api_router.include_router(telegram_webhook.router, prefix="/telegram", tags=["telegram-webhook"])
 api_router.include_router(telegram_notifications.router, prefix="/telegram", tags=["telegram-notifications"])
+api_router.include_router(email_sms_enhanced.router, prefix="/email-sms", tags=["email-sms-enhanced"])
 api_router.include_router(schedule.router, tags=["schedule"])
 api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
 api_router.include_router(cardio.router, tags=["cardio"])
