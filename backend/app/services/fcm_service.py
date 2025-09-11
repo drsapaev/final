@@ -24,30 +24,37 @@ class FCMService:
                 from firebase_admin.exceptions import FirebaseError
                 
                 # Проверяем, есть ли уже инициализированное приложение
-                if not messaging._get_app():
-                    # Используем переменные окружения для конфигурации
-                    firebase_config = {
-                        "type": "service_account",
-                        "project_id": os.getenv("FIREBASE_PROJECT_ID", "clinic-mobile-app"),
-                        "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID", ""),
-                        "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
-                        "client_email": os.getenv("FIREBASE_CLIENT_EMAIL", ""),
-                        "client_id": os.getenv("FIREBASE_CLIENT_ID", ""),
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                        "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL", "")
-                    }
-                    
-                    # Создаем credentials объект
-                    cred = credentials.Certificate(firebase_config)
-                    
-                    # Инициализируем приложение
-                    self.app = initialize_app(cred, name="clinic-fcm")
-                    logger.info("Firebase Admin SDK инициализирован успешно")
-                else:
-                    self.app = messaging._get_app()
-                    logger.info("Firebase Admin SDK уже инициализирован")
+                try:
+                    # Проверяем, есть ли уже инициализированное приложение
+                    existing_app = messaging._get_app()
+                    if existing_app:
+                        self.app = existing_app
+                        logger.info("Firebase Admin SDK уже инициализирован")
+                        return
+                except ValueError:
+                    # Приложение не инициализировано, продолжаем
+                    pass
+                
+                # Используем переменные окружения для конфигурации
+                firebase_config = {
+                    "type": "service_account",
+                    "project_id": os.getenv("FIREBASE_PROJECT_ID", "clinic-mobile-app"),
+                    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID", ""),
+                    "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
+                    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL", ""),
+                    "client_id": os.getenv("FIREBASE_CLIENT_ID", ""),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL", "")
+                }
+                
+                # Создаем credentials объект
+                cred = credentials.Certificate(firebase_config)
+                
+                # Инициализируем приложение
+                self.app = initialize_app(cred, name="clinic-fcm")
+                logger.info("Firebase Admin SDK инициализирован успешно")
                     
             except ImportError:
                 logger.warning("Firebase Admin SDK не установлен. Используется режим эмуляции.")
