@@ -25,7 +25,15 @@ export default function Sidebar() {
       { to: '/admin/users', label: 'Админ: Пользователи' },
       { to: '/admin/analytics', label: 'Админ: Аналитика' },
       { to: '/admin/settings', label: 'Админ: Настройки' },
-      { to: '/admin/security', label: 'Админ: Безопасность' }
+      { to: '/admin/security', label: 'Админ: Безопасность' },
+      // Новые компоненты
+      { to: '/new-dashboard', label: '🆕 Новый Дашборд' },
+      { to: '/new-users', label: '🆕 Управление пользователями' },
+      { to: '/new-emr', label: '🆕 Медицинские карты' },
+      { to: '/new-files', label: '🆕 Файловый менеджер' },
+      { to: '/new-notifications', label: '🆕 Уведомления' },
+      { to: '/new-telegram', label: '🆕 Telegram' },
+      { to: '/new-security', label: '🆕 Безопасность' }
     );
   }
   if (role === 'registrar') {
@@ -35,14 +43,37 @@ export default function Sidebar() {
   }
   if (role === 'doctor') {
     byRole.push(
-      { to: '/doctor-panel', label: 'Панель врача' }
+      { to: '/doctor-panel', label: 'Панель врача' },
+      // Новые компоненты для врачей
+      { to: '/new-dashboard', label: '🆕 Новый Дашборд' },
+      { to: '/new-emr', label: '🆕 Медицинские карты' },
+      { to: '/new-files', label: '🆕 Файловый менеджер' },
+      { to: '/new-security', label: '🆕 Безопасность' }
     );
   }
   if (role === 'lab') {
-    byRole.push({ to: '/lab-panel', label: 'Лаборатория' });
+    byRole.push(
+      { to: '/lab-panel', label: 'Лаборатория' },
+      // Новые компоненты для лаборантов
+      { to: '/new-dashboard', label: '🆕 Новый Дашборд' },
+      { to: '/new-files', label: '🆕 Файловый менеджер' }
+    );
   }
   if (role === 'cashier') {
-    byRole.push({ to: '/cashier-panel', label: 'Касса' });
+    byRole.push(
+      { to: '/cashier-panel', label: 'Касса' },
+      // Новые компоненты для кассиров
+      { to: '/new-dashboard', label: '🆕 Новый Дашборд' }
+    );
+  }
+  if (role === 'nurse') {
+    byRole.push(
+      // Новые компоненты для медсестер
+      { to: '/new-dashboard', label: '🆕 Новый Дашборд' },
+      { to: '/new-emr', label: '🆕 Медицинские карты' },
+      { to: '/new-files', label: '🆕 Файловый менеджер' },
+      { to: '/new-security', label: '🆕 Безопасность' }
+    );
   }
 
   const items = [...byRole, ...common];

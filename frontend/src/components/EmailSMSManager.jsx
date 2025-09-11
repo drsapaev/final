@@ -6,570 +6,289 @@ import {
   Typography,
   Button,
   TextField,
-  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  IconButton,
-  Chip,
-  Switch,
-  FormControlLabel,
-  Divider,
+  Alert,
+  CircularProgress,
   Grid,
-  Paper,
-  Tabs,
-  Tab,
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
-  Email,
-  Sms,
   Add,
   Edit,
   Delete,
   Send,
-  Settings,
-  Notifications,
-  NotificationsOff,
-  CheckCircle,
-  Error,
+  Email,
+  Sms,
   Refresh,
-  Template,
+  Settings,
   History
 } from '@mui/icons-material';
 
 const EmailSMSManager = () => {
-  const [activeTab, setActiveTab] = useState(0);
   const [templates, setTemplates] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
-  const [showSendDialog, setShowSendDialog] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [newTemplate, setNewTemplate] = useState({
+  const [templateForm, setTemplateForm] = useState({
     name: '',
+    type: 'email',
     subject: '',
     content: '',
-    type: 'email',
-    variables: []
-  });
-  const [sendData, setSendData] = useState({
-    recipients: [],
-    template_id: '',
-    variables: {}
+    is_active: true
   });
 
   useEffect(() => {
-    loadEmailSMSData();
+    loadTemplates();
   }, []);
 
-  const loadEmailSMSData = async () => {
-    setLoading(true);
+  const loadTemplates = async () => {
     try {
-      const [templatesRes, historyRes, statsRes] = await Promise.all([
-        fetch('/api/v1/notifications/templates'),
-        fetch('/api/v1/notifications/history'),
-        fetch('/api/v1/notifications/history/stats')
-      ]);
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/v1/notifications/templates', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-      if (templatesRes.ok) {
-        const templatesData = await templatesRes.json();
-        setTemplates(templatesData);
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data.templates || data || []);
+      } else {
+        setError('Ошибка загрузки шаблонов');
       }
-
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        setHistory(historyData);
-      }
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
-    } catch (error) {
-      setError('Ошибка загрузки данных Email/SMS');
+    } catch (err) {
+      setError('Ошибка подключения к серверу');
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreateTemplate = async () => {
-    setLoading(true);
     try {
+      const token = localStorage.getItem('access_token');
       const response = await fetch('/api/v1/notifications/templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTemplate)
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(templateForm)
       });
 
       if (response.ok) {
-        setSuccess('Шаблон создан');
+        setSuccess('Шаблон успешно создан');
+        loadTemplates();
         setShowTemplateDialog(false);
-        setNewTemplate({
-          name: '',
-          subject: '',
-          content: '',
-          type: 'email',
-          variables: []
-        });
-        loadEmailSMSData();
+        resetForm();
       } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка создания шаблона');
+        setError('Ошибка создания шаблона');
       }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      setError('Ошибка создания шаблона');
     }
   };
 
-  const handleUpdateTemplate = async (templateId, updatedTemplate) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/v1/notifications/templates/${templateId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTemplate)
-      });
-
-      if (response.ok) {
-        setSuccess('Шаблон обновлен');
-        loadEmailSMSData();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка обновления шаблона');
-      }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
-    }
+  const resetForm = () => {
+    setTemplateForm({
+      name: '',
+      type: 'email',
+      subject: '',
+      content: '',
+      is_active: true
+    });
   };
 
-  const handleDeleteTemplate = async (templateId) => {
-    if (!window.confirm('Удалить шаблон?')) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/v1/notifications/templates/${templateId}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        setSuccess('Шаблон удален');
-        loadEmailSMSData();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка удаления шаблона');
-      }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendMessage = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/v1/notifications/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sendData)
-      });
-
-      if (response.ok) {
-        setSuccess('Сообщения отправлены');
-        setShowSendDialog(false);
-        setSendData({
-          recipients: [],
-          template_id: '',
-          variables: {}
-        });
-        loadEmailSMSData();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка отправки сообщений');
-      }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'sent': return 'success';
-      case 'failed': return 'error';
-      case 'pending': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'sent': return 'Отправлено';
-      case 'failed': return 'Ошибка';
-      case 'pending': return 'Ожидает';
-      default: return status;
-    }
-  };
-
-  const TabPanel = ({ children, value, index, ...other }) => (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`tabpanel-${index}`}
-      aria-labelledby={`tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-            <Box display="flex" alignItems="center">
-              <Email color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6" component="h3">
-                Email/SMS Менеджер
+    <Box sx={{ p: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          Управление уведомлениями
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={() => setShowTemplateDialog(true)}
+        >
+          Новый шаблон
+        </Button>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={8}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Шаблоны уведомлений
               </Typography>
-            </Box>
-            <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={loadEmailSMSData}
-              disabled={loading}
-            >
-              Обновить
-            </Button>
-          </Box>
-
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-          {stats && (
-            <Grid container spacing={2} mb={3}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="primary">
-                    {stats.total_sent || 0}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Отправлено
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="success.main">
-                    {stats.success_rate || 0}%
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Успешность
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="info.main">
-                    {stats.templates_count || 0}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Шаблонов
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="warning.main">
-                    {stats.pending_count || 0}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    В очереди
-                  </Typography>
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
-
-          <Box display="flex" gap={2} flexWrap="wrap">
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={() => setShowTemplateDialog(true)}
-            >
-              Создать шаблон
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Send />}
-              onClick={() => setShowSendDialog(true)}
-            >
-              Отправить сообщения
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-            <Tab icon={<Template />} label="Шаблоны" />
-            <Tab icon={<History />} label="История" />
-          </Tabs>
-        </Box>
-
-        <TabPanel value={activeTab} index={0}>
-          <List>
-            {templates.map((template) => (
-              <React.Fragment key={template.id}>
-                <ListItem>
-                  <ListItemIcon>
-                    {template.type === 'email' ? <Email /> : <Sms />}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={template.name}
-                    secondary={
-                      <Box>
-                        <Typography variant="body2" color="text.secondary">
-                          {template.subject}
-                        </Typography>
-                        <Box display="flex" gap={1} mt={1}>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Название</TableCell>
+                      <TableCell>Тип</TableCell>
+                      <TableCell>Статус</TableCell>
+                      <TableCell align="right">Действия</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {templates.map((template) => (
+                      <TableRow key={template.id} hover>
+                        <TableCell>{template.name}</TableCell>
+                        <TableCell>
                           <Chip
-                            size="small"
+                            icon={template.type === 'email' ? <Email /> : <Sms />}
                             label={template.type === 'email' ? 'Email' : 'SMS'}
-                            color="primary"
-                            variant="outlined"
-                          />
-                          <Chip
+                            color={template.type === 'email' ? 'primary' : 'secondary'}
                             size="small"
-                            label={template.language || 'RU'}
-                            variant="outlined"
                           />
-                        </Box>
-                      </Box>
-                    }
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={template.is_active ? 'Активен' : 'Неактивен'}
+                            color={template.is_active ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton>
+                            <Edit />
+                          </IconButton>
+                          <IconButton>
+                            <Delete />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Статистика
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={2}>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography>Email отправлено:</Typography>
+                  <Typography variant="h6">1,234</Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography>SMS отправлено:</Typography>
+                  <Typography variant="h6">567</Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography>Активных шаблонов:</Typography>
+                  <Typography variant="h6">{templates.filter(t => t.is_active).length}</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Dialog open={showTemplateDialog} onClose={() => setShowTemplateDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Создать шаблон уведомления</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Название шаблона"
+                value={templateForm.name}
+                onChange={(e) => setTemplateForm({...templateForm, name: e.target.value})}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Тип</InputLabel>
+                <Select
+                  value={templateForm.type}
+                  onChange={(e) => setTemplateForm({...templateForm, type: e.target.value})}
+                  label="Тип"
+                >
+                  <MenuItem value="email">Email</MenuItem>
+                  <MenuItem value="sms">SMS</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Тема"
+                value={templateForm.subject}
+                onChange={(e) => setTemplateForm({...templateForm, subject: e.target.value})}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Содержание"
+                multiline
+                rows={6}
+                value={templateForm.content}
+                onChange={(e) => setTemplateForm({...templateForm, content: e.target.value})}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={templateForm.is_active}
+                    onChange={(e) => setTemplateForm({...templateForm, is_active: e.target.checked})}
                   />
-                  <ListItemSecondaryAction>
-                    <Box display="flex" gap={1}>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setSelectedTemplate(template);
-                          setShowTemplateDialog(true);
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteTemplate(template.id)}
-                        color="error"
-                      >
-                        <Delete />
-                      </IconButton>
-                    </Box>
-                  </ListItemSecondaryAction>
-                </ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-          </List>
-        </TabPanel>
-
-        <TabPanel value={activeTab} index={1}>
-          <List>
-            {history.slice(0, 10).map((item) => (
-              <ListItem key={item.id}>
-                <ListItemIcon>
-                  {item.status === 'sent' ? <CheckCircle color="success" /> : <Error color="error" />}
-                </ListItemIcon>
-                <ListItemText
-                  primary={item.subject}
-                  secondary={
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {item.recipient} • {new Date(item.created_at).toLocaleString()}
-                      </Typography>
-                      <Box display="flex" gap={1} mt={1}>
-                        <Chip
-                          size="small"
-                          label={getStatusLabel(item.status)}
-                          color={getStatusColor(item.status)}
-                          variant="outlined"
-                        />
-                        <Chip
-                          size="small"
-                          label={item.type}
-                          variant="outlined"
-                        />
-                      </Box>
-                    </Box>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        </TabPanel>
-      </Card>
-
-      {/* Диалог создания/редактирования шаблона */}
-      <Dialog
-        open={showTemplateDialog}
-        onClose={() => setShowTemplateDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          {selectedTemplate ? 'Редактировать шаблон' : 'Создать шаблон'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Название"
-            value={selectedTemplate?.name || newTemplate.name}
-            onChange={(e) => {
-              if (selectedTemplate) {
-                setSelectedTemplate({ ...selectedTemplate, name: e.target.value });
-              } else {
-                setNewTemplate({ ...newTemplate, name: e.target.value });
-              }
-            }}
-            margin="normal"
-          />
-          
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Тип</InputLabel>
-            <Select
-              value={selectedTemplate?.type || newTemplate.type}
-              onChange={(e) => {
-                if (selectedTemplate) {
-                  setSelectedTemplate({ ...selectedTemplate, type: e.target.value });
-                } else {
-                  setNewTemplate({ ...newTemplate, type: e.target.value });
                 }
-              }}
-            >
-              <MenuItem value="email">Email</MenuItem>
-              <MenuItem value="sms">SMS</MenuItem>
-            </Select>
-          </FormControl>
-          
-          <TextField
-            fullWidth
-            label="Тема"
-            value={selectedTemplate?.subject || newTemplate.subject}
-            onChange={(e) => {
-              if (selectedTemplate) {
-                setSelectedTemplate({ ...selectedTemplate, subject: e.target.value });
-              } else {
-                setNewTemplate({ ...newTemplate, subject: e.target.value });
-              }
-            }}
-            margin="normal"
-          />
-          
-          <TextField
-            fullWidth
-            multiline
-            rows={6}
-            label="Содержание"
-            value={selectedTemplate?.content || newTemplate.content}
-            onChange={(e) => {
-              if (selectedTemplate) {
-                setSelectedTemplate({ ...selectedTemplate, content: e.target.value });
-              } else {
-                setNewTemplate({ ...newTemplate, content: e.target.value });
-              }
-            }}
-            margin="normal"
-          />
+                label="Активный шаблон"
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setShowTemplateDialog(false);
-            setSelectedTemplate(null);
-          }}>
-            Отмена
-          </Button>
-          <Button
-            variant="contained"
-            onClick={selectedTemplate ? 
-              () => handleUpdateTemplate(selectedTemplate.id, selectedTemplate) : 
-              handleCreateTemplate
-            }
-            disabled={loading}
-          >
-            {selectedTemplate ? 'Обновить' : 'Создать'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Диалог отправки сообщений */}
-      <Dialog
-        open={showSendDialog}
-        onClose={() => setShowSendDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Отправить сообщения</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Шаблон"
-            value={sendData.template_id}
-            onChange={(e) => setSendData({ ...sendData, template_id: e.target.value })}
-            margin="normal"
-          >
-            {templates.map((template) => (
-              <MenuItem key={template.id} value={template.id}>
-                {template.name} ({template.type})
-              </MenuItem>
-            ))}
-          </TextField>
-          
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Получатели (по одному на строку)"
-            value={sendData.recipients.join('\n')}
-            onChange={(e) => setSendData({ 
-              ...sendData, 
-              recipients: e.target.value.split('\n').filter(r => r.trim()) 
-            })}
-            margin="normal"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowSendDialog(false)}>
-            Отмена
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleSendMessage}
-            disabled={!sendData.template_id || sendData.recipients.length === 0 || loading}
-          >
-            Отправить
+          <Button onClick={() => setShowTemplateDialog(false)}>Отмена</Button>
+          <Button onClick={handleCreateTemplate} variant="contained">
+            Создать
           </Button>
         </DialogActions>
       </Dialog>

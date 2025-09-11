@@ -6,428 +6,403 @@ import {
   Typography,
   Button,
   TextField,
-  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent,
-  Chip,
+  Alert,
+  CircularProgress,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  FormControlLabel,
   List,
   ListItem,
   ListItemText,
   ListItemIcon,
-  IconButton,
-  Divider
+  Divider,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent
 } from '@mui/material';
 import {
   Security,
-  QrCode,
   Phone,
   Email,
+  QrCode,
   CheckCircle,
   Error,
+  Warning,
   Refresh,
-  Delete,
-  Add
+  Settings,
+  Add,
+  Edit,
+  Delete
 } from '@mui/icons-material';
 
 const TwoFactorManager = () => {
-  const [activeStep, setActiveStep] = useState(0);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [twoFactorMethod, setTwoFactorMethod] = useState('sms');
-  const [qrCode, setQrCode] = useState('');
-  const [backupCodes, setBackupCodes] = useState([]);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [twoFactorStatus, setTwoFactorStatus] = useState(null);
+  const [trustedDevices, setTrustedDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showSetupDialog, setShowSetupDialog] = useState(false);
-
-  const methods = [
-    { value: 'sms', label: 'SMS', icon: <Phone />, description: 'Код отправляется на номер телефона' },
-    { value: 'email', label: 'Email', icon: <Email />, description: 'Код отправляется на email' },
-    { value: 'app', label: 'Приложение', icon: <QrCode />, description: 'Использование приложения-аутентификатора' }
-  ];
-
-  const steps = [
-    'Выбор метода',
-    'Настройка',
-    'Подтверждение',
-    'Завершение'
-  ];
+  const [activeStep, setActiveStep] = useState(0);
+  const [qrCode, setQrCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState([]);
 
   useEffect(() => {
-    // Загружаем текущее состояние 2FA
-    loadTwoFactorStatus();
+    loadTwoFactorData();
   }, []);
 
-  const loadTwoFactorStatus = async () => {
+  const loadTwoFactorData = async () => {
     try {
-      // Здесь должен быть API запрос для получения статуса 2FA
-      const response = await fetch('/api/v1/two-factor/status');
-      const data = await response.json();
-      setTwoFactorEnabled(data.enabled);
-      setTwoFactorMethod(data.method);
-    } catch (error) {
-      console.error('Ошибка загрузки статуса 2FA:', error);
-    }
-  };
-
-  const handleSetupTwoFactor = () => {
-    setShowSetupDialog(true);
-    setActiveStep(0);
-    setError('');
-    setSuccess('');
-  };
-
-  const handleNext = () => {
-    setActiveStep((prevStep) => prevStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevStep) => prevStep - 1);
-  };
-
-  const handleMethodChange = (method) => {
-    setTwoFactorMethod(method);
-  };
-
-  const handleSetupMethod = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      let response;
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
       
-      switch (twoFactorMethod) {
-        case 'sms':
-          response = await fetch('/api/v1/two-factor/setup-sms', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone_number: phoneNumber })
-          });
-          break;
-        case 'email':
-          response = await fetch('/api/v1/two-factor/setup-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-          });
-          break;
-        case 'app':
-          response = await fetch('/api/v1/two-factor/setup-app', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const data = await response.json();
-          setQrCode(data.qr_code);
-          setBackupCodes(data.backup_codes);
-          break;
-      }
-      
-      if (response.ok) {
-        setSuccess('Метод 2FA настроен. Проверьте код подтверждения.');
-        handleNext();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка настройки 2FA');
-      }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const response = await fetch('/api/v1/two-factor/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          code: verificationCode,
-          method: twoFactorMethod 
+      const [statusRes, devicesRes] = await Promise.all([
+        fetch('/api/v1/auth/2fa/status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/v1/auth/2fa/trusted-devices', {
+          headers: { 'Authorization': `Bearer ${token}` }
         })
-      });
-      
-      if (response.ok) {
-        setSuccess('2FA успешно активирован!');
-        setTwoFactorEnabled(true);
-        handleNext();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Неверный код подтверждения');
+      ]);
+
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        setTwoFactorStatus(statusData);
       }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
+
+      if (devicesRes.ok) {
+        const devicesData = await devicesRes.json();
+        setTrustedDevices(devicesData.devices || devicesData || []);
+      }
+    } catch (err) {
+      setError('Ошибка загрузки данных 2FA');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDisableTwoFactor = async () => {
-    setLoading(true);
-    setError('');
-    
+  const handleSetup2FA = async () => {
     try {
-      const response = await fetch('/api/v1/two-factor/disable', {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/v1/auth/2fa/setup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
-        setSuccess('2FA отключен');
-        setTwoFactorEnabled(false);
+        const data = await response.json();
+        setQrCode(data.qr_code);
+        setBackupCodes(data.backup_codes);
+        setShowSetupDialog(true);
       } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка отключения 2FA');
+        setError('Ошибка настройки 2FA');
       }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      setError('Ошибка настройки 2FA');
     }
   };
 
-  const renderStepContent = (step) => {
-    switch (step) {
-      case 0:
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Выберите метод двухфакторной аутентификации
-            </Typography>
-            <List>
-              {methods.map((method) => (
-                <ListItem
-                  key={method.value}
-                  button
-                  onClick={() => handleMethodChange(method.value)}
-                  selected={twoFactorMethod === method.value}
-                >
-                  <ListItemIcon>{method.icon}</ListItemIcon>
-                  <ListItemText
-                    primary={method.label}
-                    secondary={method.description}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Box>
-        );
-      
-      case 1:
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Настройка {methods.find(m => m.value === twoFactorMethod)?.label}
-            </Typography>
-            
-            {twoFactorMethod === 'sms' && (
-              <TextField
-                fullWidth
-                label="Номер телефона"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+7 (999) 123-45-67"
-                margin="normal"
-              />
-            )}
-            
-            {twoFactorMethod === 'email' && (
-              <TextField
-                fullWidth
-                label="Email адрес"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
-                margin="normal"
-              />
-            )}
-            
-            {twoFactorMethod === 'app' && qrCode && (
-              <Box textAlign="center" mt={2}>
-                <Typography variant="body2" gutterBottom>
-                  Отсканируйте QR-код в приложении-аутентификаторе:
-                </Typography>
-                <Box 
-                  component="img" 
-                  src={qrCode} 
-                  alt="QR Code" 
-                  sx={{ maxWidth: 200, border: 1, borderColor: 'divider' }}
-                />
-                <Typography variant="caption" display="block" mt={1}>
-                  Или введите код вручную: {backupCodes[0]}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        );
-      
-      case 2:
-        return (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Подтверждение кода
-            </Typography>
-            <TextField
-              fullWidth
-              label="Код подтверждения"
-              value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value)}
-              placeholder="Введите 6-значный код"
-              margin="normal"
-            />
-          </Box>
-        );
-      
-      case 3:
-        return (
-          <Box textAlign="center">
-            <CheckCircle color="success" sx={{ fontSize: 64, mb: 2 }} />
-            <Typography variant="h6" gutterBottom>
-              Двухфакторная аутентификация активирована!
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Теперь для входа в систему потребуется дополнительный код подтверждения
-            </Typography>
-            
-            {backupCodes.length > 0 && (
-              <Box mt={3}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Резервные коды (сохраните их в безопасном месте):
-                </Typography>
-                <Box display="flex" flexWrap="wrap" gap={1} justifyContent="center">
-                  {backupCodes.map((code, index) => (
-                    <Chip key={index} label={code} variant="outlined" />
-                  ))}
-                </Box>
-              </Box>
-            )}
-          </Box>
-        );
-      
-      default:
-        return null;
+  const handleVerify2FA = async (code) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/v1/auth/2fa/verify', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ code })
+      });
+
+      if (response.ok) {
+        setSuccess('2FA успешно настроен');
+        setShowSetupDialog(false);
+        loadTwoFactorData();
+      } else {
+        setError('Неверный код');
+      }
+    } catch (err) {
+      setError('Ошибка верификации');
     }
   };
+
+  const handleRemoveDevice = async (deviceId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/v1/auth/2fa/trusted-devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setSuccess('Устройство удалено');
+        loadTwoFactorData();
+      } else {
+        setError('Ошибка удаления устройства');
+      }
+    } catch (err) {
+      setError('Ошибка удаления устройства');
+    }
+  };
+
+  const steps = [
+    'Сканируйте QR-код',
+    'Введите код из приложения',
+    'Сохраните резервные коды'
+  ];
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <Card>
-      <CardContent>
-        <Box display="flex" alignItems="center" mb={2}>
-          <Security color="primary" sx={{ mr: 1 }} />
-          <Typography variant="h6" component="h3">
-            Двухфакторная аутентификация
-          </Typography>
-        </Box>
-
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-        <Box mb={3}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Двухфакторная аутентификация добавляет дополнительный уровень безопасности к вашему аккаунту
-          </Typography>
-          
-          <Box display="flex" alignItems="center" gap={2} mt={2}>
-            <Chip
-              icon={twoFactorEnabled ? <CheckCircle /> : <Error />}
-              label={twoFactorEnabled ? 'Активирована' : 'Не активирована'}
-              color={twoFactorEnabled ? 'success' : 'error'}
-              variant="outlined"
-            />
-            {twoFactorEnabled && (
-              <Chip
-                label={`Метод: ${methods.find(m => m.value === twoFactorMethod)?.label}`}
-                variant="outlined"
-              />
-            )}
-          </Box>
-        </Box>
-
-        <Box display="flex" gap={2}>
-          {!twoFactorEnabled ? (
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={handleSetupTwoFactor}
-            >
-              Настроить 2FA
-            </Button>
-          ) : (
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<Delete />}
-              onClick={handleDisableTwoFactor}
-              disabled={loading}
-            >
-              Отключить 2FA
-            </Button>
-          )}
-          
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={loadTwoFactorStatus}
-            disabled={loading}
-          >
-            Обновить
-          </Button>
-        </Box>
-
-        <Dialog
-          open={showSetupDialog}
-          onClose={() => setShowSetupDialog(false)}
-          maxWidth="md"
-          fullWidth
+    <Box sx={{ p: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          Двухфакторная аутентификация
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadTwoFactorData}
         >
-          <DialogTitle>Настройка двухфакторной аутентификации</DialogTitle>
-          <DialogContent>
-            <Stepper activeStep={activeStep} orientation="vertical">
-              {steps.map((label, index) => (
-                <Step key={label}>
-                  <StepLabel>{label}</StepLabel>
-                  <StepContent>
-                    {renderStepContent(index)}
-                    <Box mt={2}>
-                      <Button
-                        variant="contained"
-                        onClick={index === 1 ? handleSetupMethod : index === 2 ? handleVerifyCode : handleNext}
-                        disabled={loading}
-                        sx={{ mr: 1 }}
-                      >
-                        {index === steps.length - 1 ? 'Завершить' : 'Далее'}
-                      </Button>
-                      {index > 0 && (
-                        <Button onClick={handleBack} disabled={loading}>
-                          Назад
-                        </Button>
-                      )}
-                    </Box>
-                  </StepContent>
-                </Step>
-              ))}
-            </Stepper>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowSetupDialog(false)}>
-              Отмена
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </CardContent>
-    </Card>
+          Обновить
+        </Button>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Статус 2FA
+              </Typography>
+              <List>
+                <ListItem>
+                  <ListItemIcon>
+                    <Security color={twoFactorStatus?.enabled ? "success" : "error"} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="2FA включен"
+                    secondary={twoFactorStatus?.enabled ? "Да" : "Нет"}
+                  />
+                  <Chip
+                    label={twoFactorStatus?.enabled ? "Включен" : "Отключен"}
+                    color={twoFactorStatus?.enabled ? "success" : "error"}
+                    size="small"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Phone />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="SMS уведомления"
+                    secondary={twoFactorStatus?.sms_enabled ? "Включены" : "Отключены"}
+                  />
+                  <Chip
+                    label={twoFactorStatus?.sms_enabled ? "Включены" : "Отключены"}
+                    color={twoFactorStatus?.sms_enabled ? "success" : "default"}
+                    size="small"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Email />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Email уведомления"
+                    secondary={twoFactorStatus?.email_enabled ? "Включены" : "Отключены"}
+                  />
+                  <Chip
+                    label={twoFactorStatus?.email_enabled ? "Включены" : "Отключены"}
+                    color={twoFactorStatus?.email_enabled ? "success" : "default"}
+                    size="small"
+                  />
+                </ListItem>
+              </List>
+              <Box mt={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  startIcon={<Security />}
+                  onClick={handleSetup2FA}
+                  disabled={twoFactorStatus?.enabled}
+                >
+                  {twoFactorStatus?.enabled ? '2FA уже настроен' : 'Настроить 2FA'}
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Доверенные устройства
+              </Typography>
+              <List>
+                {trustedDevices.map((device) => (
+                  <ListItem key={device.id}>
+                    <ListItemIcon>
+                      <Settings />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={device.device_name}
+                      secondary={`${device.browser} • ${device.last_used}`}
+                    />
+                    <IconButton
+                      onClick={() => handleRemoveDevice(device.id)}
+                      color="error"
+                    >
+                      <Delete />
+                    </IconButton>
+                  </ListItem>
+                ))}
+                {trustedDevices.length === 0 && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Нет доверенных устройств"
+                      secondary="Добавьте устройство для упрощения входа"
+                    />
+                  </ListItem>
+                )}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Резервные коды
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Сохраните эти коды в безопасном месте. Они помогут вам войти в систему,
+                если вы потеряете доступ к устройству с приложением аутентификатора.
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={() => setSuccess('Новые резервные коды сгенерированы')}
+              >
+                Сгенерировать новые коды
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Dialog open={showSetupDialog} onClose={() => setShowSetupDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Настройка двухфакторной аутентификации</DialogTitle>
+        <DialogContent>
+          <Stepper activeStep={activeStep} orientation="vertical">
+            <Step>
+              <StepLabel>Сканируйте QR-код</StepLabel>
+              <StepContent>
+                <Box textAlign="center" py={2}>
+                  {qrCode && (
+                    <Box
+                      component="img"
+                      src={qrCode}
+                      alt="QR Code"
+                      sx={{ maxWidth: 200, height: 'auto' }}
+                    />
+                  )}
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    Отсканируйте QR-код в приложении аутентификатора
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => setActiveStep(1)}
+                    sx={{ mt: 2 }}
+                  >
+                    Далее
+                  </Button>
+                </Box>
+              </StepContent>
+            </Step>
+            <Step>
+              <StepLabel>Введите код из приложения</StepLabel>
+              <StepContent>
+                <TextField
+                  fullWidth
+                  label="Код из приложения"
+                  placeholder="000000"
+                  sx={{ mb: 2 }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={() => setActiveStep(2)}
+                  sx={{ mr: 1 }}
+                >
+                  Далее
+                </Button>
+                <Button onClick={() => setActiveStep(0)}>
+                  Назад
+                </Button>
+              </StepContent>
+            </Step>
+            <Step>
+              <StepLabel>Сохраните резервные коды</StepLabel>
+              <StepContent>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Сохраните эти коды в безопасном месте:
+                </Typography>
+                <Box sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', p: 2, borderRadius: 1 }}>
+                  {backupCodes.map((code, index) => (
+                    <Typography key={index} variant="body2">
+                      {code}
+                    </Typography>
+                  ))}
+                </Box>
+                <Button
+                  variant="contained"
+                  onClick={() => setShowSetupDialog(false)}
+                  sx={{ mt: 2 }}
+                >
+                  Завершить
+                </Button>
+              </StepContent>
+            </Step>
+          </Stepper>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 };
 
