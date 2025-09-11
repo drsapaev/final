@@ -34,6 +34,10 @@ from .clinic import (
     Backup, BackupStatus, BackupType, SystemInfo
 )
 from .online_queue import DailyQueue, QueueEntry, QueueToken
+from .file_system import (
+    File, FileVersion, FileShare, FileFolder, FileAccessLog, 
+    FileStorage, FileQuota, FileType, FileStatus, FilePermission
+)
 
 # Make sure all models are available
 __all__ = [

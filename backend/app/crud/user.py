@@ -12,7 +12,7 @@ from app.models.user import User
 from app.core.config import settings
 
 # Контекст для хеширования паролей
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 
 def _to_dict(u: User) -> Dict:

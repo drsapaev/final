@@ -1,45 +1,44 @@
 #!/usr/bin/env python3
 """
-Скрипт для проверки существующих таблиц в базе данных
+Проверить таблицы в базе данных
 """
-import os
 import sqlite3
 
-
 def check_tables():
-    """Проверяем существующие таблицы"""
-    db_path = "clinic.db"
-
-    if not os.path.exists(db_path):
-        print(f"❌ База данных {db_path} не найдена")
-        return
-
+    """Проверить какие таблицы есть в БД"""
+    conn = sqlite3.connect('clinic.db')
+    cursor = conn.cursor()
+    
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # Получаем список всех таблиц
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
-
-        print(f"📋 Таблицы в базе данных {db_path}:")
-        for table in tables:
-            print(f"  - {table[0]}")
-
-        # Проверяем конкретно таблицы вебхуков
-        payment_tables = [t[0] for t in tables if "payment" in t[0].lower()]
-        if payment_tables:
-            print("\n💰 Таблицы вебхуков оплат:")
-            for table in payment_tables:
-                print(f"  - {table}")
+        
+        print("📋 Таблицы в базе данных:")
+        if tables:
+            for table in tables:
+                print(f"  ✅ {table[0]}")
         else:
-            print("\n💰 Таблицы вебхуков оплат не найдены")
-
-        conn.close()
-
+            print("  ❌ Таблицы не найдены")
+        
+        # Проверим есть ли таблица users
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        users_table = cursor.fetchone()
+        
+        if users_table:
+            print(f"\n✅ Таблица 'users' существует")
+            # Проверим структуру таблицы users
+            cursor.execute("PRAGMA table_info(users)")
+            columns = cursor.fetchall()
+            print("   Структура таблицы users:")
+            for col in columns:
+                print(f"     - {col[1]} ({col[2]})")
+        else:
+            print(f"\n❌ Таблица 'users' НЕ существует")
+            
     except Exception as e:
-        print(f"❌ Ошибка при проверке таблиц: {e}")
-
+        print(f"❌ Ошибка: {e}")
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     check_tables()

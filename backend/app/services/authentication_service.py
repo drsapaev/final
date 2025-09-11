@@ -81,43 +81,62 @@ class AuthenticationService:
     def authenticate_user(self, db: Session, username: str, password: str, ip_address: str = None, user_agent: str = None) -> Tuple[Optional[User], str]:
         """Аутентифицирует пользователя"""
         try:
+            print(f"DEBUG: authenticate_user called with username={username}")
+            
             # Ищем пользователя по username или email
             user = db.query(User).filter(
                 or_(User.username == username, User.email == username)
             ).first()
 
             if not user:
+                print(f"DEBUG: User not found for username={username}")
                 self._log_login_attempt(db, None, username, ip_address, user_agent, False, "user_not_found")
                 return None, "Пользователь не найден"
 
+            print(f"DEBUG: User found: ID={user.id}, Username={user.username}, IsActive={user.is_active}")
+
             if not user.is_active:
+                print(f"DEBUG: User is inactive")
                 self._log_login_attempt(db, user.id, username, ip_address, user_agent, False, "user_inactive")
                 return None, "Пользователь деактивирован"
 
-            if not verify_password(password, user.hashed_password):
+            print(f"DEBUG: Verifying password...")
+            password_valid = verify_password(password, user.hashed_password)
+            print(f"DEBUG: Password verification result: {password_valid}")
+            
+            if not password_valid:
+                print(f"DEBUG: Invalid password")
                 self._log_login_attempt(db, user.id, username, ip_address, user_agent, False, "invalid_password")
                 return None, "Неверный пароль"
 
             # Проверяем блокировку
             if self._is_user_locked(db, user.id):
+                print(f"DEBUG: User is locked")
                 self._log_login_attempt(db, user.id, username, ip_address, user_agent, False, "user_locked")
                 return None, "Пользователь заблокирован из-за множественных неудачных попыток входа"
 
             # Успешный вход
+            print(f"DEBUG: Authentication successful")
             self._log_login_attempt(db, user.id, username, ip_address, user_agent, True, None)
             self._log_user_activity(db, user.id, "login", "Успешный вход в систему", ip_address, user_agent)
             
             return user, "Успешная аутентификация"
 
         except Exception as e:
+            print(f"DEBUG: Exception in authenticate_user: {e}")
             logger.error(f"Error authenticating user: {e}")
             return None, "Ошибка аутентификации"
 
     def login_user(self, db: Session, username: str, password: str, ip_address: str = None, user_agent: str = None, device_fingerprint: str = None, remember_me: bool = False) -> Dict[str, Any]:
         """Выполняет вход пользователя"""
+        print(f"DEBUG: login_user called with username={username}")
+        
         user, message = self.authenticate_user(db, username, password, ip_address, user_agent)
         
+        print(f"DEBUG: authenticate_user returned user={user is not None}, message={message}")
+        
         if not user:
+            print(f"DEBUG: Authentication failed, returning error")
             return {
                 "success": False,
                 "message": message,
@@ -158,12 +177,10 @@ class AuthenticationService:
         
         user_session = UserSession(
             user_id=user.id,
-            session_id=session_id,
-            session_token=session_token,
+            refresh_token=session_token,
             expires_at=session_expires,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            device_fingerprint=device_fingerprint
+            ip=ip_address,
+            user_agent=user_agent
         )
         db.add(user_session)
         
@@ -269,9 +286,8 @@ class AuthenticationService:
                     
                     # Деактивируем связанную сессию
                     db.query(UserSession).filter(
-                        UserSession.user_id == token_obj.user_id,
-                        UserSession.device_fingerprint == token_obj.device_fingerprint
-                    ).update({"is_active": False})
+                        UserSession.user_id == token_obj.user_id
+                    ).update({"revoked": True})
                     
                     self._log_user_activity(db, token_obj.user_id, "logout", "Выход из системы")
             
