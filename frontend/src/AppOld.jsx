@@ -33,22 +33,6 @@ import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import MediLabDemo from './pages/MediLabDemo.jsx';
 
-// Новые компоненты - ПОШАГОВОЕ ДОБАВЛЕНИЕ
-import TestComponent from './components/TestComponent.jsx';
-import SimpleDashboard from './components/SimpleDashboard.jsx';
-import SimpleUserManagement from './components/SimpleUserManagement.jsx';
-import SimpleEMR from './components/SimpleEMR.jsx';
-import SimpleFileManager from './components/SimpleFileManager.jsx';
-// import LoginForm from './components/LoginForm.jsx'; // ВРЕМЕННО ОТКЛЮЧЕН - Material-UI конфликт
-// import NewDashboard from './components/Dashboard';
-// import UserManagement from './components/UserManagement';
-// import EMRInterface from './components/EMRInterface';
-// import FileManager from './components/FileManager';
-// import EmailSMSManager from './components/EmailSMSManager';
-// import TelegramManager from './components/TelegramManager';
-// import TwoFactorManager from './components/TwoFactorManager';
-// import TestComponent from './TestComponent';
-
 import auth from './stores/auth.js';
 
 // ===== мягкая проверка ролей (как раньше) =====
@@ -153,24 +137,6 @@ export default function App() {
           <Route path="analytics"     element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
           <Route path="visits/:id"    element={<VisitDetails />} />
           <Route path="search"        element={<Search />} />
-          
-          {/* Новые маршруты для созданных компонентов - ПОШАГОВОЕ ДОБАВЛЕНИЕ */}
-          <Route path="test"           element={<TestComponent />} />
-          <Route path="simple-dashboard" element={<SimpleDashboard />} />
-          <Route path="simple-users"   element={<SimpleUserManagement />} />
-          <Route path="simple-emr"     element={<SimpleEMR />} />
-          <Route path="simple-files"   element={<SimpleFileManager />} />
-          {/* <Route path="new-login"      element={<LoginForm />} /> ВРЕМЕННО ОТКЛЮЧЕН */}
-          {/* <Route path="new-dashboard" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><NewDashboard /></RequireAuth>} />
-          <Route path="new-login"     element={<LoginForm />} />
-          <Route path="new-dashboard" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><NewDashboard /></RequireAuth>} />
-          <Route path="new-users"     element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
-          <Route path="new-emr"       element={<RequireAuth roles={['Admin','Doctor','Nurse']}><EMRInterface /></RequireAuth>} />
-          <Route path="new-files"     element={<RequireAuth roles={['Admin','Doctor','Nurse']}><FileManager /></RequireAuth>} />
-          <Route path="new-notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
-          <Route path="new-telegram"  element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
-          <Route path="new-security"  element={<RequireAuth roles={['Admin','Doctor','Nurse']}><TwoFactorManager /></RequireAuth>} /> */}
-          
           <Route path="*"             element={<Navigate to="/" replace />} />
         </Route>
       </Route>
@@ -203,3 +169,4 @@ const main = {
   width: '100%',
   boxSizing: 'border-box'
 };
+

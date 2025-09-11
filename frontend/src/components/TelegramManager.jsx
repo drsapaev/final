@@ -6,66 +6,76 @@ import {
   Typography,
   Button,
   TextField,
-  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
+  CircularProgress,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  FormControlLabel,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  IconButton,
-  Chip,
-  Switch,
-  FormControlLabel,
-  Divider,
-  Grid,
-  Paper
+  ListItemIcon
 } from '@mui/material';
 import {
-  Telegram,
   Add,
   Edit,
   Delete,
   Send,
+  Telegram,
   Settings,
-  Notifications,
-  NotificationsOff,
+  Refresh,
   CheckCircle,
   Error,
-  Refresh,
-  QrCode
+  Warning
 } from '@mui/icons-material';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
-  const [botConfig, setBotConfig] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const [showUserDialog, setShowUserDialog] = useState(false);
-  const [showMessageDialog, setShowMessageDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [messageText, setMessageText] = useState('');
-  const [messageType, setMessageType] = useState('text');
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    message_type: 'text',
+    content: '',
+    is_active: true
+  });
 
   useEffect(() => {
     loadTelegramData();
   }, []);
 
   const loadTelegramData = async () => {
-    setLoading(true);
     try {
-      const [statusRes, configRes, usersRes, messagesRes] = await Promise.all([
-        fetch('/api/v1/telegram/bot-status'),
-        fetch('/api/v1/telegram/config'),
-        fetch('/api/v1/telegram/users'),
-        fetch('/api/v1/telegram/messages')
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      
+      const [statusRes, templatesRes] = await Promise.all([
+        fetch('/api/v1/telegram/bot-status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/v1/telegram/templates', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       ]);
 
       if (statusRes.ok) {
@@ -73,267 +83,130 @@ const TelegramManager = () => {
         setBotStatus(statusData);
       }
 
-      if (configRes.ok) {
-        const configData = await configRes.json();
-        setBotConfig(configData);
+      if (templatesRes.ok) {
+        const templatesData = await templatesRes.json();
+        setTemplates(templatesData.templates || templatesData || []);
       }
-
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData);
-      }
-
-      if (messagesRes.ok) {
-        const messagesData = await messagesRes.json();
-        setMessages(messagesData);
-      }
-    } catch (error) {
+    } catch (err) {
       setError('Ошибка загрузки данных Telegram');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!selectedUser || !messageText.trim()) return;
-
-    setLoading(true);
+  const handleCreateTemplate = async () => {
     try {
-      const response = await fetch('/api/v1/telegram/send-message', {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/v1/telegram/templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: selectedUser.id,
-          message: messageText,
-          message_type: messageType
-        })
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(templateForm)
       });
 
       if (response.ok) {
-        setSuccess('Сообщение отправлено');
-        setMessageText('');
-        setShowMessageDialog(false);
+        setSuccess('Шаблон успешно создан');
         loadTelegramData();
+        setShowTemplateDialog(false);
+        resetForm();
       } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка отправки сообщения');
+        setError('Ошибка создания шаблона');
       }
-    } catch (error) {
-      setError('Ошибка подключения к серверу');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      setError('Ошибка создания шаблона');
     }
   };
 
-  const handleToggleNotifications = async (userId, enabled) => {
-    try {
-      const response = await fetch(`/api/v1/telegram/users/${userId}/notifications`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled })
-      });
-
-      if (response.ok) {
-        setSuccess('Настройки уведомлений обновлены');
-        loadTelegramData();
-      }
-    } catch (error) {
-      setError('Ошибка обновления настроек');
-    }
+  const resetForm = () => {
+    setTemplateForm({
+      name: '',
+      message_type: 'text',
+      content: '',
+      is_active: true
+    });
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Удалить пользователя из Telegram?')) return;
-
-    try {
-      const response = await fetch(`/api/v1/telegram/users/${userId}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        setSuccess('Пользователь удален');
-        loadTelegramData();
-      }
-    } catch (error) {
-      setError('Ошибка удаления пользователя');
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'success';
-      case 'inactive': return 'error';
-      case 'pending': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'active': return 'Активен';
-      case 'inactive': return 'Неактивен';
-      case 'pending': return 'Ожидает';
-      default: return status;
-    }
-  };
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-            <Box display="flex" alignItems="center">
-              <Telegram color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6" component="h3">
-                Telegram Bot
-              </Typography>
-            </Box>
-            <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={loadTelegramData}
-              disabled={loading}
-            >
-              Обновить
-            </Button>
-          </Box>
+    <Box sx={{ p: 3 }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          Telegram бот
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadTelegramData}
+        >
+          Обновить
+        </Button>
+      </Box>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-          {botStatus && (
-            <Grid container spacing={2} mb={3}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="primary">
-                    {botStatus.total_users || 0}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Пользователей
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="success.main">
-                    {botStatus.active_users || 0}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Активных
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="h4" color="info.main">
-                    {botStatus.messages_sent || 0}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Сообщений
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Paper sx={{ p: 2, textAlign: 'center' }}>
-                  <Chip
-                    icon={botStatus.bot_active ? <CheckCircle /> : <Error />}
-                    label={botStatus.bot_active ? 'Активен' : 'Неактивен'}
-                    color={botStatus.bot_active ? 'success' : 'error'}
-                  />
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
-
-          <Box display="flex" gap={2} flexWrap="wrap">
-            <Button
-              variant="contained"
-              startIcon={<Settings />}
-              onClick={() => setShowConfigDialog(true)}
-            >
-              Настройки
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Send />}
-              onClick={() => setShowMessageDialog(true)}
-            >
-              Отправить сообщение
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
-              <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                <Typography variant="h6">Пользователи</Typography>
-                <Button
-                  size="small"
-                  startIcon={<Add />}
-                  onClick={() => setShowUserDialog(true)}
-                >
-                  Добавить
-                </Button>
-              </Box>
-              
+              <Typography variant="h6" gutterBottom>
+                Статус бота
+              </Typography>
               <List>
-                {users.map((user) => (
-                  <React.Fragment key={user.id}>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Telegram />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={user.first_name + ' ' + user.last_name}
-                        secondary={
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">
-                              @{user.username} • {user.telegram_id}
-                            </Typography>
-                            <Box display="flex" gap={1} mt={1}>
-                              <Chip
-                                size="small"
-                                label={getStatusLabel(user.status)}
-                                color={getStatusColor(user.status)}
-                                variant="outlined"
-                              />
-                              <Chip
-                                size="small"
-                                label={user.language_code?.toUpperCase() || 'RU'}
-                                variant="outlined"
-                              />
-                            </Box>
-                          </Box>
-                        }
-                      />
-                      <ListItemSecondaryAction>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={user.notifications_enabled}
-                                onChange={(e) => handleToggleNotifications(user.id, e.target.checked)}
-                                size="small"
-                              />
-                            }
-                            label="Уведомления"
-                          />
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeleteUser(user.id)}
-                            color="error"
-                          >
-                            <Delete />
-                          </IconButton>
-                        </Box>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
+                <ListItem>
+                  <ListItemIcon>
+                    <Telegram color={botStatus?.bot_active ? "success" : "error"} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Бот активен"
+                    secondary={botStatus?.bot_active ? "Да" : "Нет"}
+                  />
+                  <Chip
+                    label={botStatus?.bot_active ? "Активен" : "Неактивен"}
+                    color={botStatus?.bot_active ? "success" : "error"}
+                    size="small"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Webhook настроен"
+                    secondary={botStatus?.webhook_configured ? "Да" : "Нет"}
+                  />
+                  <Chip
+                    label={botStatus?.webhook_configured ? "Настроен" : "Не настроен"}
+                    color={botStatus?.webhook_configured ? "success" : "warning"}
+                    size="small"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemIcon>
+                    <CheckCircle />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Подписчиков"
+                    secondary={botStatus?.subscribers_count || 0}
+                  />
+                </ListItem>
               </List>
             </CardContent>
           </Card>
@@ -343,98 +216,147 @@ const TelegramManager = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Последние сообщения
+                Быстрые действия
               </Typography>
-              
-              <List>
-                {messages.slice(0, 5).map((message) => (
-                  <ListItem key={message.id}>
-                    <ListItemIcon>
-                      {message.status === 'sent' ? <CheckCircle color="success" /> : <Error color="error" />}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={message.message_text}
-                      secondary={
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">
-                            {message.user_name} • {new Date(message.sent_at).toLocaleString()}
-                          </Typography>
+              <Box display="flex" flexDirection="column" gap={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  startIcon={<Settings />}
+                  sx={{ py: 1.5 }}
+                >
+                  Настроить бота
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<Send />}
+                  sx={{ py: 1.5 }}
+                >
+                  Отправить сообщение
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<Add />}
+                  onClick={() => setShowTemplateDialog(true)}
+                  sx={{ py: 1.5 }}
+                >
+                  Новый шаблон
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Шаблоны сообщений
+              </Typography>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Название</TableCell>
+                      <TableCell>Тип</TableCell>
+                      <TableCell>Статус</TableCell>
+                      <TableCell align="right">Действия</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {templates.map((template) => (
+                      <TableRow key={template.id} hover>
+                        <TableCell>{template.name}</TableCell>
+                        <TableCell>
                           <Chip
+                            label={template.message_type}
+                            color="primary"
                             size="small"
-                            label={message.message_type}
-                            variant="outlined"
                           />
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={template.is_active ? 'Активен' : 'Неактивен'}
+                            color={template.is_active ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton>
+                            <Edit />
+                          </IconButton>
+                          <IconButton>
+                            <Delete />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Диалог отправки сообщения */}
-      <Dialog
-        open={showMessageDialog}
-        onClose={() => setShowMessageDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Отправить сообщение</DialogTitle>
+      <Dialog open={showTemplateDialog} onClose={() => setShowTemplateDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Создать шаблон сообщения</DialogTitle>
         <DialogContent>
-          <TextField
-            fullWidth
-            select
-            label="Пользователь"
-            value={selectedUser?.id || ''}
-            onChange={(e) => {
-              const user = users.find(u => u.id === e.target.value);
-              setSelectedUser(user);
-            }}
-            margin="normal"
-          >
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.first_name} {user.last_name} (@{user.username})
-              </option>
-            ))}
-          </TextField>
-          
-          <TextField
-            fullWidth
-            select
-            label="Тип сообщения"
-            value={messageType}
-            onChange={(e) => setMessageType(e.target.value)}
-            margin="normal"
-          >
-            <option value="text">Текст</option>
-            <option value="notification">Уведомление</option>
-            <option value="reminder">Напоминание</option>
-          </TextField>
-          
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="Текст сообщения"
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            margin="normal"
-          />
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Название шаблона"
+                value={templateForm.name}
+                onChange={(e) => setTemplateForm({...templateForm, name: e.target.value})}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Тип сообщения</InputLabel>
+                <Select
+                  value={templateForm.message_type}
+                  onChange={(e) => setTemplateForm({...templateForm, message_type: e.target.value})}
+                  label="Тип сообщения"
+                >
+                  <MenuItem value="text">Текст</MenuItem>
+                  <MenuItem value="photo">Фото</MenuItem>
+                  <MenuItem value="document">Документ</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Содержание сообщения"
+                multiline
+                rows={6}
+                value={templateForm.content}
+                onChange={(e) => setTemplateForm({...templateForm, content: e.target.value})}
+                required
+                placeholder="Используйте переменные: {patient_name}, {appointment_date}, {doctor_name}"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={templateForm.is_active}
+                    onChange={(e) => setTemplateForm({...templateForm, is_active: e.target.checked})}
+                  />
+                }
+                label="Активный шаблон"
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowMessageDialog(false)}>
-            Отмена
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleSendMessage}
-            disabled={!selectedUser || !messageText.trim() || loading}
-          >
-            Отправить
+          <Button onClick={() => setShowTemplateDialog(false)}>Отмена</Button>
+          <Button onClick={handleCreateTemplate} variant="contained">
+            Создать
           </Button>
         </DialogActions>
       </Dialog>
