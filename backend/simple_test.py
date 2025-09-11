@@ -1,50 +1,52 @@
 #!/usr/bin/env python3
 """
-Простой тест логина
+Простой тест API
 """
 
 import requests
-import time
+import json
 
-
-def test_login():
-    """Простой тест логина"""
-    # Ждем запуска сервера
-    time.sleep(2)
-
+def test_api():
+    base_url = "http://localhost:8000"
+    
+    print("🔍 Тестирование API...")
+    
+    # 1. Проверка OpenAPI
     try:
-        print("Тестируем логин...")
-        response = requests.post(
-            'http://localhost:8000/api/v1/auth/login',
-            data={
-                'username': 'admin',
-                'password': 'admin123',
-                'grant_type': 'password',
-            },
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        )
-
-        print(f"Status: {response.status_code}")
+        response = requests.get(f"{base_url}/openapi.json", timeout=5)
         if response.status_code == 200:
-            data = response.json()
-            print("✅ Логин успешен!")
-            print(f"Token: {data.get('access_token', 'N/A')[:30]}...")
-            return True
+            print("✅ OpenAPI доступен")
         else:
-            print(f"❌ Ошибка: {response.text}")
-            return False
-
-    except requests.exceptions.ConnectionError:
-        print("❌ Сервер не доступен")
-        return False
+            print(f"❌ OpenAPI недоступен: {response.status_code}")
     except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        return False
-
+        print(f"❌ Ошибка подключения к API: {e}")
+        return
+    
+    # 2. Проверка логина
+    try:
+        data = {
+            "username": "admin",
+            "password": "admin123"
+        }
+        
+        response = requests.post(
+            f"{base_url}/api/v1/auth/login",
+            data=data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=5
+        )
+        
+        print(f"📊 Статус логина: {response.status_code}")
+        print(f"📋 Заголовки: {dict(response.headers)}")
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"✅ Логин успешен: {result.get('access_token', '')[:20]}...")
+        else:
+            print(f"❌ Ошибка логина: {response.text}")
+            
+    except Exception as e:
+        print(f"❌ Ошибка при тестировании логина: {e}")
 
 if __name__ == "__main__":
-    success = test_login()
-    if success:
-        print("\n🎉 Аутентификация работает!")
-    else:
-        print("\n❌ Проблема с аутентификацией")
+    test_api()
