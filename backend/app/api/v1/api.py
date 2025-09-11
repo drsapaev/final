@@ -46,6 +46,7 @@ from app.api.v1.endpoints import (
     telegram_webhook,
     telegram_notifications,
     email_sms_enhanced,
+    file_system,
     authentication,
     user_management,
     online_queue,
@@ -118,6 +119,7 @@ api_router.include_router(two_factor_devices.router, prefix="/2fa", tags=["two-f
 api_router.include_router(telegram_webhook.router, prefix="/telegram", tags=["telegram-webhook"])
 api_router.include_router(telegram_notifications.router, prefix="/telegram", tags=["telegram-notifications"])
 api_router.include_router(email_sms_enhanced.router, prefix="/email-sms", tags=["email-sms-enhanced"])
+api_router.include_router(file_system.router, prefix="/files", tags=["file-system"])
 api_router.include_router(schedule.router, tags=["schedule"])
 api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
 api_router.include_router(cardio.router, tags=["cardio"])
@@ -142,5 +144,5 @@ api_router.include_router(
 )
 api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(activation_ep.router, tags=["activation"])
-# api_router.include_router(authentication.router, prefix="/auth", tags=["authentication"])  # Дублирует auth.router
+api_router.include_router(authentication.router, prefix="/authentication", tags=["authentication"])
 api_router.include_router(user_management.router, prefix="/users", tags=["user-management"])

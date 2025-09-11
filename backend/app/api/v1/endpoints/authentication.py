@@ -46,9 +46,14 @@ async def login(
 ):
     """Вход в систему"""
     try:
+        print(f"DEBUG: Login endpoint called with username={request_data.username}")
+        
         ip_address, user_agent = get_client_info(request)
+        print(f"DEBUG: IP={ip_address}, UserAgent={user_agent}")
         
         service = get_authentication_service()
+        print(f"DEBUG: Service obtained: {service}")
+        
         result = service.login_user(
             db=db,
             username=request_data.username,
@@ -59,7 +64,10 @@ async def login(
             remember_me=request_data.remember_me
         )
         
+        print(f"DEBUG: login_user result: {result}")
+        
         if not result["success"]:
+            print(f"DEBUG: Authentication failed, raising HTTPException")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=result["message"]

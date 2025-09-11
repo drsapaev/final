@@ -27,7 +27,7 @@ def _get_db_url_from_env_or_settings() -> str:
         return env_url
 
     # 3) fallback
-    return "sqlite:///./data.db"
+    return "sqlite:///./clinic.db"
 
 
 def _normalize_sqlite_to_sync(url: str) -> str:
