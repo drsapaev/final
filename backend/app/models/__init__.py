@@ -38,6 +38,7 @@ from .file_system import (
     File, FileVersion, FileShare, FileFolder, FileAccessLog, 
     FileStorage, FileQuota, FileType, FileStatus, FilePermission
 )
+from .telegram_config import TelegramConfig, TelegramTemplate, TelegramUser, TelegramMessage
 
 # Make sure all models are available
 __all__ = [
@@ -109,4 +110,8 @@ __all__ = [
     "DailyQueue",
     "QueueEntry", 
     "QueueToken",
+    "TelegramConfig",
+    "TelegramTemplate",
+    "TelegramUser", 
+    "TelegramMessage",
 ]

@@ -28,6 +28,7 @@ from app.services.mobile_notifications import get_mobile_notification_service
 from app.crud import user as crud_user
 from app.crud import appointment as crud_appointment
 from app.crud import patient as crud_patient
+from app.crud.patient import get_patient_by_user_id
 from app.crud import lab as crud_lab
 from app.crud import payment as crud_payment
 
@@ -137,7 +138,7 @@ async def get_mobile_patient_profile(
     """Профиль пациента для мобильного приложения"""
     try:
         # Получаем профиль пациента
-        patient = crud_patient.get_patient_by_user_id(db, user_id=current_user.id)
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
         
         if not patient:
             raise HTTPException(
@@ -189,7 +190,7 @@ async def get_upcoming_appointments(
 ):
     """Предстоящие записи пациента"""
     try:
-        patient = crud_patient.get_patient_by_user_id(db, user_id=current_user.id)
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
         
         if not patient:
             raise HTTPException(
@@ -233,7 +234,7 @@ async def get_appointment_detail(
 ):
     """Детальная информация о записи"""
     try:
-        patient = crud_patient.get_patient_by_user_id(db, user_id=current_user.id)
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
         
         if not patient:
             raise HTTPException(
@@ -292,7 +293,7 @@ async def book_mobile_appointment(
 ):
     """Запись к врачу через мобильное приложение"""
     try:
-        patient = crud_patient.get_patient_by_user_id(db, user_id=current_user.id)
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
         
         if not patient:
             raise HTTPException(
@@ -354,7 +355,7 @@ async def get_lab_results(
 ):
     """Результаты анализов пациента"""
     try:
-        patient = crud_patient.get_patient_by_user_id(db, user_id=current_user.id)
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
         
         if not patient:
             raise HTTPException(
@@ -396,7 +397,7 @@ async def get_mobile_quick_stats(
 ):
     """Быстрая статистика для мобильного приложения"""
     try:
-        patient = crud_patient.get_patient_by_user_id(db, user_id=current_user.id)
+        patient = get_patient_by_user_id(db, user_id=current_user.id)
         
         if not patient:
             raise HTTPException(
@@ -405,33 +406,17 @@ async def get_mobile_quick_stats(
             )
         
         # Получаем статистику
-        total_appointments = crud_appointment.count_patient_visits(
-            db, patient_id=patient.id
-        )
+        from app.crud.appointment import count_patient_visits, count_upcoming_appointments, get_last_visit
+        from app.crud.payment import get_patient_total_spent, count_pending_payments
         
-        upcoming_appointments = crud_appointment.count_upcoming_appointments(
-            db, patient_id=patient.id
-        )
+        total_appointments = count_patient_visits(db, patient_id=patient.id)
+        upcoming_appointments = count_upcoming_appointments(db, patient_id=patient.id)
+        completed_appointments = total_appointments - upcoming_appointments  # Вычисляем как разность
         
-        completed_appointments = crud_appointment.count_completed_appointments(
-            db, patient_id=patient.id
-        )
-        
-        total_spent = crud_payment.get_patient_total_spent(
-            db, patient_id=patient.id
-        )
-        
-        last_visit = crud_appointment.get_last_visit(
-            db, patient_id=patient.id
-        )
-        
-        favorite_doctor = crud_appointment.get_favorite_doctor(
-            db, patient_id=patient.id
-        )
-        
-        pending_payments = crud_payment.count_pending_payments(
-            db, patient_id=patient.id
-        )
+        total_spent = get_patient_total_spent(db, patient_id=patient.id)
+        last_visit = get_last_visit(db, patient_id=patient.id)
+        favorite_doctor = None  # Пока не реализовано
+        pending_payments = count_pending_payments(db, patient_id=patient.id)
         
         return MobileQuickStats(
             total_appointments=total_appointments,

@@ -110,7 +110,7 @@ class FileSystemService:
         """Проверить квоту пользователя"""
         return file_quota.check_quota(db, user_id=user_id, additional_size=file_size, additional_files=1)
     
-    async def upload_file(
+    def upload_file(
         self, 
         db: Session, 
         upload_file: UploadFile, 
@@ -120,7 +120,7 @@ class FileSystemService:
         """Загрузить файл"""
         try:
             # Читаем содержимое файла
-            file_content = await upload_file.read()
+            file_content = upload_file.file.read()
             file_size = len(file_content)
             
             # Проверяем размер файла
