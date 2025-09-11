@@ -11,7 +11,7 @@ def get_auth_token():
     """Получаем JWT токен для аутентификации"""
     try:
         data = urllib.parse.urlencode(
-            {"username": "admin", "password": "admin"}
+            {"username": "admin", "password": "admin123"}
         ).encode()
         req = urllib.request.Request(
             "http://127.0.0.1:8000/api/v1/login",

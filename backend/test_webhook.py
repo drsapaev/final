@@ -93,7 +93,7 @@ def test_providers_list():
 
     # Сначала получаем токен
     login_url = f"{BASE_URL}/api/v1/auth/login"
-    login_data = {"username": "admin", "password": "admin"}
+    login_data = {"username": "admin", "password": "admin123"}
 
     try:
         # Подготавливаем данные логина
