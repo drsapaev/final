@@ -1,0 +1,1 @@
+Programma Clinic: Напоминание о записи к {{ doctor_name }} на {{ appointment_date }} в {{ appointment_time }}. Кабинет: {{ cabinet }}. Приходите за 10 мин. до приема. Тел: {{ clinic_phone }}

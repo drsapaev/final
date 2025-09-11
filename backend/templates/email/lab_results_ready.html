@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты анализов готовы - Programma Clinic</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .results-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .results-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+        .info-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            color: #28a745;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+            margin-right: 5px;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .download-section {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .download-section h3 {
+            margin: 0 0 15px 0;
+            color: #0066cc;
+            font-size: 18px;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #28a745;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 10px;
+        }
+        .cta-button:hover {
+            background-color: #218838;
+        }
+        .cta-button.secondary {
+            background-color: #6c757d;
+        }
+        .cta-button.secondary:hover {
+            background-color: #5a6268;
+        }
+        .abnormal-results {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .abnormal-results h3 {
+            margin: 0 0 10px 0;
+            color: #721c24;
+            font-size: 16px;
+        }
+        .abnormal-results p {
+            margin: 0;
+            color: #721c24;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .footer p {
+            margin: 5px 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #28a745;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 600px) {
+            .results-info {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Programma Clinic</h1>
+            <p>Результаты анализов готовы</p>
+        </div>
+        
+        <div class="content">
+            <h2>Здравствуйте, {{ patient_name }}!</h2>
+            
+            <p>Ваши результаты анализов готовы и доступны для просмотра:</p>
+            
+            <div class="results-card">
+                <div class="results-info">
+                    <div class="info-item">
+                        <span class="info-icon">🧪</span>
+                        <span class="info-label">Тип анализа:</span>
+                        <span class="info-value">{{ test_type }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">📅</span>
+                        <span class="info-label">Дата сдачи:</span>
+                        <span class="info-value">{{ collection_date }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">✅</span>
+                        <span class="info-label">Готовность:</span>
+                        <span class="info-value">{{ ready_date }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-icon">📊</span>
+                        <span class="info-label">Статус:</span>
+                        <span class="info-value">Готово</span>
+                    </div>
+                </div>
+            </div>
+            
+            {% if has_abnormalities %}
+            <div class="abnormal-results">
+                <h3>⚠️ Внимание!</h3>
+                <p>В результатах анализов обнаружены отклонения от нормы. Рекомендуем обратиться к врачу для консультации.</p>
+            </div>
+            {% endif %}
+            
+            <div class="download-section">
+                <h3>📥 Скачать результаты</h3>
+                <p>Вы можете скачать результаты анализов в удобном формате:</p>
+                <a href="{{ download_link }}" class="cta-button">📄 Скачать PDF</a>
+                <a href="tel:{{ clinic_phone }}" class="cta-button secondary">📞 Связаться с врачом</a>
+            </div>
+            
+            <p><strong>Важно:</strong> Результаты анализов носят информационный характер. Для правильной интерпретации результатов и назначения лечения обратитесь к врачу.</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Programma Clinic</strong></p>
+            <p>{{ clinic_address }}</p>
+            <p>Телефон: <a href="tel:{{ clinic_phone }}">{{ clinic_phone }}</a></p>
+            <p>Email: <a href="mailto:info@programma-clinic.uz">info@programma-clinic.uz</a></p>
+            <p style="margin-top: 20px; font-size: 12px; color: #adb5bd;">
+                Это автоматическое сообщение. Пожалуйста, не отвечайте на это письмо.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
