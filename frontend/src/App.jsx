@@ -39,7 +39,7 @@ import SimpleDashboard from './components/SimpleDashboard.jsx';
 import SimpleUserManagement from './components/SimpleUserManagement.jsx';
 import SimpleEMR from './components/SimpleEMR.jsx';
 import SimpleFileManager from './components/SimpleFileManager.jsx';
-// import LoginForm from './components/LoginForm.jsx'; // ВРЕМЕННО ОТКЛЮЧЕН - Material-UI конфликт
+import LoginFormStyled from './components/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
 // import NewDashboard from './components/Dashboard';
 // import UserManagement from './components/UserManagement';
 // import EMRInterface from './components/EMRInterface';
@@ -108,6 +108,7 @@ export default function App() {
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/new-login" element={<LoginFormStyled />} />
       <Route path="/" element={<Landing />} />
       <Route path="/medilab-demo" element={<MediLabDemo />} />
       <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
@@ -160,7 +161,6 @@ export default function App() {
           <Route path="simple-users"   element={<SimpleUserManagement />} />
           <Route path="simple-emr"     element={<SimpleEMR />} />
           <Route path="simple-files"   element={<SimpleFileManager />} />
-          {/* <Route path="new-login"      element={<LoginForm />} /> ВРЕМЕННО ОТКЛЮЧЕН */}
           {/* <Route path="new-dashboard" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><NewDashboard /></RequireAuth>} />
           <Route path="new-login"     element={<LoginForm />} />
           <Route path="new-dashboard" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><NewDashboard /></RequireAuth>} />
