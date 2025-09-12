@@ -40,6 +40,7 @@ import SimpleUserManagement from './components/SimpleUserManagement.jsx';
 import SimpleEMR from './components/SimpleEMR.jsx';
 import SimpleFileManager from './components/SimpleFileManager.jsx';
 import LoginFormStyled from './components/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
+import NewComponentsNav from './components/NewComponentsNav.jsx'; // Навигация по новым компонентам
 // import NewDashboard from './components/Dashboard';
 // import UserManagement from './components/UserManagement';
 // import EMRInterface from './components/EMRInterface';
@@ -109,6 +110,7 @@ export default function App() {
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/new-login" element={<LoginFormStyled />} />
+      <Route path="/components" element={<NewComponentsNav />} />
       <Route path="/" element={<Landing />} />
       <Route path="/medilab-demo" element={<MediLabDemo />} />
       <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
