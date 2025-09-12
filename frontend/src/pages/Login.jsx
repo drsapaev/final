@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getApiBase, api } from '../api/client';
-import { setToken, setProfile } from '../stores/auth';
+import { login, me, setToken } from '../api/client';
+import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
 import { useTheme } from '../contexts/ThemeContext';
+import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
 
 /**
  * Логин по OAuth2 Password (FastAPI):
@@ -11,16 +12,7 @@ import { useTheme } from '../contexts/ThemeContext';
  *   username, password, grant_type=password, scope, client_id, client_secret
  */
 export default function Login() {
-  const roleOptions = [
-    { key: 'admin', label: 'Администратор', username: 'admin', route: '/admin' },
-    { key: 'registrar', label: 'Регистратура', username: 'registrar', route: '/registrar-panel' },
-    { key: 'lab', label: 'Лаборатория', username: 'lab', route: '/lab-panel' },
-    { key: 'doctor', label: 'Врач', username: 'doctor', route: '/doctor-panel' },
-    { key: 'cashier', label: 'Касса', username: 'cashier', route: '/cashier-panel' },
-    { key: 'cardio', label: 'Кардиолог', username: 'cardio', route: '/cardiologist' },
-    { key: 'derma', label: 'Дерматолог', username: 'derma', route: '/dermatologist' },
-    { key: 'dentist', label: 'Стоматолог', username: 'dentist', route: '/dentist' },
-  ];
+  const roleOptions = ROLE_OPTIONS;
 
   const [selectedRoleKey, setSelectedRoleKey] = useState('admin');
   const [username, setUsername] = useState('admin');
@@ -96,24 +88,20 @@ export default function Login() {
 
   async function performLogin(u, p) {
     try {
-        const response = await fetch('http://localhost:8000/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ username: u, password: p }).toString(),
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-      const data = await response.json();
+      // Используем централизованный API клиент
+      const data = await login(u, p);
       const token = data?.access_token;
       if (!token) throw new Error('В ответе не найден access_token');
+      
+      // Устанавливаем токен (interceptor автоматически добавит его в заголовки)
       setToken(token);
+      
       try {
-        const meRes = await fetch('http://localhost:8000/api/v1/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-        if (meRes.ok) setProfile(await meRes.json()); else setProfile(null);
-      } catch {
-        // Игнорируем ошибки получения профиля
+        // Получаем профиль пользователя
+        const profile = await me();
+        setProfile(profile);
+      } catch (profileError) {
+        console.warn('Не удалось получить профиль:', profileError);
         setProfile(null);
       }
     } catch (error) {
@@ -127,62 +115,14 @@ export default function Login() {
       const token = localStorage.getItem('auth_token');
       if (!token) return defaultPath;
       
-      // ВАЖНО: Получаем роль из актуального профиля после логина
-      // Не полагаемся на кэшированный профиль, который может быть устаревшим
       const state = auth.getState ? auth.getState() : { profile: null };
-      const role = String(state?.profile?.role || '').toLowerCase();
-      
-      // Логируем для отладки
-      console.log('pickRouteForRoleCached: role =', role, 'profile =', state?.profile);
-      
-      if (role === 'admin') return '/admin';
-      if (role === 'registrar') return '/registrar-panel';
-      if (role === 'lab') return '/lab-panel';
-      if (role === 'doctor') return '/doctor-panel';
-      if (role === 'cashier') return '/cashier-panel';
-      if (role === 'cardio') return '/cardiologist';
-      if (role === 'derma') return '/dermatologist';
-      if (role === 'dentist') return '/dentist';
-      return '/search';
+      return getRouteForProfile(state?.profile) || defaultPath;
     } catch (error) {
       console.error('pickRouteForRoleCached error:', error);
       return defaultPath;
     }
   }
 
-  function roleToRoute(roleLower) {
-    switch (roleLower) {
-      case 'admin': return '/admin';
-      case 'registrar': return '/registrar-panel';
-      case 'lab': return '/lab-panel';
-      case 'doctor': return '/doctor-panel';
-      case 'cashier': return '/cashier-panel';
-      case 'cardio': return '/cardiologist';
-      case 'derma': return '/dermatologist';
-      case 'dentist': return '/dentist';
-      default: return '/search';
-    }
-  }
-
-  function resolveRouteFromProfile(profile) {
-    if (!profile) return '/search';
-    const rolesArr = Array.isArray(profile.roles) ? profile.roles.map(r => String(r).toLowerCase()) : [];
-    const roleLower = String(profile.role || profile.role_name || '').toLowerCase();
-    
-    console.log('Profile data:', { profile, rolesArr, roleLower });
-    
-    if (rolesArr.includes('admin') || roleLower === 'admin') return '/admin';
-    if (roleLower) {
-      const route = roleToRoute(roleLower);
-      console.log('Route for role:', roleLower, '->', route);
-      return route;
-    }
-    for (const r of rolesArr) {
-      const route = roleToRoute(r);
-      if (route && route !== '/search') return route;
-    }
-    return '/search';
-  }
 
   function isProtectedPanelPath(pathname) {
     const prefixes = [
@@ -205,7 +145,7 @@ export default function Login() {
 
       const state = auth.getState ? auth.getState() : { profile: null };
       const profile = state?.profile || null;
-      const computedRoute = resolveRouteFromProfile(profile);
+      const computedRoute = getRouteForProfile(profile);
       const fromClean = from || '/';
 
       // Если from ведёт на другой защищённый раздел панели — игнорируем его
@@ -222,7 +162,9 @@ export default function Login() {
       console.log('Login redirect:', { from: fromClean, computedRoute, target, profile });
       navigate(target, { replace: true });
     } catch (e2) {
-      setErr(e2?.message || 'Ошибка входа');
+      // Используем нормализованное сообщение об ошибке
+      const errorMessage = e2?.normalizedMessage || e2?.message || 'Ошибка входа';
+      setErr(errorMessage);
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { ThemeProvider } from './contexts/ThemeContext.jsx';
+import { AppProviders } from './providers/AppProviders';
 import PWAInstallPrompt from './components/mobile/PWAInstallPrompt.jsx';
 import OfflineIndicator from './components/mobile/OfflineIndicator.jsx';
 import { usePWA } from './hooks/usePWA.js';
@@ -104,7 +104,7 @@ export default function App() {
   const { shouldShowInstallPrompt } = usePWA();
 
   return (
-    <ThemeProvider>
+    <AppProviders>
       <OfflineIndicator />
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
@@ -177,7 +177,7 @@ export default function App() {
         </Route>
       </Route>
     </Routes>
-    </ThemeProvider>
+    </AppProviders>
   );
 }
 

@@ -17,7 +17,7 @@
 //
 // Keep changes minimal and additive — don't remove existing exported names.
 
-import * as client from '../api/client.js';
+import { me, setToken as setClientToken } from '../api/client.js';
 
 const TOKEN_KEY = 'auth_token';
 const PROFILE_KEY = 'auth_profile';
@@ -94,21 +94,13 @@ export function setToken(token) {
     console.warn('setToken localStorage failed:', e);
   }
 
-  // If client provides a function to set auth token (name may vary), call it.
+  // Синхронизируем токен с API клиентом
   try {
-    if (typeof client.setAuthToken === 'function') {
-      client.setAuthToken(token);
-    } else if (typeof client.setToken === 'function') {
-      // older name
-      client.setToken(token);
-    } else if (typeof client.setAxiosAuthToken === 'function') {
-      // some variants
-      client.setAxiosAuthToken(token);
-    } else if (typeof client.setBearerToken === 'function') {
-      client.setBearerToken(token);
+    if (typeof setClientToken === 'function') {
+      setClientToken(token);
     }
   } catch (e) {
-    console.warn('client.setAuthToken call failed:', e);
+    console.warn('client.setToken call failed:', e);
   }
 
   // notify subscribers
@@ -132,22 +124,10 @@ export async function getProfile(force = false) {
   const stored = getProfileFromStorage();
   if (!force && stored) return stored;
 
-  // try several possible client-side exported helpers
+  // Используем централизованный API клиент
   try {
-    if (typeof client.me === 'function') {
-      const res = await client.me();
-      if (res) {
-        setProfile(res);
-        return res;
-      }
-    } else if (typeof client.getProfile === 'function') {
-      const res = await client.getProfile();
-      if (res) {
-        setProfile(res);
-        return res;
-      }
-    } else if (typeof client.api === 'object' && typeof client.api.me === 'function') {
-      const res = await client.api.me();
+    if (typeof me === 'function') {
+      const res = await me();
       if (res) {
         setProfile(res);
         return res;
