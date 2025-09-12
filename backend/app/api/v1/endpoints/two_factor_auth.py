@@ -108,7 +108,7 @@ async def verify_totp_setup(
                 success=True,
                 message="TOTP setup verified successfully"
             )
-    else:
+        else:
             return TwoFactorVerifyResponse(
                 success=False,
                 message="Invalid TOTP code"
@@ -202,9 +202,9 @@ async def disable_two_factor_auth(
             password=request_data.password,
             totp_code=request_data.totp_code,
             backup_code=request_data.backup_code
-    )
+        )
 
-    if success:
+        if success:
             return TwoFactorSuccessResponse(
                 success=True,
                 message="2FA disabled successfully"
