@@ -11,7 +11,7 @@ import statistics
 from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.payment import Payment
-from app.models.queue import QueueTicket
+# from app.models.queue import QueueTicket  # Временно отключено
 from app.models.user import User
 from app.models.emr import EMR
 
@@ -67,14 +67,15 @@ class AdvancedAnalyticsService:
             # Средний чек
             avg_revenue_per_visit = total_revenue / completed_appointments if completed_appointments > 0 else 0
             
-            # Время ожидания в очереди (среднее)
-            queue_wait_times = db.query(QueueTicket).filter(
-                and_(
-                    QueueTicket.created_at >= start_date,
-                    QueueTicket.created_at <= end_date,
-                    QueueTicket.served_at.isnot(None)
-                )
-            ).all()
+            # Время ожидания в очереди (среднее) - ВРЕМЕННО ОТКЛЮЧЕНО
+            # queue_wait_times = db.query(QueueTicket).filter(
+            #     and_(
+            #         QueueTicket.created_at >= start_date,
+            #         QueueTicket.created_at <= end_date,
+            #         QueueTicket.served_at.isnot(None)
+            #     )
+            # ).all()
+            queue_wait_times = []  # Временная заглушка
             
             avg_wait_time = 0
             if queue_wait_times:

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.services.display_websocket import get_display_manager, DisplayWebSocketManager
-from app.models.online_queue import QueueEntry
+from app.models.online_queue import OnlineQueueEntry
 from app.crud import display_config as crud_display
 
 router = APIRouter()
@@ -81,7 +81,7 @@ async def call_patient_to_board(
             )
 
         # Получаем запись в очереди
-        queue_entry = db.query(QueueEntry).filter(QueueEntry.id == entry_id).first()
+        queue_entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         
         if not queue_entry:
             raise HTTPException(
@@ -277,10 +277,10 @@ async def quick_call_next_patient(
             )
 
         # Находим следующего пациента в статусе "waiting"
-        next_entry = db.query(QueueEntry).filter(
-            QueueEntry.queue_id == daily_queue.id,
-            QueueEntry.status == "waiting"
-        ).order_by(QueueEntry.number).first()
+        next_entry = db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id == daily_queue.id,
+            OnlineQueueEntry.status == "waiting"
+        ).order_by(OnlineQueueEntry.number).first()
         
         if not next_entry:
             return {

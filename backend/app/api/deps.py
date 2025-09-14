@@ -86,7 +86,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def _username_from_token(token: str) -> Optional[str]:
     """
-    Decode JWT and extract 'sub' (username) claim. Returns None if invalid.
+    Decode JWT and extract username claim. Returns None if invalid.
+    Tries 'username' field first, then falls back to 'sub' if it's a string.
     """
     try:
         payload = jwt.decode(
@@ -94,9 +95,17 @@ def _username_from_token(token: str) -> Optional[str]:
             settings.SECRET_KEY,
             algorithms=[getattr(settings, "ALGORITHM", "HS256")],
         )
+        
+        # Сначала пробуем поле 'username'
+        username = payload.get("username")
+        if isinstance(username, str):
+            return username
+            
+        # Fallback на 'sub' если это строка (не ID)
         sub = payload.get("sub")
-        if isinstance(sub, str):
+        if isinstance(sub, str) and not sub.isdigit():
             return sub
+            
         return None
     except JWTError:
         return None

@@ -11,7 +11,7 @@ from sqlalchemy import and_
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, QueueEntry
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
 
@@ -79,9 +79,9 @@ def get_doctor_queue_today(
             }
         
         # Получаем записи очереди
-        entries = db.query(QueueEntry).filter(
-            QueueEntry.queue_id == daily_queue.id
-        ).order_by(QueueEntry.number).all()
+        entries = db.query(OnlineQueueEntry).filter(
+            OnlineQueueEntry.queue_id == daily_queue.id
+        ).order_by(OnlineQueueEntry.number).all()
         
         # Формируем данные для врача
         queue_entries = []
@@ -159,7 +159,7 @@ def call_patient(
     """
     try:
         # Получаем запись в очереди
-        queue_entry = db.query(QueueEntry).filter(QueueEntry.id == entry_id).first()
+        queue_entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         
         if not queue_entry:
             raise HTTPException(
@@ -237,7 +237,7 @@ def start_patient_visit(
     Начать прием пациента (статус в процессе)
     """
     try:
-        queue_entry = db.query(QueueEntry).filter(QueueEntry.id == entry_id).first()
+        queue_entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         
         if not queue_entry:
             raise HTTPException(
@@ -281,7 +281,7 @@ def complete_patient_visit(
     Из passport.md стр. 1425: POST /api/visits/:id/complete
     """
     try:
-        queue_entry = db.query(QueueEntry).filter(QueueEntry.id == entry_id).first()
+        queue_entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
         
         if not queue_entry:
             raise HTTPException(
@@ -544,7 +544,7 @@ def get_doctor_stats(
         online_patients = 0
         
         for queue in daily_queues:
-            entries = db.query(QueueEntry).filter(QueueEntry.queue_id == queue.id).all()
+            entries = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == queue.id).all()
             total_patients += len(entries)
             served_patients += len([e for e in entries if e.status == "served"])
             online_patients += len([e for e in entries if e.source == "online"])
@@ -571,9 +571,9 @@ def get_doctor_stats(
                 {
                     "date": queue.day.isoformat(),
                     "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
-                    "total_entries": db.query(QueueEntry).filter(QueueEntry.queue_id == queue.id).count(),
-                    "served_entries": db.query(QueueEntry).filter(
-                        and_(QueueEntry.queue_id == queue.id, QueueEntry.status == "served")
+                    "total_entries": db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == queue.id).count(),
+                    "served_entries": db.query(OnlineQueueEntry).filter(
+                        and_(OnlineQueueEntry.queue_id == queue.id, OnlineQueueEntry.status == "served")
                     ).count()
                 }
                 for queue in daily_queues

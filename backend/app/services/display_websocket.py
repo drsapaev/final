@@ -11,7 +11,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.models.display_config import DisplayBoard
-from app.models.online_queue import QueueEntry, DailyQueue
+from app.models.online_queue import OnlineQueueEntry, DailyQueue
 from app.crud import display_config as crud_display
 from app.db.session import SessionLocal
 
@@ -94,7 +94,7 @@ class DisplayWebSocketManager:
 
     async def broadcast_patient_call(
         self, 
-        queue_entry: QueueEntry,
+        queue_entry: OnlineQueueEntry,
         doctor_name: str,
         cabinet: str = None,
         board_ids: List[str] = None
@@ -140,9 +140,9 @@ class DisplayWebSocketManager:
             db = SessionLocal()
             
             # Получаем текущую очередь
-            queue_entries = db.query(QueueEntry).filter(
-                QueueEntry.queue_id == daily_queue.id
-            ).order_by(QueueEntry.number).all()
+            queue_entries = db.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.queue_id == daily_queue.id
+            ).order_by(OnlineQueueEntry.number).all()
 
             # Формируем данные очереди
             queue_data = []
@@ -221,27 +221,74 @@ class DisplayWebSocketManager:
     async def _send_current_state(self, websocket: WebSocket, board_id: str) -> None:
         """Отправка текущего состояния табло новому подключению"""
         try:
-            if board_id in self.board_states:
+            # Получаем актуальные данные из базы
+            db = SessionLocal()
+            try:
+                from datetime import date
+                today = date.today()
+                
+                # Получаем активные очереди на сегодня
+                queues = db.query(DailyQueue).filter(
+                    DailyQueue.day == today,
+                    DailyQueue.active == True
+                ).all()
+                
+                queue_entries = []
+                for queue in queues:
+                    entries = db.query(OnlineQueueEntry).filter(
+                        OnlineQueueEntry.queue_id == queue.id,
+                        OnlineQueueEntry.status.in_(["waiting", "called"])
+                    ).order_by(OnlineQueueEntry.number).all()
+                    
+                    for entry in entries:
+                        queue_entries.append({
+                            "id": entry.id,
+                            "number": entry.number,
+                            "patient_name": self._format_patient_name(entry.patient_name or "Пациент"),
+                            "status": entry.status,
+                            "specialist_id": queue.specialist_id,
+                            "specialist_name": queue.specialist.full_name if queue.specialist else f"Врач #{queue.specialist_id}",
+                            "created_at": entry.created_at.isoformat() if entry.created_at else None,
+                            "called_at": entry.called_at.isoformat() if entry.called_at else None
+                        })
+                
                 current_state = {
                     "type": "initial_state",
-                    "data": self.board_states[board_id]
+                    "data": {
+                        "queue_entries": queue_entries,
+                        "current_call": self.board_states.get(board_id, {}).get("current_call"),
+                        "announcements": self.board_states.get(board_id, {}).get("announcements", []),
+                        "last_update": datetime.utcnow().isoformat(),
+                        "board_id": board_id,
+                        "total_entries": len(queue_entries),
+                        "waiting_entries": len([e for e in queue_entries if e["status"] == "waiting"])
+                    }
                 }
+                
                 await websocket.send_text(json.dumps(current_state, ensure_ascii=False))
-            else:
-                # Отправляем пустое состояние
+                logger.info(f"Отправлено актуальное состояние для табло {board_id}: {len(queue_entries)} записей")
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Ошибка отправки текущего состояния: {e}")
+            # Отправляем пустое состояние в случае ошибки
+            try:
                 empty_state = {
                     "type": "initial_state",
                     "data": {
                         "queue_entries": [],
                         "current_call": None,
                         "announcements": [],
-                        "last_update": datetime.utcnow().isoformat()
+                        "last_update": datetime.utcnow().isoformat(),
+                        "board_id": board_id,
+                        "error": "Ошибка загрузки данных"
                     }
                 }
                 await websocket.send_text(json.dumps(empty_state, ensure_ascii=False))
-                
-        except Exception as e:
-            logger.error(f"Ошибка отправки текущего состояния: {e}")
+            except:
+                pass
 
     def _format_patient_name(self, full_name: str, format_type: str = "initials") -> str:
         """Форматирование имени пациента для табло"""
@@ -278,6 +325,66 @@ class DisplayWebSocketManager:
                 "active": len(connections) > 0
             }
         return status
+
+    async def broadcast_patient_call(self, queue_entry, doctor_name: str, cabinet: Optional[str] = None, board_ids: Optional[List[str]] = None) -> None:
+        """Трансляция вызова пациента на табло"""
+        try:
+            message = {
+                "type": "patient_call",
+                "data": {
+                    "queue_entry_id": queue_entry.id,
+                    "number": queue_entry.number,
+                    "patient_name": queue_entry.patient_name,
+                    "doctor_name": doctor_name,
+                    "cabinet": cabinet,
+                    "called_at": queue_entry.called_at.isoformat() if queue_entry.called_at else None,
+                    "specialist_id": queue_entry.queue.specialist_id,
+                    "department": f"specialist_{queue_entry.queue.specialist_id}"
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            # Если указаны конкретные табло
+            if board_ids:
+                for board_id in board_ids:
+                    await self.broadcast_to_board(board_id, message)
+            else:
+                # Отправляем на все табло
+                for board_id in self.connections.keys():
+                    await self.broadcast_to_board(board_id, message)
+                    
+            logger.info(f"Трансляция вызова пациента №{queue_entry.number} на табло")
+            
+        except Exception as e:
+            logger.error(f"Ошибка трансляции вызова пациента: {e}")
+
+    async def broadcast_queue_update(self, queue_entry, event_type: str) -> None:
+        """Трансляция обновления очереди"""
+        try:
+            message = {
+                "type": "queue_update",
+                "event_type": event_type,
+                "data": {
+                    "queue_entry_id": queue_entry.id,
+                    "number": queue_entry.number,
+                    "patient_name": queue_entry.patient_name,
+                    "status": queue_entry.status,
+                    "created_at": queue_entry.created_at.isoformat() if queue_entry.created_at else None,
+                    "specialist_id": queue_entry.queue.specialist_id,
+                    "department": f"specialist_{queue_entry.queue.specialist_id}",
+                    "queue_id": queue_entry.queue.id
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+            # Отправляем на все табло
+            for board_id in self.connections.keys():
+                await self.broadcast_to_board(board_id, message)
+                
+            logger.info(f"Трансляция обновления очереди: {event_type} для пациента №{queue_entry.number}")
+            
+        except Exception as e:
+            logger.error(f"Ошибка трансляции обновления очереди: {e}")
 
 # Глобальный менеджер WebSocket
 display_manager = DisplayWebSocketManager()

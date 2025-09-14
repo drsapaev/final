@@ -5,10 +5,10 @@ import AppointmentsTable from '../components/AppointmentsTable';
 import ServiceChecklist from '../components/ServiceChecklist';
 import IntegratedServiceSelector from '../components/registrar/IntegratedServiceSelector';
 import IntegratedDoctorSelector from '../components/registrar/IntegratedDoctorSelector';
-import OnlineQueueManager from '../components/registrar/OnlineQueueManager';
+import OnlineQueueManager from '../components/queue/OnlineQueueManager';
 import AppointmentFlow from '../components/AppointmentFlow';
 import ResponsiveTable from '../components/ResponsiveTable';
-import ResponsiveNavigation from '../components/ResponsiveNavigation';
+import ResponsiveNavigation from '../components/layout/ResponsiveNavigation';
 import { Button, Card, Badge, Skeleton, AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
 import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
@@ -183,6 +183,7 @@ const RegistrarPanel = () => {
       tabs_dental: 'Стоматолог',
       tabs_lab: 'Лаборатория',
       tabs_procedures: 'Процедуры',
+      tabs_queue: 'Онлайн-очередь',
       
       // Действия
       new_appointment: 'Новая запись',
@@ -644,6 +645,7 @@ const RegistrarPanel = () => {
         else if (e.key === '2') setActiveTab('appointments');
         else if (e.key === '3') setActiveTab('cardio');
         else if (e.key === '4') setActiveTab('derma');
+        else if (e.key === '5') setActiveTab('queue');
         else if (e.key === 'a') {
           e.preventDefault();
           setAppointmentsSelected(new Set(appointments.map(a => a.id)));
@@ -766,6 +768,14 @@ const RegistrarPanel = () => {
         >
             <TestTube size={16} style={{ marginRight: '8px' }} />
           {t('tabs_lab')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('lab')).length})
+        </button>
+        <button
+          style={activeTab === 'queue' ? activeTabStyle : tabStyle}
+          onClick={() => setActiveTab('queue')}
+          aria-selected={activeTab === 'queue'}
+        >
+            <MessageCircle size={16} style={{ marginRight: '8px' }} />
+          {t('tabs_queue')}
         </button>
         <button
           style={activeTab === 'procedures' ? activeTabStyle : tabStyle}
@@ -1009,8 +1019,40 @@ const RegistrarPanel = () => {
           </AnimatedTransition>
         )}
 
+        {/* Вкладка онлайн-очереди */}
+        {activeTab === 'queue' && (
+          <AnimatedTransition type="fade" delay={100}>
+            <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
+              <Card.Header>
+                <AnimatedTransition type="slide" direction="up" delay={200}>
+                  <h1 style={{ 
+                    margin: 0, 
+                    fontSize: getFontSize('3xl'), 
+                    fontWeight: '400', 
+                    lineHeight: '1.25',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px' 
+                  }}>
+                    📱 Онлайн-очередь
+                  </h1>
+                </AnimatedTransition>
+                <AnimatedTransition type="fade" delay={400}>
+                  <div style={{ fontSize: getFontSize('lg'), opacity: 0.9, lineHeight: '1.5' }}>
+                    Управление онлайн-записью и QR кодами для очереди
+                  </div>
+                </AnimatedTransition>
+              </Card.Header>
+            
+              <Card.Content>
+                <OnlineQueueManager />
+              </Card.Content>
+            </Card>
+          </AnimatedTransition>
+        )}
+
         {/* Основная панель с записями */}
-        {activeTab !== 'welcome' && (
+        {activeTab !== 'welcome' && activeTab !== 'queue' && (
           <div style={{
             ...tableContainerStyle, 
             // избегаем конфликта marginTop + margin (шорткат)

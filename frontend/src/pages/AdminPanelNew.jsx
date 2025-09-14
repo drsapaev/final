@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 
 // Новые унифицированные компоненты
-import UnifiedLayout from '../components/UnifiedLayout';
+import UnifiedLayout from '../components/layout/UnifiedLayout';
 import { MedicalCard, MetricCard, MedicalTable } from '../components/medical';
 import { useTheme } from '../contexts/ThemeContext';
 

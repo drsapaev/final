@@ -13,7 +13,7 @@ from app.models.user import User
 from app.models.patient import Patient
 from app.models.clinic import Doctor, ServiceCategory, ClinicSettings
 from app.models.service import Service
-from app.models.online_queue import DailyQueue, QueueEntry, QueueToken
+from app.models.online_queue import DailyQueue, OnlineOnlineQueueEntry, QueueToken
 from app.core.auth import create_access_token
 
 client = TestClient(app)

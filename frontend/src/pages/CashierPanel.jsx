@@ -3,6 +3,16 @@ import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, D
 import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint } from '../design-system/hooks';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
+import PaymentWidget from '../components/payment/PaymentWidget';
+import { 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions,
+  Typography,
+  Box,
+  Alert
+} from '@mui/material';
 
 const CashierPanel = () => {
   const { isMobile } = useBreakpoint();
@@ -13,6 +23,9 @@ const CashierPanel = () => {
   const [appointments, setAppointments] = useState([]);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentWidget, setShowPaymentWidget] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(null);
+  const [paymentError, setPaymentError] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -67,6 +80,47 @@ const CashierPanel = () => {
   }, []);
 
   const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
+
+  // Обработчики PaymentWidget
+  const handlePaymentSuccess = (paymentData) => {
+    setPaymentSuccess(paymentData);
+    setShowPaymentWidget(false);
+    
+    // Обновляем список записей
+    setAppointments(prev => prev.map(apt => 
+      apt.id === selectedAppointment?.id 
+        ? { ...apt, status: 'paid', payment_id: paymentData.payment_id }
+        : apt
+    ));
+    
+    // Добавляем платеж в историю
+    setPayments(prev => [{
+      id: paymentData.payment_id,
+      time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      patient: selectedAppointment?.patient_name || 'Неизвестно',
+      service: selectedAppointment?.department || 'Услуга',
+      amount: paymentData.amount || selectedAppointment?.cost,
+      method: paymentData.provider || 'Онлайн',
+      status: 'paid'
+    }, ...prev]);
+  };
+
+  const handlePaymentError = (error) => {
+    setPaymentError(error);
+    console.error('Ошибка платежа:', error);
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentWidget(false);
+    setSelectedAppointment(null);
+  };
+
+  const openPaymentWidget = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowPaymentWidget(true);
+    setPaymentError(null);
+    setPaymentSuccess(null);
+  };
 
   // Функции для работы с оплатами
   const processPayment = async (appointment, paymentData) => {
@@ -189,16 +243,26 @@ const CashierPanel = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant="warning">Ожидает оплаты</Badge>
-                    <Button 
-                      size="sm" 
-                      onClick={() => {
-                        setSelectedAppointment(appointment);
-                        setShowPaymentModal(true);
-                      }}
-                    >
-                      <DollarSign className="w-4 h-4 mr-1" />
-                      Оплатить
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => openPaymentWidget(appointment)}
+                      >
+                        <CreditCard className="w-4 h-4 mr-1" />
+                        Онлайн
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedAppointment(appointment);
+                          setShowPaymentModal(true);
+                        }}
+                      >
+                        <DollarSign className="w-4 h-4 mr-1" />
+                        Касса
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -260,6 +324,88 @@ const CashierPanel = () => {
             }}
           />
         )}
+
+        {/* Диалог онлайн-оплаты */}
+        <Dialog 
+          open={showPaymentWidget} 
+          onClose={handlePaymentCancel}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Typography variant="h6">
+              Онлайн-оплата
+            </Typography>
+            {selectedAppointment && (
+              <Typography variant="body2" color="textSecondary">
+                Пациент: {selectedAppointment.patient_name} • {selectedAppointment.department}
+              </Typography>
+            )}
+          </DialogTitle>
+          
+          <DialogContent>
+            {paymentError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {paymentError}
+              </Alert>
+            )}
+            
+            {selectedAppointment && (
+              <PaymentWidget
+                visitId={selectedAppointment.id}
+                amount={selectedAppointment.cost || 100000}
+                currency="UZS"
+                description={`Оплата за ${selectedAppointment.department || 'медицинские услуги'}`}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+                onCancel={handlePaymentCancel}
+              />
+            )}
+          </DialogContent>
+          
+          <DialogActions>
+            <Button onClick={handlePaymentCancel}>
+              Закрыть
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Диалог успешной оплаты */}
+        <Dialog 
+          open={!!paymentSuccess} 
+          onClose={() => setPaymentSuccess(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box display="flex" alignItems="center">
+              <CheckCircle style={{ color: '#4caf50', marginRight: 8 }} />
+              Оплата успешна!
+            </Box>
+          </DialogTitle>
+          
+          <DialogContent>
+            {paymentSuccess && (
+              <Box>
+                <Typography variant="body1" gutterBottom>
+                  Платеж успешно обработан
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  ID платежа: {paymentSuccess.payment_id}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Провайдер: {paymentSuccess.provider}
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          
+          <DialogActions>
+            <Button onClick={() => setPaymentSuccess(null)} variant="contained">
+              OK
+            </Button>
+          </DialogActions>
+        </Dialog>
       </div>
     </div>
   );

@@ -29,7 +29,7 @@ import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ServiceChecklist from '../components/ServiceChecklist';
-import EMRSystem from '../components/EMRSystem';
+import EMRSystem from '../components/medical/EMRSystem';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import QueueIntegration from '../components/QueueIntegration';

@@ -4,8 +4,8 @@ export { useBreakpoint, useTouchDevice, useTheme } from '../../design-system/hoo
 
 // Экспорт существующих компонентов
 export { default as ResponsiveTable } from '../ResponsiveTable';
-export { default as ResponsiveNavigation } from '../ResponsiveNavigation';
+export { default as ResponsiveNavigation } from '../layout/ResponsiveNavigation';
 export { default as ResponsiveModal } from '../ResponsiveModal';
-export { default as ResponsiveForm } from '../ResponsiveForm';
+export { default as ResponsiveForm } from '../forms/ResponsiveForm';
 export { default as AnimatedToast } from '../AnimatedToast';
 export { default as AnimatedLoader } from '../AnimatedLoader';

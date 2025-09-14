@@ -49,13 +49,20 @@ export const API_ENDPOINTS = {
     BY_DATE: '/appointments/by-date'
   },
 
-  // Очередь
+  // Очередь (обновлено)
   QUEUE: {
     LIST: '/queue',
     CREATE: '/queue',
     STATS: '/queue/stats',
     BY_DEPARTMENT: '/queue/by-department',
-    CALL_NEXT: '/queue/call-next'
+    CALL_NEXT: '/queue/call-next',
+    // Новые endpoints онлайн-очереди
+    GENERATE_QR: '/queue/qrcode',
+    JOIN: '/queue/join',
+    OPEN: '/queue/open',
+    TODAY: '/queue/today',
+    CALL_PATIENT: '/queue/call',
+    STATISTICS: '/queue/statistics'
   },
 
   // Услуги
@@ -93,6 +100,31 @@ export const API_ENDPOINTS = {
   FILES: {
     UPLOAD: '/files/upload',
     LIST: '/files'
+  },
+
+  // Платежи (новое)
+  PAYMENTS: {
+    PROVIDERS: '/payments/providers',
+    INIT: '/payments/init',
+    STATUS: '/payments',
+    RECEIPT: '/payments/receipt',
+    DOWNLOAD_RECEIPT: '/payments/receipt/download'
+  },
+
+  // Печать (новое)
+  PRINT: {
+    PRINTERS: '/print/printers',
+    TEMPLATES: '/print/templates',
+    TICKET: '/print/ticket',
+    PRESCRIPTION: '/print/prescription',
+    CERTIFICATE: '/print/certificate',
+    QUICK: '/print/quick',
+    TEST: '/print/test'
+  },
+
+  // WebSocket (новое)
+  WEBSOCKET: {
+    DISPLAY_BOARD: '/display/ws/board'
   },
 
   // Аудит

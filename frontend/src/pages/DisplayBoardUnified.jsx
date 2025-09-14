@@ -16,7 +16,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { api } from '../api/client';
-import { openQueueWS } from '../api/ws';
+import { openQueueWS, openDisplayBoardWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 
 /**
@@ -211,49 +211,25 @@ export default function DisplayBoardUnified({
   // WebSocket подключение (новое)
   const connectWebSocket = () => {
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/v1/display/ws/board/${currentBoardId}`;
+      // Закрываем предыдущее соединение если есть
+      if (wsRef.current) {
+        wsRef.current();
+        wsRef.current = null;
+      }
       
-      wsRef.current = new WebSocket(wsUrl);
+      // Создаем новое соединение
+      const closeWS = openDisplayBoardWS(
+        currentBoardId,
+        handleWebSocketMessage,
+        () => setConnected(true),
+        () => setConnected(false)
+      );
       
-      wsRef.current.onopen = () => {
-        console.log('WebSocket подключен к табло');
-        setConnected(true);
-        
-        // Отправляем ping каждые 30 секунд
-        setInterval(() => {
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 30000);
-      };
-      
-      wsRef.current.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          handleWebSocketMessage(message);
-        } catch (error) {
-          console.error('Ошибка парсинга WebSocket сообщения:', error);
-        }
-      };
-      
-      wsRef.current.onclose = () => {
-        console.log('WebSocket отключен');
-        setConnected(false);
-        
-        // Переподключение через 5 секунд
-        setTimeout(() => {
-          connectWebSocket();
-        }, 5000);
-      };
-      
-      wsRef.current.onerror = (error) => {
-        console.error('Ошибка WebSocket:', error);
-        setConnected(false);
-      };
+      wsRef.current = closeWS;
       
     } catch (error) {
-      console.error('Ошибка подключения WebSocket:', error);
+      console.error('Ошибка создания WebSocket:', error);
+      setConnected(false);
     }
   };
 
@@ -280,7 +256,15 @@ export default function DisplayBoardUnified({
         break;
         
       case 'queue_update':
-        setQueueData(message.data.queue_entries || []);
+        // Обновляем очередь при добавлении/изменении записей
+        if (message.event_type === 'queue.created') {
+          // Добавляем новую запись в очередь
+          setQueueData(prev => [...prev, message.data]);
+          console.log(`➕ Новая запись в очереди: №${message.data.number}`);
+        } else {
+          // Обновляем всю очередь
+          setQueueData(message.data.queue_entries || []);
+        }
         break;
         
       case 'announcement':
@@ -304,13 +288,34 @@ export default function DisplayBoardUnified({
     if (!boardSettings.soundEnabled) return;
     
     try {
-      const audio = new Audio('/sounds/patient-call.mp3');
-      audio.volume = 0.7;
-      audio.play().catch(console.error);
+      // Создаем звуковой сигнал с помощью Web Audio API
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Настройки звука вызова (приятный двойной сигнал)
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+      
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.15);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.2);
+      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.4);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.4);
+      
+      console.log(`🔊 Звуковой сигнал для пациента №${message.data.number}`);
       
       // Голосовое объявление
-      if (boardSettings.voiceEnabled && message.voice_text) {
-        playVoiceAnnouncement(message.voice_text);
+      if (boardSettings.voiceEnabled) {
+        const text = `Пациент номер ${message.data.number}, ${message.data.patient_name}, пройдите к врачу ${message.data.doctor_name}`;
+        playVoiceAnnouncement(text);
       }
     } catch (error) {
       console.error('Ошибка воспроизведения звука:', error);
