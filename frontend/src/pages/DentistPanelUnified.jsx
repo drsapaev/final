@@ -70,9 +70,7 @@ import '../styles/animations.css';
  */
 const DentistPanelUnified = () => {
   // Проверяем демо-режим в самом начале
-  const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                    window.location.hostname === 'localhost' && 
-                    window.location.port === '5173';
+  const isDemoMode = window.location.pathname.includes('/medilab-demo');
   
   // В демо-режиме не рендерим компонент
   if (isDemoMode) {
