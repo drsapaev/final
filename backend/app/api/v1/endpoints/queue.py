@@ -1,416 +1,476 @@
-from datetime import datetime, timedelta
-from typing import Optional
-
+"""
+API endpoints для системы очередей
+"""
+from datetime import datetime, date, time, timedelta
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from app.models.user import User
+# from app.models.patient import Patient  # Временно отключено
+from app.api.deps import get_current_user
+from app.services.queue_service import get_queue_service
+from pydantic import BaseModel
+import uuid
+router = APIRouter()
 
-from app.api import deps
-from app.services import online_queue
+# Timezone для Узбекистана (UTC+5)
+TASHKENT_OFFSET = 5
 
-router = APIRouter(prefix="/queue", tags=["queue"])
+# Pydantic схемы
+class QueueTokenResponse(BaseModel):
+    token: str
+    qr_url: str
+    expires_at: datetime
+    specialist_name: str
+    day: date
+
+class QueueJoinRequest(BaseModel):
+    token: str
+    phone: Optional[str] = None
+    telegram_id: Optional[str] = None
+    patient_name: Optional[str] = None
+
+class QueueJoinResponse(BaseModel):
+    success: bool
+    number: Optional[int] = None
+    message: str
+    duplicate: bool = False
+    queue_info: Optional[dict] = None
+
+class QueueEntryResponse(BaseModel):
+    id: int
+    number: int
+    patient_name: Optional[str]
+    phone: Optional[str]
+    status: str
+    created_at: datetime
+    called_at: Optional[datetime]
+
+class QueueStatusResponse(BaseModel):
+    queue_id: int
+    day: date
+    specialist_name: str
+    is_open: bool
+    opened_at: Optional[datetime]
+    total_entries: int
+    waiting_entries: int
+    entries: List[QueueEntryResponse]
 
 
-@router.get("/status", summary="Статус очереди")
-async def get_queue_status(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    department: str = Query(..., description="Отделение"),
-    date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
+@router.post("/qrcode", response_model=QueueTokenResponse)
+def generate_qr_token(
+    day: date = Query(..., description="День для очереди (YYYY-MM-DD)"),
+    specialist_id: int = Query(..., description="ID специалиста"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Получить текущий статус очереди для отделения на конкретную дату
+    Генерация QR токена для онлайн-очереди
+    Доступно только регистраторам и админам
     """
-    try:
-        stats = online_queue.load_stats(db, department=department, date_str=date_str)
-        return {
-            "department": department,
-            "date": date_str,
-            "is_open": stats.is_open,
-            "start_number": stats.start_number,
-            "last_ticket": stats.last_ticket,
-            "waiting": stats.waiting,
-            "serving": stats.serving,
-            "done": stats.done,
-            "total": stats.waiting + stats.serving + stats.done,
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения статуса очереди: {str(e)}"
+    # Проверка прав доступа
+    if current_user.role not in ["Admin", "Registrar"]:
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    
+    # Проверка существования специалиста
+    specialist = db.query(User).filter(
+        User.id == specialist_id,
+        User.role == "Doctor"
+    ).first()
+    
+    if not specialist:
+        raise HTTPException(status_code=404, detail="Специалист не найден")
+    
+    # Проверка даты (не в прошлом)
+    if day < date.today():
+        raise HTTPException(status_code=400, detail="Нельзя создать очередь на прошедший день")
+    
+    # Создание или получение очереди на день
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id
+    ).first()
+    
+    if not daily_queue:
+        # Получаем правильный стартовый номер для специалиста
+        queue_service = get_queue_service()
+        start_number = queue_service.get_start_number_for_specialist(specialist)
+        
+        daily_queue = DailyQueue(
+            day=day,
+            specialist_id=specialist_id,
+            active=True,
+            start_number=start_number,
+            max_online_slots=queue_service.DEFAULT_MAX_SLOTS
         )
-
-
-@router.post("/open", summary="Открыть очередь")
-async def open_queue(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar")),
-    department: str = Query(..., description="Отделение"),
-    date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
-    start_number: int = Query(1, ge=1, description="Начальный номер талона"),
-):
-    """
-    Открыть очередь для отделения на конкретную дату
-    """
-    try:
-        # Открываем день
-        online_queue.get_or_create_day(
-            db, department=department, date_str=date_str, open_flag=True
+        db.add(daily_queue)
+        db.commit()
+        db.refresh(daily_queue)
+    
+    # Генерация токена
+    token_str = str(uuid.uuid4())
+    expires_at = datetime.combine(day, time(23, 59, 59))  # До конца дня
+    
+    # Проверка существующего токена
+    existing_token = db.query(QueueToken).filter(
+        QueueToken.day == day,
+        QueueToken.specialist_id == specialist_id,
+        QueueToken.expires_at > datetime.now()
+    ).first()
+    
+    if existing_token:
+        token_str = existing_token.token
+    else:
+        queue_token = QueueToken(
+            token=token_str,
+            day=day,
+            specialist_id=specialist_id,
+            expires_at=expires_at
         )
-
-        # Устанавливаем начальный номер
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "start_number"), start_number
-        )
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "last_ticket"), start_number - 1
-        )
-        online_queue._set_int(db, online_queue._k(department, date_str, "waiting"), 0)
-        online_queue._set_int(db, online_queue._k(department, date_str, "serving"), 0)
-        online_queue._set_int(db, online_queue._k(department, date_str, "done"), 0)
-
+        db.add(queue_token)
         db.commit()
 
-        # Отправляем broadcast через WebSocket
-        try:
-            stats = online_queue.load_stats(
-                db, department=department, date_str=date_str
-            )
-            online_queue._broadcast(department, date_str, stats)
-        except Exception as e:
-            print(f"⚠️ WebSocket broadcast error: {e}")
-
-        return {
-            "message": "Очередь успешно открыта",
-            "department": department,
-            "date": date_str,
-            "start_number": start_number,
-            "is_open": True,
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка открытия очереди: {str(e)}"
-        )
+    # Формирование QR URL
+    qr_url = f"/queue/join?token={token_str}"
+    
+    return QueueTokenResponse(
+        token=token_str,
+        qr_url=qr_url,
+        expires_at=expires_at,
+        specialist_name=specialist.full_name or specialist.username,
+        day=day
+    )
 
 
-@router.post("/close", summary="Закрыть очередь")
-async def close_queue(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar")),
-    department: str = Query(..., description="Отделение"),
-    date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
+@router.post("/join", response_model=QueueJoinResponse)
+def join_queue(
+    request: QueueJoinRequest,
+    db: Session = Depends(get_db)
 ):
     """
-    Закрыть очередь для отделения на конкретную дату
+    Вступление в онлайн-очередь по токену
+    Доступно всем (публичный endpoint)
     """
+    # Проверка токена
+    token = db.query(QueueToken).filter(
+        QueueToken.token == request.token,
+        QueueToken.expires_at > datetime.now()
+    ).first()
+    
+    if not token:
+        return QueueJoinResponse(
+            success=False,
+            message="Недействительный или истекший токен"
+        )
+    
+    # Получение очереди
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == token.day,
+        DailyQueue.specialist_id == token.specialist_id
+    ).first()
+    
+    if not daily_queue:
+        return QueueJoinResponse(
+            success=False,
+            message="Очередь не найдена"
+        )
+    
+    # Получаем сервис очереди
+    queue_service = get_queue_service()
+    
+    # Валидация данных
+    is_valid, validation_message = queue_service.validate_queue_entry_data(
+        request.patient_name, request.phone, request.telegram_id
+    )
+    if not is_valid:
+        return QueueJoinResponse(success=False, message=validation_message)
+    
+    # Проверка временного окна
+    time_allowed, time_message = queue_service.check_queue_time_window(
+        token.day, daily_queue.opened_at
+    )
+    if not time_allowed:
+        return QueueJoinResponse(success=False, message=time_message)
+    
+    # Проверка лимитов
+    limits_ok, limits_message = queue_service.check_queue_limits(db, daily_queue)
+    if not limits_ok:
+        return QueueJoinResponse(success=False, message=limits_message)
+    
+    # Проверка уникальности
+    existing_entry, duplicate_reason = queue_service.check_uniqueness(
+        db, daily_queue, request.phone, request.telegram_id
+    )
+    
+    if existing_entry:
+        # Возвращаем существующий номер с подробной информацией
+        status_text = {
+            "waiting": "ожидает вызова",
+            "called": "вызван к врачу"
+        }.get(existing_entry.status, existing_entry.status)
+        
+        return QueueJoinResponse(
+            success=True,
+            number=existing_entry.number,
+            message=f"✅ Вы уже записаны по {duplicate_reason}. Ваш номер: {existing_entry.number} ({status_text})",
+            duplicate=True,
+            queue_info={
+                "specialist": daily_queue.specialist.full_name,
+                "day": str(daily_queue.day),
+                "position": existing_entry.number,
+                "status": existing_entry.status,
+                "created_at": existing_entry.created_at.isoformat(),
+                "estimated_time": f"Записались в {existing_entry.created_at.strftime('%H:%M')}"
+            }
+        )
+    
+    # Создание новой записи
+    # Вычисляем следующий номер через сервис
+    next_number = queue_service.calculate_next_number(db, daily_queue)
+    
+    queue_entry = OnlineQueueEntry(
+        queue_id=daily_queue.id,
+        number=next_number,
+        patient_name=request.patient_name,
+        phone=request.phone,
+        telegram_id=request.telegram_id,
+        source="online",
+        status="waiting"
+    )
+    
+    db.add(queue_entry)
+    
+    # Увеличиваем счетчик использований токена
+    token.current_uses += 1
+    
+    db.commit()
+    db.refresh(queue_entry)
+    
+    # Отправка WebSocket события о новой записи
     try:
-        # Закрываем день
-        online_queue.get_or_create_day(
-            db, department=department, date_str=date_str, open_flag=False
-        )
-
-        db.commit()
-
-        # Отправляем broadcast через WebSocket
-        try:
-            stats = online_queue.load_stats(
-                db, department=department, date_str=date_str
+        import asyncio
+        from app.services.display_websocket import get_display_manager
+        
+        async def send_queue_update():
+            manager = get_display_manager()
+            await manager.broadcast_queue_update(
+                queue_entry=queue_entry,
+                event_type="queue.created"
             )
-            online_queue._broadcast(department, date_str, stats)
-        except Exception as e:
-            print(f"⚠️ WebSocket broadcast error: {e}")
-
-        return {
-            "message": "Очередь успешно закрыта",
-            "department": department,
-            "date": date_str,
-            "is_open": False,
+        
+        # Запускаем асинхронную отправку в фоне
+        asyncio.create_task(send_queue_update())
+        
+    except Exception as ws_error:
+        print(f"Предупреждение: не удалось отправить обновление очереди: {ws_error}")
+    
+    return QueueJoinResponse(
+        success=True,
+        number=next_number,
+        message=f"Вы записаны в очередь. Ваш номер: {next_number}",
+        duplicate=False,
+        queue_info={
+            "specialist": daily_queue.specialist.full_name,
+            "day": str(daily_queue.day),
+            "position": next_number,
+            "estimated_time": "Придите к открытию приема"
         }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка закрытия очереди: {str(e)}"
-        )
+    )
 
 
-@router.post("/next", summary="Следующий пациент")
-async def call_next_patient(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    department: str = Query(..., description="Отделение"),
-    date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
+@router.get("/statistics/{specialist_id}")
+def get_queue_statistics(
+    specialist_id: int,
+    day: date = Query(default_factory=date.today, description="День для статистики"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Вызвать следующего пациента из очереди
+    Получить статистику очереди для специалиста
     """
-    try:
-        # Получаем текущий статус
-        stats = online_queue.load_stats(db, department=department, date_str=date_str)
-
-        if not stats.is_open:
-            raise HTTPException(status_code=400, detail="Очередь закрыта")
-
-        if stats.waiting == 0:
-            raise HTTPException(status_code=400, detail="В очереди нет пациентов")
-
-        # Уменьшаем количество ожидающих
-        waiting = max(0, stats.waiting - 1)
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "waiting"), waiting
-        )
-
-        # Увеличиваем количество обслуживаемых
-        serving = stats.serving + 1
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "serving"), serving
-        )
-
-        db.commit()
-
-        # Отправляем broadcast через WebSocket
-        try:
-            updated_stats = online_queue.load_stats(
-                db, department=department, date_str=date_str
-            )
-            online_queue._broadcast(department, date_str, updated_stats)
-        except Exception as e:
-            print(f"⚠️ WebSocket broadcast error: {e}")
-
+    # Получаем очередь
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id
+    ).first()
+    
+    if not daily_queue:
         return {
-            "message": "Следующий пациент вызван",
-            "department": department,
-            "date": date_str,
-            "waiting": waiting,
-            "serving": serving,
+            "success": False,
+            "message": "Очередь не найдена",
+            "statistics": {
+                "total_entries": 0,
+                "waiting": 0,
+                "called": 0,
+                "completed": 0,
+                "cancelled": 0,
+                "max_slots": 0,
+                "available_slots": 0,
+                "is_open": False,
+                "opened_at": None
+            }
         }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка вызова пациента: {str(e)}")
+    
+    # Используем сервис для получения статистики
+    queue_service = get_queue_service()
+    stats = queue_service.get_queue_statistics(db, daily_queue)
+    
+    return {
+        "success": True,
+        "statistics": stats,
+        "specialist": {
+            "id": specialist_id,
+            "name": daily_queue.specialist.full_name if daily_queue.specialist else f"Врач #{specialist_id}"
+        },
+        "day": day.isoformat()
+    }
 
 
-@router.post("/complete", summary="Завершить прием")
-async def complete_patient(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    department: str = Query(..., description="Отделение"),
-    date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
+@router.post("/open")
+def open_queue(
+    day: date = Query(..., description="День очереди"),
+    specialist_id: int = Query(..., description="ID специалиста"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Завершить прием пациента
+    Открытие приема (закрывает онлайн-запись)
+    Доступно только регистраторам и админам
     """
-    try:
-        # Получаем текущий статус
-        stats = online_queue.load_stats(db, department=department, date_str=date_str)
-
-        if not stats.is_open:
-            raise HTTPException(status_code=400, detail="Очередь закрыта")
-
-        if stats.serving == 0:
-            raise HTTPException(status_code=400, detail="Нет пациентов на приеме")
-
-        # Уменьшаем количество обслуживаемых
-        serving = max(0, stats.serving - 1)
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "serving"), serving
-        )
-
-        # Увеличиваем количество завершенных
-        done = stats.done + 1
-        online_queue._set_int(db, online_queue._k(department, date_str, "done"), done)
-
-        db.commit()
-
-        # Отправляем broadcast через WebSocket
-        try:
-            updated_stats = online_queue.load_stats(
-                db, department=department, date_str=date_str
-            )
-            online_queue._broadcast(department, date_str, updated_stats)
-        except Exception as e:
-            print(f"⚠️ WebSocket broadcast error: {e}")
-
-        return {
-            "message": "Прием пациента завершен",
-            "department": department,
-            "date": date_str,
-            "serving": serving,
-            "done": done,
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка завершения приема: {str(e)}"
-        )
+    # Проверка прав доступа
+    if current_user.role not in ["Admin", "Registrar"]:
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    
+    # Получение очереди
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id
+    ).first()
+    
+    if not daily_queue:
+        raise HTTPException(status_code=404, detail="Очередь не найдена")
+    
+    if daily_queue.opened_at:
+        raise HTTPException(status_code=400, detail="Прием уже открыт")
+    
+    # Открытие приема
+    daily_queue.opened_at = datetime.now()
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Прием открыт. Онлайн-запись закрыта",
+        "opened_at": daily_queue.opened_at
+    }
 
 
-@router.post("/add", summary="Добавить пациента в очередь")
-async def add_to_queue(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar")),
-    department: str = Query(..., description="Отделение"),
-    date_str: str = Query(..., description="Дата (YYYY-MM-DD)"),
-    patient_name: str = Query(..., description="Имя пациента"),
-    priority: bool = Query(False, description="Приоритетная очередь"),
+@router.get("/today", response_model=QueueStatusResponse)
+def get_today_queue(
+    specialist_id: int = Query(..., description="ID специалиста"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Добавить пациента в очередь
+    Получение текущей очереди на сегодня
     """
-    try:
-        # Получаем текущий статус
-        stats = online_queue.load_stats(db, department=department, date_str=date_str)
-
-        if not stats.is_open:
-            raise HTTPException(status_code=400, detail="Очередь закрыта")
-
-        # Генерируем следующий номер талона
-        next_ticket = stats.last_ticket + 1
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "last_ticket"), next_ticket
-        )
-
-        # Увеличиваем количество ожидающих
-        waiting = stats.waiting + 1
-        online_queue._set_int(
-            db, online_queue._k(department, date_str, "waiting"), waiting
-        )
-
-        db.commit()
-
-        # Отправляем broadcast через WebSocket
-        try:
-            updated_stats = online_queue.load_stats(
-                db, department=department, date_str=date_str
-            )
-            online_queue._broadcast(department, date_str, updated_stats)
-        except Exception as e:
-            print(f"⚠️ WebSocket broadcast error: {e}")
-
-        return {
-            "message": "Пациент добавлен в очередь",
-            "department": department,
-            "date": date_str,
-            "ticket_number": next_ticket,
-            "patient_name": patient_name,
-            "priority": priority,
-            "waiting": waiting,
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка добавления в очередь: {str(e)}"
-        )
+    today = date.today()
+    
+    # Получение очереди
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == today,
+        DailyQueue.specialist_id == specialist_id
+    ).first()
+    
+    if not daily_queue:
+        raise HTTPException(status_code=404, detail="Очередь на сегодня не найдена")
+    
+    # Получение записей
+    entries = db.query(OnlineQueueEntry).filter(
+        OnlineQueueEntry.queue_id == daily_queue.id
+    ).order_by(OnlineQueueEntry.number).all()
+    
+    waiting_count = sum(1 for entry in entries if entry.status == "waiting")
+    
+    return QueueStatusResponse(
+        queue_id=daily_queue.id,
+        day=daily_queue.day,
+        specialist_name=daily_queue.specialist.full_name or daily_queue.specialist.username,
+        is_open=daily_queue.opened_at is not None,
+        opened_at=daily_queue.opened_at,
+        total_entries=len(entries),
+        waiting_entries=waiting_count,
+        entries=[
+            QueueEntryResponse(
+                id=entry.id,
+                number=entry.number,
+                patient_name=entry.patient_name,
+                phone=entry.phone,
+                status=entry.status,
+                created_at=entry.created_at,
+                called_at=entry.called_at
+            ) for entry in entries
+        ]
+    )
 
 
-@router.get("/departments", summary="Список отделений с очередями")
-async def get_queue_departments(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar", "Doctor")),
-    date_str: Optional[str] = Query(None, description="Дата (YYYY-MM-DD)"),
+@router.post("/call/{entry_id}")
+def call_patient(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Получить список отделений с информацией об очередях
+    Вызов пациента (для табло)
     """
+    # Проверка прав доступа
+    if current_user.role not in ["Admin", "Registrar", "Doctor"]:
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    
+    if not entry:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    
+    if entry.status != "waiting":
+        raise HTTPException(status_code=400, detail="Пациент уже вызван или обслужен")
+    
+    # Обновление статуса
+    entry.status = "called"
+    entry.called_at = datetime.now()
+    
+    db.commit()
+    
+    # Отправка WebSocket события для табло
     try:
-        if not date_str:
-            date_str = datetime.now().strftime("%Y-%m-%d")
-
-        # Получаем список отделений из настроек
-        dept_stmt = db.execute(
-            "SELECT DISTINCT SUBSTRING_INDEX(key, '::', 1) as dept FROM settings WHERE category = 'queue' AND key LIKE '%::%'"
-        )
-        departments = [row[0] for row in dept_stmt.fetchall() if row[0]]
-
-        result = []
-        for dept in departments:
-            try:
-                stats = online_queue.load_stats(db, department=dept, date_str=date_str)
-                dept_info = {
-                    "department": dept,
-                    "date": date_str,
-                    "is_open": stats.is_open,
-                    "start_number": stats.start_number,
-                    "last_ticket": stats.last_ticket,
-                    "waiting": stats.waiting,
-                    "serving": stats.serving,
-                    "done": stats.done,
-                    "total": stats.waiting + stats.serving + stats.done,
-                }
-                result.append(dept_info)
-            except Exception as e:
-                # Если не удалось загрузить статистику для отделения, пропускаем
-                print(f"⚠️ Ошибка загрузки статистики для {dept}: {e}")
-                continue
-
-        return result
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения списка отделений: {str(e)}"
-        )
-
-
-@router.get("/history", summary="История очереди")
-async def get_queue_history(
-    db: Session = Depends(deps.get_db),
-    user=Depends(deps.require_roles("Admin", "Registrar")),
-    department: str = Query(..., description="Отделение"),
-    date_from: str = Query(..., description="Дата начала (YYYY-MM-DD)"),
-    date_to: str = Query(..., description="Дата окончания (YYYY-MM-DD)"),
-):
-    """
-    Получить историю очереди за период
-    """
-    try:
-        # Парсим даты
-        start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
-        end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
-
-        if start_date > end_date:
-            raise HTTPException(
-                status_code=400, detail="Дата начала не может быть позже даты окончания"
+        import asyncio
+        from app.services.display_websocket import get_display_manager
+        
+        async def send_to_display():
+            manager = get_display_manager()
+            specialist_name = entry.queue.specialist.full_name if entry.queue.specialist else f"Специалист #{entry.queue.specialist_id}"
+            
+            await manager.broadcast_patient_call(
+                queue_entry=entry,
+                doctor_name=specialist_name,
+                cabinet=None  # TODO: Добавить кабинет в модель
             )
-
-        history = []
-        current_date = start_date
-
-        while current_date <= end_date:
-            date_str = current_date.strftime("%Y-%m-%d")
-            try:
-                stats = online_queue.load_stats(
-                    db, department=department, date_str=date_str
-                )
-                day_history = {
-                    "date": date_str,
-                    "is_open": stats.is_open,
-                    "start_number": stats.start_number,
-                    "last_ticket": stats.last_ticket,
-                    "waiting": stats.waiting,
-                    "serving": stats.serving,
-                    "done": stats.done,
-                    "total": stats.waiting + stats.serving + stats.done,
-                }
-                history.append(day_history)
-            except Exception:
-                # Если не удалось загрузить статистику для дня, добавляем пустую запись
-                day_history = {
-                    "date": date_str,
-                    "is_open": False,
-                    "start_number": 0,
-                    "last_ticket": 0,
-                    "waiting": 0,
-                    "serving": 0,
-                    "done": 0,
-                    "total": 0,
-                }
-                history.append(day_history)
-
-            current_date += timedelta(days=1)
-
-        return {
-            "department": department,
-            "date_from": date_from,
-            "date_to": date_to,
-            "history": history,
+        
+        # Запускаем асинхронную отправку в фоне
+        asyncio.create_task(send_to_display())
+        
+    except Exception as ws_error:
+        # Не прерываем основной процесс если WebSocket не работает
+        print(f"Предупреждение: не удалось отправить на табло: {ws_error}")
+    
+    return {
+        "success": True,
+        "message": f"Пациент №{entry.number} вызван",
+        "entry": {
+            "id": entry.id,
+            "number": entry.number,
+            "patient_name": entry.patient_name,
+            "called_at": entry.called_at
         }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения истории очереди: {str(e)}"
-        )
+    }

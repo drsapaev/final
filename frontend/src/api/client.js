@@ -97,9 +97,17 @@ const setAxiosAuthToken = setToken; // alias
 const setBearerToken = setToken; // alias
 const getProfile = me; // alias
 const get = api.get; // alias for direct axios usage
+const apiClient = api; // alias for PaymentWidget and other components
+
+// Инициализируем токен при загрузке модуля
+const existingToken = localStorage.getItem('auth_token');
+if (existingToken) {
+  api.defaults.headers.common['Authorization'] = `Bearer ${existingToken}`;
+}
 
 export {
   api,
+  apiClient,
   getApiBase,
   apiRequest,
   setToken,

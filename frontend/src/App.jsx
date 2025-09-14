@@ -6,8 +6,8 @@ import OfflineIndicator from './components/mobile/OfflineIndicator.jsx';
 import { usePWA } from './hooks/usePWA.js';
 import './styles/theme.css';
 
-import Header from './components/Header.jsx';
-import Sidebar from './components/Sidebar.jsx';
+import Header from './components/layout/Header.jsx';
+import Sidebar from './components/layout/Sidebar.jsx';
 
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
@@ -32,14 +32,18 @@ import QueueBoard from './pages/QueueBoard.jsx';
 import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import MediLabDemo from './pages/MediLabDemo.jsx';
+import QueueJoin from './pages/QueueJoin.jsx';
+import PaymentSuccess from './pages/PaymentSuccess.jsx';
+import PaymentCancel from './pages/PaymentCancel.jsx';
+import PaymentTest from './pages/PaymentTest.jsx';
 
 // Новые компоненты - ПОШАГОВОЕ ДОБАВЛЕНИЕ
 import TestComponent from './components/TestComponent.jsx';
-import SimpleDashboard from './components/SimpleDashboard.jsx';
-import SimpleUserManagement from './components/SimpleUserManagement.jsx';
-import SimpleEMR from './components/SimpleEMR.jsx';
+import SimpleDashboard from './components/dashboard/SimpleDashboard.jsx';
+import SimpleUserManagement from './components/admin/SimpleUserManagement.jsx';
+import SimpleEMR from './components/medical/SimpleEMR.jsx';
 import SimpleFileManager from './components/SimpleFileManager.jsx';
-import LoginFormStyled from './components/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
+import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
 import NewComponentsNav from './components/NewComponentsNav.jsx'; // Навигация по новым компонентам
 // import NewDashboard from './components/Dashboard';
 // import UserManagement from './components/UserManagement';
@@ -100,11 +104,12 @@ function AppShell() {
   );
 }
 
-export default function App() {
+// Внутренний компонент с PWA логикой
+function AppContent() {
   const { shouldShowInstallPrompt } = usePWA();
 
   return (
-    <AppProviders>
+    <>
       <OfflineIndicator />
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
@@ -118,6 +123,10 @@ export default function App() {
       <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
       <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
       <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
+      <Route path="/queue/join" element={<QueueJoin />} />
+      <Route path="/payment/success" element={<PaymentSuccess />} />
+      <Route path="/payment/cancel" element={<PaymentCancel />} />
+      <Route path="/payment/test" element={<PaymentTest />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
 
@@ -177,6 +186,15 @@ export default function App() {
         </Route>
       </Route>
     </Routes>
+    </>
+  );
+}
+
+// Основной компонент App
+export default function App() {
+  return (
+    <AppProviders>
+      <AppContent />
     </AppProviders>
   );
 }

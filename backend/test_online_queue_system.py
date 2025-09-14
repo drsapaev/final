@@ -10,7 +10,7 @@ from app.main import app
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, QueueEntry, QueueToken
+from app.models.online_queue import DailyQueue, OnlineOnlineQueueEntry, QueueToken
 from app.core.auth import create_access_token
 
 client = TestClient(app)

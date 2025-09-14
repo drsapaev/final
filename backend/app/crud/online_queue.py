@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from zoneinfo import ZoneInfo
 
-from app.models.online_queue import DailyQueue, QueueEntry, QueueToken
+from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.clinic import Doctor
 from app.crud.clinic import get_queue_settings
 
@@ -77,7 +77,7 @@ def generate_qr_token(
     db.commit()
     
     # Формируем ответ
-    current_count = db.query(QueueEntry).filter(QueueEntry.queue_id == daily_queue.id).count()
+    current_count = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
     max_slots = queue_settings.get("max_per_day", {}).get(doctor.specialty, 15)
     
     return token, {
@@ -170,12 +170,12 @@ def join_online_queue(
     # Проверяем дубликат по телефону или telegram_id
     existing_entry = None
     if phone:
-        existing_entry = db.query(QueueEntry).filter(
-            and_(QueueEntry.queue_id == daily_queue.id, QueueEntry.phone == phone)
+        existing_entry = db.query(OnlineQueueEntry).filter(
+            and_(OnlineQueueEntry.queue_id == daily_queue.id, OnlineQueueEntry.phone == phone)
         ).first()
     elif telegram_id:
-        existing_entry = db.query(QueueEntry).filter(
-            and_(QueueEntry.queue_id == daily_queue.id, QueueEntry.telegram_id == telegram_id)
+        existing_entry = db.query(OnlineQueueEntry).filter(
+            and_(OnlineQueueEntry.queue_id == daily_queue.id, OnlineQueueEntry.telegram_id == telegram_id)
         ).first()
     
     if existing_entry:
@@ -190,7 +190,7 @@ def join_online_queue(
         }
     
     # Проверяем лимит мест
-    current_count = db.query(QueueEntry).filter(QueueEntry.queue_id == daily_queue.id).count()
+    current_count = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
     max_slots = queue_settings.get("max_per_day", {}).get(queue_token.specialist.specialty, 15)
     
     if current_count >= max_slots:
@@ -206,7 +206,7 @@ def join_online_queue(
     next_number = start_number + current_count
     
     # Создаем запись в очереди
-    queue_entry = QueueEntry(
+    queue_entry = OnlineQueueEntry(
         queue_id=daily_queue.id,
         number=next_number,
         patient_name=patient_name,
@@ -269,8 +269,8 @@ def open_daily_queue(
     db.refresh(daily_queue)
     
     # Подсчитываем онлайн-записи
-    online_entries_count = db.query(QueueEntry).filter(
-        and_(QueueEntry.queue_id == daily_queue.id, QueueEntry.source == "online")
+    online_entries_count = db.query(OnlineQueueEntry).filter(
+        and_(OnlineQueueEntry.queue_id == daily_queue.id, OnlineQueueEntry.source == "online")
     ).count()
     
     return {
@@ -304,9 +304,9 @@ def get_queue_status(
         }
     
     # Подсчитываем записи
-    total_entries = db.query(QueueEntry).filter(QueueEntry.queue_id == daily_queue.id).count()
-    waiting_entries = db.query(QueueEntry).filter(
-        and_(QueueEntry.queue_id == daily_queue.id, QueueEntry.status == "waiting")
+    total_entries = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
+    waiting_entries = db.query(OnlineQueueEntry).filter(
+        and_(OnlineQueueEntry.queue_id == daily_queue.id, OnlineQueueEntry.status == "waiting")
     ).count()
     
     return {
@@ -372,7 +372,7 @@ def check_queue_availability(
     
     # Проверяем лимит мест
     if daily_queue:
-        current_count = db.query(QueueEntry).filter(QueueEntry.queue_id == daily_queue.id).count()
+        current_count = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
         max_slots = queue_settings.get("max_per_day", {}).get(
             db.query(Doctor).filter(Doctor.id == specialist_id).first().specialty, 
             15
@@ -398,19 +398,19 @@ def find_existing_entry(
     queue_id: int,
     phone: Optional[str] = None,
     telegram_id: Optional[int] = None
-) -> Optional[QueueEntry]:
+) -> Optional[OnlineQueueEntry]:
     """
     Поиск существующей записи по телефону или Telegram ID
     Из detail.md стр. 241: "Один номер на телефон или Telegram‑чат"
     """
     
     if phone:
-        return db.query(QueueEntry).filter(
-            and_(QueueEntry.queue_id == queue_id, QueueEntry.phone == phone)
+        return db.query(OnlineQueueEntry).filter(
+            and_(OnlineQueueEntry.queue_id == queue_id, OnlineQueueEntry.phone == phone)
         ).first()
     elif telegram_id:
-        return db.query(QueueEntry).filter(
-            and_(QueueEntry.queue_id == queue_id, QueueEntry.telegram_id == telegram_id)
+        return db.query(OnlineQueueEntry).filter(
+            and_(OnlineQueueEntry.queue_id == queue_id, OnlineQueueEntry.telegram_id == telegram_id)
         ).first()
     
     return None
@@ -455,7 +455,7 @@ def get_queue_statistics(
     served_entries = 0
     
     for queue in queues:
-        entries = db.query(QueueEntry).filter(QueueEntry.queue_id == queue.id).all()
+        entries = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == queue.id).all()
         total_entries += len(entries)
         online_entries += len([e for e in entries if e.source == "online"])
         served_entries += len([e for e in entries if e.status == "served"])
@@ -471,7 +471,7 @@ def get_queue_statistics(
                 "specialist_id": q.specialist_id,
                 "specialist_name": q.specialist.user.full_name if q.specialist.user else f"Врач #{q.specialist_id}",
                 "opened_at": q.opened_at,
-                "entries_count": db.query(QueueEntry).filter(QueueEntry.queue_id == q.id).count()
+                "entries_count": db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == q.id).count()
             }
             for q in queues
         ]

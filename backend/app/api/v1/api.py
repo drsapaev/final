@@ -52,8 +52,8 @@ from app.api.v1.endpoints import (
     file_test,
     authentication,
     user_management,
-    online_queue,
-    online_queue_new,
+    # online_queue,  # Временно отключено
+    # online_queue_new,  # Временно отключено
     patients,
     registrar_integration,
     doctor_integration,
@@ -65,7 +65,7 @@ from app.api.v1.endpoints import (
     payment_webhook,
     payments,
     print as print_ep,
-    queue,
+    # queue,  # Временно отключено
     queues,
     reports as reports_ep,
     schedule,
@@ -73,6 +73,14 @@ from app.api.v1.endpoints import (
     specialized_panels,
     visits,
 )
+# Импортируем новый queue endpoint
+from app.api.v1.endpoints.queue import router as queue_router
+from app.api.v1.endpoints.queue_simple import router as simple_queue_router
+# from app.api.v1.endpoints.queue_fixed import router as fixed_queue_router  # Временно отключено
+
+# Импортируем новые payment endpoints
+from app.api.v1.endpoints.payments import router as payments_new_router
+from app.api.v1.endpoints.payment_webhooks import router as payment_webhooks_router
 
 api_router = APIRouter()
 
@@ -82,10 +90,12 @@ api_router.include_router(patients.router, prefix="/patients", tags=["patients"]
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services", tags=["services"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
+api_router.include_router(payments_new_router, prefix="/payments", tags=["payments-new"])
+api_router.include_router(payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
-api_router.include_router(online_queue.router, tags=["online-queue"])
-api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
+# api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
+# api_router.include_router(online_queue_new.router, tags=["online-queue-new"])  # Временно отключено
 api_router.include_router(registrar_integration.router, tags=["registrar"])
 api_router.include_router(doctor_integration.router, tags=["doctor-integration"])
 api_router.include_router(print_templates.router, prefix="/print/templates", tags=["print-templates"])
@@ -127,7 +137,12 @@ api_router.include_router(file_upload_simple.router, prefix="/files", tags=["fil
 api_router.include_router(file_upload_json.router, prefix="/files", tags=["file-upload-json"])
 api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(schedule.router, tags=["schedule"])
-api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
+# Основной queue router с онлайн-очередью
+api_router.include_router(queue_router, prefix="/queue", tags=["queue"])
+# Простой queue router для тестирования
+api_router.include_router(simple_queue_router, prefix="/queue", tags=["queue-simple"])
+# Исправленный queue router (временно отключено)
+# api_router.include_router(fixed_queue_router, prefix="/queue", tags=["queue-fixed"])
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])

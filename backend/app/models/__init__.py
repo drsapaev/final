@@ -10,7 +10,7 @@ from .service import Service, ServiceCatalog
 from .payment import Payment
 from .payment_webhook import PaymentWebhook, PaymentProvider, PaymentTransaction
 from .appointment import Appointment
-from .queue import QueueTicket
+# QueueTicket заменен на новые модели в queue.py
 from .schedule import ScheduleTemplate
 from .emr import EMR, Prescription
 from .emr_template import EMRTemplate
@@ -33,7 +33,7 @@ from .clinic import (
     License, LicenseStatus, LicenseType, LicenseActivation,
     Backup, BackupStatus, BackupType, SystemInfo
 )
-from .online_queue import DailyQueue, QueueEntry, QueueToken
+from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from .file_system import (
     File, FileVersion, FileShare, FileFolder, FileAccessLog, 
     FileStorage, FileQuota, FileType, FileStatus, FilePermission
@@ -53,7 +53,7 @@ __all__ = [
     "PaymentProvider",
     "PaymentTransaction",
     "Appointment",
-    "QueueTicket",
+    # "QueueTicket", # заменен на DailyQueue, QueueEntry, QueueToken
     "ScheduleTemplate",
     "EMR",
     "Prescription",
@@ -108,7 +108,7 @@ __all__ = [
     "BackupType",
     "SystemInfo",
     "DailyQueue",
-    "QueueEntry", 
+    "OnlineQueueEntry", 
     "QueueToken",
     "TelegramConfig",
     "TelegramTemplate",

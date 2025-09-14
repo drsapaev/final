@@ -20,13 +20,12 @@ class FCMService:
         try:
             # Проверяем, есть ли Firebase в requirements
             try:
-                from firebase_admin import messaging, credentials, initialize_app
+                from firebase_admin import messaging, credentials, initialize_app, get_app
                 from firebase_admin.exceptions import FirebaseError
                 
                 # Проверяем, есть ли уже инициализированное приложение
                 try:
-                    # Проверяем, есть ли уже инициализированное приложение
-                    existing_app = messaging._get_app()
+                    existing_app = get_app("clinic-fcm")
                     if existing_app:
                         self.app = existing_app
                         logger.info("Firebase Admin SDK уже инициализирован")
@@ -35,13 +34,23 @@ class FCMService:
                     # Приложение не инициализировано, продолжаем
                     pass
                 
+                # Проверяем наличие необходимых переменных окружения
+                project_id = os.getenv("FIREBASE_PROJECT_ID")
+                private_key = os.getenv("FIREBASE_PRIVATE_KEY")
+                client_email = os.getenv("FIREBASE_CLIENT_EMAIL")
+                
+                if not all([project_id, private_key, client_email]):
+                    logger.info("Firebase переменные окружения не настроены. Используется режим эмуляции.")
+                    self.app = None
+                    return
+                
                 # Используем переменные окружения для конфигурации
                 firebase_config = {
                     "type": "service_account",
-                    "project_id": os.getenv("FIREBASE_PROJECT_ID", "clinic-mobile-app"),
+                    "project_id": project_id,
                     "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID", ""),
-                    "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
-                    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL", ""),
+                    "private_key": private_key.replace('\\n', '\n'),
+                    "client_email": client_email,
                     "client_id": os.getenv("FIREBASE_CLIENT_ID", ""),
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
@@ -57,11 +66,11 @@ class FCMService:
                 logger.info("Firebase Admin SDK инициализирован успешно")
                     
             except ImportError:
-                logger.warning("Firebase Admin SDK не установлен. Используется режим эмуляции.")
+                logger.info("Firebase Admin SDK не установлен. Используется режим эмуляции.")
                 self.app = None
                 
         except Exception as e:
-            logger.error(f"Ошибка инициализации Firebase: {e}")
+            logger.info(f"Firebase не настроен: {e}. Используется режим эмуляции.")
             self.app = None
     
     async def send_notification(

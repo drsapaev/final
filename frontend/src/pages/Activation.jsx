@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import Nav from '../components/Nav.jsx';
+import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { getActivationStatus } from '../api';

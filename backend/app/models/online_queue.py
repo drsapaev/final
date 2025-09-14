@@ -20,10 +20,10 @@ class DailyQueue(Base):
     
     # Relationships
     specialist = relationship("Doctor", foreign_keys=[specialist_id])
-    entries = relationship("QueueEntry", back_populates="queue", cascade="all, delete-orphan")
+    entries = relationship("OnlineQueueEntry", back_populates="queue", cascade="all, delete-orphan")
 
 
-class QueueEntry(Base):
+class OnlineQueueEntry(Base):
     """Записи в онлайн-очереди"""
     __tablename__ = "queue_entries"
     

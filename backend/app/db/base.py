@@ -23,7 +23,7 @@ from app.models import (  # noqa: F401, E402
     patient as _m_patient,
     payment as _m_payment,
     payment_webhook as _m_payment_webhook,
-    queue as _m_queue,
+    # queue as _m_queue,  # Временно отключено
     schedule as _m_schedule,
     service as _m_service,
     setting as _m_setting,

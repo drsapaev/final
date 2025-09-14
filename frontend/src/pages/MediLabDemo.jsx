@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
 
 // Новые унифицированные компоненты
-import UnifiedLayout from '../components/UnifiedLayout';
+import UnifiedLayout from '../components/layout/UnifiedLayout';
 import { MedicalCard, PatientCard, MetricCard, MedicalTable } from '../components/medical';
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/full-width.css';
