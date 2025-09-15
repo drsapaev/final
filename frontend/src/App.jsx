@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
 import PWAInstallPrompt from './components/mobile/PWAInstallPrompt.jsx';
 import OfflineIndicator from './components/mobile/OfflineIndicator.jsx';
-import { usePWA } from './hooks/usePWA.js';
+import usePWA from './hooks/usePWA.js';
 import './styles/theme.css';
 
 import Header from './components/layout/Header.jsx';
@@ -138,6 +138,7 @@ function AppContent() {
           <Route path="admin/services" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/patients" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/appointments" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+          <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/ai-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />

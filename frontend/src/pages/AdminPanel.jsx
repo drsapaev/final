@@ -420,8 +420,8 @@ const AdminPanel = () => {
   const [animationsStarted, setAnimationsStarted] = useState(false);
 
   useEffect(() => {
-    // Запуск анимаций только один раз после первой загрузки статистики
-    if (!statsLoading && !animationsStarted && statsData) {
+    // Запуск анимаций при загрузке компонента
+    if (!animationsStarted) {
       const timer = setTimeout(() => {
         startFadeIn(300);
         startSlideIn(400);
@@ -431,7 +431,7 @@ const AdminPanel = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [statsLoading, animationsStarted, statsData, startFadeIn, startSlideIn, startScaleIn]);
+  }, [animationsStarted, startFadeIn, startSlideIn, startScaleIn]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('ru-RU', {
@@ -3013,7 +3013,11 @@ const AdminPanel = () => {
         />
 
         {/* Основной контент */}
-        <div style={{ opacity: fadeIn ? 1 : 0, transform: slideIn ? 'translateY(0)' : 'translateY(20px)' }}>
+        <div style={{ 
+          opacity: fadeIn ? 1 : 0, 
+          transform: slideIn ? 'translateY(0)' : 'translateY(20px)',
+          transition: 'opacity 0.3s ease, transform 0.4s ease'
+        }}>
           {renderContent()}
         </div>
         

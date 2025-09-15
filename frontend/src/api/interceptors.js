@@ -12,7 +12,7 @@ export function setupInterceptors() {
   api.interceptors.request.use(
     (config) => {
       // Добавляем токен если есть
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       if (token && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -70,7 +70,7 @@ export function setupInterceptors() {
 
             if (response.data.access_token) {
               // Сохраняем новый токен
-              localStorage.setItem('token', response.data.access_token);
+              localStorage.setItem('auth_token', response.data.access_token);
               api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
               
               // Повторяем оригинальный запрос
@@ -83,7 +83,7 @@ export function setupInterceptors() {
         }
 
         // Если обновление токена не удалось, выходим
-        localStorage.removeItem('token');
+        localStorage.removeItem('auth_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
         delete api.defaults.headers.common['Authorization'];
@@ -131,7 +131,7 @@ export function setupInterceptors() {
  * Установка базового токена при загрузке приложения
  */
 export function initializeAuth() {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('auth_token');
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
@@ -141,7 +141,7 @@ export function initializeAuth() {
  * Очистка авторизации
  */
 export function clearAuth() {
-  localStorage.removeItem('token');
+  localStorage.removeItem('auth_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
   delete api.defaults.headers.common['Authorization'];

@@ -11,8 +11,8 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
  */
 export function AppProviders({ children }) {
   return (
-    <ErrorBoundary>
-      <ThemeProvider>
+    <ThemeProvider>
+      <ErrorBoundary>
         <ToastProvider>
           <ModalProvider>
             <FormProvider>
@@ -20,8 +20,8 @@ export function AppProviders({ children }) {
             </FormProvider>
           </ModalProvider>
         </ToastProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }
 

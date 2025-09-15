@@ -55,8 +55,10 @@ import {
   Remove,
   Biotech,
   LocalHospital,
+  Psychology,
 } from '@mui/icons-material';
 import { api } from '../../api/client';
+import { AIButton, AIAssistant } from '../ai';
 
 // Категории анализов
 const LAB_CATEGORIES = {
@@ -82,6 +84,8 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadDialog, setUploadDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+  const [aiAnalysisResults, setAiAnalysisResults] = useState(null);
   
   // Форма результата
   const [resultForm, setResultForm] = useState({
@@ -315,6 +319,17 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
               <Button size="small" startIcon={<Send />} onClick={sendToPatient}>
                 Отправить
               </Button>
+              <AIButton
+                text="AI Анализ"
+                size="small"
+                onClick={() => {
+                  if (results.length > 0) {
+                    setShowAIAnalysis(true);
+                  }
+                }}
+                disabled={results.length === 0}
+                tooltip="AI интерпретация результатов"
+              />
             </Box>
           </Box>
 
@@ -579,6 +594,53 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* AI Analysis Dialog */}
+      {showAIAnalysis && (
+        <Dialog 
+          open={showAIAnalysis} 
+          onClose={() => setShowAIAnalysis(false)} 
+          maxWidth="md" 
+          fullWidth
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="h6">
+                <Psychology sx={{ mr: 1, verticalAlign: 'middle' }} />
+                AI Интерпретация результатов
+              </Typography>
+              <IconButton onClick={() => setShowAIAnalysis(false)}>
+                <Remove />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          
+          <DialogContent>
+            <AIAssistant
+              analysisType="lab"
+              data={{
+                results: results.map(r => ({
+                  name: r.test_name,
+                  value: r.value,
+                  unit: r.unit,
+                  reference: `${r.reference_min}-${r.reference_max}`
+                })),
+                patient_age: patientId ? 35 : null, // Здесь нужно получить реальный возраст
+                patient_gender: null
+              }}
+              onResult={(result) => {
+                setAiAnalysisResults(result);
+              }}
+            />
+          </DialogContent>
+          
+          <DialogActions>
+            <Button onClick={() => setShowAIAnalysis(false)}>
+              Закрыть
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };

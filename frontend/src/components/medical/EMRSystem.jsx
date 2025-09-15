@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Save, Plus, X, Camera, Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { FileText, Save, Plus, X, Camera, Upload, AlertCircle, CheckCircle, Brain } from 'lucide-react';
 import { Card, Button, Badge } from '../../design-system/components';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../../constants/appointmentStatus';
+import { AIButton, AISuggestions, AIAssistant } from '../ai';
+import { Box, Grid, Divider } from '@mui/material';
 
 const EMRSystem = ({ appointment, onSave, onComplete }) => {
   const [emrData, setEmrData] = useState({
@@ -18,6 +20,9 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [icd10Suggestions, setIcd10Suggestions] = useState([]);
 
   useEffect(() => {
     // Загрузка существующего EMR
@@ -167,7 +172,16 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Жалобы */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Жалобы пациента</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Жалобы пациента</h3>
+            <AIButton
+              onClick={() => setShowAIAssistant(true)}
+              loading={aiLoading}
+              variant="icon"
+              tooltip="AI анализ жалоб"
+              disabled={!emrData.complaints || !canSaveEMR}
+            />
+          </div>
           <textarea
             value={emrData.complaints}
             onChange={(e) => handleFieldChange('complaints', e.target.value)}
@@ -203,7 +217,35 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
         {/* Диагноз и МКБ-10 */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Диагноз</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Диагноз</h3>
+            <AIButton
+              onClick={async () => {
+                if (emrData.complaints || emrData.diagnosis) {
+                  setAiLoading(true);
+                  try {
+                    const response = await fetch('/api/v1/ai/icd-suggest', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        symptoms: emrData.complaints.split('.').filter(s => s.trim()),
+                        diagnosis: emrData.diagnosis
+                      })
+                    });
+                    const suggestions = await response.json();
+                    setIcd10Suggestions(suggestions);
+                  } catch (error) {
+                    console.error('AI error:', error);
+                  }
+                  setAiLoading(false);
+                }
+              }}
+              loading={aiLoading}
+              variant="icon"
+              tooltip="AI подсказки МКБ-10"
+              disabled={(!emrData.complaints && !emrData.diagnosis) || !canSaveEMR}
+            />
+          </div>
           <div className="space-y-3">
             <input
               type="text"
@@ -221,6 +263,18 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               className="w-full p-3 border border-gray-300 rounded-lg"
               disabled={!canSaveEMR}
             />
+            {icd10Suggestions.length > 0 && (
+              <AISuggestions
+                suggestions={icd10Suggestions}
+                type="icd10"
+                onSelect={(item) => {
+                  handleFieldChange('icd10', item.code);
+                  handleFieldChange('diagnosis', item.name);
+                  setIcd10Suggestions([]);
+                }}
+                title="AI подсказки МКБ-10"
+              />
+            )}
           </div>
         </Card>
       </div>
@@ -362,6 +416,41 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
           </div>
         </div>
       </Card>
+
+      {/* AI Assistant Modal */}
+      {showAIAssistant && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-semibold">AI Анализ жалоб</h2>
+                <button
+                  onClick={() => setShowAIAssistant(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <AIAssistant
+                analysisType="complaint"
+                data={{
+                  complaint: emrData.complaints,
+                  patient_age: appointment?.patient?.age,
+                  patient_gender: appointment?.patient?.gender
+                }}
+                onResult={(result) => {
+                  // Автоматически заполняем рекомендации если есть
+                  if (result.recommendations) {
+                    const recommendations = result.lab_tests?.join('\n') || '';
+                    handleFieldChange('recommendations', recommendations);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
