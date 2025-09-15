@@ -39,13 +39,13 @@ const UnifiedLayout = ({ children, showSidebar = true }) => {
   // Стили для основного контента
   const mainContentStyle = {
     marginLeft: showSidebar ? (isCollapsed ? '80px' : '280px') : '0',
-    height: '100vh',
+    minHeight: '100vh',
     width: '100%',
     maxWidth: '100%',
     backgroundColor: isDark ? '#0f172a' : '#f8fafc',
     transition: 'margin-left 0.3s ease',
     padding: '20px',
-    overflow: 'hidden' // Предотвращаем скролл на уровне макета
+    overflow: 'auto' // Разрешаем скролл для просмотра всего контента
   };
 
   // Стили для мобильных устройств
