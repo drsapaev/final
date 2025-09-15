@@ -23,10 +23,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
+import ECGViewer from '../components/cardiology/ECGViewer';
+import EchoForm from '../components/cardiology/EchoForm';
 
 /**
  * Унифицированная панель кардиолога
- * Объединяет: очередь + специализированные функции + AI
+ * Объединяет: очередь + специализированные функции + AI + ЭКГ/ЭхоКГ
  */
 const CardiologistPanelUnified = () => {
   // Проверяем демо-режим только для специальных демо-страниц
@@ -512,158 +514,27 @@ const CardiologistPanelUnified = () => {
         {/* ЭКГ */}
         {activeTab === 'ecg' && (
           <div className="space-y-6">
-            <Card className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium flex items-center">
-                  <Activity size={20} className="mr-2 text-green-600" />
-                  ЭКГ исследования
-                </h3>
-                <Button onClick={() => setShowEcgForm(true)}>
-                  <Plus size={16} className="mr-2" />
-                  Новое ЭКГ
-                </Button>
-              </div>
-
-              {ecgResults.length > 0 ? (
-                <div className="space-y-4">
-                  {ecgResults.map((ecg) => (
-                    <div key={ecg.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">ЭКГ #{ecg.id}</h4>
-                        <Badge variant="info">{ecg.ecg_date}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                        <div>💓 Ритм: {ecg.rhythm}</div>
-                        <div>🫀 ЧСС: {ecg.heart_rate} уд/мин</div>
-                        <div>⏱️ PR: {ecg.pr_interval}мс</div>
-                        <div>QRS: {ecg.qrs_duration}мс</div>
-                      </div>
-                      {ecg.interpretation && (
-                        <div className="mt-2 text-sm">
-                          <strong>Интерпретация:</strong> {ecg.interpretation}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Activity size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p>Нет данных ЭКГ</p>
-                </div>
-              )}
-            </Card>
-
-            {/* Форма ЭКГ */}
-            {showEcgForm && (
-              <Card className="p-6">
-                <h3 className="text-lg font-medium mb-4">Новое ЭКГ исследование</h3>
-                <form onSubmit={handleEcgSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Дата ЭКГ *
-                      </label>
-                      <input
-                        type="date"
-                        value={ecgForm.ecg_date}
-                        onChange={(e) => setEcgForm({ ...ecgForm, ecg_date: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Ритм *
-                      </label>
-                      <select
-                        value={ecgForm.rhythm}
-                        onChange={(e) => setEcgForm({ ...ecgForm, rhythm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        required
-                      >
-                        <option value="">Выберите ритм</option>
-                        <option value="sinus">Синусовый</option>
-                        <option value="atrial_fibrillation">Фибрилляция предсердий</option>
-                        <option value="atrial_flutter">Трепетание предсердий</option>
-                        <option value="ventricular_tachycardia">Желудочковая тахикардия</option>
-                        <option value="bradycardia">Брадикардия</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        ЧСС (уд/мин) *
-                      </label>
-                      <input
-                        type="number"
-                        value={ecgForm.heart_rate}
-                        onChange={(e) => setEcgForm({ ...ecgForm, heart_rate: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        required
-                        placeholder="60-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        PR интервал (мс)
-                      </label>
-                      <input
-                        type="number"
-                        value={ecgForm.pr_interval}
-                        onChange={(e) => setEcgForm({ ...ecgForm, pr_interval: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        placeholder="120-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        QRS длительность (мс)
-                      </label>
-                      <input
-                        type="number"
-                        value={ecgForm.qrs_duration}
-                        onChange={(e) => setEcgForm({ ...ecgForm, qrs_duration: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        placeholder="80-120"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Интерпретация
-                    </label>
-                    <textarea
-                      value={ecgForm.interpretation}
-                      onChange={(e) => setEcgForm({ ...ecgForm, interpretation: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                      rows={4}
-                      placeholder="Описание ЭКГ изменений"
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowEcgForm(false)}
-                    >
-                      Отмена
-                    </Button>
-                    <Button type="submit">
-                      <Save size={16} className="mr-2" />
-                      Сохранить ЭКГ
-                    </Button>
-                  </div>
-                </form>
-              </Card>
-            )}
+            {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
+            <ECGViewer 
+              visitId={selectedPatient?.visitId || 'demo-visit-1'}
+              patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
+              onDataUpdate={() => {
+                console.log('ЭКГ данные обновлены');
+                loadPatientData();
+              }}
+            />
+            
+            <EchoForm
+              visitId={selectedPatient?.visitId || 'demo-visit-1'}
+              patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
+              onDataUpdate={() => {
+                console.log('ЭхоКГ данные обновлены');
+                loadPatientData();
+              }}
+            />
           </div>
         )}
-
+        
         {/* Анализы крови */}
         {activeTab === 'blood' && (
           <div className="space-y-6">

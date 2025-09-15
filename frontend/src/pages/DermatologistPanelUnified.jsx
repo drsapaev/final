@@ -27,9 +27,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
-import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ServiceChecklist from '../components/ServiceChecklist';
 import EMRSystem from '../components/medical/EMRSystem';
+import PhotoUploader from '../components/dermatology/PhotoUploader';
+import PhotoComparison from '../components/dermatology/PhotoComparison';
+import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
+import SkinAnalysis from '../components/dermatology/SkinAnalysis';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import QueueIntegration from '../components/QueueIntegration';
@@ -904,13 +907,27 @@ const DermatologistPanelUnified = () => {
 
         {/* Фото до/после */}
         {activeTab === 'photos' && selectedPatient && (
-          <PhotoComparison
-            patientId={selectedPatient.patient?.id}
-            patientName={selectedPatient.patient_name}
-            onPhotosChange={(photos) => {
-              console.log('Фото обновлены:', photos);
-            }}
-          />
+          <div className="space-y-6">
+            {/* Загрузчик фото с HEIC поддержкой */}
+            <PhotoUploader
+              visitId={selectedPatient.visitId || 'demo-visit-1'}
+              patientId={selectedPatient.patient?.id || 'demo-patient-1'}
+              onDataUpdate={() => {
+                console.log('Фото обновлены');
+                loadPatientData();
+              }}
+            />
+            
+            {/* AI анализ кожи */}
+            <SkinAnalysis
+              photos={photoData}
+              visitId={selectedPatient.visitId || 'demo-visit-1'}
+              patientId={selectedPatient.patient?.id || 'demo-patient-1'}
+              onAnalysisComplete={(result) => {
+                console.log('AI анализ завершен:', result);
+              }}
+            />
+          </div>
         )}
 
         {/* Осмотр кожи */}
@@ -1245,11 +1262,29 @@ const DermatologistPanelUnified = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Выбор услуг
                   </label>
-                  <ServiceChecklist
-                    value={selectedServices}
-                    onChange={setSelectedServices}
-                    department="derma"
+                  
+                  {/* Шаблоны процедур */}
+                  <ProcedureTemplates
+                    visitId={selectedPatient?.visitId || 'demo-visit-1'}
+                    onSelectProcedure={(procedure) => {
+                      console.log('Выбрана процедура:', procedure);
+                      // Добавляем процедуру в список услуг
+                      setSelectedServices(prev => [...prev, {
+                        id: Date.now(),
+                        name: procedure.name,
+                        price: procedure.price,
+                        duration: procedure.duration,
+                      }]);
+                    }}
                   />
+                  
+                  <div className="mt-4">
+                    <ServiceChecklist
+                      value={selectedServices}
+                      onChange={setSelectedServices}
+                      department="derma"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

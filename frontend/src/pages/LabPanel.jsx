@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AIAssistant from '../components/ai/AIAssistant';
+import LabResultsManager from '../components/laboratory/LabResultsManager';
+import LabReportGenerator from '../components/laboratory/LabReportGenerator';
 
 const LabPanel = () => {
   const [activeTab, setActiveTab] = useState('tests');
@@ -9,6 +11,8 @@ const LabPanel = () => {
   const [loading, setLoading] = useState(false);
   const [showTestForm, setShowTestForm] = useState(false);
   const [showResultForm, setShowResultForm] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedVisit, setSelectedVisit] = useState(null);
 
   const [testForm, setTestForm] = useState({ patient_id: '', test_date: '', test_type: '', sample_type: '', notes: '' });
   const [resultForm, setResultForm] = useState({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' });
@@ -170,31 +174,29 @@ const LabPanel = () => {
 
       {activeTab === 'results' && (
         <div>
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '18px' }}>Результаты анализов</h2>
-              <button style={{ ...buttonStyle, backgroundColor: 'white', color: '#28a745' }} onClick={() => setShowResultForm(true)}>➕ Новый результат</button>
+          {/* Новый компонент управления результатами */}
+          <LabResultsManager
+            patientId={selectedPatient?.id || 'demo-patient-1'}
+            visitId={selectedVisit?.id || 'demo-visit-1'}
+            onUpdate={() => {
+              console.log('Результаты обновлены');
+              // Обновляем список результатов
+              setResults(prev => [...prev]);
+            }}
+          />
+          
+          {/* Генератор отчетов */}
+          {results.length > 0 && (
+            <div style={{ marginTop: '20px' }}>
+              <LabReportGenerator
+                results={results}
+                patient={selectedPatient || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
+                doctor={{ name: 'Доктор Иванов', specialty: 'Терапевт' }}
+                clinic={{ name: 'Медицинская клиника' }}
+                visitId={selectedVisit?.id || 'demo-visit-1'}
+              />
             </div>
-            <div style={cardContentStyle}>
-              <div>
-                {results.map((r) => (
-                  <div key={r.id} style={listItemStyle}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                        <h3 style={{ margin: 0, fontSize: '16px' }}>Результат #{r.id} — Пациент ID: {r.patient_id}</h3>
-                        <span style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '12px', backgroundColor: '#e3f2fd', color: '#1976d2', marginLeft: '8px' }}>{r.result_date}</span>
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>{r.test_type} — {r.parameter}: {r.value} {r.unit} (норма: {r.reference})</div>
-                      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Интерпретация: {r.interpretation}</div>
-                    </div>
-                    <div>
-                      <button style={buttonStyle}>📄 Печать</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 

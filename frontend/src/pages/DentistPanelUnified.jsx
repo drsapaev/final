@@ -11,7 +11,8 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import auth from '../stores/auth.js';
 import AIAssistant from '../components/ai/AIAssistant';
-import DentalChart from '../components/dental/DentalChart';
+import TeethChart from '../components/dental/TeethChart';
+import ToothModal from '../components/dental/ToothModal';
 import TreatmentPlanner from '../components/dental/TreatmentPlanner';
 import PatientCard from '../components/dental/PatientCard';
 import ExaminationForm from '../components/dental/ExaminationForm';
@@ -114,6 +115,8 @@ const DentistPanelUnified = () => {
   const [showProstheticForm, setShowProstheticForm] = useState(false);
   const [dentalChartData, setDentalChartData] = useState(null);
   const [currentTreatmentPlan, setCurrentTreatmentPlan] = useState(null);
+  const [selectedTooth, setSelectedTooth] = useState(null);
+  const [toothModalOpen, setToothModalOpen] = useState(false);
 
   // Формы данных
   const [examinationForm, setExaminationForm] = useState({
@@ -1433,13 +1436,15 @@ const DentistPanelUnified = () => {
                 <XCircle className="h-6 w-6" />
               </button>
             </div>
-            <DentalChart
+            <TeethChart
               patientId={selectedPatient.id}
               initialData={dentalChartData}
-              onSave={handleSaveDentalChart}
-              onTreatmentPlan={(toothId, treatment) => {
-                console.log('Добавить в план лечения:', toothId, treatment);
+              onToothClick={(toothNumber, toothData) => {
+                console.log('Клик по зубу:', toothNumber, toothData);
+                setSelectedTooth({ number: toothNumber, data: toothData });
+                setToothModalOpen(true);
               }}
+              readOnly={false}
             />
           </div>
         </div>
@@ -1461,10 +1466,12 @@ const DentistPanelUnified = () => {
             </div>
             <TreatmentPlanner
               patientId={selectedPatient.id}
-              patientName={selectedPatient.name}
-              initialPlan={currentTreatmentPlan}
-              onSave={handleSaveTreatmentPlan}
-              onSendToPatient={handleSendToPatient}
+              visitId={selectedPatient.visitId || 'demo-visit-1'}
+              teethData={dentalChartData || {}}
+              onUpdate={(plan) => {
+                console.log('План лечения обновлен:', plan);
+                setCurrentTreatmentPlan(plan);
+              }}
             />
           </div>
         </div>
@@ -1935,6 +1942,30 @@ const DentistPanelUnified = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Модальное окно для работы с зубом */}
+      {toothModalOpen && selectedTooth && (
+        <ToothModal
+          open={toothModalOpen}
+          onClose={() => {
+            setToothModalOpen(false);
+            setSelectedTooth(null);
+          }}
+          toothNumber={selectedTooth.number}
+          toothData={selectedTooth.data}
+          onSave={(toothNumber, data) => {
+            console.log('Сохранение данных зуба:', toothNumber, data);
+            // Обновляем данные зубной карты
+            setDentalChartData(prev => ({
+              ...prev,
+              [toothNumber]: data
+            }));
+            setToothModalOpen(false);
+          }}
+          patientId={selectedPatient?.id}
+          visitId={selectedPatient?.visitId || 'demo-visit-1'}
+        />
       )}
     </div>
   );

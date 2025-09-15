@@ -1,477 +1,421 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Camera, 
-  Upload, 
-  Download, 
-  RotateCcw, 
-  ZoomIn, 
-  ZoomOut,
-  Maximize2,
-  Minimize2,
-  Eye,
-  EyeOff,
-  Trash2,
-  Plus,
-  Image as ImageIcon,
-  Calendar,
-  User,
-  MapPin
-} from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
-
 /**
- * Компонент сравнения фото до/после для дерматологии
- * Основа: passport.md стр. 1789-2063
+ * Photo Comparison Component
+ * Сравнение фото до/после с слайдером
+ * Согласно MASTER_TODO_LIST строка 266
  */
-const PhotoComparison = ({ 
-  patientId, 
-  patientName,
-  onPhotosChange,
-  className = '' 
-}) => {
-  // Проверяем демо-режим в самом начале
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('PhotoComparison: Skipping render in demo mode');
-    return null;
-  }
-  
-  const [photos, setPhotos] = useState({
-    before: [],
-    after: [],
-    progress: []
-  });
-  const [selectedPhoto, setSelectedPhoto] = useState(null);
-  const [viewMode, setViewMode] = useState('split'); // split, overlay, slider
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Slider,
+  IconButton,
+  ToggleButton,
+  ToggleButtonGroup,
+  Chip,
+  Paper,
+  Tooltip,
+} from '@mui/material';
+import {
+  CompareArrows,
+  SwapHoriz,
+  Fullscreen,
+  ZoomIn,
+  ZoomOut,
+  RestartAlt,
+  ViewColumn,
+  ViewStream,
+} from '@mui/icons-material';
+
+const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
+  const [sliderPosition, setSliderPosition] = useState(50);
+  const [viewMode, setViewMode] = useState('slider'); // slider, side-by-side, overlay
   const [zoom, setZoom] = useState(1);
-  const [showFullscreen, setShowFullscreen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  const fileInputRef = useRef(null);
-  const canvasRef = useRef(null);
-
-  // Загрузка существующих фото
+  // Обновление размера контейнера
   useEffect(() => {
-    loadPatientPhotos();
-  }, [patientId]);
-
-  const loadPatientPhotos = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/v1/dermatology/photos?patient_id=${patientId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPhotos(data);
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
       }
-    } catch (error) {
-      console.error('Ошибка загрузки фото:', error);
-    } finally {
-      setLoading(false);
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  // Обработка перетаскивания слайдера
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    updateSliderPosition(e);
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      updateSliderPosition(e);
     }
   };
 
-  const handleFileUpload = async (files, category) => {
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      
-      Array.from(files).forEach((file, index) => {
-        formData.append('files', file);
-      });
-      
-      formData.append('patient_id', patientId);
-      formData.append('category', category); // before, after, progress
-      formData.append('patient_name', patientName);
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
-      const response = await fetch('/api/v1/dermatology/photos/upload', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: formData
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setPhotos(prev => ({
-          ...prev,
-          [category]: [...prev[category], ...result.photos]
-        }));
-        setMessage({ type: 'success', text: `Загружено ${files.length} фото` });
-        onPhotosChange?.(photos);
-      } else {
-        throw new Error('Ошибка загрузки фото');
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки:', error);
-      setMessage({ type: 'error', text: error.message });
-    } finally {
-      setLoading(false);
+  const updateSliderPosition = (e) => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percentage = (x / rect.width) * 100;
+      setSliderPosition(Math.max(0, Math.min(100, percentage)));
     }
   };
 
-  const handleDeletePhoto = async (photoId, category) => {
-    try {
-      const response = await fetch(`/api/v1/dermatology/photos/${photoId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
+  // Обработка касаний для мобильных
+  const handleTouchStart = (e) => {
+    setIsDragging(true);
+    updateSliderPositionTouch(e);
+  };
 
-      if (response.ok) {
-        setPhotos(prev => ({
-          ...prev,
-          [category]: prev[category].filter(p => p.id !== photoId)
-        }));
-        setMessage({ type: 'success', text: 'Фото удалено' });
-      }
-    } catch (error) {
-      console.error('Ошибка удаления:', error);
-      setMessage({ type: 'error', text: 'Ошибка удаления фото' });
+  const handleTouchMove = (e) => {
+    if (isDragging) {
+      updateSliderPositionTouch(e);
     }
   };
 
-  const handlePhotoClick = (photo) => {
-    setSelectedPhoto(photo);
-    setShowFullscreen(true);
+  const updateSliderPositionTouch = (e) => {
+    if (containerRef.current && e.touches.length > 0) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = e.touches[0].clientX - rect.left;
+      const percentage = (x / rect.width) * 100;
+      setSliderPosition(Math.max(0, Math.min(100, percentage)));
+    }
   };
 
-  const handleZoom = (direction) => {
-    setZoom(prev => {
-      const newZoom = direction === 'in' ? prev * 1.2 : prev / 1.2;
-      return Math.max(0.5, Math.min(5, newZoom));
-    });
+  // Зум функции
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.25, 3));
   };
 
-  const resetZoom = () => {
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleResetZoom = () => {
     setZoom(1);
+    setSliderPosition(50);
   };
 
-  const PhotoCard = ({ photo, category, title }) => (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="aspect-square bg-gray-100 relative group">
-        <img
-          src={photo.thumbnail_url || photo.url}
-          alt={title}
-          className="w-full h-full object-cover cursor-pointer"
-          onClick={() => handlePhotoClick(photo)}
-        />
-        
-        {/* Overlay с информацией */}
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handlePhotoClick(photo)}
-              className="bg-white text-gray-900 hover:bg-gray-100"
-            >
-              <Eye size={16} />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleDeletePhoto(photo.id, category)}
-              className="bg-white text-red-600 hover:bg-red-50"
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
-        </div>
-
-        {/* Badge категории */}
-        <div className="absolute top-2 left-2">
-          <Badge 
-            variant={category === 'before' ? 'error' : category === 'after' ? 'success' : 'info'}
-            size="sm"
-          >
-            {category === 'before' ? 'До' : category === 'after' ? 'После' : 'Прогресс'}
-          </Badge>
-        </div>
-      </div>
-      
-      <div className="p-3">
-        <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-          {title}
-        </div>
-        <div className="text-xs text-gray-500 flex items-center">
-          <Calendar size={12} className="mr-1" />
-          {new Date(photo.created_at).toLocaleDateString('ru-RU')}
-        </div>
-        {photo.notes && (
-          <div className="text-xs text-gray-600 mt-1 line-clamp-2">
-            {photo.notes}
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-
-  const ComparisonView = () => {
-    if (photos.before.length === 0 && photos.after.length === 0) {
-      return (
-        <div className="text-center py-12">
-          <ImageIcon size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="text-gray-500">Нет фото для сравнения</p>
-          <p className="text-sm text-gray-400">Загрузите фото "до" и "после" для сравнения</p>
-        </div>
-      );
+  // Полноэкранный режим
+  const handleFullscreen = () => {
+    if (containerRef.current) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      }
     }
-
-    return (
-      <div className="space-y-6">
-        {/* Режимы просмотра */}
-        <div className="flex justify-center space-x-2">
-          <Button
-            variant={viewMode === 'split' ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('split')}
-          >
-            Раздельно
-          </Button>
-          <Button
-            variant={viewMode === 'overlay' ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('overlay')}
-          >
-            Наложение
-          </Button>
-          <Button
-            variant={viewMode === 'slider' ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('slider')}
-          >
-            Слайдер
-          </Button>
-        </div>
-
-        {/* Сравнение фото */}
-        {viewMode === 'split' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-medium mb-4 text-red-600">До лечения</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {photos.before.map(photo => (
-                  <PhotoCard
-                    key={photo.id}
-                    photo={photo}
-                    category="before"
-                    title={`Фото ${photos.before.indexOf(photo) + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium mb-4 text-green-600">После лечения</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {photos.after.map(photo => (
-                  <PhotoCard
-                    key={photo.id}
-                    photo={photo}
-                    category="after"
-                    title={`Фото ${photos.after.indexOf(photo) + 1}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {viewMode === 'overlay' && (
-          <div className="relative">
-            <div className="grid grid-cols-2 gap-4">
-              {photos.before.slice(0, 1).map(photo => (
-                <div key={photo.id} className="relative">
-                  <img
-                    src={photo.url}
-                    alt="До"
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
-                  <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded text-sm">
-                    До
-                  </div>
-                </div>
-              ))}
-              {photos.after.slice(0, 1).map(photo => (
-                <div key={photo.id} className="relative">
-                  <img
-                    src={photo.url}
-                    alt="После"
-                    className="w-full h-64 object-cover rounded-lg"
-                  />
-                  <div className="absolute top-2 left-2 bg-green-600 text-white px-2 py-1 rounded text-sm">
-                    После
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {viewMode === 'slider' && (
-          <div className="relative">
-            <div className="relative h-64 overflow-hidden rounded-lg">
-              <div className="absolute inset-0 flex">
-                {photos.before.slice(0, 1).map(photo => (
-                  <img
-                    key={photo.id}
-                    src={photo.url}
-                    alt="До"
-                    className="w-1/2 h-full object-cover"
-                  />
-                ))}
-                {photos.after.slice(0, 1).map(photo => (
-                  <img
-                    key={photo.id}
-                    src={photo.url}
-                    alt="После"
-                    className="w-1/2 h-full object-cover"
-                  />
-                ))}
-              </div>
-              
-              {/* Слайдер */}
-              <div className="absolute top-0 left-1/2 w-1 bg-white h-full transform -translate-x-1/2">
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center cursor-pointer">
-                  <div className="w-4 h-4 border-l-2 border-r-2 border-gray-400"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
+
+  if (!beforePhoto || !afterPhoto) {
+    return (
+      <Card>
+        <CardContent>
+          <Typography variant="body1" color="text.secondary" align="center">
+            Для сравнения необходимы фото до и после процедуры
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      {/* Заголовок */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold flex items-center">
-            <Camera className="mr-2 text-orange-600" size={24} />
-            Фото до/после
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Пациент: {patientName}
-          </p>
-        </div>
-        
-        <div className="flex space-x-2">
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
+    <Card>
+      <CardContent>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">
+            <CompareArrows sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Сравнение результатов
+          </Typography>
+          
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            {/* Режим отображения */}
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(e, newMode) => newMode && setViewMode(newMode)}
+              size="small"
+            >
+              <ToggleButton value="slider">
+                <Tooltip title="Слайдер">
+                  <SwapHoriz />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="side-by-side">
+                <Tooltip title="Рядом">
+                  <ViewColumn />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="overlay">
+                <Tooltip title="Наложение">
+                  <ViewStream />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+            
+            {/* Зум контролы */}
+            <IconButton onClick={handleZoomOut} size="small">
+              <ZoomOut />
+            </IconButton>
+            <Chip label={`${Math.round(zoom * 100)}%`} size="small" />
+            <IconButton onClick={handleZoomIn} size="small">
+              <ZoomIn />
+            </IconButton>
+            <IconButton onClick={handleResetZoom} size="small">
+              <RestartAlt />
+            </IconButton>
+            <IconButton onClick={handleFullscreen} size="small">
+              <Fullscreen />
+            </IconButton>
+          </Box>
+        </Box>
+
+        {/* Метаданные */}
+        {metadata.zone && (
+          <Box sx={{ mb: 2 }}>
+            <Chip label={`Зона: ${metadata.zone}`} size="small" sx={{ mr: 1 }} />
+            <Chip label={`Ракурс: ${metadata.angle || 'front'}`} size="small" sx={{ mr: 1 }} />
+            <Chip label={`Освещение: ${metadata.lighting || 'natural'}`} size="small" />
+          </Box>
+        )}
+
+        {/* Режим слайдера */}
+        {viewMode === 'slider' && (
+          <Box
+            ref={containerRef}
+            sx={{
+              position: 'relative',
+              width: '100%',
+              height: '500px',
+              overflow: 'hidden',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleMouseUp}
           >
-            <Upload size={16} className="mr-2" />
-            Загрузить фото
-          </Button>
-        </div>
-      </div>
-
-      {/* Скрытый input для загрузки */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const files = e.target.files;
-          if (files.length > 0) {
-            // Показываем диалог выбора категории
-            const category = prompt('Выберите категорию:\n1 - До лечения\n2 - После лечения\n3 - Прогресс');
-            const categoryMap = { '1': 'before', '2': 'after', '3': 'progress' };
-            const selectedCategory = categoryMap[category] || 'before';
-            handleFileUpload(files, selectedCategory);
-          }
-        }}
-      />
-
-      {/* Сообщения */}
-      {message.text && (
-        <div className={`p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
-          {message.text}
-        </div>
-      )}
-
-      {/* Сравнение фото */}
-      <ComparisonView />
-
-      {/* Прогресс лечения */}
-      {photos.progress.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium mb-4 text-blue-600">Прогресс лечения</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {photos.progress.map(photo => (
-              <PhotoCard
-                key={photo.id}
-                photo={photo}
-                category="progress"
-                title={`Прогресс ${photos.progress.indexOf(photo) + 1}`}
+            {/* Фото ПОСЛЕ (нижний слой) */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                overflow: 'hidden',
+              }}
+            >
+              <img
+                src={afterPhoto}
+                alt="После"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  transform: `scale(${zoom})`,
+                  transition: isDragging ? 'none' : 'transform 0.3s ease',
+                }}
               />
-            ))}
-          </div>
-        </div>
-      )}
+            </Box>
+            
+            {/* Фото ДО (верхний слой с обрезкой) */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: `${sliderPosition}%`,
+                height: '100%',
+                overflow: 'hidden',
+                borderRight: '2px solid white',
+              }}
+            >
+              <img
+                src={beforePhoto}
+                alt="До"
+                style={{
+                  width: containerWidth || '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  transform: `scale(${zoom})`,
+                  transition: isDragging ? 'none' : 'transform 0.3s ease',
+                }}
+              />
+            </Box>
+            
+            {/* Слайдер-разделитель */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: `${sliderPosition}%`,
+                width: '40px',
+                height: '100%',
+                marginLeft: '-20px',
+                cursor: 'ew-resize',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Paper
+                sx={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'white',
+                  boxShadow: 3,
+                }}
+              >
+                <SwapHoriz />
+              </Paper>
+            </Box>
+            
+            {/* Метки */}
+            <Typography
+              sx={{
+                position: 'absolute',
+                top: 10,
+                left: 10,
+                bgcolor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                fontSize: '0.875rem',
+              }}
+            >
+              ДО
+            </Typography>
+            <Typography
+              sx={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                bgcolor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                fontSize: '0.875rem',
+              }}
+            >
+              ПОСЛЕ
+            </Typography>
+          </Box>
+        )}
 
-      {/* Полноэкранный просмотр */}
-      {showFullscreen && selectedPhoto && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
-          <div className="relative max-w-4xl max-h-full">
+        {/* Режим рядом */}
+        {viewMode === 'side-by-side' && (
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle2" align="center" gutterBottom>
+                ДО
+              </Typography>
+              <Box sx={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
+                <img
+                  src={beforePhoto}
+                  alt="До"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    transform: `scale(${zoom})`,
+                    transition: 'transform 0.3s ease',
+                  }}
+                />
+              </Box>
+            </Box>
+            
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle2" align="center" gutterBottom>
+                ПОСЛЕ
+              </Typography>
+              <Box sx={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
+                <img
+                  src={afterPhoto}
+                  alt="После"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    transform: `scale(${zoom})`,
+                    transition: 'transform 0.3s ease',
+                  }}
+                />
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        {/* Режим наложения */}
+        {viewMode === 'overlay' && (
+          <Box sx={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
             <img
-              src={selectedPhoto.url}
-              alt="Фото"
-              className="max-w-full max-h-full object-contain"
-              style={{ transform: `scale(${zoom})` }}
+              src={beforePhoto}
+              alt="До"
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                opacity: 1 - sliderPosition / 100,
+                transform: `scale(${zoom})`,
+                transition: 'transform 0.3s ease',
+              }}
+            />
+            <img
+              src={afterPhoto}
+              alt="После"
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                opacity: sliderPosition / 100,
+                transform: `scale(${zoom})`,
+                transition: 'transform 0.3s ease',
+              }}
             />
             
-            {/* Элементы управления */}
-            <div className="absolute top-4 right-4 flex space-x-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleZoom('out')}
-                className="bg-white text-gray-900"
-              >
-                <ZoomOut size={16} />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleZoom('in')}
-                className="bg-white text-gray-900"
-              >
-                <ZoomIn size={16} />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={resetZoom}
-                className="bg-white text-gray-900"
-              >
-                <RotateCcw size={16} />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowFullscreen(false)}
-                className="bg-white text-gray-900"
-              >
-                <Minimize2 size={16} />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            <Box sx={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+              <Typography variant="caption" color="white" gutterBottom>
+                Прозрачность
+              </Typography>
+              <Slider
+                value={sliderPosition}
+                onChange={(e, value) => setSliderPosition(value)}
+                sx={{
+                  color: 'white',
+                  '& .MuiSlider-thumb': {
+                    bgcolor: 'white',
+                  },
+                }}
+              />
+            </Box>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
