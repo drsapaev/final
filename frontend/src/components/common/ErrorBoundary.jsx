@@ -56,7 +56,10 @@ class ErrorBoundary extends React.Component {
  * Fallback UI компонент
  */
 function ErrorFallback({ error, errorInfo, onRetry, theme }) {
-  const { getColor, getSpacing, getFontSize } = theme;
+  // Проверяем, что theme существует и имеет необходимые методы
+  const getColor = theme?.getColor || ((color) => color);
+  const getSpacing = theme?.getSpacing || ((size) => size);
+  const getFontSize = theme?.getFontSize || ((size) => size);
 
   const containerStyle = {
     display: 'flex',

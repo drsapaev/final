@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     admin_users,
     ai,  # Новый AI модуль
     analytics,
+    telegram_bot,  # Telegram Bot
     analytics_kpi,
     analytics_predictive,
     api_documentation,
@@ -103,6 +104,7 @@ api_router.include_router(print_templates.router, prefix="/print/templates", tag
 api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
 api_router.include_router(ai_integration.router, prefix="/ai", tags=["ai-integration"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])  # Новые AI endpoints
+api_router.include_router(telegram_bot.router, prefix="/telegram/bot", tags=["telegram-bot"])  # Telegram Bot
 api_router.include_router(telegram_integration.router, prefix="/telegram", tags=["telegram-integration"])
 api_router.include_router(display_websocket.router, prefix="/display", tags=["display-websocket"])
 api_router.include_router(print_ep.router, tags=["print"])
