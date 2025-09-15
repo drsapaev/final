@@ -44,16 +44,77 @@ export default defineConfig({
     // PWA оптимизации
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          ui: ['lucide-react'],
-          mui: ['@mui/material', '@mui/icons-material']
+        manualChunks: (id) => {
+          // Vendor chunks
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('react-router')) {
+              return 'router';
+            }
+            if (id.includes('@mui')) {
+              return 'mui';
+            }
+            if (id.includes('lucide-react')) {
+              return 'icons';
+            }
+            if (id.includes('axios') || id.includes('fetch')) {
+              return 'http';
+            }
+            return 'vendor';
+          }
+          
+          // App chunks по функциональности
+          if (id.includes('/pages/')) {
+            if (id.includes('Admin') || id.includes('Settings') || id.includes('Audit')) {
+              return 'admin-pages';
+            }
+            if (id.includes('Doctor') || id.includes('Cardiologist') || id.includes('Dermatologist') || id.includes('Dentist')) {
+              return 'doctor-pages';
+            }
+            if (id.includes('Patient') || id.includes('Mobile')) {
+              return 'patient-pages';
+            }
+            if (id.includes('Payment') || id.includes('Cashier')) {
+              return 'payment-pages';
+            }
+            if (id.includes('Queue') || id.includes('Display')) {
+              return 'queue-pages';
+            }
+            return 'other-pages';
+          }
+          
+          if (id.includes('/components/')) {
+            if (id.includes('medical') || id.includes('laboratory')) {
+              return 'medical-components';
+            }
+            if (id.includes('admin') || id.includes('auth')) {
+              return 'admin-components';
+            }
+            if (id.includes('pwa') || id.includes('mobile')) {
+              return 'pwa-components';
+            }
+            if (id.includes('ai')) {
+              return 'ai-components';
+            }
+            return 'common-components';
+          }
         }
       }
     },
     // Увеличиваем лимит для больших файлов
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1000,
+    // Минификация
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
+    // Source maps только для development
+    sourcemap: process.env.NODE_ENV === 'development'
   },
   optimizeDeps: {
     // Принудительно предварительно собираем Material-UI

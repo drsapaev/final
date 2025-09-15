@@ -16,7 +16,12 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "check-theme": "node scripts/check-theme-compliance.js"
+    "test:e2e:report": "playwright show-report",
+    "check-theme": "node scripts/check-theme-compliance.js",
+    "analyze": "node scripts/analyze-bundle.js",
+    "build:analyze": "npm run build && npm run analyze",
+    "optimize": "npm run build:analyze && npm run test:e2e:run",
+    "test:e2e:run": "playwright test --reporter=html"
   },
   "dependencies": {
     "@emotion/babel-plugin": "^11.13.5",
