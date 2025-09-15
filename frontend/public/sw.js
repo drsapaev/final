@@ -3,33 +3,61 @@
  * Обеспечивает офлайн работу и кэширование
  */
 
-const CACHE_NAME = 'clinic-pwa-v1.0.0';
-const STATIC_CACHE = 'clinic-static-v1.0.0';
-const DYNAMIC_CACHE = 'clinic-dynamic-v1.0.0';
+const CACHE_NAME = 'clinic-pwa-v2.0.0';
+const STATIC_CACHE = 'clinic-static-v2.0.0';
+const DYNAMIC_CACHE = 'clinic-dynamic-v2.0.0';
+const API_CACHE = 'clinic-api-v2.0.0';
 
 // Файлы для кэширования при установке
 const STATIC_FILES = [
   '/',
   '/index.html',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
+  '/offline.html',
   '/manifest.json',
   '/favicon.ico',
-  // Добавляем основные страницы
+  // Vite assets
+  '/assets/index.css',
+  '/assets/index.js',
+  // Основные страницы
+  '/login',
   '/dashboard',
   '/patients',
   '/appointments',
-  '/queue'
+  '/queue',
+  '/doctor',
+  '/registrar',
+  '/cashier',
+  '/lab',
+  '/mobile'
 ];
 
 // API endpoints для кэширования
 const API_CACHE_PATTERNS = [
+  /\/api\/v1\/auth\/me/,
+  /\/api\/v1\/patients/,
+  /\/api\/v1\/visits/,
+  /\/api\/v1\/queue/,
+  /\/api\/v1\/services/,
   /\/api\/v1\/mobile\/auth\/profile/,
   /\/api\/v1\/mobile\/appointments/,
   /\/api\/v1\/mobile\/stats/,
   /\/api\/v1\/mobile\/notifications/,
   /\/api\/v1\/mobile\/health/
 ];
+
+// API endpoints которые НЕ нужно кэшировать
+const NO_CACHE_PATTERNS = [
+  /\/api\/v1\/auth\/login/,
+  /\/api\/v1\/auth\/logout/,
+  /\/api\/v1\/payments/,
+  /\/api\/v1\/ai/,
+  /\/api\/v1\/telegram/,
+  /\/api\/v1\/print/
+];
+
+// Background Sync задачи
+const BACKGROUND_SYNC_TAG = 'clinic-background-sync';
+const OFFLINE_QUEUE_NAME = 'clinic-offline-queue';
 
 // Установка Service Worker
 self.addEventListener('install', (event) => {
@@ -291,4 +319,166 @@ self.addEventListener('message', (event) => {
   }
 });
 
-console.log('Service Worker: Loaded successfully');
+// Periodic Background Sync (если поддерживается)
+self.addEventListener('periodicsync', (event) => {
+  console.log('Service Worker: Periodic sync', event.tag);
+  
+  if (event.tag === 'clinic-data-sync') {
+    event.waitUntil(syncClinicData());
+  }
+});
+
+// Синхронизация данных клиники
+async function syncClinicData() {
+  try {
+    console.log('Service Worker: Syncing clinic data');
+    
+    // Обновляем критические данные
+    const endpoints = [
+      '/api/v1/auth/me',
+      '/api/v1/queue/today',
+      '/api/v1/mobile/notifications'
+    ];
+    
+    const cache = await caches.open(API_CACHE);
+    
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint);
+        if (response.ok) {
+          await cache.put(endpoint, response.clone());
+          console.log(`Service Worker: Synced ${endpoint}`);
+        }
+      } catch (error) {
+        console.log(`Service Worker: Failed to sync ${endpoint}`, error);
+      }
+    }
+    
+  } catch (error) {
+    console.error('Service Worker: Clinic data sync failed', error);
+  }
+}
+
+// Обработка HEIC конвертации
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CONVERT_HEIC') {
+    event.waitUntil(convertHEICToJPEG(event.data.file, event.ports[0]));
+  }
+});
+
+// HEIC → JPEG конвертация
+async function convertHEICToJPEG(heicFile, port) {
+  try {
+    // Импортируем heic2any динамически
+    const heic2any = (await import('https://cdn.skypack.dev/heic2any')).default;
+    
+    const jpegBlob = await heic2any({
+      blob: heicFile,
+      toType: 'image/jpeg',
+      quality: 0.8
+    });
+    
+    port.postMessage({
+      success: true,
+      convertedFile: jpegBlob
+    });
+    
+    console.log('Service Worker: HEIC converted to JPEG');
+    
+  } catch (error) {
+    console.error('Service Worker: HEIC conversion failed', error);
+    port.postMessage({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+// Обработка офлайн очереди
+async function processOfflineQueue() {
+  try {
+    const cache = await caches.open(OFFLINE_QUEUE_NAME);
+    const requests = await cache.keys();
+    
+    for (const request of requests) {
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          await cache.delete(request);
+          console.log('Service Worker: Processed offline request', request.url);
+        }
+      } catch (error) {
+        console.log('Service Worker: Still offline, keeping request in queue');
+      }
+    }
+  } catch (error) {
+    console.error('Service Worker: Error processing offline queue', error);
+  }
+}
+
+// Обновленная фоновая синхронизация
+async function doBackgroundSync() {
+  try {
+    console.log('Service Worker: Performing background sync');
+    
+    // Обрабатываем офлайн очередь
+    await processOfflineQueue();
+    
+    // Синхронизируем данные клиники
+    await syncClinicData();
+    
+    // Уведомляем основной поток об успешной синхронизации
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'SYNC_COMPLETE',
+        timestamp: Date.now()
+      });
+    });
+    
+  } catch (error) {
+    console.error('Service Worker: Background sync failed', error);
+  }
+}
+
+// Регистрация Periodic Background Sync при активации
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
+  
+  event.waitUntil((async () => {
+    // Очищаем старые кэши
+    const cacheNames = await caches.keys();
+    const oldCaches = cacheNames.filter(name => 
+      name.startsWith('clinic-') && 
+      !name.includes('v2.0.0')
+    );
+    
+    await Promise.all(oldCaches.map(name => caches.delete(name)));
+    
+    // Регистрируем periodic sync если поддерживается
+    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+      try {
+        await self.registration.sync.register(BACKGROUND_SYNC_TAG);
+        console.log('Service Worker: Background sync registered');
+      } catch (error) {
+        console.log('Service Worker: Background sync not supported');
+      }
+    }
+    
+    // Periodic sync для современных браузеров
+    if ('periodicSync' in self.registration) {
+      try {
+        await self.registration.periodicSync.register('clinic-data-sync', {
+          minInterval: 24 * 60 * 60 * 1000, // 24 часа
+        });
+        console.log('Service Worker: Periodic sync registered');
+      } catch (error) {
+        console.log('Service Worker: Periodic sync not supported');
+      }
+    }
+    
+    return self.clients.claim();
+  })());
+});
+
+console.log('Service Worker: Loaded successfully with enhanced PWA features');

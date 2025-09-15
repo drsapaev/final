@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
-import PWAInstallPrompt from './components/mobile/PWAInstallPrompt.jsx';
-import OfflineIndicator from './components/mobile/OfflineIndicator.jsx';
+import { PWAInstallPrompt, ConnectionStatus } from './components/pwa';
 import usePWA from './hooks/usePWA.js';
 import './styles/theme.css';
 
@@ -110,7 +109,7 @@ function AppContent() {
 
   return (
     <>
-      <OfflineIndicator />
+      <ConnectionStatus />
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
       <Route path="/login" element={<Login />} />
