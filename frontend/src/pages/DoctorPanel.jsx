@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import '../styles/dark-theme-visibility-fix.css';
 import { 
   Button, 
   Card, 

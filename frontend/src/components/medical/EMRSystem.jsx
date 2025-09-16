@@ -364,7 +364,14 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               className="hidden"
               disabled={!canSaveEMR}
             />
-            <Button size="sm" disabled={!canSaveEMR}>
+            <Button 
+              size="sm" 
+              disabled={!canSaveEMR}
+              onClick={(e) => {
+                // Предотвращаем двойной клик
+                e.preventDefault();
+              }}
+            >
               <Upload className="w-4 h-4 mr-2" />
               Загрузить файлы
             </Button>

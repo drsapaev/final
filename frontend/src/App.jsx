@@ -4,6 +4,7 @@ import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt, ConnectionStatus } from './components/pwa';
 import usePWA from './hooks/usePWA.js';
 import './styles/theme.css';
+import './styles/dark-theme-visibility-fix.css';
 
 import Header from './components/layout/Header.jsx';
 import Sidebar from './components/layout/Sidebar.jsx';

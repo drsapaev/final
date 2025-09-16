@@ -1,0 +1,208 @@
+/* 
+ * КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ ВИДИМОСТИ В ТЕМНОЙ ТЕМЕ
+ * Этот файл исправляет проблемы с прозрачными фонами и слабыми границами
+ */
+
+/* Основные переменные для улучшенной видимости */
+:root[data-theme="dark"] {
+  /* Непрозрачные фоны вместо прозрачных */
+  --dark-card-bg: #1e293b;
+  --dark-panel-bg: #334155;
+  --dark-modal-bg: #0f172a;
+  
+  /* Видимые границы */
+  --dark-border: #475569;
+  --dark-border-light: #64748b;
+  --dark-border-strong: #94a3b8;
+  
+  /* Контрастный текст */
+  --dark-text-primary: #f8fafc;
+  --dark-text-secondary: #e2e8f0;
+  --dark-text-muted: #cbd5e1;
+}
+
+/* ИСПРАВЛЕНИЕ 1: Замена всех прозрачных фонов */
+[data-theme="dark"] div[style*="rgba(15, 23, 42, 0.8)"],
+[data-theme="dark"] div[style*="rgba(15,23,42,0.8)"],
+[data-theme="dark"] .registrar-panel [style*="rgba(15, 23, 42, 0.8)"],
+[data-theme="dark"] .admin-panel [style*="rgba(15, 23, 42, 0.8)"] {
+  background: var(--dark-card-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] div[style*="rgba(255, 255, 255, 0.8)"],
+[data-theme="dark"] div[style*="rgba(255,255,255,0.8)"] {
+  background: var(--dark-card-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 2: Замена слабых границ */
+[data-theme="dark"] [style*="rgba(255, 255, 255, 0.1)"],
+[data-theme="dark"] [style*="rgba(255,255,255,0.1)"] {
+  border-color: var(--dark-border) !important;
+}
+
+[data-theme="dark"] [style*="rgba(255, 255, 255, 0.2)"],
+[data-theme="dark"] [style*="rgba(255,255,255,0.2)"] {
+  border-color: var(--dark-border-light) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 3: Отключение backdrop-filter в темной теме */
+[data-theme="dark"] [style*="backdrop-filter: blur"] {
+  backdrop-filter: none !important;
+}
+
+/* ИСПРАВЛЕНИЕ 4: Специальные стили для панелей */
+[data-theme="dark"] .registrar-panel,
+[data-theme="dark"] .admin-panel,
+[data-theme="dark"] .analytics-panel {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 5: Карточки и контейнеры */
+[data-theme="dark"] .card-container,
+[data-theme="dark"] .table-container,
+[data-theme="dark"] .modal-container {
+  background: var(--dark-card-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 6: Таблицы */
+[data-theme="dark"] table,
+[data-theme="dark"] .table-wrapper,
+[data-theme="dark"] .data-table {
+  background: var(--dark-card-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] th,
+[data-theme="dark"] td {
+  border-color: var(--dark-border) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 7: Модальные окна */
+[data-theme="dark"] .modal,
+[data-theme="dark"] .dialog,
+[data-theme="dark"] .popup {
+  background: var(--dark-modal-bg) !important;
+  border: 2px solid var(--dark-border-strong) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 8: Вкладки */
+[data-theme="dark"] .tabs,
+[data-theme="dark"] .tab-container {
+  background: var(--dark-panel-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .tab-button {
+  background: transparent !important;
+  color: var(--dark-text-secondary) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .tab-button.active,
+[data-theme="dark"] .tab-button:hover {
+  background: var(--dark-card-bg) !important;
+  color: var(--dark-text-primary) !important;
+  border-color: var(--dark-border-light) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 9: Формы */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: var(--dark-panel-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: var(--dark-border-strong) !important;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.3) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 10: Кнопки */
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .button-secondary {
+  background: var(--dark-panel-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .btn-secondary:hover,
+[data-theme="dark"] .button-secondary:hover {
+  background: var(--dark-card-bg) !important;
+  border-color: var(--dark-border-light) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 11: Специфичные селекторы для inline стилей */
+[data-theme="dark"] div[style*="background: rgba(15, 23, 42, 0.8)"] {
+  background: var(--dark-card-bg) !important;
+}
+
+[data-theme="dark"] div[style*="background: rgba(255, 255, 255, 0.8)"] {
+  background: var(--dark-card-bg) !important;
+}
+
+[data-theme="dark"] div[style*="border: 1px solid rgba(255, 255, 255, 0.1)"] {
+  border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] div[style*="border: 1px solid rgba(255, 255, 255, 0.2)"] {
+  border: 1px solid var(--dark-border-light) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 12: Принудительное исправление для всех элементов с проблемными стилями */
+[data-theme="dark"] * {
+  /* Исправляем любые элементы с очень низкой непрозрачностью */
+}
+
+[data-theme="dark"] *[style*="opacity: 0.1"],
+[data-theme="dark"] *[style*="opacity: 0.2"],
+[data-theme="dark"] *[style*="opacity: 0.3"] {
+  opacity: 0.8 !important;
+}
+
+/* ИСПРАВЛЕНИЕ 13: Дополнительные утилитарные классы */
+.dark-theme-visible {
+  background: var(--dark-card-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+.dark-theme-panel {
+  background: var(--dark-panel-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+.dark-theme-modal {
+  background: var(--dark-modal-bg) !important;
+  border: 2px solid var(--dark-border-strong) !important;
+  color: var(--dark-text-primary) !important;
+}
+
+/* ИСПРАВЛЕНИЕ 14: Медиа-запросы для мобильных устройств */
+@media (max-width: 768px) {
+  [data-theme="dark"] .mobile-card,
+  [data-theme="dark"] .mobile-panel {
+    background: var(--dark-card-bg) !important;
+    border: 1px solid var(--dark-border) !important;
+  }
+}
+
+/* ИСПРАВЛЕНИЕ 15: Анимации и переходы */
+[data-theme="dark"] .fade-in,
+[data-theme="dark"] .slide-in,
+[data-theme="dark"] .scale-in {
+  background: var(--dark-card-bg) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+/* ВАЖНО: Этот файл должен загружаться ПОСЛЕ всех остальных CSS файлов */

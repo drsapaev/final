@@ -41,6 +41,7 @@ import {
 import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
+import '../styles/dark-theme-visibility-fix.css';
  
 
 const RegistrarPanel = () => {
@@ -330,6 +331,7 @@ const RegistrarPanel = () => {
     alignItems: 'center',
     background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 700)} 50%, ${getColor('primary', 900)} 100%)`,
     color: 'white',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
     position: 'relative',
     overflow: 'hidden'
   };
@@ -378,13 +380,15 @@ const RegistrarPanel = () => {
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
     position: 'relative',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
   };
 
   const buttonSecondaryStyle = {
     ...buttonStyle,
     background: `linear-gradient(135deg, ${getColor('gray', 500)} 0%, ${getColor('gray', 600)} 100%)`,
-    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
+    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
   };
 
   const buttonSuccessStyle = {

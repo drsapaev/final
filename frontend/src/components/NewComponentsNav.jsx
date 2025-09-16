@@ -61,14 +61,16 @@ const NewComponentsNav = () => {
           <h1 style={{
             fontSize: '32px',
             fontWeight: 'bold',
-            margin: '0 0 10px 0'
+            margin: '0 0 10px 0',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
           }}>
             🚀 Новые компоненты системы
           </h1>
           <p style={{
             fontSize: '18px',
             margin: '0',
-            opacity: 0.9
+            opacity: 0.95,
+            textShadow: '0 1px 2px rgba(0, 0, 0, 0.6)'
           }}>
             Выберите компонент для тестирования
           </p>
