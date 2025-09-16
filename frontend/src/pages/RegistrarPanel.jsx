@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import InputMask from 'react-input-mask';
+import PhoneInput from '../components/ui/PhoneInput';
 import { Toaster, toast } from 'react-hot-toast';
 import AppointmentsTable from '../components/AppointmentsTable';
 import ServiceChecklist from '../components/ServiceChecklist';
@@ -813,6 +813,42 @@ const RegistrarPanel = () => {
     return null;
   };
 
+  // Функция генерации CSV
+  const generateCSV = (data) => {
+    const headers = ['№', 'ФИО', 'Год рождения', 'Телефон', 'Услуги', 'Тип обращения', 'Вид оплаты', 'Стоимость', 'Статус'];
+    const rows = data.map((row, index) => [
+      index + 1,
+      row.patient_fio || '',
+      row.patient_birth_year || '',
+      row.patient_phone || '',
+      Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
+      row.visit_type || '',
+      row.payment_type || '',
+      row.cost || '',
+      row.status || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    return csvContent;
+  };
+  
+  // Функция скачивания CSV
+  const downloadCSV = (content, filename) => {
+    const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Статистика для экрана приветствия
   const stats = {
     totalPatients: appointments.length,
@@ -1207,6 +1243,86 @@ const RegistrarPanel = () => {
               {/* Индикатор источника данных для всех вкладок */}
               <DataSourceIndicator count={filteredAppointments.length} />
               
+              {/* Панель управления таблицей */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => setShowAddressColumn(!showAddressColumn)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      border: showAddressColumn ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                      background: showAddressColumn ? '#3b82f620' : 'white',
+                      color: showAddressColumn ? '#3b82f6' : '#6b7280',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    📍 {showAddressColumn ? 'Скрыть адрес' : 'Показать адрес'}
+                  </button>
+                  
+                  <button
+                    onClick={() => loadAppointments()}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    🔄 Обновить
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      const csv = generateCSV(filteredAppointments);
+                      downloadCSV(csv, `appointments_${new Date().toISOString().split('T')[0]}.csv`);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    📥 Экспорт CSV
+                  </button>
+                </div>
+                
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#6b7280',
+                  fontWeight: '500'
+                }}>
+                  Показано: {filteredAppointments.length} записей
+                </div>
+              </div>
+              
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
                 <div style={{ 
@@ -1243,24 +1359,189 @@ const RegistrarPanel = () => {
                 <ResponsiveTable
                   data={filteredAppointments}
                   columns={[
-                    { key: 'id', label: '№', align: 'center', minWidth: '60px' },
-                    { key: 'patient_fio', label: 'ФИО', minWidth: '200px' },
-                    { key: 'birth_year', label: 'Год рождения', align: 'center', minWidth: '120px' },
-                    { key: 'phone', label: 'Телефон', minWidth: '150px' },
-                    { key: 'services', label: 'Услуги', minWidth: '200px', mobileHidden: isMobile },
-                    { key: 'visit_type', label: 'Тип обращения', minWidth: '120px', mobileHidden: isMobile },
-                    { key: 'payment_type', label: 'Вид оплаты', minWidth: '120px', mobileHidden: isMobile },
-                    { key: 'total_cost', label: 'Стоимость', align: 'center', minWidth: '100px' },
+                    { 
+                      key: 'number', 
+                      label: '№', 
+                      align: 'center', 
+                      minWidth: '50px',
+                      fixed: true,
+                      render: (value, row, index) => index + 1
+                    },
+                    { 
+                      key: 'patient_fio', 
+                      label: 'ФИО', 
+                      minWidth: '250px',
+                      clickable: true,
+                      onClick: (row) => {
+                        // Открыть карту пациента
+                        console.log('Открыть карту пациента:', row.patient_fio);
+                      }
+                    },
+                    { 
+                      key: 'patient_birth_year', 
+                      label: 'Год рождения', 
+                      align: 'center', 
+                      minWidth: '100px',
+                      validate: (value) => {
+                        const currentYear = new Date().getFullYear();
+                        return value >= 1900 && value <= currentYear - 1;
+                      }
+                    },
+                    { 
+                      key: 'patient_phone', 
+                      label: 'Телефон', 
+                      minWidth: '150px',
+                      masked: true,
+                      copyable: true,
+                      clickable: true,
+                      onClick: (row) => {
+                        // Звонок по клику
+                        console.log('Звонок:', row.patient_phone);
+                      }
+                    },
+                    { 
+                      key: 'address', 
+                      label: 'Адрес', 
+                      minWidth: '200px',
+                      collapsible: true,
+                      hidden: !showAddressColumn,
+                      mobileHidden: true
+                    },
+                    { 
+                      key: 'services', 
+                      label: 'Услуги', 
+                      minWidth: '250px',
+                      render: (value) => {
+                        if (Array.isArray(value)) {
+                          return (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {value.map((service, idx) => {
+                                // Определяем группу услуги
+                                const getServiceGroup = (service) => {
+                                  const s = service.toLowerCase();
+                                  if (s.includes('дерм') || s.includes('косм')) return 'derm';
+                                  if (s.includes('кардио')) return 'cardio';
+                                  if (s.includes('экг')) return 'ecg';
+                                  if (s.includes('эхо')) return 'echo';
+                                  if (s.includes('стомат') || s.includes('зуб')) return 'stomatology';
+                                  if (s.includes('лаб') || s.includes('анализ')) return 'lab';
+                                  return 'other';
+                                };
+                                
+                                const group = getServiceGroup(service);
+                                const groupColors = {
+                                  derm: '#f59e0b',
+                                  cardio: '#ef4444',
+                                  ecg: '#ec4899',
+                                  echo: '#8b5cf6',
+                                  stomatology: '#3b82f6',
+                                  lab: '#10b981',
+                                  other: '#6b7280'
+                                };
+                                
+                                return (
+                                  <span
+                                    key={idx}
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      backgroundColor: groupColors[group] + '20',
+                                      color: groupColors[group],
+                                      border: `1px solid ${groupColors[group]}50`
+                                    }}
+                                  >
+                                    {service}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        return value;
+                      }
+                    },
+                    { 
+                      key: 'visit_type', 
+                      label: 'Тип обращения', 
+                      minWidth: '120px',
+                      align: 'center',
+                      render: (value) => {
+                        const types = {
+                          'Платный': { color: '#3b82f6', icon: '💰' },
+                          'Повторный': { color: '#10b981', icon: '🔄' },
+                          'Льготный': { color: '#f59e0b', icon: '🎫' }
+                        };
+                        const type = types[value] || { color: '#6b7280', icon: '📋' };
+                        return (
+                          <span style={{ color: type.color, fontWeight: '500' }}>
+                            {type.icon} {value}
+                          </span>
+                        );
+                      }
+                    },
+                    { 
+                      key: 'payment_type', 
+                      label: 'Вид оплаты', 
+                      minWidth: '110px',
+                      align: 'center',
+                      render: (value) => {
+                        const payments = {
+                          'Наличные': '💵',
+                          'Карта': '💳',
+                          'Онлайн': '🌐',
+                          'Перевод': '📱'
+                        };
+                        return (
+                          <span>
+                            {payments[value] || '💰'} {value}
+                          </span>
+                        );
+                      }
+                    },
+                    { 
+                      key: 'cost', 
+                      label: 'Стоимость', 
+                      align: 'right', 
+                      minWidth: '100px',
+                      render: (value) => {
+                        return (
+                          <span style={{ fontWeight: '600', color: '#059669' }}>
+                            {value ? `${value.toLocaleString()} ₽` : '—'}
+                          </span>
+                        );
+                      }
+                    },
                     { 
                       key: 'status', 
                       label: 'Статус', 
                       align: 'center', 
-                      minWidth: '120px',
-                      render: (value) => (
-                        <Badge variant={getStatusVariant(value)} size="md">
-                          {value || 'scheduled'}
-                        </Badge>
-                      )
+                      minWidth: '130px',
+                      render: (value) => {
+                        const statusConfig = {
+                          'plan': { label: 'Запланирован', color: 'info', icon: '📅' },
+                          'confirmed': { label: 'Подтвержден', color: 'success', icon: '✅' },
+                          'queued': { label: 'В очереди', color: 'warning', icon: '⏳' },
+                          'in_cabinet': { label: 'В кабинете', color: 'primary', icon: '🏥' },
+                          'done': { label: 'Завершен', color: 'success', icon: '✔️' },
+                          'canceled': { label: 'Отменен', color: 'danger', icon: '❌' },
+                          'no_show': { label: 'Неявка', color: 'secondary', icon: '🚫' },
+                          'paid_pending': { label: 'Ожидает оплаты', color: 'warning', icon: '💳' },
+                          'paid': { label: 'Оплачен', color: 'success', icon: '💰' }
+                        };
+                        
+                        const config = statusConfig[value] || { 
+                          label: value || 'Неизвестно', 
+                          color: 'secondary', 
+                          icon: '❓' 
+                        };
+                        
+                        return (
+                          <Badge variant={config.color} size="md">
+                            {config.icon} {config.label}
+                          </Badge>
+                        );
+                      }
                     }
                   ]}
                   actions={[
@@ -1268,25 +1549,46 @@ const RegistrarPanel = () => {
                       icon: <Printer size={16} />, 
                       variant: 'primary', 
                       title: 'Печать талона',
-                      onClick: (row) => console.log('Print', row)
+                      onClick: (row) => {
+                        setPrintDialog({ 
+                          open: true, 
+                          type: 'ticket', 
+                          data: row 
+                        });
+                      },
+                      visible: (row) => row.status !== 'canceled' && row.status !== 'done'
                     },
                     { 
                       icon: <X size={16} />, 
                       variant: 'danger', 
                       title: 'Отмена',
-                      onClick: (row) => console.log('Cancel', row)
+                      onClick: async (row) => {
+                        const reason = prompt('Укажите причину отмены:');
+                        if (reason) {
+                          await updateAppointmentStatus(row.id, 'canceled', reason);
+                          toast.success('Запись отменена');
+                        }
+                      },
+                      visible: (row) => row.status !== 'canceled' && row.status !== 'done'
                     },
                     { 
                       icon: <Calendar size={16} />, 
                       variant: 'warning', 
                       title: 'Перенос',
-                      onClick: (row) => console.log('Reschedule', row)
+                      onClick: (row) => {
+                        setSelectedAppointment(row);
+                        setShowSlotsModal(true);
+                      },
+                      visible: (row) => row.status !== 'done' && row.status !== 'in_cabinet'
                     },
                     { 
                       icon: <CreditCard size={16} />, 
                       variant: 'info', 
                       title: 'Оплата',
-                      onClick: (row) => console.log('Payment', row)
+                      onClick: (row) => {
+                        handlePayment(row);
+                      },
+                      visible: (row) => row.status === 'paid_pending' || !row.payment_status
                     }
                   ]}
                   selectedRows={appointmentsSelected}
@@ -1374,9 +1676,8 @@ const RegistrarPanel = () => {
                   </div>
                   <div>
                     <label style={labelStyle}>Телефон</label>
-                    <InputMask
-                      mask="+7 (999) 999-99-99"
-                  style={inputStyle}
+                    <PhoneInput
+                      style={inputStyle}
                       placeholder="+7 (999) 123-45-67"
                       value={wizardData.patient.phone || ''}
                       onChange={(e) => setWizardData({

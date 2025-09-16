@@ -80,17 +80,32 @@ const ResponsiveTable = ({
               {/* Основная информация */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {columns
-                  .filter(col => !col.mobileHidden)
-                  .map((column, colIndex) => (
-                    <div key={colIndex} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280', fontSize: '14px' }}>
-                        {column.label}:
-                      </span>
-                      <span style={{ fontWeight: '500', fontSize: '14px' }}>
-                        {column.render ? column.render(row[column.key], row) : row[column.key]}
-                      </span>
-                    </div>
-                  ))}
+                  .filter(col => !col.mobileHidden && !col.hidden)
+                  .map((column, colIndex) => {
+                    // Получаем значение для отображения
+                    let displayValue;
+                    if (column.render) {
+                      displayValue = column.render(row[column.key], row, index);
+                    } else {
+                      displayValue = row[column.key];
+                    }
+                    
+                    // Проверяем на NaN и другие некорректные значения
+                    if (typeof displayValue === 'number' && isNaN(displayValue)) {
+                      displayValue = '';
+                    }
+                    
+                    return (
+                      <div key={colIndex} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                          {column.label}:
+                        </span>
+                        <span style={{ fontWeight: '500', fontSize: '14px' }}>
+                          {displayValue}
+                        </span>
+                      </div>
+                    );
+                  })}
               </div>
 
               {/* Действия */}
@@ -101,20 +116,28 @@ const ResponsiveTable = ({
                   marginTop: '12px',
                   justifyContent: 'flex-end'
                 }}>
-                  {actions.map((action, actionIndex) => (
-                    <Button
-                      key={actionIndex}
-                      variant={action.variant || 'primary'}
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        action.onClick(row, index);
-                      }}
-                      style={{ minWidth: 'auto' }}
-                    >
-                      {action.icon}
-                    </Button>
-                  ))}
+                  {actions.map((action, actionIndex) => {
+                    // Проверяем видимость действия
+                    if (action.visible && !action.visible(row)) {
+                      return null;
+                    }
+                    
+                    return (
+                      <Button
+                        key={actionIndex}
+                        variant={action.variant || 'primary'}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          action.onClick(row, index);
+                        }}
+                        style={{ minWidth: 'auto' }}
+                        title={action.title}
+                      >
+                        {action.icon}
+                      </Button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -207,37 +230,77 @@ const ResponsiveTable = ({
                   />
                 </td>
               )}
-              {columns.map((column, colIndex) => (
-                <td
-                  key={colIndex}
-                  style={{
-                    padding: '12px',
-                    textAlign: column.align || 'left',
-                    fontSize: '14px',
-                    color: '#374151'
-                  }}
-                >
-                  {column.render ? column.render(row[column.key], row) : row[column.key]}
-                </td>
-              ))}
+              {columns.map((column, colIndex) => {
+                // Пропускаем скрытые колонки
+                if (column.hidden) return null;
+                
+                // Получаем значение для отображения
+                let displayValue;
+                if (column.render) {
+                  // Передаем три параметра: value, row, index
+                  displayValue = column.render(row[column.key], row, index);
+                } else {
+                  displayValue = row[column.key];
+                }
+                
+                // Проверяем на NaN и другие некорректные значения
+                if (typeof displayValue === 'number' && isNaN(displayValue)) {
+                  displayValue = '';
+                }
+                
+                // Обработка кликабельных колонок
+                const handleClick = column.clickable && column.onClick ? 
+                  (e) => {
+                    e.stopPropagation();
+                    column.onClick(row);
+                  } : undefined;
+                
+                return (
+                  <td
+                    key={colIndex}
+                    style={{
+                      padding: '12px',
+                      textAlign: column.align || 'left',
+                      fontSize: '14px',
+                      color: '#374151',
+                      cursor: column.clickable ? 'pointer' : 'inherit',
+                      textDecoration: column.clickable ? 'underline' : 'none',
+                      position: column.fixed ? 'sticky' : 'relative',
+                      left: column.fixed ? 0 : 'auto',
+                      background: column.fixed ? 'white' : 'inherit',
+                      zIndex: column.fixed ? 1 : 'auto'
+                    }}
+                    onClick={handleClick}
+                  >
+                    {displayValue}
+                  </td>
+                );
+              })}
               {actions.length > 0 && (
                 <td style={{ padding: '12px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                    {actions.map((action, actionIndex) => (
-                      <Button
-                        key={actionIndex}
-                        variant={action.variant || 'primary'}
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          action.onClick(row, index);
-                        }}
-                        style={{ minWidth: 'auto' }}
-                        title={action.title}
-                      >
-                        {action.icon}
-                      </Button>
-                    ))}
+                    {actions.map((action, actionIndex) => {
+                      // Проверяем видимость действия
+                      if (action.visible && !action.visible(row)) {
+                        return null;
+                      }
+                      
+                      return (
+                        <Button
+                          key={actionIndex}
+                          variant={action.variant || 'primary'}
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            action.onClick(row, index);
+                          }}
+                          style={{ minWidth: 'auto' }}
+                          title={action.title}
+                        >
+                          {action.icon}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </td>
               )}
