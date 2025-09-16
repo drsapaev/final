@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { Button, Card, Badge } from '../../design-system/components';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const SimpleUserManagement = () => {
+  const { getColor, getSpacing } = useTheme();
   const [users, setUsers] = useState([
     { id: 1, name: 'Иван Петров', role: 'Врач', email: 'ivan@clinic.com', status: 'Активен' },
     { id: 2, name: 'Мария Сидорова', role: 'Медсестра', email: 'maria@clinic.com', status: 'Активен' },
@@ -39,86 +42,63 @@ const SimpleUserManagement = () => {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1 style={{ color: '#1976d2', marginBottom: '20px' }}>
-        👥 Управление Пользователями
-      </h1>
+    <div className="clinic-page clinic-p-lg">
+      <div className="clinic-header">
+        <h1>👥 Управление Пользователями</h1>
+      </div>
 
-      <div style={{ marginBottom: '20px' }}>
-        <button 
+      <div className="clinic-m-md">
+        <Button 
+          variant="primary"
           onClick={() => setShowAddForm(!showAddForm)}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#4caf50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
         >
           {showAddForm ? 'Отмена' : '+ Добавить пользователя'}
-        </button>
+        </Button>
       </div>
 
       {showAddForm && (
-        <div style={{
-          border: '1px solid #ddd',
-          borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '20px',
-          backgroundColor: '#f9f9f9'
-        }}>
+        <Card className="clinic-m-md">
           <h3>Добавить нового пользователя</h3>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="clinic-flex clinic-gap-md clinic-m-md">
             <input
               type="text"
               placeholder="Имя пользователя"
               value={newUser.name}
               onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-              style={{ padding: '8px', marginRight: '10px', width: '200px' }}
+              className="clinic-input"
+              style={{ width: '200px' }}
             />
             <input
               type="email"
               placeholder="Email"
               value={newUser.email}
               onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-              style={{ padding: '8px', marginRight: '10px', width: '200px' }}
+              className="clinic-input"
+              style={{ width: '200px' }}
             />
             <select
               value={newUser.role}
               onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-              style={{ padding: '8px', marginRight: '10px' }}
+              className="clinic-input"
             >
               <option value="Врач">Врач</option>
               <option value="Медсестра">Медсестра</option>
               <option value="Администратор">Администратор</option>
               <option value="Лаборант">Лаборант</option>
             </select>
-            <button 
+            <Button 
+              variant="primary"
               onClick={handleAddUser}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#1976d2',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
             >
               Добавить
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ 
-          width: '100%', 
-          borderCollapse: 'collapse', 
-          border: '1px solid #ddd',
-          backgroundColor: 'white'
-        }}>
+      <Card className="clinic-m-md">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#f5f5f5' }}>
               <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>ID</th>
@@ -137,55 +117,39 @@ const SimpleUserManagement = () => {
                 <td style={{ padding: '12px', border: '1px solid #ddd' }}>{user.role}</td>
                 <td style={{ padding: '12px', border: '1px solid #ddd' }}>{user.email}</td>
                 <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                  <span style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    backgroundColor: user.status === 'Активен' ? '#4caf50' : '#f44336',
-                    color: 'white',
-                    fontSize: '12px'
-                  }}>
+                  <Badge 
+                    variant={user.status === 'Активен' ? 'success' : 'danger'}
+                  >
                     {user.status}
-                  </span>
+                  </Badge>
                 </td>
                 <td style={{ padding: '12px', border: '1px solid #ddd' }}>
-                  <button
-                    onClick={() => toggleUserStatus(user.id)}
-                    style={{
-                      padding: '4px 8px',
-                      marginRight: '5px',
-                      backgroundColor: user.status === 'Активен' ? '#ff9800' : '#4caf50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    {user.status === 'Активен' ? 'Деактивировать' : 'Активировать'}
-                  </button>
-                  <button
-                    onClick={() => deleteUser(user.id)}
-                    style={{
-                      padding: '4px 8px',
-                      backgroundColor: '#f44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    Удалить
-                  </button>
+                  <div className="clinic-flex clinic-gap-sm">
+                    <Button
+                      variant={user.status === 'Активен' ? 'secondary' : 'primary'}
+                      size="small"
+                      onClick={() => toggleUserStatus(user.id)}
+                    >
+                      {user.status === 'Активен' ? 'Деактивировать' : 'Активировать'}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="small"
+                      onClick={() => deleteUser(user.id)}
+                    >
+                      Удалить
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      </Card>
 
-      <div style={{ marginTop: '20px', textAlign: 'center' }}>
-        <p style={{ color: '#666' }}>
+      <div className="clinic-text-center clinic-m-md">
+        <p style={{ color: 'var(--text-secondary)' }}>
           Всего пользователей: <strong>{users.length}</strong> | 
           Активных: <strong>{users.filter(u => u.status === 'Активен').length}</strong>
         </p>

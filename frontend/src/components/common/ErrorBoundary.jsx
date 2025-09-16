@@ -1,6 +1,7 @@
 // Error Boundary для обработки ошибок React
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Button } from '../../design-system/components';
 
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
@@ -128,18 +129,12 @@ function ErrorFallback({ error, errorInfo, onRetry, theme }) {
           Произошла неожиданная ошибка. Мы уже работаем над её исправлением.
         </p>
         
-        <button 
-          style={buttonStyle}
+        <Button 
+          variant="primary"
           onClick={onRetry}
-          onMouseOver={(e) => {
-            e.target.style.backgroundColor = getColor('primary', 'dark');
-          }}
-          onMouseOut={(e) => {
-            e.target.style.backgroundColor = getColor('primary', 'main');
-          }}
         >
           Попробовать снова
-        </button>
+        </Button>
 
         {process.env.NODE_ENV === 'development' && error && (
           <details style={detailsStyle}>

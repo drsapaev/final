@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { api } from '../api/client';
-import AnalyticsChart from '../components/AnalyticsChart';
-import AnalyticsMetrics from '../components/AnalyticsMetrics';
-import AnalyticsCharts from '../components/AnalyticsCharts';
-import AdvancedCharts from '../components/analytics/AdvancedCharts';
+import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import KPIMetrics from '../components/analytics/KPIMetrics';
+import AdvancedCharts from '../components/analytics/AdvancedCharts';
 import DataExporter from '../components/analytics/DataExporter';
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
 import { 
@@ -168,14 +166,14 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <AnalyticsMetrics metrics={metrics} />
+        <KPIMetrics metrics={metrics} />
         
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '24px'
         }}>
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Визиты по дням недели"
             data={Object.entries(month.visits?.day_stats || {}).map(([day, count]) => ({
               label: day,
@@ -185,7 +183,7 @@ export default function AnalyticsPage() {
             color="#3b82f6"
           />
           
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Доходы по отделениям"
             data={Object.entries(month.revenue?.department_stats || {}).map(([dept, stats]) => ({
               label: dept,
@@ -233,14 +231,14 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <AnalyticsMetrics metrics={metrics} />
+        <KPIMetrics metrics={metrics} />
         
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '24px'
         }}>
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Распределение по статусам"
             data={Object.entries(status_distribution).map(([status, count]) => ({
               label: status,
@@ -249,7 +247,7 @@ export default function AnalyticsPage() {
             type="pie"
           />
           
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Конверсия по воронке"
             data={[
               { label: 'Запись → Оплата', value: conversion_rates.pending_to_paid },
@@ -294,14 +292,14 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <AnalyticsMetrics metrics={metrics} />
+        <KPIMetrics metrics={metrics} />
         
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '24px'
         }}>
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Доходы по дням"
             data={daily_revenue.map(item => ({
               label: new Date(item.date).toLocaleDateString('ru-RU', { 
@@ -314,7 +312,7 @@ export default function AnalyticsPage() {
             color="#10b981"
           />
           
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Доходы по провайдерам"
             data={Object.entries(data.revenue.provider_breakdown || {}).map(([provider, stats]) => ({
               label: provider,
@@ -364,14 +362,14 @@ export default function AnalyticsPage() {
 
     return (
       <div>
-        <AnalyticsMetrics metrics={metrics} />
+        <KPIMetrics metrics={metrics} />
         
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '24px'
         }}>
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Доходы по провайдерам"
             data={Object.entries(providers).map(([code, stats]) => ({
               label: stats.name,
@@ -380,7 +378,7 @@ export default function AnalyticsPage() {
             type="pie"
           />
           
-          <AnalyticsChart
+          <AnalyticsDashboard
             title="Успешность провайдеров"
             data={Object.entries(providers).map(([code, stats]) => ({
               label: stats.name,

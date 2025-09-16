@@ -79,14 +79,13 @@ async function me() {
  * Caller should call setToken(response.access_token) to persist.
  */
 async function login(username, password) {
-  const params = new URLSearchParams();
-  params.append('username', username);
-  params.append('password', password);
-  params.append('grant_type', 'password');
+  const credentials = {
+    username: username,
+    password: password,
+    remember_me: false
+  };
 
-  const resp = await api.post('/auth/login', params.toString(), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
+  const resp = await api.post('/authentication/login', credentials);
   
   return resp.data;
 }
