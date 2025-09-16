@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
+import AppointmentFlow from '../components/AppointmentFlow.jsx';
+import AppointmentsTable from '../components/AppointmentsTable.jsx';
 import { api } from '../api/client.js';
 
 function todayStr() {
@@ -23,6 +25,8 @@ export default function Appointments() {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [useAdvancedTable, setUseAdvancedTable] = useState(false);
+  const [selectedAppointments, setSelectedAppointments] = useState(new Set());
 
   async function load() {
     setBusy(true);
@@ -69,12 +73,29 @@ export default function Appointments() {
             </label>
             <input placeholder="Поиск по пациенту/врачу/статусу/ID" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...inp, minWidth: 260 }}/>
             <button onClick={load} disabled={busy} style={btn}>{busy ? 'Загрузка' : 'Обновить'}</button>
+            <label>
+              <input 
+                type="checkbox" 
+                checked={useAdvancedTable} 
+                onChange={(e) => setUseAdvancedTable(e.target.checked)} 
+              />
+              &nbsp;Расширенная таблица
+            </label>
           </div>
 
           {err && <div style={errBox}>{String(err)}</div>}
 
-          <div style={{ overflow: 'auto', border: '1px solid #eee', borderRadius: 12, background: '#fff' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          {useAdvancedTable ? (
+            <AppointmentsTable 
+              appointments={filtered}
+              appointmentsSelected={selectedAppointments}
+              setAppointmentsSelected={setSelectedAppointments}
+              updateAppointmentStatus={(id, status) => console.log('Update status:', id, status)}
+              setShowWizard={(show) => console.log('Show wizard:', show)}
+            />
+          ) : (
+            <div style={{ overflow: 'auto', border: '1px solid #eee', borderRadius: 12, background: '#fff' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={th}>ID</th>
@@ -94,15 +115,27 @@ export default function Appointments() {
                       {(a.time || a.slot || a.start_time) ? (a.time || a.slot || a.start_time) : '—'}
                       {(a.end_time ? ` — ${a.end_time}` : '')}
                     </td>
-                    <td style={td}>{a.status || '—'}</td>
+                    <td style={td}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {a.status || '—'}
+                        {a.status && (
+                          <AppointmentFlow 
+                            appointment={a}
+                            onStartVisit={(appointment) => console.log('Start visit:', appointment)}
+                            onPayment={(appointment) => console.log('Payment:', appointment)}
+                          />
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
                   <tr><td style={td} colSpan={5}>Нет записей</td></tr>
                 )}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          )}
         </div>
       </RoleGate>
     </div>

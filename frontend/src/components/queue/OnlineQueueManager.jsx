@@ -87,7 +87,9 @@ const OnlineQueueManager = () => {
     try {
       // Используем существующий endpoint для получения пользователей
       const response = await apiClient.get('/users/users');
-      const doctors = response.data.filter(user => user.role === 'Doctor');
+      // response.data содержит объект с полем users
+      const users = response.data.users || response.data;
+      const doctors = users.filter(user => user.role === 'Doctor');
       setSpecialists(doctors);
     } catch (err) {
       console.error('Ошибка загрузки специалистов:', err);

@@ -1,6 +1,7 @@
 // Компоненты для отображения состояния загрузки
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import AnimatedLoader from '../AnimatedLoader.jsx';
 
 /**
  * Основной компонент загрузки
@@ -160,9 +161,17 @@ export function ButtonLoading({ loading, children, ...props }) {
 }
 
 /**
- * Компонент для загрузки таблицы
+ * Компонент для загрузки таблицы (использует AnimatedLoader)
  */
 export function TableLoading({ columns = 3, rows = 5 }) {
+  // Используем улучшенный AnimatedLoader
+  return <AnimatedLoader.TableSkeleton rows={rows} columns={columns} />;
+}
+
+/**
+ * Компонент для загрузки таблицы (старая версия)
+ */
+export function TableLoadingOld({ columns = 3, rows = 5 }) {
   const theme = useTheme();
   const { getColor, getSpacing } = theme;
 
@@ -210,9 +219,22 @@ export function TableLoading({ columns = 3, rows = 5 }) {
 }
 
 /**
- * Компонент для загрузки карточек
+ * Компонент для загрузки карточек (использует AnimatedLoader)
  */
 export function CardLoading({ count = 3 }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <AnimatedLoader.CardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Компонент для загрузки карточек (старая версия)
+ */
+export function CardLoadingOld({ count = 3 }) {
   const theme = useTheme();
   const { getColor, getSpacing } = theme;
 

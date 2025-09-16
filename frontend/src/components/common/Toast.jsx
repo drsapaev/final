@@ -1,6 +1,7 @@
 // Система уведомлений (Toast)
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import AnimatedToast from '../AnimatedToast.jsx';
 
 // Контекст для уведомлений
 const ToastContext = createContext();

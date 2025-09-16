@@ -27,7 +27,6 @@ import LabPanel from './pages/LabPanel.jsx';
 import UserSelect from './pages/UserSelect.jsx';
 import Search from './pages/Search.jsx';
 import PatientPanel from './pages/PatientPanel.jsx';
-import QueueBoard from './pages/QueueBoard.jsx';
 import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import MediLabDemo from './pages/MediLabDemo.jsx';
@@ -115,6 +114,7 @@ function AppContent() {
       <Route path="/login" element={<Login />} />
       <Route path="/new-login" element={<LoginFormStyled />} />
       <Route path="/components" element={<NewComponentsNav />} />
+      <Route path="/health" element={<Health />} />
       <Route path="/" element={<Landing />} />
       <Route path="/medilab-demo" element={<MediLabDemo />} />
       <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
