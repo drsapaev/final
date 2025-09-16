@@ -21,3 +21,7 @@ aiohttp>=3.12,<3.13
 aiofiles>=24.1,<25.0
 weasyprint>=62.0,<63.0
 python-telegram-bot>=22.0,<23.0
+openai>=1.0.0,<2.0.0
+google-generativeai>=0.8.0,<1.0.0
+pillow>=10.0.0,<12.0.0
+aiogram>=3.0.0,<4.0.0
