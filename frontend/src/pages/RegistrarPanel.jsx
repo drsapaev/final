@@ -54,8 +54,8 @@ const RegistrarPanel = () => {
   
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
-  const [appointments, setAppointments] = useState([
-    // Тестовые данные для демонстрации кнопок
+  // Демо-данные вынесены в константу
+  const DEMO_APPOINTMENTS = [
     {
       id: 1,
       patient_fio: 'Иванов Иван Иванович',
@@ -134,7 +134,11 @@ const RegistrarPanel = () => {
       isEmpty: false,
       department: 'procedures'
     }
-  ]);
+  ];
+
+  // Состояния для управления данными
+  const [appointments, setAppointments] = useState([]);
+  const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [showAddressColumn, setShowAddressColumn] = useState(false);
@@ -497,21 +501,60 @@ const RegistrarPanel = () => {
     }
   };
 
-  // Загрузка записей (старая функция)
+  // Улучшенная загрузка записей с правильной обработкой ошибок
   const loadAppointments = async () => {
     try {
       setAppointmentsLoading(true);
+      setDataSource('loading');
+      
+      // Проверяем наличие токена
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.warn('Токен аутентификации отсутствует, используем демо-данные');
+        setDataSource('demo');
+        setAppointments(DEMO_APPOINTMENTS);
+        return;
+      }
+      
       const response = await fetch('/api/v1/appointments/?limit=50', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
+      
       if (response.ok) {
         const data = await response.json();
-        setAppointments(data);
+        const appointmentsData = Array.isArray(data) ? data : (data.items || data.appointments || []);
+        
+        if (appointmentsData.length > 0) {
+          setAppointments(appointmentsData);
+          setDataSource('api');
+          console.log('✅ Загружены данные из API:', appointmentsData.length, 'записей');
+        } else {
+          // API вернул пустой массив - показываем демо-данные
+          setAppointments(DEMO_APPOINTMENTS);
+          setDataSource('demo');
+          console.log('ℹ️ API вернул пустые данные, используем демо-данные');
+        }
+      } else if (response.status === 401) {
+        // Токен недействителен
+        console.warn('Токен недействителен (401), очищаем и используем демо-данные');
+        localStorage.removeItem('auth_token');
+        setDataSource('demo');
+        setAppointments(DEMO_APPOINTMENTS);
+      } else {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.error('Ошибка загрузки записей:', error);
+      setDataSource('demo');
+      setAppointments(DEMO_APPOINTMENTS);
+      
+      // Показываем уведомление пользователю
+      if (window.toast) {
+        window.toast.error('Не удалось загрузить данные с сервера. Показаны демо-данные.');
+      }
     } finally {
       setAppointmentsLoading(false);
     }
@@ -668,6 +711,13 @@ const RegistrarPanel = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showWizard, showSlotsModal, showQRModal, wizardStep, appointments]);
 
+  // Функция для подсчета записей по отделам (исправляет двойную фильтрацию)
+  const getDepartmentCount = (department) => {
+    return appointments.filter(a => 
+      a.department?.toLowerCase().includes(department.toLowerCase())
+    ).length;
+  };
+
   // Фильтрация записей по вкладке
   const filteredAppointments = appointments.filter(appointment => {
     if (activeTab === 'welcome' || activeTab === 'appointments') return true;
@@ -679,6 +729,89 @@ const RegistrarPanel = () => {
     if (activeTab === 'procedures') return appointment.department?.toLowerCase().includes('proc');
     return true;
   });
+
+  // Компонент индикатора источника данных (для всех вкладок)
+  const DataSourceIndicator = ({ count }) => {
+    if (dataSource === 'demo') {
+      return (
+        <div style={{
+          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          marginBottom: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+        }}>
+          <span>⚠️</span>
+          <span>Показаны демо-данные. Проверьте подключение к серверу.</span>
+          <button 
+            onClick={loadAppointments}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              marginLeft: 'auto'
+            }}
+          >
+            🔄 Повторить
+          </button>
+        </div>
+      );
+    }
+    
+    if (dataSource === 'api') {
+      return (
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          marginBottom: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+        }}>
+          <span>✅</span>
+          <span>Данные загружены с сервера ({count} записей)</span>
+        </div>
+      );
+    }
+    
+    if (dataSource === 'loading') {
+      return (
+        <div style={{
+          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          marginBottom: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+        }}>
+          <span>🔄</span>
+          <span>Загрузка данных...</span>
+        </div>
+      );
+    }
+    
+    return null;
+  };
 
   // Статистика для экрана приветствия
   const stats = {
@@ -731,7 +864,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'appointments'}
         >
             <FileText size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_appointments')} ({filteredAppointments.length})
+          {t('tabs_appointments')} ({appointments.length})
         </button>
         <button
           style={activeTab === 'cardio' ? activeTabStyle : tabStyle}
@@ -739,7 +872,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'cardio'}
         >
             <Heart size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_cardio')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('cardio')).length})
+          {t('tabs_cardio')} ({getDepartmentCount('cardio')})
         </button>
         <button
           style={activeTab === 'echokg' ? activeTabStyle : tabStyle}
@@ -747,7 +880,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'echokg'}
         >
             <Activity size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_echokg')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('echo')).length})
+          {t('tabs_echokg')} ({getDepartmentCount('echo')})
         </button>
         <button
           style={activeTab === 'derma' ? activeTabStyle : tabStyle}
@@ -755,7 +888,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'derma'}
         >
             <User size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_derma')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('derma')).length})
+          {t('tabs_derma')} ({getDepartmentCount('derma')})
         </button>
         <button
           style={activeTab === 'dental' ? activeTabStyle : tabStyle}
@@ -763,7 +896,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'dental'}
         >
             <User size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_dental')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('dental')).length})
+          {t('tabs_dental')} ({getDepartmentCount('dental')})
         </button>
         <button
           style={activeTab === 'lab' ? activeTabStyle : tabStyle}
@@ -771,7 +904,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'lab'}
         >
             <TestTube size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_lab')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('lab')).length})
+          {t('tabs_lab')} ({getDepartmentCount('lab')})
         </button>
         <button
           style={activeTab === 'queue' ? activeTabStyle : tabStyle}
@@ -787,7 +920,7 @@ const RegistrarPanel = () => {
           aria-selected={activeTab === 'procedures'}
         >
             <Syringe size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_procedures')} ({filteredAppointments.filter(a => a.department?.toLowerCase().includes('proc')).length})
+          {t('tabs_procedures')} ({getDepartmentCount('proc')})
         </button>
       </div>
       {/* </div> Закрытие фиксированного контейнера */}
@@ -1008,6 +1141,9 @@ const RegistrarPanel = () => {
                     borderRadius: '8px',
                     padding: '16px'
                   }}>
+            {/* Индикатор источника данных */}
+            <DataSourceIndicator count={appointments.length} />
+
             <AppointmentsTable
                       appointments={appointments.slice(0, 5)}
               appointmentsSelected={appointmentsSelected}
@@ -1067,6 +1203,9 @@ const RegistrarPanel = () => {
               ...tableContentStyle,
               padding: isMobile ? getSpacing('sm') : getSpacing('md')
             }}>
+              
+              {/* Индикатор источника данных для всех вкладок */}
+              <DataSourceIndicator count={filteredAppointments.length} />
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (

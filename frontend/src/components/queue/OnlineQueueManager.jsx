@@ -45,152 +45,62 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 import { QRCodeSVG } from 'qrcode.react';
-import { api as apiClient } from '../../api/client';
+import { useQueueManager } from '../../hooks/useQueueManager';
 
 const OnlineQueueManager = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [statistics, setStatistics] = useState(null);
+  // Используем кастомный хук вместо прямых API вызовов
+  const {
+    loading,
+    error,
+    success,
+    statistics,
+    specialists,
+    queueData,
+    qrData,
+    generateQRCode,
+    loadTodayQueue,
+    loadStatistics,
+    openQueue,
+    callPatient,
+    clearMessages
+  } = useQueueManager();
   
-  // Состояние для генерации QR
+  // Локальные состояния для UI
   const [qrDialog, setQrDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSpecialist, setSelectedSpecialist] = useState('');
-  const [specialists, setSpecialists] = useState([]);
-  const [qrData, setQrData] = useState(null);
-  
-  // Состояние очереди
-  const [queueData, setQueueData] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  
-  // Загрузка специалистов при монтировании
-  useEffect(() => {
-    loadSpecialists();
-  }, []);
   
   // Автообновление очереди
   useEffect(() => {
     let interval;
     if (autoRefresh && selectedSpecialist) {
       interval = setInterval(() => {
-        loadTodayQueue();
-        loadStatistics();
+        loadTodayQueue(selectedSpecialist);
+        loadStatistics(selectedSpecialist, selectedDate);
       }, 10000); // Обновляем каждые 10 секунд
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoRefresh, selectedSpecialist]);
+  }, [autoRefresh, selectedSpecialist, selectedDate, loadTodayQueue, loadStatistics]);
 
-  const loadSpecialists = async () => {
-    try {
-      // Используем существующий endpoint для получения пользователей
-      const response = await apiClient.get('/users/users');
-      // response.data содержит объект с полем users
-      const users = response.data.users || response.data;
-      const doctors = users.filter(user => user.role === 'Doctor');
-      setSpecialists(doctors);
-    } catch (err) {
-      console.error('Ошибка загрузки специалистов:', err);
-      setError('Не удалось загрузить список специалистов');
+  // Обработчики для UI - используют методы из хука
+  const handleGenerateQR = async () => {
+    await generateQRCode(selectedDate, selectedSpecialist);
+  };
+
+  const handleOpenQueue = async () => {
+    const success = await openQueue(selectedSpecialist);
+    if (success) {
+      loadTodayQueue(selectedSpecialist);
     }
   };
 
-  const generateQRCode = async () => {
-    if (!selectedDate || !selectedSpecialist) {
-      setError('Выберите дату и специалиста');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      const response = await apiClient.post('/queue/qrcode', null, {
-        params: {
-          day: selectedDate,
-          specialist_id: selectedSpecialist
-        }
-      });
-      
-      setQrData(response.data);
-      setSuccess('QR код успешно сгенерирован');
-    } catch (err) {
-      console.error('Ошибка генерации QR:', err);
-      setError(err.response?.data?.detail || 'Ошибка генерации QR кода');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTodayQueue = async () => {
-    if (!selectedSpecialist) return;
-    
-    try {
-      const response = await apiClient.get('/queue/today', {
-        params: { specialist_id: selectedSpecialist }
-      });
-      setQueueData(response.data);
-    } catch (err) {
-      console.error('Ошибка загрузки очереди:', err);
-      if (err.response?.status !== 404) {
-        setError('Ошибка загрузки очереди');
-      }
-    }
-  };
-
-  const loadStatistics = async () => {
-    if (!selectedSpecialist) return;
-    
-    try {
-      const response = await apiClient.get(`/queue/statistics/${selectedSpecialist}`, {
-        params: { day: selectedDate }
-      });
-      
-      if (response.data.success) {
-        setStatistics(response.data.statistics);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
-    }
-  };
-
-  const openQueue = async () => {
-    if (!selectedSpecialist) {
-      setError('Выберите специалиста');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      await apiClient.post('/queue/open', null, {
-        params: {
-          day: new Date().toISOString().split('T')[0],
-          specialist_id: selectedSpecialist
-        }
-      });
-      setSuccess('Прием открыт. Онлайн-запись закрыта');
-      loadTodayQueue();
-    } catch (err) {
-      console.error('Ошибка открытия приема:', err);
-      setError(err.response?.data?.detail || 'Ошибка открытия приема');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const callPatient = async (entryId) => {
-    setLoading(true);
-    try {
-      await apiClient.post(`/queue/call/${entryId}`);
-      setSuccess('Пациент вызван');
-      loadTodayQueue();
-    } catch (err) {
-      console.error('Ошибка вызова пациента:', err);
-      setError(err.response?.data?.detail || 'Ошибка вызова пациента');
-    } finally {
-      setLoading(false);
+  const handleCallPatient = async (entryId) => {
+    const success = await callPatient(entryId);
+    if (success) {
+      loadTodayQueue(selectedSpecialist);
     }
   };
 
@@ -385,7 +295,7 @@ const OnlineQueueManager = () => {
                   variant="contained"
                   color="success"
                   startIcon={<StartIcon />}
-                  onClick={openQueue}
+                  onClick={handleOpenQueue}
                   disabled={!selectedSpecialist || loading || queueData?.is_open}
                   fullWidth
                 >
@@ -555,7 +465,7 @@ const OnlineQueueManager = () => {
                               <Tooltip title="Вызвать пациента">
                                 <IconButton
                                   size="small"
-                                  onClick={() => callPatient(entry.id)}
+                                  onClick={() => handleCallPatient(entry.id)}
                                   disabled={loading}
                                   sx={{ 
                                     bgcolor: 'success.main',
@@ -667,7 +577,7 @@ const OnlineQueueManager = () => {
             Отмена
           </Button>
           <Button
-            onClick={generateQRCode}
+            onClick={handleGenerateQR}
             variant="contained"
             disabled={!selectedDate || !selectedSpecialist || loading}
           >

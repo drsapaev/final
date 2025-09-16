@@ -3,9 +3,20 @@ import { FileText, Save, Plus, X, Camera, Upload, AlertCircle, CheckCircle, Brai
 import { Card, Button, Badge } from '../../design-system/components';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../../constants/appointmentStatus';
 import { AIButton, AISuggestions, AIAssistant } from '../ai';
+import { useEMRAI } from '../../hooks/useEMRAI';
 import { Box, Grid, Divider } from '@mui/material';
 
 const EMRSystem = ({ appointment, onSave, onComplete }) => {
+  // Используем AI хук для работы с искусственным интеллектом
+  const {
+    loading: aiLoading,
+    error: aiError,
+    icd10Suggestions,
+    getICD10Suggestions,
+    analyzeComplaints,
+    clearError
+  } = useEMRAI();
+
   const [emrData, setEmrData] = useState({
     complaints: '',           // Жалобы
     anamnesis: '',           // Анамнез
@@ -21,8 +32,6 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [icd10Suggestions, setIcd10Suggestions] = useState([]);
 
   useEffect(() => {
     // Загрузка существующего EMR
@@ -222,22 +231,8 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             <AIButton
               onClick={async () => {
                 if (emrData.complaints || emrData.diagnosis) {
-                  setAiLoading(true);
-                  try {
-                    const response = await fetch('/api/v1/ai/icd-suggest', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        symptoms: emrData.complaints.split('.').filter(s => s.trim()),
-                        diagnosis: emrData.diagnosis
-                      })
-                    });
-                    const suggestions = await response.json();
-                    setIcd10Suggestions(suggestions);
-                  } catch (error) {
-                    console.error('AI error:', error);
-                  }
-                  setAiLoading(false);
+                  const suggestions = await getICD10Suggestions(emrData.complaints, emrData.diagnosis);
+                  // setIcd10Suggestions уже вызывается в хуке
                 }
               }}
               loading={aiLoading}
