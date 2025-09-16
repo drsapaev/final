@@ -44,14 +44,15 @@ import SimpleEMR from './components/medical/SimpleEMR.jsx';
 import SimpleFileManager from './components/SimpleFileManager.jsx';
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
 import NewComponentsNav from './components/NewComponentsNav.jsx'; // Навигация по новым компонентам
-// import NewDashboard from './components/Dashboard';
-// import UserManagement from './components/UserManagement';
-// import EMRInterface from './components/EMRInterface';
-// import FileManager from './components/FileManager';
-// import EmailSMSManager from './components/EmailSMSManager';
-// import TelegramManager from './components/TelegramManager';
-// import TwoFactorManager from './components/TwoFactorManager';
-// import TestComponent from './TestComponent';
+
+// Скрытые компоненты для интеграции
+import TelegramManager from './components/TelegramManager.jsx';
+import EmailSMSManager from './components/notifications/EmailSMSManager.jsx';
+import TwoFactorManager from './components/security/TwoFactorManager.jsx';
+import FileManager from './components/files/FileManager.jsx';
+import EMRInterface from './components/medical/EMRInterface.jsx';
+import UserManagement from './components/admin/UserManagement.jsx';
+import IntegrationDemo from './components/integration/IntegrationDemo.jsx';
 
 import auth from './stores/auth.js';
 
@@ -173,15 +174,17 @@ function AppContent() {
           <Route path="simple-users"   element={<SimpleUserManagement />} />
           <Route path="simple-emr"     element={<SimpleEMR />} />
           <Route path="simple-files"   element={<SimpleFileManager />} />
-          {/* <Route path="new-dashboard" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><NewDashboard /></RequireAuth>} />
-          <Route path="new-login"     element={<LoginForm />} />
-          <Route path="new-dashboard" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><NewDashboard /></RequireAuth>} />
-          <Route path="new-users"     element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
-          <Route path="new-emr"       element={<RequireAuth roles={['Admin','Doctor','Nurse']}><EMRInterface /></RequireAuth>} />
-          <Route path="new-files"     element={<RequireAuth roles={['Admin','Doctor','Nurse']}><FileManager /></RequireAuth>} />
-          <Route path="new-notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
-          <Route path="new-telegram"  element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
-          <Route path="new-security"  element={<RequireAuth roles={['Admin','Doctor','Nurse']}><TwoFactorManager /></RequireAuth>} /> */}
+          
+          {/* Интегрированные скрытые компоненты */}
+          <Route path="advanced-users"     element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
+          <Route path="advanced-emr"       element={<RequireAuth roles={['Admin','Doctor','Nurse']}><EMRInterface /></RequireAuth>} />
+          <Route path="file-management"    element={<RequireAuth roles={['Admin','Doctor','Nurse']}><FileManager /></RequireAuth>} />
+          <Route path="notifications"     element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
+          <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
+          <Route path="security-settings" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><TwoFactorManager /></RequireAuth>} />
+          
+          {/* Демо интеграции */}
+          <Route path="integration-demo"   element={<IntegrationDemo />} />
           
           <Route path="*"             element={<Navigate to="/" replace />} />
         </Route>

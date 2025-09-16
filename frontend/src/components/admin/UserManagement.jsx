@@ -51,7 +51,7 @@ import {
   Error,
   Warning,
   Block,
-  Unblock,
+  CheckCircleOutline,
   AdminPanelSettings,
   PersonAdd
 } from '@mui/icons-material';
@@ -447,7 +447,7 @@ const UserManagement = () => {
           setAnchorEl(null);
         }}>
           <ListItemIcon>
-            {selectedUser?.is_active ? <Block /> : <Unblock />}
+            {selectedUser?.is_active ? <Block /> : <CheckCircleOutline />}
           </ListItemIcon>
           <ListItemText>
             {selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
