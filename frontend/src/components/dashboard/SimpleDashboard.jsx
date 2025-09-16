@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card, Badge } from '../../design-system/components';
 
 const SimpleDashboard = () => {
+  const navigate = useNavigate();
+  
   return (
     <div className="clinic-page clinic-p-lg">
       <div className="clinic-header">
@@ -19,10 +22,16 @@ const SimpleDashboard = () => {
         <Card>
           <h3>⚡ Быстрые действия</h3>
           <div className="clinic-flex clinic-flex-col clinic-gap-sm">
-            <Button variant="primary">
+            <Button 
+              variant="primary"
+              onClick={() => navigate('/registrar-panel')}
+            >
               Добавить пациента
             </Button>
-            <Button variant="success">
+            <Button 
+              variant="success"
+              onClick={() => navigate('/appointments')}
+            >
               Новая запись
             </Button>
           </div>

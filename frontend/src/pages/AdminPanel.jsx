@@ -82,6 +82,7 @@ import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
 import '../styles/admin.css';
 import '../styles/admin-dark-theme.css';
+import '../styles/dark-theme-visibility-fix.css';
 
 const AdminPanel = () => {
   const location = useLocation();

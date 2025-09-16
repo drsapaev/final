@@ -120,7 +120,8 @@ export default function Header() {
     background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    transform: 'translateY(-1px)'
+    transform: 'translateY(-1px)',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
   };
 
   const controlsStyle = {
@@ -166,7 +167,8 @@ export default function Header() {
     background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
     color: 'white',
     border: 'none',
-    boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
+    boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)',
+    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
   };
 
   // Ролевые метки на русском
@@ -295,7 +297,8 @@ export default function Header() {
               background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
               color: 'white',
               border: 'none',
-              boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)'
+              boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
             }}
             onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
             onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}

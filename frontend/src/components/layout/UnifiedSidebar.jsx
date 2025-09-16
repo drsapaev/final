@@ -146,6 +146,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     borderRadius: '12px',
     color: isActive ? '#ffffff' : (isDark ? '#cbd5e1' : '#64748b'),
     background: isActive ? 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' : 'transparent',
+    textShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.6)' : 'none',
     backgroundColor: isActive ? 'transparent' : 'transparent',
     boxShadow: isActive ? '0 8px 25px rgba(102, 126, 234, 0.3), 0 4px 12px rgba(118, 75, 162, 0.2), 0 2px 6px rgba(240, 147, 251, 0.2)' : 'none',
     textDecoration: 'none',

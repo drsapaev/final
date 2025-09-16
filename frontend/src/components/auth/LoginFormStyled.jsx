@@ -72,9 +72,16 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
             justifyContent: 'center',
             margin: '0 auto 20px',
             fontSize: '24px',
-            color: 'white'
+            color: 'white',
+            position: 'relative'
           }}>
-            🏥
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.2)',
+              borderRadius: '50%'
+            }} />
+            <span style={{ position: 'relative', zIndex: 1 }}>🏥</span>
           </div>
           <h1 style={{
             fontSize: '24px',
@@ -276,7 +283,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               fontWeight: 'bold',
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              transition: 'opacity 0.2s'
+              transition: 'opacity 0.2s',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
             }}
           >
             {loading ? 'Вход...' : 'ВОЙТИ →'}

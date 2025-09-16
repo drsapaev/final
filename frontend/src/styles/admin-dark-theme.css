@@ -6,11 +6,17 @@
 /* Основные переменные темной темы */
 :root[data-theme="dark"],
 .dark {
-  /* Цвета фона */
+  /* Цвета фона - УЛУЧШЕННЫЕ ДЛЯ ВИДИМОСТИ */
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --bg-tertiary: #334155;
   --bg-hover: #475569;
+  
+  /* Улучшенные фоны для карточек и панелей */
+  --bg-card-solid: #1e293b;
+  --bg-card-elevated: #334155;
+  --bg-panel-solid: #0f172a;
+  --bg-panel-elevated: #1e293b;
   
   /* Цвета текста */
   --text-primary: #f8fafc;
@@ -18,10 +24,15 @@
   --text-muted: #94a3b8;
   --text-inverse: #1e293b;
   
-  /* Цвета границ */
+  /* Цвета границ - УЛУЧШЕННЫЕ ДЛЯ ВИДИМОСТИ */
   --border-color: #334155;
   --border-light: #475569;
   --border-focus: #3b82f6;
+  
+  /* Улучшенные границы для лучшей видимости */
+  --border-strong: #475569;
+  --border-card: #475569;
+  --border-panel: #334155;
   
   /* Акцентные цвета */
   --accent-color: #3b82f6;
@@ -64,10 +75,10 @@
   color: var(--text-secondary) !important;
 }
 
-/* Улучшения для карточек */
+/* Улучшения для карточек - ИСПРАВЛЕНА ВИДИМОСТЬ */
 .dark .admin-card {
-  background: var(--admin-card-bg);
-  border: 1px solid var(--border-color);
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-card) !important;
   box-shadow: var(--shadow-md);
   transition: all 0.2s ease;
 }
@@ -75,6 +86,28 @@
 .dark .admin-card:hover {
   border-color: var(--border-light);
   box-shadow: var(--shadow-lg);
+}
+
+/* КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Прозрачные фоны в темной теме */
+.dark [style*="rgba(15, 23, 42, 0.8)"],
+.dark [style*="rgba(15,23,42,0.8)"] {
+  background: var(--bg-card-solid) !important;
+}
+
+.dark [style*="rgba(255, 255, 255, 0.1)"],
+.dark [style*="rgba(255,255,255,0.1)"] {
+  border-color: var(--border-card) !important;
+}
+
+/* Исправление для всех прозрачных карточек */
+.dark div[style*="background: rgba(15, 23, 42, 0.8)"] {
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-card) !important;
+}
+
+.dark div[style*="background: rgba(255, 255, 255, 0.8)"] {
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-card) !important;
 }
 
 /* Улучшения для форм */
@@ -349,6 +382,35 @@
 .dark .admin-focus-ring:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* НОВЫЕ КЛАССЫ ДЛЯ УЛУЧШЕНИЯ ВИДИМОСТИ */
+.dark .dark-theme-card {
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .dark-theme-panel {
+  background: var(--bg-panel-elevated) !important;
+  border: 1px solid var(--border-panel) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .dark-theme-table {
+  background: var(--bg-card-solid) !important;
+  border: 1px solid var(--border-card) !important;
+}
+
+.dark .dark-theme-modal {
+  background: var(--bg-card-elevated) !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Исправление backdrop-filter проблем */
+.dark [style*="backdrop-filter"] {
+  backdrop-filter: none !important;
 }
 
 /* Адаптивные размеры шрифтов */
