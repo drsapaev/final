@@ -92,7 +92,7 @@ class QueueBusinessService:
             OnlineQueueEntry.status.in_(["waiting", "called"])
         ).count()
         
-        max_slots = daily_queue.max_online_slots or cls.DEFAULT_MAX_SLOTS
+        max_slots = getattr(daily_queue, 'max_slots', None) or cls.DEFAULT_MAX_SLOTS
         
         if current_entries >= max_slots:
             return False, f"🚫 Достигнут лимит мест ({max_slots}). Обратитесь в регистратуру."
@@ -158,8 +158,8 @@ class QueueBusinessService:
             "called": len([e for e in entries if e.status == "called"]),
             "completed": len([e for e in entries if e.status == "completed"]),
             "cancelled": len([e for e in entries if e.status == "cancelled"]),
-            "max_slots": daily_queue.max_online_slots or cls.DEFAULT_MAX_SLOTS,
-            "available_slots": max(0, (daily_queue.max_online_slots or cls.DEFAULT_MAX_SLOTS) - len([e for e in entries if e.status in ["waiting", "called"]])),
+            "max_slots": getattr(daily_queue, 'max_slots', None) or cls.DEFAULT_MAX_SLOTS,
+            "available_slots": max(0, (getattr(daily_queue, 'max_slots', None) or cls.DEFAULT_MAX_SLOTS) - len([e for e in entries if e.status in ["waiting", "called"]])),
             "is_open": daily_queue.opened_at is not None,
             "opened_at": daily_queue.opened_at.isoformat() if daily_queue.opened_at else None
         }

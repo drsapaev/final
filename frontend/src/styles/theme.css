@@ -50,6 +50,9 @@
   /* Overlay для градиентов */
   --gradient-overlay: rgba(0, 0, 0, 0.3);
   --gradient-overlay-strong: rgba(0, 0, 0, 0.5);
+
+  /* Современный UI‑шрифт глобально */
+  --ui-font: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
 }
 
 /* Универсальные стили для всех страниц */
@@ -57,8 +60,15 @@
   min-height: 100vh;
   background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--ui-font);
   line-height: 1.5;
+}
+
+/* Глобальный шрифт для всего приложения */
+html, body, button, input, select, textarea {
+  font-family: var(--ui-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Универсальные стили для карточек */
@@ -83,20 +93,46 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 10px 18px;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   backdrop-filter: blur(10px);
+  letter-spacing: 0.01em;
 }
 
 .clinic-button-primary {
   background: linear-gradient(135deg, var(--accent-color) 0%, #2563eb 100%);
   color: white;
   box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+}
+
+/* Новые варианты кнопок для всего приложения */
+.clinic-button-success {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(34, 197, 94, 0.3);
+}
+
+.clinic-button-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.3);
+}
+
+.clinic-button-warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #111827;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.3);
+}
+
+.clinic-button-outline {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .clinic-button-primary:hover {
@@ -241,6 +277,13 @@
 [data-theme="dark"] .clinic-card {
   background: var(--bg-card-dark) !important;
   border: 1px solid var(--border-dark) !important;
+}
+
+/* Темная тема: контраст для outline-кнопок */
+[data-theme="dark"] .clinic-button-outline {
+  background: var(--bg-panel-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
 }
 
 [data-theme="dark"] .clinic-page {

@@ -52,7 +52,7 @@ const IntegratedDoctorSelector = ({
 
   useEffect(() => {
     loadData();
-  }, [specialty]);
+  }, []);
 
   const loadData = async () => {
     try {
@@ -60,12 +60,13 @@ const IntegratedDoctorSelector = ({
       setError('');
 
       // Загружаем врачей и настройки очередей
+      const token = localStorage.getItem('auth_token');
       const [doctorsRes, queueRes] = await Promise.all([
-        fetch(`/api/v1/registrar/doctors${specialty ? `?specialty=${specialty}` : ''}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        fetch(`/api/v1/registrar/doctors`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch('/api/v1/registrar/queue-settings', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 

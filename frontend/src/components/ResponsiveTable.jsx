@@ -123,19 +123,31 @@ const ResponsiveTable = ({
                     }
                     
                     return (
-                      <Button
-                        key={actionIndex}
-                        variant={action.variant || 'primary'}
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          action.onClick(row, index);
-                        }}
-                        style={{ minWidth: 'auto' }}
-                        title={action.title}
-                      >
-                        {action.icon}
-                      </Button>
+                      action.className ? (
+                        <button
+                          key={actionIndex}
+                          className={action.className}
+                          style={action.style}
+                          onClick={(e) => { e.stopPropagation(); action.onClick(row, index); }}
+                          title={action.title}
+                        >
+                          {action.icon || action.title}
+                        </button>
+                      ) : (
+                        <Button
+                          key={actionIndex}
+                          variant={action.variant || 'primary'}
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            action.onClick(row, index);
+                          }}
+                          style={{ minWidth: 'auto', ...(action.style || {}) }}
+                          title={action.title}
+                        >
+                          {action.icon}
+                        </Button>
+                      )
                     );
                   })}
                 </div>
@@ -148,13 +160,76 @@ const ResponsiveTable = ({
   }
 
   // Планшетный и десктопный вид - таблица
+  // Предварительно вычисляем оффсеты для фиксированных колонок
+  const visibleColumns = React.useMemo(() => columns.filter(c => !c.hidden), [columns]);
+  const selectionOffset = onRowSelect ? 50 : 0; // ширина колонки чекбокса
+  const leftOffsets = React.useMemo(() => {
+    let currentLeft = selectionOffset;
+    return visibleColumns.map((col) => {
+      const left = col.fixed ? currentLeft : null;
+      const widthValue = typeof col.minWidth === 'string' ? parseInt(col.minWidth, 10) : (col.minWidth || 120);
+      if (col.fixed) currentLeft += widthValue;
+      return left;
+    });
+  }, [visibleColumns, selectionOffset]);
   return (
     <div className={`responsive-table-container ${className}`} style={style}>
-      <table className="responsive-table" style={{ borderCollapse: 'collapse', width: '100%' }}>
+      {/* Отладочная информация */}
+      
+      <table className="responsive-table" style={{ 
+        borderCollapse: 'collapse', 
+        width: '100%',
+        position: 'relative'
+      }}>
+        <style>{`
+          .responsive-table thead th {
+            display: table-cell !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background: #f8fafc !important;
+            color: #374151 !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            padding: 12px !important;
+            border-bottom: 2px solid #e5e7eb !important;
+            position: relative !important;
+            z-index: 10 !important;
+          }
+          
+          .responsive-table thead tr {
+            display: table-row !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background: #f8fafc !important;
+          }
+          
+          .responsive-table thead {
+            display: table-header-group !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+        `}</style>
         <thead>
-          <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e5e7eb' }}>
+          <tr style={{ 
+            background: '#f8fafc', 
+            borderBottom: '2px solid #e5e7eb',
+            position: 'relative',
+            zIndex: 10
+          }}>
             {onRowSelect && (
-              <th style={{ padding: '12px', textAlign: 'center', width: '50px' }}>
+              <th style={{ 
+                padding: '12px', 
+                textAlign: 'center', 
+                width: '50px',
+                background: '#f8fafc !important',
+                position: 'sticky',
+                top: 0,
+                zIndex: 11,
+                display: 'table-cell !important',
+                visibility: 'visible !important',
+                opacity: '1 !important',
+                color: '#374151 !important'
+              }}>
                 <input
                   type="checkbox"
                   checked={selectedRows.size === data.length && data.length > 0}
@@ -164,33 +239,57 @@ const ResponsiveTable = ({
                 />
               </th>
             )}
-            {columns.map((column, index) => (
-              <th
-                key={index}
-                style={{
-                  padding: '12px',
-                  textAlign: column.align || 'left',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  color: '#374151',
-                  cursor: column.sortable ? 'pointer' : 'default',
-                  userSelect: 'none',
-                  minWidth: column.minWidth || '120px'
-                }}
-                onClick={() => column.sortable && handleSort(column.key)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {column.label}
-                  {column.sortable && (
-                    <span style={{ fontSize: '12px', opacity: 0.6 }}>
-                      {sortField === column.key ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                    </span>
-                  )}
-                </div>
-              </th>
-            ))}
+            {visibleColumns.map((column, index) => {
+              return (
+                <th
+                  key={index}
+                  style={{
+                    padding: '12px',
+                    textAlign: column.align || 'left',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    color: '#374151 !important',
+                    cursor: column.sortable ? 'pointer' : 'default',
+                    userSelect: 'none',
+                    minWidth: column.minWidth || '120px',
+                    background: '#f8fafc !important',
+                    position: column.fixed ? 'sticky' : 'relative',
+                    left: column.fixed ? leftOffsets[index] : 'auto',
+                    top: 0,
+                    zIndex: column.fixed ? 12 : 11,
+                    borderBottom: '2px solid #e5e7eb',
+                    display: 'table-cell !important',
+                    visibility: 'visible !important',
+                    opacity: '1 !important'
+                  }}
+                  onClick={() => column.sortable && handleSort(column.key)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {column.label}
+                    {column.sortable && (
+                      <span style={{ fontSize: '12px', opacity: 0.6 }}>
+                        {sortField === column.key ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              );
+            })}
             {actions.length > 0 && (
-              <th style={{ padding: '12px', textAlign: 'center', width: '200px' }}>
+              <th style={{ 
+                padding: '12px', 
+                textAlign: 'center', 
+                width: '200px',
+                background: '#f8fafc !important',
+                position: 'sticky',
+                top: 0,
+                zIndex: 11,
+                borderBottom: '2px solid #e5e7eb',
+                display: 'table-cell !important',
+                visibility: 'visible !important',
+                opacity: '1 !important',
+                color: '#374151 !important'
+              }}>
                 Действия
               </th>
             )}
@@ -230,10 +329,7 @@ const ResponsiveTable = ({
                   />
                 </td>
               )}
-              {columns.map((column, colIndex) => {
-                // Пропускаем скрытые колонки
-                if (column.hidden) return null;
-                
+              {visibleColumns.map((column, colIndex) => {
                 // Получаем значение для отображения
                 let displayValue;
                 if (column.render) {
@@ -266,7 +362,7 @@ const ResponsiveTable = ({
                       cursor: column.clickable ? 'pointer' : 'inherit',
                       textDecoration: column.clickable ? 'underline' : 'none',
                       position: column.fixed ? 'sticky' : 'relative',
-                      left: column.fixed ? 0 : 'auto',
+                      left: column.fixed ? leftOffsets[colIndex] : 'auto',
                       background: column.fixed ? 'white' : 'inherit',
                       zIndex: column.fixed ? 1 : 'auto'
                     }}
@@ -286,19 +382,31 @@ const ResponsiveTable = ({
                       }
                       
                       return (
-                        <Button
-                          key={actionIndex}
-                          variant={action.variant || 'primary'}
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            action.onClick(row, index);
-                          }}
-                          style={{ minWidth: 'auto' }}
-                          title={action.title}
-                        >
-                          {action.icon}
-                        </Button>
+                        action.className ? (
+                          <button
+                            key={actionIndex}
+                            className={action.className}
+                            style={action.style}
+                            onClick={(e) => { e.stopPropagation(); action.onClick(row, index); }}
+                            title={action.title}
+                          >
+                            {action.icon || action.title}
+                          </button>
+                        ) : (
+                          <Button
+                            key={actionIndex}
+                            variant={action.variant || 'primary'}
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              action.onClick(row, index);
+                            }}
+                            style={{ minWidth: 'auto', ...(action.style || {}) }}
+                            title={action.title}
+                          >
+                            {action.icon}
+                          </Button>
+                        )
                       );
                     })}
                   </div>

@@ -12,13 +12,9 @@ const API_CACHE = 'clinic-api-v2.0.0';
 const STATIC_FILES = [
   '/',
   '/index.html',
-  '/offline.html',
   '/manifest.json',
   '/favicon.ico',
-  // Vite assets
-  '/assets/index.css',
-  '/assets/index.js',
-  // Основные страницы
+  // Основные страницы (только существующие)
   '/login',
   '/dashboard',
   '/patients',
@@ -67,7 +63,15 @@ self.addEventListener('install', (event) => {
     caches.open(STATIC_CACHE)
       .then((cache) => {
         console.log('Service Worker: Caching static files');
-        return cache.addAll(STATIC_FILES);
+        // Кэшируем файлы по одному, чтобы избежать ошибок
+        return Promise.allSettled(
+          STATIC_FILES.map(url => 
+            cache.add(url).catch(err => {
+              console.warn(`Service Worker: Failed to cache ${url}:`, err);
+              return null;
+            })
+          )
+        );
       })
       .then(() => {
         console.log('Service Worker: Installation complete');
@@ -166,20 +170,31 @@ async function handleRequest(request) {
 
 // Cache First стратегия
 async function cacheFirst(request, cacheName) {
-  const cachedResponse = await caches.match(request);
-  
-  if (cachedResponse) {
-    return cachedResponse;
+  try {
+    const cachedResponse = await caches.match(request);
+    
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.warn('Service Worker: Cache first failed for', request.url, error);
+    // Возвращаем кэшированный ответ, если есть
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    // Иначе возвращаем ошибку
+    throw error;
   }
-  
-  const networkResponse = await fetch(request);
-  
-  if (networkResponse.ok) {
-    const cache = await caches.open(cacheName);
-    cache.put(request, networkResponse.clone());
-  }
-  
-  return networkResponse;
 }
 
 // Network First стратегия

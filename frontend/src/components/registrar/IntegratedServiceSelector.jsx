@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, 
   Stethoscope, 
@@ -21,8 +21,9 @@ import { Card, Badge } from '../../design-system/components';
 const IntegratedServiceSelector = ({ 
   selectedServices = [], 
   onServicesChange,
-  specialty = null,
-  className = ''
+  className = '',
+  simple = false,
+  onNext
 }) => {
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState({});
@@ -30,121 +31,148 @@ const IntegratedServiceSelector = ({
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
 
-  // Демо-данные для услуг (fallback)
+  // Демо-данные для услуг (fallback) - 3 категории
   const DEMO_SERVICES = {
-    consultation: [
-      { id: 1, name: 'Консультация кардиолога', price: 50000, specialty: 'cardiology', group: 'consultation' },
-      { id: 2, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'consultation' },
-      { id: 3, name: 'Консультация стоматолога', price: 30000, specialty: 'stomatology', group: 'consultation' },
-      { id: 4, name: 'Консультация терапевта', price: 25000, specialty: 'general', group: 'consultation' }
-    ],
-    procedure: [
-      { id: 5, name: 'ЭКГ', price: 15000, specialty: 'cardiology', group: 'procedure' },
-      { id: 6, name: 'Эхокардиография', price: 80000, specialty: 'cardiology', group: 'procedure' },
-      { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'procedure' },
-      { id: 8, name: 'Чистка зубов', price: 35000, specialty: 'stomatology', group: 'procedure' }
-    ],
-    diagnostics: [
-      { id: 9, name: 'Рентген грудной клетки', price: 25000, specialty: 'cardiology', group: 'diagnostics' },
-      { id: 10, name: 'МРТ сердца', price: 150000, specialty: 'cardiology', group: 'diagnostics' },
-      { id: 11, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'diagnostics' },
-      { id: 12, name: 'Панорамный снимок', price: 40000, specialty: 'stomatology', group: 'diagnostics' }
-    ],
     laboratory: [
-      { id: 13, name: 'Общий анализ крови', price: 20000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 14, name: 'Биохимия крови', price: 35000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 15, name: 'Липидный профиль', price: 45000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 16, name: 'Коагулограмма', price: 30000, specialty: 'laboratory', group: 'laboratory' }
+      { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 5, name: 'Анализ на сахар', price: 8000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 6, name: 'Анализ на холестерин', price: 10000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 7, name: 'Анализ на гормоны', price: 30000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 8, name: 'Анализ на инфекции', price: 20000, specialty: 'laboratory', group: 'laboratory' }
+    ],
+    dermatology: [
+      { id: 9, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 10, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 11, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 12, name: 'Биопсия кожи', price: 50000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 13, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 14, name: 'Лечение псориаза', price: 80000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 15, name: 'Удаление родинок', price: 45000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 16, name: 'Лечение экземы', price: 70000, specialty: 'dermatology', group: 'dermatology' }
+    ],
+    cosmetology: [
+      { id: 17, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 18, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 19, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 20, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 21, name: 'Ботокс', price: 150000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 22, name: 'Филлеры', price: 200000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 23, name: 'Лазерная эпиляция', price: 80000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 24, name: 'Удаление татуировок', price: 100000, specialty: 'cosmetology', group: 'cosmetology' }
     ]
   };
 
   const DEMO_CATEGORIES = [
-    { id: 1, name_ru: 'Кардиология', code: 'cardiology', specialty: 'cardiology' },
-    { id: 2, name_ru: 'Дерматология', code: 'dermatology', specialty: 'dermatology' },
-    { id: 3, name_ru: 'Стоматология', code: 'stomatology', specialty: 'stomatology' },
-    { id: 4, name_ru: 'Лаборатория', code: 'laboratory', specialty: 'laboratory' }
+    { id: 1, name_ru: 'Лаборатория', code: 'laboratory', specialty: 'laboratory' },
+    { id: 2, name_ru: 'Дерматологические услуги', code: 'dermatology', specialty: 'dermatology' },
+    { id: 3, name_ru: 'Косметологические услуги', code: 'cosmetology', specialty: 'cosmetology' }
   ];
 
   // Иконки по специальностям из документации
   const specialtyIcons = {
-    cardiology: Heart,
-    dermatology: Stethoscope,
-    stomatology: Scissors,
     laboratory: TestTube,
+    dermatology: Stethoscope,
+    cosmetology: Activity,
     general: User
   };
 
   const specialtyColors = {
-    cardiology: 'text-red-600',
-    dermatology: 'text-orange-600', 
-    stomatology: 'text-blue-600',
     laboratory: 'text-green-600',
+    dermatology: 'text-orange-600', 
+    cosmetology: 'text-pink-600',
     general: 'text-gray-600'
   };
 
   // Названия групп услуг из detail.md
   const groupNames = {
-    consultation: 'Консультации',
-    procedure: 'Процедуры',
-    diagnostics: 'Диагностика',
-    laboratory: 'Лабораторные'
+    laboratory: 'Лабораторные анализы',
+    dermatology: 'Дерматологические услуги',
+    cosmetology: 'Косметологические услуги'
   };
 
+  const hasLoadedRef = useRef(false);
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     loadServices();
-  }, [specialty]);
+  }, []);
 
   const loadServices = async () => {
     try {
-      setLoading(true);
+      // не включаем индикатор загрузки, чтобы избежать мерцаний
       setError('');
 
+      // Сначала устанавливаем fallback данные
+      console.log('IntegratedServiceSelector: Setting fallback data');
+      setServices(DEMO_SERVICES);
+      setCategories(DEMO_CATEGORIES);
+      setLoading(false);
+
       // Проверяем наличие токена
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       if (!token) {
         console.warn('Токен не найден, используем демо-данные');
-        setServices(DEMO_SERVICES);
-        setCategories(DEMO_CATEGORIES);
-        setLoading(false);
         return;
       }
 
+      // Пытаемся загрузить с API, но не заменяем fallback данные если API пустой
+      try {
       const params = new URLSearchParams();
-      if (specialty) params.set('specialty', specialty);
-      
-      const response = await fetch(`/api/v1/registrar/services?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Исключаем фильтрацию по specialty, чтобы не терять группы
+      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/v1/registrar/services?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data.services_by_group || DEMO_SERVICES);
-        setCategories(data.categories || DEMO_CATEGORIES);
-        setRetryCount(0); // Сброс счетчика при успехе
-      } else if (response.status === 401) {
-        // Не авторизован - используем демо-данные
-        console.warn('Не авторизован, используем демо-данные');
-        setServices(DEMO_SERVICES);
-        setCategories(DEMO_CATEGORIES);
-      } else {
-        throw new Error(`Ошибка сервера: ${response.status}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('IntegratedServiceSelector: API response:', data);
+          
+          // Проверяем структуру ответа более детально
+          if (data.services_by_group) {
+            const groupKeys = Object.keys(data.services_by_group);
+            console.log('IntegratedServiceSelector: Groups in API response:', groupKeys);
+            
+            // Проверяем, есть ли реальные услуги в группах
+            let hasServices = false;
+            for (const group of groupKeys) {
+              const groupServices = data.services_by_group[group];
+              if (Array.isArray(groupServices) && groupServices.length > 0) {
+                hasServices = true;
+                console.log(`IntegratedServiceSelector: Group ${group} has ${groupServices.length} services`);
+              }
+            }
+            
+            if (hasServices) {
+              setServices(data.services_by_group);
+              setCategories(data.categories || DEMO_CATEGORIES);
+              console.log('IntegratedServiceSelector: Loaded data from API with services');
+            } else {
+              console.log('IntegratedServiceSelector: API groups are empty, keeping fallback');
+              // Не перезаписываем fallback пустыми данными
+            }
+          } else {
+            console.log('IntegratedServiceSelector: No services_by_group in API response, keeping fallback');
+          }
+          setRetryCount(0);
+        } else {
+          console.warn('IntegratedServiceSelector: API request failed, keeping fallback data');
+        }
+      } catch (apiError) {
+        console.warn('IntegratedServiceSelector: API error, keeping fallback data:', apiError);
       }
     } catch (err) {
-      console.error('Ошибка загрузки услуг:', err);
-      
-      // Используем демо-данные при ошибке
-      setServices(DEMO_SERVICES);
-      setCategories(DEMO_CATEGORIES);
-      
-      // Показываем ошибку только если это не первая попытка
+      console.error('IntegratedServiceSelector: Critical error:', err);
+      // Fallback данные уже установлены выше, просто показываем ошибку
       if (retryCount > 0) {
         setError(`Ошибка загрузки справочника услуг: ${err.message}`);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -159,7 +187,7 @@ const IntegratedServiceSelector = ({
     if (isSelected) {
       // Убираем услугу
       const newServices = selectedServices.filter(s => s.id !== serviceId);
-      onServicesChange(newServices);
+      onServicesChange?.(newServices);
     } else {
       // Добавляем услугу
       const newServices = [...selectedServices, {
@@ -169,7 +197,7 @@ const IntegratedServiceSelector = ({
         specialty: serviceData.specialty,
         group: serviceData.group
       }];
-      onServicesChange(newServices);
+      onServicesChange?.(newServices);
     }
   };
 
@@ -178,13 +206,16 @@ const IntegratedServiceSelector = ({
   };
 
   const getServicesByGroup = () => {
+    // Если services пустой, используем DEMO_SERVICES
+    const sourceServices = Object.keys(services).length > 0 ? services : DEMO_SERVICES;
     const filteredServices = {};
     
-    Object.keys(services).forEach(group => {
-      const groupServices = services[group] || [];
-      filteredServices[group] = specialty 
-        ? groupServices.filter(service => service.specialty === specialty)
-        : groupServices;
+    Object.keys(sourceServices).forEach(group => {
+      const groupServices = sourceServices[group] || [];
+      // Убеждаемся, что groupServices - это массив
+      const servicesArray = Array.isArray(groupServices) ? groupServices : [];
+      // Не фильтруем услуги по специальности, показываем все доступные
+      filteredServices[group] = servicesArray;
     });
     
     return filteredServices;
@@ -203,7 +234,7 @@ const IntegratedServiceSelector = ({
     );
   }
 
-  return (
+  const content = (
     <div className={`service-selector ${className}`}>
       {/* Заголовок с информацией о данных */}
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -231,8 +262,8 @@ const IntegratedServiceSelector = ({
         </div>
       </div>
 
-      {/* Фильтр по специальности */}
-      {!specialty && (
+      {/* Фильтр по специальности отключен в мастере регистратуры */}
+      {false && (
         <div className="mb-4">
           <div className="flex flex-wrap gap-2">
             {categories.map(category => {
@@ -273,7 +304,9 @@ const IntegratedServiceSelector = ({
       <div className="space-y-4">
         {Object.keys(filteredServices).map(group => {
           const groupServices = filteredServices[group];
-          if (groupServices.length === 0) return null;
+          if (!Array.isArray(groupServices) || groupServices.length === 0) {
+            return null;
+          }
 
           return (
             <Card key={group} className="p-4">
@@ -281,64 +314,53 @@ const IntegratedServiceSelector = ({
                 {groupNames[group] || group}
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {groupServices.map(service => {
-                  const isSelected = selectedServices.some(s => s.id === service.id);
-                  const Icon = specialtyIcons[service.specialty] || User;
-                  const colorClass = specialtyColors[service.specialty] || 'text-gray-600';
-                  
-                  return (
-                    <div
-                      key={service.id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
-                          : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleServiceToggle(service.id, service)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-2 flex-1">
-                          <div className="flex-shrink-0 mt-1">
-                            {isSelected ? (
-                              <CheckCircle className="w-5 h-5 text-blue-600" />
-                            ) : (
-                              <Circle className="w-5 h-5 text-gray-400" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <Icon className={`w-4 h-4 ${colorClass}`} />
-                              <span className="text-sm font-medium text-gray-900 truncate">
-                                {service.name}
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {service.specialty && (
-                                <Badge variant="secondary" className="mr-1">
-                                  {categories.find(c => c.specialty === service.specialty)?.name_ru || service.specialty}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-2">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {service.price?.toLocaleString('ru-RU')} сум
-                          </div>
-                        </div>
-                      </div>
+              <div className="space-y-3">
+                <select
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  onChange={(e) => {
+                    const serviceId = parseInt(e.target.value);
+                    if (serviceId) {
+                      const service = groupServices.find(s => s.id === serviceId);
+                      if (service) {
+                        handleServiceToggle(service.id, service);
+                        e.target.value = ''; // Сброс выбора
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Выберите услугу из {groupNames[group] || group}</option>
+                  {groupServices.map(service => (
+                    <option key={service.id} value={service.id}>
+                      {service.name} - {service.price?.toLocaleString('ru-RU')} сум
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Выбранные услуги из этой группы */}
+                {selectedServices.filter(s => s.group === group).map(service => (
+                  <div key={service.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-5 h-5 text-blue-600" />
+                      <span className="font-medium text-gray-900">{service.name}</span>
+                      <span className="text-sm text-gray-600">({service.price?.toLocaleString('ru-RU')} сум)</span>
                     </div>
-                  );
-                })}
+                    <button
+                      onClick={() => handleServiceToggle(service.id, service)}
+                      className="text-red-600 hover:text-red-800 p-1"
+                      title="Удалить услугу"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             </Card>
           );
         })}
       </div>
 
-      {/* Итого */}
-      {selectedServices.length > 0 && (
+      {/* Итого + Далее (в простом режиме) */}
+      {(selectedServices.length > 0) && (
         <Card className="mt-4 p-4 bg-green-50 border-green-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -347,8 +369,15 @@ const IntegratedServiceSelector = ({
                 Выбрано услуг: {selectedServices.length}
               </span>
             </div>
-            <div className="text-lg font-bold text-green-900">
-              {getTotalPrice().toLocaleString('ru-RU')} сум
+            <div className="flex items-center gap-3">
+              <div className="text-lg font-bold text-green-900">
+                {getTotalPrice().toLocaleString('ru-RU')} сум
+              </div>
+              {simple && (
+                <button className="px-4 py-2 rounded bg-blue-600 text-white" onClick={() => onNext?.()}>
+                  Далее →
+                </button>
+              )}
             </div>
           </div>
         </Card>
@@ -365,6 +394,9 @@ const IntegratedServiceSelector = ({
       )}
     </div>
   );
+
+  // Простой режим возвращает компактный контент без лишних вспомогательных блоков
+  return content;
 };
 
 export default IntegratedServiceSelector;

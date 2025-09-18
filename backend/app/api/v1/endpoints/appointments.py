@@ -102,7 +102,7 @@ def create_appointment(
             status_code=400, detail="Это время уже занято у выбранного врача"
         )
 
-    appointment = appointment_crud.create_appointment(db=db, appointment=appointment_in)
+    appointment = appointment_crud.create(db=db, obj_in=appointment_in)
     return appointment
 
 

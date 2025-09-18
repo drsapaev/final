@@ -33,7 +33,7 @@ class CRUDPatient(CRUDBase[Patient, PatientCreate, PatientUpdate]):
                     self.model.last_name.ilike(search_term),
                     self.model.middle_name.ilike(search_term),
                     self.model.phone.ilike(search_term),
-                    self.model.document_no.ilike(search_term),
+                    self.model.doc_number.ilike(search_term),
                 )
             )
 

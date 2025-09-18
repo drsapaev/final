@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
+import '../../styles/cursor-effects.css';
+import '../../styles/animations.css';
+import '../ui/animations.css';
 import { 
   Hospital, 
   Sun, 
@@ -10,7 +13,9 @@ import {
   Home,
   User,
   Settings,
-  Globe
+  Globe,
+  CreditCard,
+  Search as SearchIcon
 } from 'lucide-react';
 
 export default function Header() {
@@ -30,6 +35,7 @@ export default function Header() {
   const user = st.profile || st.user || null;
   const role = (user?.role || user?.role_name || 'Guest');
   const roleLower = String(role).toLowerCase();
+  const view = new URLSearchParams(location.search).get('view');
 
   // Используем централизованную систему дизайна вместо дублированных токенов
   const { 
@@ -47,11 +53,8 @@ export default function Header() {
   const navItems = [];
   // Для администратора навигационные пункты скрыты
   if (roleLower !== 'admin') {
-    if (roleLower === 'registrar') navItems.push({ to: '/registrar-panel', label: 'Регистратор', icon: '📋' });
-    if (roleLower === 'doctor')    navItems.push({ to: '/doctor-panel',    label: 'Врач', icon: '👨‍⚕️' });
-    if (roleLower === 'cashier')   navItems.push({ to: '/cashier-panel',   label: 'Касса', icon: '💰' });
-    if (roleLower === 'lab')       navItems.push({ to: '/lab-panel',       label: 'Лаборатория', icon: '🧪' });
-    if (roleLower === 'patient')   navItems.push({ to: '/patient-panel',   label: 'Пациент', icon: '👤' });
+    if (roleLower === 'registrar') navItems.push({ to: '/cashier-panel', label: 'Кассир', icon: <CreditCard size={16} /> });
+    if (roleLower === 'cashier')   navItems.push({ to: '/cashier-panel', label: 'Касса',  icon: <CreditCard size={16} /> });
   }
   
   // Специализированные роли
@@ -97,6 +100,22 @@ export default function Header() {
     display: 'flex',
     gap: getSpacing('sm'),
     alignItems: 'center'
+  };
+
+  const historyPanelStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: getSpacing('sm'),
+    marginLeft: getSpacing('xl')
+  };
+
+  const inputStyle = {
+    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+    border: `1px solid ${borderColor}`,
+    borderRadius: '8px',
+    background: theme === 'light' ? 'white' : getColor('gray', 800),
+    color: textColor,
+    fontSize: getFontSize('sm')
   };
 
   const navButtonStyle = {
@@ -210,105 +229,394 @@ export default function Header() {
   };
 
   return (
-    <div style={headerStyle}>
-      {/* Логотип */}
-      <div style={logoStyle} onClick={() => navigate('/')}>
-        <Hospital size={24} color={getColor('primary', 500)} />
-        <span>Clinic</span>
-        <span style={{ opacity: 0.6, fontSize: getFontSize('xs'), fontWeight: '400' }}>v0.1.0</span>
-      </div>
-
-      {/* Навигация */}
-      <div style={navStyle}>
-        {navItems.map(item => {
-          const isActive = location.pathname === item.to;
-          return (
-            <button 
-              key={item.to} 
-              style={isActive ? activeNavButtonStyle : navButtonStyle}
-              onClick={() => navigate(item.to)}
-              onMouseOver={(e) => {
-                if (!isActive && e.target.style.background === 'transparent') {
-                  e.target.style.background = theme === 'light' ? getColor('gray', 100) : getColor('gray', 800);
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!isActive && e.target.style.background !== `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`) {
-                  e.target.style.background = 'transparent';
-                }
-              }}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Управление */}
-      <div style={controlsStyle}>
-        {/* Переключатель темы */}
+    <header 
+      className="interactive-element app-header-2025"
+      style={{
+        position: 'sticky',
+        top: 0,
+        left: 0,
+        right: 0,
+        width: '100%',
+        zIndex: 50,
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid',
+        transition: 'all 0.2s ease',
+        backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.9)',
+        borderColor: theme === 'light' ? getColor('gray', 200) : getColor('gray', 700),
+        boxShadow: theme === 'light' 
+          ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          : '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
+        fontFamily: 'Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif',
+        fontFeatureSettings: '"calt" 1, "liga" 1',
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale'
+      }}>
+      <style>{`
+        /* Локальные правила, чтобы победить глобальные !important из dark-theme-visibility-fix.css */
+        [data-theme="dark"] .app-header-2025 button,
+        [data-theme="dark"] .app-header-2025 select,
+        [data-theme="dark"] .app-header-2025 input {
+          color: #f8fafc !important;
+        }
+        [data-theme="dark"] .app-header-2025 .role-badge {
+          color: #e2e8f0 !important;
+        }
+        /* Современная типографика кнопок */
+        .app-header-2025 button,
+        .app-header-2025 select,
+        .app-header-2025 input {
+          letter-spacing: 0.01em;
+          font-weight: 600;
+        }
+      `}</style>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 24px',
+        maxWidth: '100%'
+      }}>
+        {/* Логотип */}
         <button 
-          onClick={toggleTheme} 
-          style={buttonStyle}
-          title="Переключить тему"
-          onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-          onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+          className="interactive-element hover-lift focus-ring"
+          onClick={() => navigate('/')}
+          style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            color: textColor 
+          }}
         >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          <Hospital size={24} color={getColor('primary', 500)} />
+          <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Clinic</span>
+          <span style={{ fontSize: '12px', fontWeight: 'normal', opacity: 0.6 }}>v0.1.0</span>
         </button>
 
-        {/* Переключатель языка */}
-        <select 
-          value={lang} 
-          onChange={(e) => changeLang(e.target.value)} 
-          style={selectStyle}
-        >
-          <option value="ru">RU</option>
-          <option value="uz">UZ</option>
-          <option value="en">EN</option>
-        </select>
+        {/* Навигация */}
+        <nav style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {navItems.map(item => {
+            const isActive = location.pathname === item.to;
+            return (
+              <button 
+                key={item.to} 
+                className="interactive-element hover-lift ripple-effect focus-ring"
+                style={{
+                  height: '40px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  ...(isActive ? {
+                    background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 700)} 100%)`,
+                    color: 'white',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+                    transform: 'translateY(-1px)'
+                  } : {
+                    background: theme === 'light' ? 'white' : getColor('gray', 700),
+                    color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                    boxShadow: 'none'
+                  })
+                }}
+                onClick={() => navigate(item.to)}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
 
-        {/* Информация о пользователе */}
-        {user ? (
-          <>
-            <div style={userInfoStyle}>
-              <User size={16} />
-              <span style={{ fontWeight: '600' }}>{displayName}</span>
-              {showRoleBadge && (
-                <span style={roleBadgeStyle}>{roleLabel}</span>
+          {/* Быстрые ссылки для регистратора внутри панели */}
+          {roleLower === 'registrar' && location.pathname === '/registrar-panel' && (
+            <>
+              <button
+                className="interactive-element hover-lift ripple-effect focus-ring"
+                style={{
+                  height: '40px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  ...(new URLSearchParams(location.search).get('view') === 'welcome' ? {
+                    background: `linear-gradient(135deg, ${getColor('success', 600)} 0%, ${getColor('success', 700)} 100%)`,
+                    color: 'white',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)',
+                    transform: 'translateY(-1px)'
+                  } : {
+                    background: theme === 'light' ? 'white' : getColor('gray', 700),
+                    color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                    boxShadow: 'none'
+                  })
+                }}
+                onClick={() => navigate('/registrar-panel?view=welcome')}
+                title="Главная"
+              >
+                <Home size={16} />
+                <span>Главная</span>
+              </button>
+              <button
+                className="interactive-element hover-lift ripple-effect focus-ring"
+                style={{
+                  height: '40px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  ...(new URLSearchParams(location.search).get('view') === 'queue' ? {
+                    background: `linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)`,
+                    color: 'white',
+                    border: 'none',
+                    boxShadow: '0 4px 6px -1px rgba(147, 51, 234, 0.3)',
+                    transform: 'translateY(-1px)'
+                  } : {
+                    background: theme === 'light' ? 'white' : getColor('gray', 700),
+                    color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                    boxShadow: 'none'
+                  })
+                }}
+                onClick={() => navigate('/registrar-panel?view=queue')}
+                title="Онлайн‑записи"
+              >
+                <span>📱</span>
+                <span>Онлайн‑записи</span>
+              </button>
+
+              {/* История (календарь+поиск) в контексте кнопки "Главная" */}
+              {view === 'welcome' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '24px' }}>
+                  <input
+                    type="date"
+                    className="interactive-element focus-ring"
+                    style={{
+                      height: '40px',
+                      padding: '8px 12px',
+                      border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.2s ease',
+                      backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+                      color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
+                    }}
+                    defaultValue={new URLSearchParams(location.search).get('date') || ''}
+                    onChange={(e) => {
+                      const params = new URLSearchParams(location.search);
+                      const val = e.currentTarget.value;
+                      if (val) params.set('date', val); else params.delete('date');
+                      params.set('view', 'welcome');
+                      navigate(`/registrar-panel?${params.toString()}`, { replace: true });
+                    }}
+                  />
+                  <div style={{ position: 'relative' }}>
+                    <SearchIcon 
+                      size={16} 
+                      style={{ 
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        opacity: 0.6,
+                        color: theme === 'light' ? getColor('gray', 600) : getColor('gray', 300)
+                      }}
+                    />
+                    <input
+                      type="search"
+                      placeholder="Поиск по истории..."
+                      className="interactive-element focus-ring"
+                      style={{
+                        height: '40px',
+                        paddingLeft: '40px',
+                        paddingRight: '12px',
+                        border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        minWidth: '240px',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+                        color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100)
+                      }}
+                      defaultValue={new URLSearchParams(location.search).get('q') || ''}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const params = new URLSearchParams(location.search);
+                          const val = e.currentTarget.value.trim();
+                          if (val) params.set('q', val); else params.delete('q');
+                          params.set('view', 'welcome');
+                          navigate(`/registrar-panel?${params.toString()}`, { replace: true });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
               )}
-            </div>
-            <button
-              onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
-              style={logoutButtonStyle}
-              onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
-              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-            >
-              <LogOut size={16} />
-              <span>Выйти</span>
-            </button>
-          </>
-        ) : (
+            </>
+          )}
+        </nav>
+
+        {/* Управление */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Переключатель темы */}
           <button 
-            onClick={() => navigate('/login')} 
+            onClick={toggleTheme} 
+            className="interactive-element hover-lift ripple-effect focus-ring"
             style={{
-              ...buttonStyle,
-              background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
-              color: 'white',
-              border: 'none',
-              boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+              backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+              color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+              cursor: 'pointer'
             }}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+            title="Переключить тему"
           >
-            <User size={16} />
-            <span>Войти</span>
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
-        )}
+
+          {/* Переключатель языка */}
+          <select 
+            value={lang} 
+            onChange={(e) => changeLang(e.target.value)} 
+            className="interactive-element focus-ring"
+            style={{
+              height: '40px',
+              padding: '8px 12px',
+              border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease',
+              minWidth: '64px',
+              backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+              color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+              cursor: 'pointer'
+            }}
+          >
+            <option value="ru">RU</option>
+            <option value="uz">UZ</option>
+            <option value="en">EN</option>
+          </select>
+
+          {/* Информация о пользователе */}
+          {user ? (
+            <>
+              <button
+                onClick={() => navigate('/registrar-panel')}
+                className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
+                style={{
+                  height: '40px',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
+                  color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+                  cursor: 'pointer'
+                }}
+                title="Открыть панель регистратора"
+              >
+                <User size={16} />
+                <span style={{ fontWeight: '700' }}>{displayName}</span>
+                {showRoleBadge && (
+                  <span 
+                    className="role-badge"
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '12px',
+                      borderRadius: '999px',
+                      border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 500)}`,
+                      backgroundColor: theme === 'light' ? getColor('gray', 100) : getColor('gray', 600),
+                      color: theme === 'light' ? getColor('gray', 700) : getColor('gray', 200),
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {roleLabel}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
+                className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
+                style={{
+                  height: '40px',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: 'white',
+                  transition: 'all 0.2s ease',
+                  background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
+                  boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <LogOut size={16} />
+                <span>Выйти</span>
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={() => navigate('/login')} 
+              className="interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+              style={{
+                height: '40px',
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'white',
+                transition: 'all 0.2s ease',
+                background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <User size={16} />
+              <span>Войти</span>
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
 

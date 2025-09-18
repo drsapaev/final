@@ -42,6 +42,8 @@ const PrintButton = ({
   const IconComponent = documentIcons[documentType] || Printer;
   const documentName = documentNames[documentType] || 'Документ';
 
+  const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || '';
+
   const handlePrint = async () => {
     try {
       setPrinting(true);
@@ -58,7 +60,7 @@ const PrintButton = ({
         lab_results: '/api/v1/print/lab-results'
       };
 
-      const endpoint = endpoints[documentType];
+      const endpoint = `${API_BASE}${endpoints[documentType]}`;
       if (!endpoint) {
         throw new Error(`Неподдерживаемый тип документа: ${documentType}`);
       }
@@ -72,7 +74,7 @@ const PrintButton = ({
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(printData)

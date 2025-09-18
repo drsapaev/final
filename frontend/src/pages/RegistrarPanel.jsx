@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PhoneInput from '../components/ui/PhoneInput';
 import { Toaster, toast } from 'react-hot-toast';
 import AppointmentsTable from '../components/AppointmentsTable';
-import ServiceChecklist from '../components/ServiceChecklist';
+// import ServiceChecklist from '../components/ServiceChecklist';
 import IntegratedServiceSelector from '../components/registrar/IntegratedServiceSelector';
 import IntegratedDoctorSelector from '../components/registrar/IntegratedDoctorSelector';
 import OnlineQueueManager from '../components/queue/OnlineQueueManager';
@@ -50,10 +51,14 @@ const RegistrarPanel = () => {
   const isTouch = useTouchDevice();
 
   // Основные состояния
-  const [activeTab, setActiveTab] = useState('welcome');
+  const [activeTab, setActiveTab] = useState(null);
+  const [searchParams] = useSearchParams();
+  const todayStr = new Date().toISOString().split('T')[0];
   
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
+  const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
+  const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
   // Демо-данные вынесены в константу
   const DEMO_APPOINTMENTS = [
     {
@@ -141,12 +146,13 @@ const RegistrarPanel = () => {
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
-  const [showAddressColumn, setShowAddressColumn] = useState(false);
+  const [showAddressColumn, setShowAddressColumn] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
   const [showSlotsModal, setShowSlotsModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showAppointmentFlow, setShowAppointmentFlow] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Фиксированный хедер убран - теперь используется глобальный хедер
   
@@ -157,6 +163,13 @@ const RegistrarPanel = () => {
     visit: {},
     payment: {}
   });
+  const [patientErrors, setPatientErrors] = useState({ fio: '', dob: '', phone: '' });
+  const [patientSuggestions, setPatientSuggestions] = useState([]);
+  const [showPatientSuggestions, setShowPatientSuggestions] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
+  const fioRef = useRef(null);
+  const dobRef = useRef(null);
+  const phoneRef = useRef(null);
   
   // Новые состояния для интеграции с админ панелью
   const [doctors, setDoctors] = useState([]);
@@ -183,7 +196,7 @@ const RegistrarPanel = () => {
       tabs_welcome: 'Главная',
       tabs_appointments: 'Все записи',
       tabs_cardio: 'Кардиолог',
-      tabs_echokg: 'ЭхоКГ',
+      tabs_echokg: 'ЭКГ',
       tabs_derma: 'Дерматолог',
       tabs_dental: 'Стоматолог',
       tabs_lab: 'Лаборатория',
@@ -230,13 +243,14 @@ const RegistrarPanel = () => {
       
       // Вкладки
       tabs_welcome: 'Asosiy',
-      tabs_appointments: 'Barcha yozuvlar',
-      tabs_cardio: 'Kardiolog',
-      tabs_echokg: 'EchoKG',
-      tabs_derma: 'Dermatolog',
-      tabs_dental: 'Stomatolog',
-      tabs_lab: 'Laboratoriya',
-      tabs_procedures: 'Protseduralar',
+      tabs_appointments: 'yozilganlar',
+      tabs_cardio: 'Кардиолог',
+      tabs_echokg: 'ЭКГ',
+      tabs_derma: 'Дерматолог',
+      tabs_dental: 'Стоматолог',
+      tabs_lab: 'Лаборатория',
+      tabs_procedures: 'muolaja',
+      tabs_queue: 'navbat',
       
       // Действия
       new_appointment: 'Yangi yozuv',
@@ -268,7 +282,8 @@ const RegistrarPanel = () => {
       total_patients: 'Jami bemorlar',
       today_appointments: 'Bugungi yozuvlar',
       pending_payments: 'To\'lovni kutmoqda',
-      active_queues: 'Faol navbatlar'
+      active_queues: 'Faol navbatlar',
+      empty_table: 'Ma\'lumot yo\'q'
     }
   };
   const t = (key) => (translations[language] && translations[language][key]) || translations.ru[key] || key;
@@ -389,11 +404,20 @@ const RegistrarPanel = () => {
   };
 
   const buttonSecondaryStyle = {
-    ...buttonStyle,
-    background: `linear-gradient(135deg, ${getColor('gray', 500)} 0%, ${getColor('gray', 600)} 100%)`,
-    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)',
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
+    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
+    background: theme === 'light' ? 'white' : getColor('gray', 800),
+    color: textColor,
+    border: `1px solid ${borderColor}`,
+    borderRadius: '12px',
+    cursor: 'pointer',
+    marginRight: getSpacing('sm'),
+    fontSize: getFontSize('sm'),
+    fontWeight: '600',
+    lineHeight: '1.25',
+    transition: 'all 0.2s ease',
+    boxShadow: 'none',
   };
+  
 
   const buttonSuccessStyle = {
     ...buttonStyle,
@@ -449,7 +473,8 @@ const RegistrarPanel = () => {
     whiteSpace: 'nowrap',
     display: 'flex',
     alignItems: 'center',
-    gap: isMobile ? '4px' : getSpacing('xs')
+    gap: isMobile ? '4px' : getSpacing('xs'),
+    borderBottom: '3px solid transparent'
   };
 
   const activeTabStyle = {
@@ -457,35 +482,125 @@ const RegistrarPanel = () => {
     background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
     color: 'white',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    transform: 'translateY(-2px)'
+    transform: 'translateY(-2px)',
+    borderBottom: `3px solid ${getColor('primary', 700)}`
   };
+
+  // Базовый URL API
+    const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8001';
 
   // Загрузка данных из админ панели
   const loadIntegratedData = async () => {
     try {
       setAppointmentsLoading(true);
       
+      // Сначала устанавливаем fallback данные для врачей и услуг
+      console.log('Setting fallback doctors and services data');
+      setDoctors([
+        { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
+        { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
+        { id: 3, specialty: 'stomatology', user: { full_name: 'Доктор Стоматолог' }, cabinet: '103', price_default: 60000 }
+      ]);
+      
+      setServices({
+        laboratory: [
+          { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
+          { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
+          { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
+          { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }
+        ],
+        dermatology: [
+          { id: 5, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
+          { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
+          { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
+          { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }
+        ],
+        cosmetology: [
+          { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
+          { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
+          { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
+          { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }
+        ]
+      });
+      
       // Загружаем врачей, услуги и настройки очередей из админ панели
       const [doctorsRes, servicesRes, queueRes] = await Promise.all([
-        fetch('/api/v1/registrar/doctors', {
+        fetch(`${API_BASE}/api/v1/registrar/doctors`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         }),
-        fetch('/api/v1/registrar/services', {
+        fetch(`${API_BASE}/api/v1/registrar/services`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         }),
-        fetch('/api/v1/registrar/queue-settings', {
+        fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         })
       ]);
 
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
-        setDoctors(doctorsData.doctors);
+        const apiDoctors = doctorsData.doctors || [];
+        // Если API пустой — оставляем уже установленные фолбэк-данные без лишних перерисовок
+        if (apiDoctors.length > 0) {
+          setDoctors(apiDoctors);
+        }
+      } else {
+        // Fallback данные для врачей
+        setDoctors([
+          { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
+          { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
+          { id: 3, specialty: 'stomatology', user: { full_name: 'Доктор Стоматолог' }, cabinet: '103', price_default: 60000 }
+        ]);
       }
 
       if (servicesRes.ok) {
         const servicesData = await servicesRes.json();
-        setServices(servicesData.services_by_group);
+        const apiServices = servicesData.services_by_group || {};
+        // Если API пустой — оставляем уже установленные фолбэк-данные без лишних перерисовок
+        if (Object.keys(apiServices).length > 0) {
+          setServices(apiServices);
+        } else {
+          setServices({
+            laboratory: [
+              { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
+              { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
+              { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
+              { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }
+            ],
+            dermatology: [
+              { id: 5, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
+              { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
+              { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
+              { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }
+            ],
+            cosmetology: [
+              { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
+              { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
+              { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
+              { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }
+            ]
+          });
+        }
+      } else {
+        setServices({
+          laboratory: [
+            { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
+            { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
+            { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
+            { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }
+          ],
+          dermatology: [
+            { id: 5, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
+            { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
+            { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
+            { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }
+          ],
+          cosmetology: [
+            { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
+            { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
+            { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
+            { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }
+          ]
+        });
       }
 
       if (queueRes.ok) {
@@ -516,7 +631,7 @@ const RegistrarPanel = () => {
         return;
       }
       
-      const response = await fetch('/api/v1/appointments/?limit=50', {
+      const response = await fetch(`${API_BASE}/api/v1/appointments/?limit=50`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -552,9 +667,7 @@ const RegistrarPanel = () => {
       setAppointments(DEMO_APPOINTMENTS);
       
       // Показываем уведомление пользователю
-      if (window.toast) {
-        window.toast.error('Не удалось загрузить данные с сервера. Показаны демо-данные.');
-      }
+      toast.error('Не удалось загрузить данные с сервера. Показаны демо-данные.');
     } finally {
       setAppointmentsLoading(false);
     }
@@ -565,10 +678,21 @@ const RegistrarPanel = () => {
     loadIntegratedData(); // Загружаем данные из админ панели
   }, []);
 
+  // Автообновление очереди с возможностью паузы
+  useEffect(() => {
+    // Во время мастера записи автообновление отключаем, чтобы не было мерцаний
+    if (showWizard) return;
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      loadAppointments();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [autoRefresh, showWizard]);
+
   // Функции для жесткого потока
   const handleStartVisit = async (appointment) => {
     try {
-      const response = await fetch(`/api/v1/appointments/${appointment.id}/start-visit`, {
+      const response = await fetch(`${API_BASE}/api/v1/appointments/${appointment.id}/start-visit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -595,7 +719,8 @@ const RegistrarPanel = () => {
 
   const handlePayment = async (appointment) => {
     try {
-      const response = await fetch(`/api/v1/appointments/${appointment.id}/mark-paid`, {
+      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || '';
+      const response = await fetch(`${API_BASE}/api/v1/appointments/${appointment.id}/mark-paid`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -610,6 +735,7 @@ const RegistrarPanel = () => {
           apt.id === appointment.id ? updatedAppointment : apt
         ));
         toast.success('Запись отмечена как оплаченная!');
+        return updatedAppointment;
       } else {
         const error = await response.json();
         toast.error(error.detail || 'Ошибка при оплате');
@@ -623,21 +749,46 @@ const RegistrarPanel = () => {
   // Обработчики событий
   const updateAppointmentStatus = useCallback(async (appointmentId, status, reason = '') => {
     try {
-      const response = await fetch(`/api/v1/appointments/${appointmentId}/status`, {
-        method: 'PATCH',
+      if (!appointmentId || Number(appointmentId) <= 0) {
+        toast.error('Некорректный идентификатор записи');
+        return;
+      }
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        toast.error('Требуется вход в систему');
+        return;
+      }
+      let url = '';
+      let method = 'POST';
+      let body;
+      if (status === 'complete' || status === 'done') {
+        url = `${API_BASE}/api/v1/appointments/${appointmentId}/complete`;
+        body = JSON.stringify({ reason });
+      } else if (status === 'paid' || status === 'mark-paid' || status === 'queued') {
+        url = `${API_BASE}/api/v1/appointments/${appointmentId}/mark-paid`;
+      } else {
+        toast.error('Изменение данного статуса не поддерживается');
+        return;
+      }
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status, reason })
+        body
       });
-      if (response.ok) {
-        await loadAppointments();
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(errText || `API ${response.status}`);
       }
+      await loadAppointments();
+      toast.success('Статус обновлен');
     } catch (error) {
-      console.error('Ошибка обновления статуса:', error);
+      console.error('RegistrarPanel: Update status error:', error);
+      toast.error('Не удалось обновить статус');
     }
-  }, []);
+  }, [API_BASE, loadAppointments]);
 
   // Функция для определения варианта Badge по статусу
   const getStatusVariant = (status) => {
@@ -658,12 +809,21 @@ const RegistrarPanel = () => {
   const handleBulkAction = useCallback(async (action, reason = '') => {
     if (appointmentsSelected.size === 0) return;
     
-    const promises = Array.from(appointmentsSelected).map(id => 
-      updateAppointmentStatus(id, action, reason)
+    // Подтверждение для опасных действий
+    if (['cancelled', 'no_show'].includes(action)) {
+      const ok = window.confirm(`Применить действие «${action}» для ${appointmentsSelected.size} записей?`);
+      if (!ok) return;
+    }
+
+    const results = await Promise.allSettled(
+      Array.from(appointmentsSelected).map(id => updateAppointmentStatus(id, action, reason))
     );
-    
-    await Promise.all(promises);
-    toast.success(`Статус ${appointmentsSelected.size} записей успешно обновлен!`);
+
+    const successCount = results.filter(r => r.status === 'fulfilled').length;
+    const failCount = results.length - successCount;
+
+    if (successCount > 0) toast.success(`Обновлено: ${successCount}`);
+    if (failCount > 0) toast.error(`Ошибок: ${failCount}`);
     setAppointmentsSelected(new Set());
   }, [appointmentsSelected, updateAppointmentStatus]);
 
@@ -700,6 +860,18 @@ const RegistrarPanel = () => {
           e.preventDefault();
           setAppointmentsSelected(new Set());
         }
+      } else if (e.altKey) {
+        if (e.key === '1') { e.preventDefault(); handleBulkAction('confirmed'); }
+        if (e.key === '2') { e.preventDefault(); 
+          const reason = window.prompt('Причина отмены');
+          if (reason) handleBulkAction('cancelled', reason);
+        }
+        if (e.key === '3') { e.preventDefault(); handleBulkAction('no_show'); }
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (showWizard && wizardStep === 1) {
+          handlePatientNext();
+        }
       } else if (e.key === 'Escape') {
         if (showWizard) setShowWizard(false);
         if (showSlotsModal) setShowSlotsModal(false);
@@ -711,22 +883,54 @@ const RegistrarPanel = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showWizard, showSlotsModal, showQRModal, wizardStep, appointments]);
 
-  // Функция для подсчета записей по отделам (исправляет двойную фильтрацию)
-  const getDepartmentCount = (department) => {
+  // Проверка принадлежности записи отделу
+  const isInDepartment = (appointment, departmentKey) => {
+    const dept = appointment.department?.toLowerCase() || '';
+    if (departmentKey === 'cardio') return dept.includes('cardio');
+    if (departmentKey === 'echokg' || departmentKey === 'ecg') return dept.includes('echo');
+    if (departmentKey === 'derma') return dept.includes('derma');
+    if (departmentKey === 'dental') return dept.includes('dental');
+    if (departmentKey === 'lab') return dept.includes('lab');
+    if (departmentKey === 'procedures' || departmentKey === 'proc') return dept.includes('proc');
+    return false;
+  };
+
+  // Счетчик «сегодня» по отделам
+  const getDepartmentCount = (departmentKey) => {
     return appointments.filter(a => 
-      a.department?.toLowerCase().includes(department.toLowerCase())
+      a.date === todayStr && isInDepartment(a, departmentKey)
     ).length;
   };
 
-  // Фильтрация записей по вкладке
+  // Индикаторы статусов по отделу
+  const hasActiveQueue = (departmentKey) => {
+    return appointments.some(a => a.status === 'queued' && isInDepartment(a, departmentKey));
+  };
+
+  const hasPendingPayments = (departmentKey) => {
+    return appointments.some(a => a.status === 'paid_pending' && isInDepartment(a, departmentKey));
+  };
+
+  // Фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
+  // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
+  const searchDate = searchParams.get('date');
+  const searchQuery = (searchParams.get('q') || '').toLowerCase();
+
+  const statusFilter = searchParams.get('status');
   const filteredAppointments = appointments.filter(appointment => {
-    if (activeTab === 'welcome' || activeTab === 'appointments') return true;
-    if (activeTab === 'cardio') return appointment.department?.toLowerCase().includes('cardio');
-    if (activeTab === 'echokg') return appointment.department?.toLowerCase().includes('echo');
-    if (activeTab === 'derma') return appointment.department?.toLowerCase().includes('derma');
-    if (activeTab === 'dental') return appointment.department?.toLowerCase().includes('dental');
-    if (activeTab === 'lab') return appointment.department?.toLowerCase().includes('lab');
-    if (activeTab === 'procedures') return appointment.department?.toLowerCase().includes('proc');
+    // Фильтр по вкладке (отдел)
+    if (activeTab && !isInDepartment(appointment, activeTab)) return false;
+    // Фильтр по дате: если не задана, показываем все даты
+    if (searchDate && appointment.date !== searchDate) return false;
+    // Фильтр по статусу
+    if (statusFilter && appointment.status !== statusFilter) return false;
+    // Поиск по ФИО/телефону/услугам
+    if (searchQuery) {
+      const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
+      const inPhone = (appointment.patient_phone || '').toLowerCase().includes(searchQuery);
+      const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
+      if (!inFio && !inPhone && !inServices) return false;
+    }
     return true;
   });
 
@@ -857,6 +1061,115 @@ const RegistrarPanel = () => {
     activeQueues: appointments.filter(a => a.status === 'queued').length
   };
 
+  // Простой режим выбора врача (для 3 специализаций)
+  const simpleDoctorMode = true;
+  const getDoctorBySpecialty = useCallback((spec) => {
+    const found = doctors.find(d => d.specialty === spec) || null;
+    return found;
+  }, [doctors]);
+
+  // Предвыбор врача при открытии мастера на основе активной вкладки
+  useEffect(() => {
+    if (!showWizard) return;
+    const tabToSpec = {
+      cardio: 'cardiology',
+      ecg: 'cardiology',
+      derma: 'dermatology',
+      dental: 'stomatology',
+      lab: null,
+      procedures: null
+    };
+    const spec = activeTab ? tabToSpec[activeTab] : null;
+    if (spec) {
+      const doc = getDoctorBySpecialty(spec);
+      if (doc) {
+        setSelectedDoctor(doc);
+        setWizardData(prev => ({ ...prev, visit: { ...prev.visit, doctor_id: doc.id, specialty: spec } }));
+      }
+    }
+  }, [showWizard, activeTab, getDoctorBySpecialty]);
+
+  // Готовность перейти на следующий шаг (врач + минимум одна услуга)
+  const canProceedStep2 = Boolean(selectedDoctor && selectedServices.length > 0);
+
+  // Валидация шага «Пациент»
+  const validatePatient = useCallback(() => {
+    const fio = (wizardData.patient.fio || '').trim();
+    const dob = wizardData.patient.dob || '';
+    const phone = (wizardData.patient.phone || '').trim();
+
+    let fioError = '';
+    let dobError = '';
+    let phoneError = '';
+
+    if (!fio) fioError = 'Укажите ФИО';
+
+    // Дата рождения в диапазоне 1900..текущий-1
+    if (!dob) {
+      dobError = 'Укажите дату рождения';
+    } else {
+      const d = new Date(dob);
+      const min = new Date('1900-01-01');
+      const max = new Date();
+      max.setFullYear(max.getFullYear() - 1);
+      if (isNaN(d.getTime()) || d < min || d > max) {
+        dobError = 'Дата вне допустимого диапазона';
+      }
+    }
+
+    // Маска телефона: +998 (XX) XXX-XX-XX
+    const uzPhoneRe = /^\+998 \(\d{2}\) \d{3}-\d{2}-\d{2}$/;
+    if (!uzPhoneRe.test(phone)) phoneError = 'Формат: +998 (XX) XXX-XX-XX';
+
+    setPatientErrors({ fio: fioError, dob: dobError, phone: phoneError });
+    return !(fioError || dobError || phoneError);
+  }, [wizardData]);
+
+  const handlePatientNext = useCallback(() => {
+    if (validatePatient()) setWizardStep(2);
+  }, [validatePatient]);
+
+  // Автопоиск по ФИО/телефону
+  useEffect(() => {
+    const fio = (wizardData.patient.fio || '').trim();
+    const phone = (wizardData.patient.phone || '').trim();
+    const q = phone || fio;
+    if (!q || q.length < 3) { setPatientSuggestions([]); return; }
+
+    const ctrl = new AbortController();
+    const token = localStorage.getItem('auth_token');
+    const doFetch = async () => {
+      try {
+        // Пытаемся искать на сервере
+        const res = await fetch(`${API_BASE}/api/v1/patients/?q=${encodeURIComponent(q)}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: ctrl.signal
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPatientSuggestions(Array.isArray(data?.items) ? data.items : []);
+          setShowPatientSuggestions(true);
+          return;
+        }
+      } catch (_) {}
+      // Фолбэк — ищем по локальным данным записей
+      const items = appointments
+        .map(a => ({ id: a.id, patient_fio: a.patient_fio, phone: a.patient_phone, dob: a.patient_birth_date }))
+        .filter(x => (
+          (x.patient_fio && fio && x.patient_fio.toLowerCase().includes(fio.toLowerCase())) ||
+          (x.phone && phone && x.phone.includes(phone.replace(/\s/g, '')))
+        ));
+      setPatientSuggestions(items.slice(0, 5));
+      setShowPatientSuggestions(true);
+    };
+    const t = setTimeout(doFetch, 300);
+    function handleClickOutside(e) {
+      if (showPatientSuggestions) setShowPatientSuggestions(false);
+    }
+    document.addEventListener('click', handleClickOutside, { once: true });
+    return () => { clearTimeout(t); ctrl.abort(); document.removeEventListener('click', handleClickOutside); };
+  }, [wizardData.patient.fio, wizardData.patient.phone, appointments]);
+
   
 
   return (
@@ -865,6 +1178,7 @@ const RegistrarPanel = () => {
       {/* Фиксированная верхняя часть убрана - используется глобальный хедер */}
 
       {/* Вкладки */}
+        {(!searchParams.get('view') || (searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue')) && (
         <div style={{
           display: 'flex',
           gap: isMobile ? '4px' : getSpacing('sm'),
@@ -886,85 +1200,171 @@ const RegistrarPanel = () => {
           overflowX: isMobile ? 'auto' : 'visible',
           flexWrap: isMobile ? 'nowrap' : 'wrap'
         }}>
-          <button
-            style={activeTab === 'welcome' ? activeTabStyle : tabStyle}
-            onClick={() => setActiveTab('welcome')}
-            aria-selected={activeTab === 'welcome'}
-          >
-            <Home size={16} style={{ marginRight: '8px' }} />
-            {t('tabs_welcome')}
-          </button>
+          {/* Оставляем только отделы: Кардиолог, ЭКГ, Дерматолог, Стоматолог, Лаборатория, Процедуры */}
         <button
-          style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('appointments')}
-          aria-selected={activeTab === 'appointments'}
-        >
-            <FileText size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_appointments')} ({appointments.length})
-        </button>
-        <button
-          style={activeTab === 'cardio' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('cardio')}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
+            activeTab === 'cardio' 
+              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md transform -translate-y-0.5' 
+              : 'border border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+          }`}
+          style={{
+            padding: isMobile ? '8px 10px' : '10px 16px',
+            fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+            borderRadius: isMobile ? 10 : 12,
+            minWidth: isMobile ? 'auto' : '128px',
+            height: isMobile ? 36 : 40,
+            fontWeight: 600,
+            borderColor: activeTab !== 'cardio' ? (isDark ? '#374151' : '#d1d5db') : undefined,
+            color: activeTab !== 'cardio' ? (isDark ? '#f9fafb' : '#374151') : undefined,
+            backgroundColor: activeTab !== 'cardio' ? (isDark ? '#374151' : 'white') : undefined,
+            boxShadow: activeTab === 'cardio' ? '0 4px 6px -1px rgba(59, 130, 246, 0.3)' : undefined
+          }}
+          onClick={() => setActiveTab(prev => prev === 'cardio' ? null : 'cardio')}
           aria-selected={activeTab === 'cardio'}
         >
-            <Heart size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_cardio')} ({getDepartmentCount('cardio')})
+            <Heart size={16} />
+            {t('tabs_cardio')} ({getDepartmentCount('cardio')})
+            {hasActiveQueue('cardio') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {hasPendingPayments('cardio') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
         <button
-          style={activeTab === 'echokg' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('echokg')}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
+            activeTab === 'echokg' 
+              ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-md transform -translate-y-0.5' 
+              : 'border border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+          }`}
+          style={{
+            padding: isMobile ? '8px 10px' : '10px 16px',
+            fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+            borderRadius: isMobile ? 10 : 12,
+            minWidth: isMobile ? 'auto' : '128px',
+            height: isMobile ? 36 : 40,
+            fontWeight: 600,
+            borderColor: activeTab !== 'echokg' ? (isDark ? '#374151' : '#d1d5db') : undefined,
+            color: activeTab !== 'echokg' ? (isDark ? '#f9fafb' : '#374151') : undefined,
+            backgroundColor: activeTab !== 'echokg' ? (isDark ? '#374151' : 'white') : undefined,
+            boxShadow: activeTab === 'echokg' ? '0 4px 6px -1px rgba(147, 51, 234, 0.3)' : undefined
+          }}
+          onClick={() => setActiveTab(prev => prev === 'echokg' ? null : 'echokg')}
           aria-selected={activeTab === 'echokg'}
         >
-            <Activity size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_echokg')} ({getDepartmentCount('echo')})
+            <Activity size={16} />
+            {t('tabs_echokg')} ({getDepartmentCount('echokg')})
+            {hasActiveQueue('echokg') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {hasPendingPayments('echokg') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
         <button
-          style={activeTab === 'derma' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('derma')}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
+            activeTab === 'derma' 
+              ? 'bg-gradient-to-r from-pink-600 to-pink-700 text-white shadow-md transform -translate-y-0.5' 
+              : 'border border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+          }`}
+          style={{
+            padding: isMobile ? '8px 10px' : '10px 16px',
+            fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+            borderRadius: isMobile ? 10 : 12,
+            minWidth: isMobile ? 'auto' : '128px',
+            height: isMobile ? 36 : 40,
+            fontWeight: 600,
+            borderColor: activeTab !== 'derma' ? (isDark ? '#374151' : '#d1d5db') : undefined,
+            color: activeTab !== 'derma' ? (isDark ? '#f9fafb' : '#374151') : undefined,
+            backgroundColor: activeTab !== 'derma' ? (isDark ? '#374151' : 'white') : undefined,
+            boxShadow: activeTab === 'derma' ? '0 4px 6px -1px rgba(219, 39, 119, 0.3)' : undefined
+          }}
+          onClick={() => setActiveTab(prev => prev === 'derma' ? null : 'derma')}
           aria-selected={activeTab === 'derma'}
         >
-            <User size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_derma')} ({getDepartmentCount('derma')})
+            <User size={16} />
+            {t('tabs_derma')} ({getDepartmentCount('derma')})
+            {hasActiveQueue('derma') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {hasPendingPayments('derma') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
         <button
-          style={activeTab === 'dental' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('dental')}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
+            activeTab === 'dental' 
+              ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md transform -translate-y-0.5' 
+              : 'border border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+          }`}
+          style={{
+            padding: isMobile ? '8px 10px' : '10px 16px',
+            fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+            borderRadius: isMobile ? 10 : 12,
+            minWidth: isMobile ? 'auto' : '128px',
+            height: isMobile ? 36 : 40,
+            fontWeight: 600,
+            borderColor: activeTab !== 'dental' ? (isDark ? '#374151' : '#d1d5db') : undefined,
+            color: activeTab !== 'dental' ? (isDark ? '#f9fafb' : '#374151') : undefined,
+            backgroundColor: activeTab !== 'dental' ? (isDark ? '#374151' : 'white') : undefined,
+            boxShadow: activeTab === 'dental' ? '0 4px 6px -1px rgba(79, 70, 229, 0.3)' : undefined
+          }}
+          onClick={() => setActiveTab(prev => prev === 'dental' ? null : 'dental')}
           aria-selected={activeTab === 'dental'}
         >
-            <User size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_dental')} ({getDepartmentCount('dental')})
+            <User size={16} />
+            {t('tabs_dental')} ({getDepartmentCount('dental')})
+            {hasActiveQueue('dental') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {hasPendingPayments('dental') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
         <button
-          style={activeTab === 'lab' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('lab')}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
+            activeTab === 'lab' 
+              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md transform -translate-y-0.5' 
+              : 'border border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+          }`}
+          style={{
+            padding: isMobile ? '8px 10px' : '10px 16px',
+            fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+            borderRadius: isMobile ? 10 : 12,
+            minWidth: isMobile ? 'auto' : '128px',
+            height: isMobile ? 36 : 40,
+            fontWeight: 600,
+            borderColor: activeTab !== 'lab' ? (isDark ? '#374151' : '#d1d5db') : undefined,
+            color: activeTab !== 'lab' ? (isDark ? '#f9fafb' : '#374151') : undefined,
+            backgroundColor: activeTab !== 'lab' ? (isDark ? '#374151' : 'white') : undefined,
+            boxShadow: activeTab === 'lab' ? '0 4px 6px -1px rgba(34, 197, 94, 0.3)' : undefined
+          }}
+          onClick={() => setActiveTab(prev => prev === 'lab' ? null : 'lab')}
           aria-selected={activeTab === 'lab'}
         >
-            <TestTube size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_lab')} ({getDepartmentCount('lab')})
+            <TestTube size={16} />
+            {t('tabs_lab')} ({getDepartmentCount('lab')})
+            {hasActiveQueue('lab') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {hasPendingPayments('lab') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
         <button
-          style={activeTab === 'queue' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('queue')}
-          aria-selected={activeTab === 'queue'}
-        >
-            <MessageCircle size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_queue')}
-        </button>
-        <button
-          style={activeTab === 'procedures' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('procedures')}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
+            activeTab === 'procedures' 
+              ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white shadow-md transform -translate-y-0.5' 
+              : 'border border-gray-300 hover:bg-gray-50 hover:-translate-y-0.5'
+          }`}
+          style={{
+            padding: isMobile ? '8px 10px' : '10px 16px',
+            fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+            borderRadius: isMobile ? 10 : 12,
+            minWidth: isMobile ? 'auto' : '128px',
+            height: isMobile ? 36 : 40,
+            fontWeight: 600,
+            borderColor: activeTab !== 'procedures' ? (isDark ? '#374151' : '#d1d5db') : undefined,
+            color: activeTab !== 'procedures' ? (isDark ? '#f9fafb' : '#374151') : undefined,
+            backgroundColor: activeTab !== 'procedures' ? (isDark ? '#374151' : 'white') : undefined,
+            boxShadow: activeTab === 'procedures' ? '0 4px 6px -1px rgba(234, 88, 12, 0.3)' : undefined
+          }}
+          onClick={() => setActiveTab(prev => prev === 'procedures' ? null : 'procedures')}
           aria-selected={activeTab === 'procedures'}
         >
-            <Syringe size={16} style={{ marginRight: '8px' }} />
-          {t('tabs_procedures')} ({getDepartmentCount('proc')})
+            <Syringe size={16} />
+            {t('tabs_procedures')} ({getDepartmentCount('procedures')})
+            {hasActiveQueue('procedures') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {hasPendingPayments('procedures') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
       </div>
+      )}
       {/* </div> Закрытие фиксированного контейнера */}
 
       {/* Основной контент без отступа сверху */}
       <div style={{ overflow: 'hidden' }}>
-        {/* Экран приветствия */}
-        {activeTab === 'welcome' && (
+        {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
+        {searchParams.get('view') === 'welcome' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
               <Card.Header>
@@ -1003,62 +1403,55 @@ const RegistrarPanel = () => {
                   gap: '20px', 
                   marginBottom: '32px' 
                 }}>
-                <div style={{
-                  background: `linear-gradient(135deg, ${accentColor} 0%, #0056b3 100%)`,
-                  color: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div className="p-6 rounded-xl text-white text-center transition-all duration-200 hover:scale-105 animate-fade-in-scale animate-delay-100 interactive-element hover-lift"
+                     style={{
+                       background: `linear-gradient(135deg, ${accentColor} 0%, #0056b3 100%)`,
+                       boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+                     }}>
+                  <div className="text-3xl font-bold mb-2">
                     {stats.totalPatients}
                   </div>
-                  <div style={{ fontSize: '16px', opacity: 0.9 }}>
+                  <div className="text-base opacity-90">
                     {t('total_patients')}
                   </div>
               </div>
               
-                <div style={{
-                  background: `linear-gradient(135deg, ${successColor} 0%, #1e7e34 100%)`,
-                  color: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div className="p-6 rounded-xl text-white text-center transition-all duration-200 hover:scale-105 animate-fade-in-scale animate-delay-200 interactive-element hover-lift"
+                     style={{
+                       background: `linear-gradient(135deg, ${successColor} 0%, #1e7e34 100%)`,
+                       boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)'
+                     }}>
+                  <div className="text-3xl font-bold mb-2">
                     {stats.todayAppointments}
                   </div>
-                  <div style={{ fontSize: '16px', opacity: 0.9 }}>
+                  <div className="text-base opacity-90">
                     {t('today_appointments')}
                 </div>
             </div>
                 
-                <div style={{
-                  background: `linear-gradient(135deg, ${warningColor} 0%, #e0a800 100%)`,
-                  color: '#212529',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div className="p-6 rounded-xl text-center transition-all duration-200 hover:scale-105 animate-fade-in-scale animate-delay-300 interactive-element hover-lift"
+                     style={{
+                       background: `linear-gradient(135deg, ${warningColor} 0%, #e0a800 100%)`,
+                       color: '#212529',
+                       boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3)'
+                     }}>
+                  <div className="text-3xl font-bold mb-2">
                     {stats.pendingPayments}
                   </div>
-                  <div style={{ fontSize: '16px', opacity: 0.9 }}>
+                  <div className="text-base opacity-90">
                     {t('pending_payments')}
             </div>
           </div>
 
-                <div style={{
-                  background: `linear-gradient(135deg, ${dangerColor} 0%, #c82333 100%)`,
-                  color: 'white',
-                  padding: '24px',
-                  borderRadius: '12px',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+                <div className="p-6 rounded-xl text-white text-center transition-all duration-200 hover:scale-105 animate-fade-in-scale animate-delay-400 interactive-element hover-lift"
+                     style={{
+                       background: `linear-gradient(135deg, ${dangerColor} 0%, #c82333 100%)`,
+                       boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)'
+                     }}>
+                  <div className="text-3xl font-bold mb-2">
                     {stats.activeQueues}
             </div>
-                  <div style={{ fontSize: '16px', opacity: 0.9 }}>
+                  <div className="text-base opacity-90">
                     {t('active_queues')}
                   </div>
                 </div>
@@ -1091,71 +1484,39 @@ const RegistrarPanel = () => {
                     <div style={{ 
                       display: 'grid', 
                       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                      gap: '16px' 
+                      gap: '16px',
+                      alignItems: 'stretch'
                     }}>
                   <AnimatedTransition type="scale" delay={1300}>
                     <button 
-                      style={{
-                        ...buttonStyle,
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
+                      className="clinic-button clinic-button-primary interactive-element hover-lift ripple-effect action-button-hover focus-ring"
                       onClick={() => setShowWizard(true)}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
-                        e.target.style.boxShadow = '0 8px 25px 0 rgba(59, 130, 246, 0.4)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0) scale(1)';
-                        e.target.style.boxShadow = '0 4px 14px 0 rgba(59, 130, 246, 0.3)';
-                      }}
+                      aria-label="Create new appointment"
+                      style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
                     >
                       ➕ {t('new_appointment')}
                     </button>
                   </AnimatedTransition>
                   <AnimatedTransition type="scale" delay={1400}>
                     <button 
-                      style={{
-                        ...buttonSecondaryStyle,
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0) scale(1)';
-                      }}
+                      className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                      style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
                     >
                       📊 {t('export_csv')}
                     </button>
                   </AnimatedTransition>
                   <AnimatedTransition type="scale" delay={1500}>
                     <button 
-                      style={{
-                        ...buttonWarningStyle,
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0) scale(1)';
-                      }}
+                      className="clinic-button clinic-button-warning interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                      style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
                     >
                       📅 {t('today')}
                     </button>
                   </AnimatedTransition>
                   <AnimatedTransition type="scale" delay={1600}>
                     <button 
-                      style={{
-                        ...buttonSecondaryStyle,
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.transform = 'translateY(-2px) scale(1.05)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.transform = 'translateY(0) scale(1)';
-                      }}
+                      className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                      style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
                     >
                       🔄 {t('reset')}
                     </button>
@@ -1195,8 +1556,8 @@ const RegistrarPanel = () => {
           </AnimatedTransition>
         )}
 
-        {/* Вкладка онлайн-очереди */}
-        {activeTab === 'queue' && (
+        {/* Онлайн-очередь по параметру view=queue */}
+        {searchParams.get('view') === 'queue' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
               <Card.Header>
@@ -1221,6 +1582,51 @@ const RegistrarPanel = () => {
               </Card.Header>
             
               <Card.Content>
+              {/* История: календарь + поиск */}
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                alignItems: 'center',
+                marginBottom: '16px',
+                flexWrap: 'wrap'
+              }}>
+                <input
+                  type="date"
+                  value={searchParams.get('date') || ''}
+                  onChange={(e) => {
+                    const params = new URLSearchParams(window.location.search);
+                    const val = e.target.value;
+                    if (val) params.set('date', val); else params.delete('date');
+                    params.delete('view');
+                    window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '8px'
+                  }}
+                />
+                <input
+                  type="search"
+                  placeholder="Поиск (ФИО/телефон/услуга)"
+                  defaultValue={searchParams.get('q') || ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const params = new URLSearchParams(window.location.search);
+                      const val = e.currentTarget.value.trim();
+                      if (val) params.set('q', val); else params.delete('q');
+                      params.delete('view');
+                      window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                    }
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '8px',
+                    minWidth: '260px'
+                  }}
+                />
+              </div>
                 <OnlineQueueManager />
               </Card.Content>
             </Card>
@@ -1228,7 +1634,7 @@ const RegistrarPanel = () => {
         )}
 
         {/* Основная панель с записями */}
-        {activeTab !== 'welcome' && activeTab !== 'queue' && (
+        {(!searchParams.get('view') || (searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue')) && (
           <div style={{
             ...tableContainerStyle, 
             // избегаем конфликта marginTop + margin (шорткат)
@@ -1240,88 +1646,33 @@ const RegistrarPanel = () => {
               padding: isMobile ? getSpacing('sm') : getSpacing('md')
             }}>
               
-              {/* Индикатор источника данных для всех вкладок */}
-              <DataSourceIndicator count={filteredAppointments.length} />
-              
-              {/* Панель управления таблицей */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '12px',
-                flexWrap: 'wrap',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button
-                    onClick={() => setShowAddressColumn(!showAddressColumn)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      border: showAddressColumn ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                      background: showAddressColumn ? '#3b82f620' : 'white',
-                      color: showAddressColumn ? '#3b82f6' : '#6b7280',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+              {/* Индикатор источника данных и автообновление */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                <DataSourceIndicator count={filteredAppointments.length} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, opacity: 0.9, padding: '6px 10px', border: `1px solid ${borderColor}`, borderRadius: 8, background: theme === 'light' ? 'white' : getColor('gray', 800) }}>
+                    <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
+                    Автообновление 15с
+                  </label>
+                  <select
+                    value={searchParams.get('status') || ''}
+                    onChange={(e) => {
+                      const params = new URLSearchParams(window.location.search);
+                      const val = e.currentTarget.value;
+                      if (val) params.set('status', val); else params.delete('status');
+                      window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
                     }}
+                    style={{ padding: '6px 10px', border: `1px solid ${borderColor}`, borderRadius: 8, fontSize: 12, background: theme === 'light' ? 'white' : getColor('gray', 800), color: textColor }}
                   >
-                    📍 {showAddressColumn ? 'Скрыть адрес' : 'Показать адрес'}
-                  </button>
-                  
-                  <button
-                    onClick={() => loadAppointments()}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #d1d5db',
-                      background: 'white',
-                      color: '#6b7280',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    🔄 Обновить
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      const csv = generateCSV(filteredAppointments);
-                      downloadCSV(csv, `appointments_${new Date().toISOString().split('T')[0]}.csv`);
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #d1d5db',
-                      background: 'white',
-                      color: '#6b7280',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    📥 Экспорт CSV
-                  </button>
-                </div>
-                
-                <div style={{ 
-                  fontSize: '14px', 
-                  color: '#6b7280',
-                  fontWeight: '500'
-                }}>
-                  Показано: {filteredAppointments.length} записей
+                    <option value="">Все статусы</option>
+                    <option value="confirmed">Подтверждено</option>
+                    <option value="queued">В очереди</option>
+                    <option value="paid_pending">Ожидает оплаты</option>
+                  </select>
                 </div>
               </div>
+              
+              {/* Панель управления таблицей — скрыта по требованию */}
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
@@ -1337,24 +1688,40 @@ const RegistrarPanel = () => {
                   <span style={{ fontWeight: 600, marginRight: '12px' }}>
                     🎯 {t('bulk_actions')} ({appointmentsSelected.size}):
                   </span>
-                  <Button variant="success" size={isMobile ? 'xs' : 'sm'} onClick={() => handleBulkAction('confirmed')}>
+                  <button 
+                    className="clinic-button clinic-button-success interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                    onClick={() => handleBulkAction('confirmed')}
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                  >
                     ✅ {!isMobile && t('confirm')}
-                  </Button>
-                  <Button variant="danger" size={isMobile ? 'xs' : 'sm'} onClick={() => {
-                    const reason = prompt(t('reason'));
-                    if (reason) handleBulkAction('cancelled', reason);
-                  }}>
+                  </button>
+                  <button
+                    className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                    onClick={() => {
+                      const reason = prompt(t('reason'));
+                      if (reason) handleBulkAction('cancelled', reason);
+                    }}
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                  >
                     ❌ {!isMobile && t('cancel')}
-                  </Button>
-                  <Button variant="warning" size={isMobile ? 'xs' : 'sm'} onClick={() => handleBulkAction('no_show')}>
+                  </button>
+                  <button
+                    className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                    onClick={() => handleBulkAction('no_show')}
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                  >
                     ⚠️ {!isMobile && t('no_show')}
-                  </Button>
+                  </button>
         </div>
               )}
               
               {/* Таблица записей */}
               {appointmentsLoading ? (
                 <AnimatedLoader.TableSkeleton rows={8} columns={10} />
+              ) : filteredAppointments.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', opacity: 0.7 }}>
+                  {t('empty_table')}
+                </div>
               ) : (
                 <ResponsiveTable
                   data={filteredAppointments}
@@ -1518,36 +1885,58 @@ const RegistrarPanel = () => {
                       align: 'center', 
                       minWidth: '130px',
                       render: (value) => {
-                        const statusConfig = {
-                          'plan': { label: 'Запланирован', color: 'info', icon: '📅' },
-                          'confirmed': { label: 'Подтвержден', color: 'success', icon: '✅' },
-                          'queued': { label: 'В очереди', color: 'warning', icon: '⏳' },
-                          'in_cabinet': { label: 'В кабинете', color: 'primary', icon: '🏥' },
-                          'done': { label: 'Завершен', color: 'success', icon: '✔️' },
-                          'canceled': { label: 'Отменен', color: 'danger', icon: '❌' },
-                          'no_show': { label: 'Неявка', color: 'secondary', icon: '🚫' },
-                          'paid_pending': { label: 'Ожидает оплаты', color: 'warning', icon: '💳' },
-                          'paid': { label: 'Оплачен', color: 'success', icon: '💰' }
+                        const map = {
+                          confirmed: { bg: '#dcfce7', text: '#166534', label: 'Подтвержден' },
+                          queued: { bg: '#fef9c3', text: '#854d0e', label: 'В очереди' },
+                          paid_pending: { bg: '#ffedd5', text: '#9a3412', label: 'Ожидает оплаты' },
+                          in_cabinet: { bg: '#dbeafe', text: '#1e3a8a', label: 'В кабинете' },
+                          done: { bg: '#e0f2fe', text: '#075985', label: 'Завершен' },
+                          canceled: { bg: '#fee2e2', text: '#991b1b', label: 'Отменен' },
+                          no_show: { bg: '#e5e7eb', text: '#374151', label: 'Неявка' },
+                          plan: { bg: '#e0e7ff', text: '#3730a3', label: 'Запланирован' },
+                          paid: { bg: '#dcfce7', text: '#166534', label: 'Оплачен' }
                         };
-                        
-                        const config = statusConfig[value] || { 
-                          label: value || 'Неизвестно', 
-                          color: 'secondary', 
-                          icon: '❓' 
-                        };
-                        
+                        const cfg = map[value] || { bg: '#e5e7eb', text: '#374151', label: value || '—' };
                         return (
-                          <Badge variant={config.color} size="md">
-                            {config.icon} {config.label}
-                          </Badge>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: cfg.bg,
+                            color: cfg.text,
+                            fontSize: 12,
+                            fontWeight: 600
+                          }}>
+                            {cfg.label}
+                          </span>
                         );
                       }
                     }
                   ]}
                   actions={[
                     { 
+                      icon: <User size={16} />, 
+                      className: 'clinic-button clinic-button-outline',
+                      title: 'В кабинет',
+                      onClick: async (row) => {
+                        await updateAppointmentStatus(row.id, 'in_cabinet');
+                        toast.success('Пациент отправлен в кабинет');
+                      },
+                      visible: (row) => row.status === 'confirmed' || row.status === 'queued',
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
+                    },
+                    {
+                      // Вызвать пациента (начать приём)
+                      className: 'clinic-button clinic-button-success',
+                      title: 'Вызвать',
+                      onClick: async (row) => {
+                        await handleStartVisit(row);
+                      },
+                      visible: (row) => row.status === 'queued',
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
+                    },
+                    { 
                       icon: <Printer size={16} />, 
-                      variant: 'primary', 
+                      className: 'clinic-button clinic-button-primary',
                       title: 'Печать талона',
                       onClick: (row) => {
                         setPrintDialog({ 
@@ -1556,39 +1945,46 @@ const RegistrarPanel = () => {
                           data: row 
                         });
                       },
-                      visible: (row) => row.status !== 'canceled' && row.status !== 'done'
+                      visible: (row) => (row.payment_status === 'paid') || (row.status === 'queued'),
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
                     },
                     { 
                       icon: <X size={16} />, 
-                      variant: 'danger', 
+                      className: 'clinic-button clinic-button-outline',
                       title: 'Отмена',
-                      onClick: async (row) => {
-                        const reason = prompt('Укажите причину отмены:');
-                        if (reason) {
-                          await updateAppointmentStatus(row.id, 'canceled', reason);
-                          toast.success('Запись отменена');
-                        }
-                      },
-                      visible: (row) => row.status !== 'canceled' && row.status !== 'done'
+                      onClick: (row) => setCancelDialog({ open: true, row, reason: '' }),
+                      visible: (row) => row.status !== 'canceled' && row.status !== 'done',
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
                     },
                     { 
                       icon: <Calendar size={16} />, 
-                      variant: 'warning', 
+                      className: 'clinic-button clinic-button-outline',
                       title: 'Перенос',
                       onClick: (row) => {
                         setSelectedAppointment(row);
                         setShowSlotsModal(true);
                       },
-                      visible: (row) => row.status !== 'done' && row.status !== 'in_cabinet'
+                      visible: (row) => row.status !== 'done' && row.status !== 'in_cabinet',
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
+                    },
+                    {
+                      // Завершить приём
+                      className: 'clinic-button clinic-button-success',
+                      title: 'Завершить',
+                      onClick: async (row) => {
+                        await updateAppointmentStatus(row.id, 'done');
+                        toast.success('Приём завершён');
+                      },
+                      visible: (row) => row.status === 'in_cabinet',
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
                     },
                     { 
                       icon: <CreditCard size={16} />, 
-                      variant: 'info', 
+                      className: 'clinic-button clinic-button-success',
                       title: 'Оплата',
-                      onClick: (row) => {
-                        handlePayment(row);
-                      },
-                      visible: (row) => row.status === 'paid_pending' || !row.payment_status
+                      onClick: (row) => setPaymentDialog({ open: true, row, paid: false, source: 'table' }),
+                      visible: (row) => row.status === 'paid_pending' || !row.payment_status,
+                      style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
                     }
                   ]}
                   selectedRows={appointmentsSelected}
@@ -1614,6 +2010,156 @@ const RegistrarPanel = () => {
       </div> {/* Закрытие скроллируемого контента */}
 
       {/* Мастер создания записи */}
+      {/* Диалог отмены */}
+      {cancelDialog.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 animate-fade-in-scale" style={{ backgroundColor: cardBg }}>
+            <div className="p-6">
+              <h3 className="text-xl font-semibold mb-4 text-gray-900" style={{ color: textColor }}>Отменить запись</h3>
+              <div className="mb-4 text-sm text-gray-600" style={{ color: textColor }}>
+                Пациент: <span className="font-medium">{cancelDialog.row?.patient_fio}</span>
+              </div>
+              <label className="block text-sm font-medium mb-2 text-gray-700" style={{ color: textColor }}>Причина отмены</label>
+              <textarea
+                value={cancelDialog.reason}
+                onChange={(e) => setCancelDialog(prev => ({ ...prev, reason: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none transition-all duration-200"
+                style={{ 
+                  borderColor: isDark ? '#374151' : '#d1d5db',
+                  backgroundColor: isDark ? '#374151' : 'white',
+                  color: textColor
+                }}
+                rows="3"
+                placeholder="Укажите причину отмены записи..."
+              />
+            </div>
+            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb' }}>
+              <button 
+                className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                onClick={() => setCancelDialog({ open: false, row: null, reason: '' })}
+              >
+                Отмена
+              </button>
+              <button
+                className="clinic-button clinic-button-danger interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                onClick={async () => {
+                  if (!cancelDialog.reason.trim()) return;
+                  await updateAppointmentStatus(cancelDialog.row.id, 'canceled', cancelDialog.reason.trim());
+                  setCancelDialog({ open: false, row: null, reason: '' });
+                  toast.success('Запись отменена');
+                }}
+              >
+                Подтвердить отмену
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Диалог оплаты */}
+      {paymentDialog.open && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 animate-fade-in-scale" style={{ backgroundColor: cardBg }}>
+            <div className="p-6">
+              <h3 className="text-xl font-semibold mb-4 text-gray-900" style={{ color: textColor }}>
+                💳 Оплата услуг
+              </h3>
+              <div className="mb-4 text-sm text-gray-600" style={{ color: textColor }}>
+                Пациент: <span className="font-medium">{paymentDialog.row?.patient_fio}</span>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700" style={{ color: textColor }}>
+                    Сумма к оплате
+                  </label>
+                  <input 
+                    type="number" 
+                    defaultValue={paymentDialog.row?.cost || ''} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                    style={{ 
+                      borderColor: isDark ? '#374151' : '#d1d5db',
+                      backgroundColor: isDark ? '#374151' : '#f9fafb',
+                      color: isDark ? '#9ca3af' : '#6b7280'
+                    }}
+                    readOnly 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700" style={{ color: textColor }}>
+                    Способ оплаты
+                  </label>
+                  <select 
+                    defaultValue={paymentDialog.row?.payment_type || 'Карта'} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    style={{ 
+                      borderColor: isDark ? '#374151' : '#d1d5db',
+                      backgroundColor: isDark ? '#374151' : 'white',
+                      color: textColor
+                    }}
+                  >
+                    <option>Карта</option>
+                    <option>Наличные</option>
+                    <option>Перевод</option>
+                    <option>Онлайн</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb' }}>
+              {/* После оплаты показываем кнопку печати талона */}
+              {paymentDialog.paid ? (
+                <>
+                  <button 
+                    className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                    onClick={() => setPaymentDialog({ open: false, row: null, paid: false })}
+                  >
+                    Закрыть
+                  </button>
+                  <button
+                    className="clinic-button clinic-button-primary interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                    onClick={() => setPrintDialog({ open: true, type: 'ticket', data: paymentDialog.row })}
+                  >
+                    🖨️ Печать талона
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                    onClick={() => setPaymentDialog({ open: false, row: null, paid: false })}
+                  >
+                    Закрыть
+                  </button>
+                  <button
+                    className="clinic-button clinic-button-success interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                    style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                    onClick={async () => {
+                      const updated = await handlePayment(paymentDialog.row);
+                      if (updated) {
+                        await updateAppointmentStatus(paymentDialog.row.id, 'queued');
+                        const nextState = { open: true, row: { ...updated }, paid: true, source: paymentDialog.source };
+                        setPaymentDialog(nextState);
+                        toast.success('Оплата успешна. Пациент добавлен в очередь');
+                        if (paymentDialog.source === 'table') {
+                          // Автооткрываем печать талона
+                          setPrintDialog({ open: true, type: 'ticket', data: updated });
+                        }
+                      }
+                    }}
+                  >
+                    💰 Оплатить
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {showWizard && (
         <div style={{
           position: 'fixed',
@@ -1646,52 +2192,132 @@ const RegistrarPanel = () => {
               <div>
                 <h3 style={{ marginBottom: '16px', color: accentColor }}>👤 {t('patient')}</h3>
                 <div style={{ display: 'grid', gap: '16px' }}>
+                  {/* Резюме шага (контекст) */}
+                  <div style={{
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 12,
+                    padding: 12,
+                    background: cardBg
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Контекст записи</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 13 }}>
+                      <div>Пациент: {(wizardData.patient.fio || '—')}</div>
+                      <div>Телефон: {(wizardData.patient.phone || '—')}</div>
+                      <div>Дата рождения: {(wizardData.patient.dob || '—')}</div>
+                    </div>
+                  </div>
                   <div>
                     <label style={labelStyle}>ФИО пациента</label>
                 <input
+                  ref={fioRef}
                   type="text"
-                  style={inputStyle}
-                      placeholder="Введите ФИО"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  style={{ 
+                    borderColor: patientErrors.fio ? '#ef4444' : (isDark ? '#374151' : '#d1d5db'),
+                    backgroundColor: isDark ? '#374151' : 'white',
+                    color: textColor
+                  }}
+                  placeholder="Введите ФИО"
                   value={wizardData.patient.fio || ''}
-                      onChange={(e) => setWizardData({
-                        ...wizardData,
-                        patient: { ...wizardData.patient, fio: e.target.value }
-                      })}
-                    />
+                  onChange={(e) => setWizardData({
+                    ...wizardData,
+                    patient: { ...wizardData.patient, fio: e.target.value }
+                  })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') dobRef.current?.focus(); }}
+                />
+                    {patientErrors.fio && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{patientErrors.fio}</div>}
                   </div>
                   <div>
-                    <label style={labelStyle}>Год рождения</label>
-                <input
-                  type="number"
-                      style={inputStyle}
-                      placeholder="1985"
-                  min="1900"
-                  max={new Date().getFullYear() - 1}
-                      value={wizardData.patient.birthYear || ''}
+                    <label style={labelStyle}>Дата рождения</label>
+                    <input
+                      ref={dobRef}
+                      type="date"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      style={{ 
+                        borderColor: patientErrors.dob ? '#ef4444' : (isDark ? '#374151' : '#d1d5db'),
+                        backgroundColor: isDark ? '#374151' : 'white',
+                        color: textColor
+                      }}
+                      value={wizardData.patient.dob || ''}
                       onChange={(e) => setWizardData({
                         ...wizardData,
-                        patient: { ...wizardData.patient, birthYear: e.target.value }
+                        patient: { ...wizardData.patient, dob: e.target.value }
                       })}
+                      onKeyDown={(e) => { if (e.key === 'Enter') phoneRef.current?.focus(); }}
                     />
+                    {patientErrors.dob && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{patientErrors.dob}</div>}
                   </div>
                   <div>
                     <label style={labelStyle}>Телефон</label>
-                    <PhoneInput
-                      style={inputStyle}
-                      placeholder="+7 (999) 123-45-67"
+                    <input
+                      ref={phoneRef}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      style={{ 
+                        borderColor: patientErrors.phone ? '#ef4444' : (isDark ? '#374151' : '#d1d5db'),
+                        backgroundColor: isDark ? '#374151' : 'white',
+                        color: textColor
+                      }}
+                      placeholder="+998 (90) 123-45-67"
                       value={wizardData.patient.phone || ''}
-                      onChange={(e) => setWizardData({
-                        ...wizardData,
-                        patient: { ...wizardData.patient, phone: e.target.value }
-                      })}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const digits = raw.replace(/\D/g, '');
+                        let value = '+998 ';
+                        const code = digits.slice(3,5);
+                        const a = digits.slice(5,8);
+                        const b = digits.slice(8,10);
+                        const c = digits.slice(10,12);
+                        value += `(${code}) ${a}${a && b ? '-' : ''}${b}${b && c ? '-' : ''}${c}`;
+                        setWizardData({ ...wizardData, patient: { ...wizardData.patient, phone: value } });
+                      }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handlePatientNext(); }}
                     />
+                    {patientErrors.phone && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{patientErrors.phone}</div>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                  <button style={buttonStyle} onClick={() => setWizardStep(2)}>
+                {showPatientSuggestions && patientSuggestions.length > 0 && (
+                  <div style={{ marginTop: 8, background: '#fff', border: `1px solid ${borderColor}`, borderRadius: 8, padding: 8 }}>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>Возможные совпадения:</div>
+                    {patientSuggestions.map(s => (
+                      <div key={s.id} style={{ padding: '6px 8px', cursor: 'pointer' }}
+                        onClick={() => {
+                          setWizardData({
+                            ...wizardData,
+                            patient: {
+                              fio: s.patient_fio || wizardData.patient.fio,
+                              dob: s.dob || wizardData.patient.dob,
+                              phone: s.phone || wizardData.patient.phone
+                            }
+                          });
+                          setSelectedPatientId(s.id || null);
+                          setShowPatientSuggestions(false);
+                        }}
+                      >
+                        {(s.patient_fio || '')} • {(s.phone || '')}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                      <button style={buttonSecondaryStyle} onClick={() => setShowPatientSuggestions(false)}>Скрыть</button>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-3 mt-6">
+                  <button 
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg flex items-center gap-2 interactive-element hover-lift ripple-effect action-button-hover focus-ring"
+                    style={{ boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)' }}
+                    onClick={handlePatientNext}
+                  >
                     {t('next')} →
                   </button>
-                  <button style={buttonSecondaryStyle} onClick={() => setShowWizard(false)}>
+                  <button 
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 text-sm font-medium interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                    style={{ 
+                      borderColor: isDark ? '#374151' : '#d1d5db',
+                      color: isDark ? '#f9fafb' : '#374151',
+                      backgroundColor: isDark ? '#374151' : 'white'
+                    }}
+                    onClick={() => setShowWizard(false)}
+                  >
                     {t('close')}
                   </button>
                 </div>
@@ -1705,17 +2331,61 @@ const RegistrarPanel = () => {
                 <div style={{ display: 'grid', gap: '16px' }}>
                   <div>
                     <label style={labelStyle}>Врач</label>
-                    <IntegratedDoctorSelector
-                      selectedDoctorId={selectedDoctor?.id}
-                      onDoctorChange={(doctor) => {
-                        setSelectedDoctor(doctor);
-                        setWizardData({
-                          ...wizardData,
-                          visit: { ...wizardData.visit, doctor_id: doctor.id }
-                        });
-                      }}
-                      showSchedule={true}
-                    />
+                    {simpleDoctorMode ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                        {[
+                          { key: 'cardiology', label: 'Кардиолог', emoji: '❤️' },
+                          { key: 'dermatology', label: 'Дерматолог/Косметолог', emoji: '✨' },
+                          { key: 'stomatology', label: 'Стоматолог', emoji: '🦷' }
+                        ].map(s => {
+                          const doc = getDoctorBySpecialty(s.key);
+                          const isSelected = selectedDoctor?.specialty === s.key;
+                          return (
+                            <button key={s.key}
+                              onClick={() => {
+                                if (doc) {
+                                  setSelectedDoctor(doc);
+                                  setWizardData({ ...wizardData, visit: { ...wizardData.visit, doctor_id: doc?.id, specialty: s.key } });
+                                }
+                              }}
+                              disabled={!doc}
+                              style={{
+                                textAlign: 'left',
+                                padding: 12,
+                                borderRadius: 12,
+                                border: `2px solid ${isSelected ? accentColor : (doc ? borderColor : '#e5e7eb')}`,
+                                background: isSelected ? `${accentColor}15` : (doc ? cardBg : '#f9fafb'),
+                                cursor: doc ? 'pointer' : 'not-allowed',
+                                opacity: doc ? 1 : 0.6
+                              }}
+                            >
+                              <div style={{ fontSize: 18, fontWeight: 600 }}>{s.emoji} {s.label}</div>
+                              <div style={{ fontSize: 13, opacity: 0.8, marginTop: 6 }}>
+                                {doc ? (doc.user?.full_name || `Врач #${doc.id}`) : 'Врач не назначен'}
+                              </div>
+                              {doc?.cabinet && (
+                                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>Кабинет: {doc.cabinet}</div>
+                              )}
+                              {doc?.price_default > 0 && (
+                                <div style={{ fontSize: 12, marginTop: 4 }}>Цена от: {doc.price_default.toLocaleString()} UZS</div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <IntegratedDoctorSelector
+                        selectedDoctorId={selectedDoctor?.id}
+                        onDoctorChange={(doctor) => {
+                          setSelectedDoctor(doctor);
+                          setWizardData({
+                            ...wizardData,
+                            visit: { ...wizardData.visit, doctor_id: doctor.id }
+                          });
+                        }}
+                        showSchedule={false}
+                      />
+                    )}
                   </div>
                   <div>
                     <label style={labelStyle}>Услуги</label>
@@ -1728,8 +2398,9 @@ const RegistrarPanel = () => {
                           visit: { ...wizardData.visit, services }
                         });
                       }}
-                      specialty={selectedDoctor?.specialty}
-                    />
+                      simple
+                      onNext={() => setWizardStep(3)}
+                      />
                   </div>
                   <div>
                     <label style={labelStyle}>Тип обращения</label>
@@ -1746,83 +2417,181 @@ const RegistrarPanel = () => {
                       <option value="free">Льготный</option>
                 </select>
                   </div>
-                  <div>
-                    <label style={labelStyle}>Приоритет</label>
-                    <select
-                  style={inputStyle}
-                      value={wizardData.visit.priority || 'normal'}
-                      onChange={(e) => setWizardData({
-                        ...wizardData,
-                        visit: { ...wizardData.visit, priority: e.target.value }
-                      })}
-                    >
-                      <option value="normal">Обычный</option>
-                      <option value="high">Высокий</option>
-                      <option value="urgent">Срочный</option>
-                    </select>
-                  </div>
+                  {/* Поле "Приоритет" удалено по ТЗ */}
                 </div>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                {/* Нижняя панель действий шага */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '24px', alignItems: 'center' }}>
                   <button style={buttonSecondaryStyle} onClick={() => setWizardStep(1)}>
                     ← {t('back')}
                   </button>
-                  <button style={buttonStyle} onClick={() => setWizardStep(3)}>
+                  <button style={{ ...buttonStyle, opacity: canProceedStep2 ? 1 : 0.5, cursor: canProceedStep2 ? 'pointer' : 'not-allowed' }}
+                          disabled={!canProceedStep2}
+                          onClick={() => canProceedStep2 && setWizardStep(3)}>
                     {t('next')} →
                   </button>
+                  {!selectedDoctor && (
+                    <span style={{ color: '#ef4444', fontSize: 12 }}>Выберите врача</span>
+                  )}
+                  {selectedDoctor && selectedServices.length === 0 && (
+                    <span style={{ color: '#ef4444', fontSize: 12 }}>
+                      Выберите минимум одну услугу (выбрано: {selectedServices.length})
+                    </span>
+                  )}
                 </div>
               </div>
             )}
             
-            {/* Шаг 3: Оплата */}
+            {/* Шаг 3: Подтверждение и оплата */}
             {wizardStep === 3 && (
               <div>
-                <h3 style={{ marginBottom: '16px', color: accentColor }}>💳 {t('payment')}</h3>
-                <div style={{ display: 'grid', gap: '16px' }}>
-                  <div>
-                    <label style={labelStyle}>Способ оплаты</label>
-                <select
-                  style={inputStyle}
-                      value={wizardData.payment.method || 'cash'}
-                      onChange={(e) => setWizardData({
-                        ...wizardData,
-                        payment: { ...wizardData.payment, method: e.target.value }
-                      })}
-                    >
-                  <option value="cash">Наличные</option>
-                      <option value="card">Банковская карта</option>
-                  <option value="online">Онлайн</option>
-                </select>
+                <h3 style={{ marginBottom: '16px', color: accentColor }}>✅ Подтверждение</h3>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Пациент</div>
+                    <div>{wizardData.patient.fio} • {wizardData.patient.phone} • {wizardData.patient.dob}</div>
                   </div>
-                  <div>
-                    <label style={labelStyle}>Стоимость (₽)</label>
-                  <input
-                      type="number"
-                      style={inputStyle}
-                      placeholder="1000"
-                      min="0"
-                      value={wizardData.payment.amount || ''}
-                      onChange={(e) => setWizardData({
-                        ...wizardData,
-                        payment: { ...wizardData.payment, amount: e.target.value }
-                      })}
-                    />
-              </div>
+                  <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Врач</div>
+                    <div>{selectedDoctor?.user?.full_name || '—'} ({selectedDoctor?.specialty || '—'})</div>
+                  </div>
+                  <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, padding: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Услуги</div>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {selectedServices.map(s => (
+                        <li key={s.id}>{s.name} — {s.price?.toLocaleString()} UZS</li>
+                      ))}
+                    </ul>
+                    <div style={{ marginTop: 8, fontWeight: 700 }}>Итого: {selectedServices.reduce((a,b)=>a+(b.price||0),0).toLocaleString()} UZS</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                  <button style={buttonSecondaryStyle} onClick={() => setWizardStep(2)}>
-                    ← {t('back')}
-                </button>
-                  <button style={buttonStyle} onClick={() => {
-                    // Здесь будет логика сохранения записи
-                    setShowWizard(false);
-                    setWizardStep(1);
-                    loadAppointments();
-                  }}>
-                    ✅ {t('save')}
-                  </button>
-          </div>
-        </div>
-      )}
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                  <button style={buttonSecondaryStyle} onClick={() => setWizardStep(2)}>← {t('back')}</button>
+                  <button style={buttonStyle} onClick={async () => {
+                    try {
+                      const token = localStorage.getItem('auth_token');
+                      if (!token) {
+                        toast.error('Требуется авторизация. Пожалуйста, войдите в систему.');
+                        return;
+                      }
+                      
+                      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8001';
+                      
+                      // Если пациент не выбран из существующих, создаем нового
+                      let patientId = selectedPatientId;
+                      if (!patientId && wizardData.patient) {
+                        console.log('Creating new patient:', wizardData.patient);
+                        
+                        // Разделяем ФИО на части
+                        const fioparts = wizardData.patient.fio.trim().split(' ');
+                        const lastName = fioparts[0] || '';
+                        const firstName = fioparts[1] || '';
+                        const middleName = fioparts.slice(2).join(' ') || null;
+                        
+                        const patientData = {
+                          last_name: lastName,
+                          first_name: firstName,
+                          middle_name: middleName,
+                          birth_date: wizardData.patient.dob,
+                          phone: wizardData.patient.phone,
+                          sex: wizardData.patient.gender === 'female' ? 'F' : 'M'
+                        };
+                        
+                        console.log('Patient data being sent:', patientData);
+                        
+                        try {
+                          const patientResponse = await fetch(`${API_BASE}/api/v1/patients/`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify(patientData)
+                          });
+                          
+                          if (patientResponse.ok) {
+                            const newPatient = await patientResponse.json();
+                            patientId = newPatient.id;
+                            console.log('Created new patient with ID:', patientId);
+                          } else {
+                            const errorData = await patientResponse.json().catch(() => ({}));
+                            console.log('Patient creation error:', errorData);
+                            const details = Array.isArray(errorData.detail) 
+                              ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                              : errorData.detail || 'Неверные данные пациента';
+                            throw new Error('Ошибка создания пациента: ' + details);
+                          }
+                        } catch (error) {
+                          console.error('Error creating patient:', error);
+                          toast.error('Ошибка создания пациента: ' + error.message);
+                          return;
+                        }
+                      }
+                      
+                      if (!patientId) {
+                        toast.error('Не удалось определить пациента. Пожалуйста, заполните данные пациента.');
+                        return;
+                      }
+                      
+                      if (!selectedDoctor?.id) {
+                        toast.error('Не выбран врач. Пожалуйста, выберите врача.');
+                        return;
+                      }
+                      
+                      if (selectedServices.length === 0) {
+                        toast.error('Не выбраны услуги. Пожалуйста, выберите минимум одну услугу.');
+                        return;
+                      }
+                      
+                      console.log('Creating appointment with API_BASE:', API_BASE, 'Token exists:', !!token);
+                      console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');
+                      console.log('selectedPatientId:', selectedPatientId, 'type:', typeof selectedPatientId);
+                      console.log('selectedDoctor:', selectedDoctor);
+                      console.log('selectedServices:', selectedServices);
+                      
+                      const appointmentData = {
+                        patient_id: parseInt(patientId),
+                        doctor_id: parseInt(selectedDoctor?.id) || null,
+                        appointment_date: new Date().toISOString().split('T')[0], // Сегодняшняя дата
+                        appointment_time: new Date().toTimeString().slice(0, 5), // Текущее время
+                        department: selectedDoctor?.specialty || 'general',
+                        notes: `Услуги: ${selectedServices.map(s => s.name).join(', ')}`,
+                        status: 'scheduled',
+                        payment_amount: selectedServices.reduce((sum, s) => sum + (s.price || 0), 0),
+                        payment_currency: 'UZS'
+                      };
+                      console.log('Appointment data being sent:', appointmentData);
+                      
+                      const res = await fetch(`${API_BASE}/api/v1/appointments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(appointmentData)
+                      });
+                      console.log('Appointment creation response status:', res.status);
+                      if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        console.log('Appointment creation error:', errorData);
+                        if (res.status === 401) {
+                          throw new Error('Сессия истекла. Пожалуйста, войдите в систему заново.');
+                        } else if (res.status === 422) {
+                          // Показываем детали ошибки валидации
+                          const details = Array.isArray(errorData.detail) 
+                            ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
+                            : errorData.detail || 'Неверные данные';
+                          console.log('Validation errors:', errorData.detail);
+                          throw new Error('Ошибка валидации данных: ' + details);
+                        } else {
+                          throw new Error('Ошибка создания записи: ' + (errorData.detail || `HTTP ${res.status}`));
+                        }
+                      }
+                      const created = await res.json();
+                      setShowWizard(false);
+                      // Открываем модалку оплаты по созданной записи
+                      setPaymentDialog({ open: true, row: created });
+                      await loadAppointments();
+                    } catch (e) {
+                      toast.error(e.message || 'Ошибка создания записи');
+                    }
+                  }}>Создать запись → Оплата</button>
+                </div>
+              </div>
+            )}
           </div>
               </div>
       )}
@@ -1915,6 +2684,29 @@ const RegistrarPanel = () => {
           </div>
         </div>
       )}
+
+      {/* Диалог печати (глобально для панели) */}
+      <PrintDialog
+        isOpen={printDialog.open}
+        onClose={() => setPrintDialog({ open: false, type: '', data: null })}
+        documentType={printDialog.type}
+        documentData={printDialog.data}
+        onPrint={async (printerName) => {
+          try {
+            await fetch(`${(import.meta?.env?.VITE_API_BASE_URL)||''}/api/v1/print/ticket`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ ...printDialog.data, printer_name: printerName })
+            });
+            toast.success('Талон отправлен на печать');
+          } catch (e) {
+            toast.error('Ошибка печати');
+          }
+        }}
+      />
 
       {/* Модальное окно жесткого потока */}
       {showAppointmentFlow && selectedAppointment && (

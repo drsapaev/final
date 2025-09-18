@@ -176,6 +176,7 @@ export const useQueueManager = () => {
     setError,
     setSuccess,
     setQueueData,
-    setQrData
+    setQrData,
+    setStatistics
   };
 };

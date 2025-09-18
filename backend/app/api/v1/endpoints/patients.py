@@ -43,7 +43,7 @@ def create_patient(
             status_code=400, detail="Пациент с таким номером телефона уже существует"
         )
 
-    patient = patient_crud.create_patient(db=db, patient=patient_in)
+    patient = patient_crud.create(db=db, obj_in=patient_in)
     return patient
 
 
