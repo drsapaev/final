@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PhoneInput from '../components/ui/PhoneInput';
 import { Toaster, toast } from 'react-hot-toast';
@@ -191,6 +191,10 @@ const RegistrarPanel = () => {
       welcome: 'Добро пожаловать',
       start_work: 'Начать работу',
       quick_start: 'Быстрый старт',
+      loading: 'Загрузка',
+      error: 'Ошибка',
+      success: 'Успешно',
+      warning: 'Предупреждение',
       
       // Вкладки
       tabs_welcome: 'Главная',
@@ -213,6 +217,9 @@ const RegistrarPanel = () => {
       no_show: 'Неявка',
       reason: 'Причина',
       bulk_actions: 'Массовые действия',
+      search: 'Поиск',
+      filter: 'Фильтр',
+      clear_filter: 'Очистить фильтр',
       
       // Мастер
       patient: 'Пациент',
@@ -229,26 +236,62 @@ const RegistrarPanel = () => {
       select_date: 'Выбрать дату',
       online_payment: 'Онлайн оплата',
       
+      // Поля формы
+      full_name: 'ФИО',
+      birth_date: 'Дата рождения',
+      phone: 'Телефон',
+      address: 'Адрес',
+      services: 'Услуги',
+      doctor: 'Врач',
+      appointment_type: 'Тип обращения',
+      payment_method: 'Способ оплаты',
+      amount: 'Сумма',
+      
+      // Статусы
+      status_scheduled: 'Запланирован',
+      status_confirmed: 'Подтвержден',
+      status_queued: 'В очереди',
+      status_in_cabinet: 'В кабинете',
+      status_done: 'Завершен',
+      status_cancelled: 'Отменен',
+      status_no_show: 'Неявка',
+      status_paid_pending: 'Ожидает оплаты',
+      status_paid: 'Оплачен',
+      
       // Статистика
       total_patients: 'Всего пациентов',
       today_appointments: 'Записей сегодня',
       pending_payments: 'Ожидают оплаты',
-      active_queues: 'Активные очереди'
+      active_queues: 'Активные очереди',
+      empty_table: 'Нет данных для отображения',
+      
+      // Сообщения
+      appointment_created: 'Запись создана успешно',
+      appointment_cancelled: 'Запись отменена',
+      payment_successful: 'Оплата прошла успешно',
+      print_ticket: 'Печать талона',
+      auto_refresh: 'Автообновление',
+      data_source_demo: 'Показаны демо-данные',
+      data_source_api: 'Данные загружены с сервера'
     },
     uz: {
       // Основные
       welcome: 'Xush kelibsiz',
       start_work: 'Ishni boshlash',
       quick_start: 'Tezkor start',
+      loading: 'Yuklanmoqda',
+      error: 'Xatolik',
+      success: 'Muvaffaqiyatli',
+      warning: 'Ogohlantirish',
       
       // Вкладки
       tabs_welcome: 'Asosiy',
       tabs_appointments: 'yozilganlar',
-      tabs_cardio: 'Кардиолог',
-      tabs_echokg: 'ЭКГ',
-      tabs_derma: 'Дерматолог',
-      tabs_dental: 'Стоматолог',
-      tabs_lab: 'Лаборатория',
+      tabs_cardio: 'Kardiolog',
+      tabs_echokg: 'EKG',
+      tabs_derma: 'Dermatolog',
+      tabs_dental: 'Stomatolog',
+      tabs_lab: 'Laboratoriya',
       tabs_procedures: 'muolaja',
       tabs_queue: 'navbat',
       
@@ -262,6 +305,9 @@ const RegistrarPanel = () => {
       no_show: 'Kelmaslik',
       reason: 'Sabab',
       bulk_actions: 'Ommaviy amallar',
+      search: 'Qidirish',
+      filter: 'Filter',
+      clear_filter: 'Filterni tozalash',
       
       // Мастер
       patient: 'Bemor',
@@ -278,12 +324,43 @@ const RegistrarPanel = () => {
       select_date: 'Sanani tanlash',
       online_payment: 'Onlayn to\'lov',
       
+      // Поля формы
+      full_name: 'F.I.Sh',
+      birth_date: 'Tug\'ilgan sana',
+      phone: 'Telefon',
+      address: 'Manzil',
+      services: 'Xizmatlar',
+      doctor: 'Shifokor',
+      appointment_type: 'Murojaat turi',
+      payment_method: 'To\'lov usuli',
+      amount: 'Summa',
+      
+      // Статусы
+      status_scheduled: 'Rejalashtirilgan',
+      status_confirmed: 'Tasdiqlangan',
+      status_queued: 'Navbatda',
+      status_in_cabinet: 'Kabinetda',
+      status_done: 'Tugallangan',
+      status_cancelled: 'Bekor qilingan',
+      status_no_show: 'Kelmagan',
+      status_paid_pending: 'To\'lovni kutmoqda',
+      status_paid: 'To\'langan',
+      
       // Статистика
       total_patients: 'Jami bemorlar',
       today_appointments: 'Bugungi yozuvlar',
       pending_payments: 'To\'lovni kutmoqda',
       active_queues: 'Faol navbatlar',
-      empty_table: 'Ma\'lumot yo\'q'
+      empty_table: 'Ma\'lumot yo\'q',
+      
+      // Сообщения
+      appointment_created: 'Yozuv muvaffaqiyatli yaratildi',
+      appointment_cancelled: 'Yozuv bekor qilindi',
+      payment_successful: 'To\'lov muvaffaqiyatli o\'tdi',
+      print_ticket: 'Talon chop etish',
+      auto_refresh: 'Avtomatik yangilash',
+      data_source_demo: 'Demo ma\'lumotlar ko\'rsatilgan',
+      data_source_api: 'Ma\'lumotlar serverdan yuklandi'
     }
   };
   const t = (key) => (translations[language] && translations[language][key]) || translations.ru[key] || key;
@@ -487,7 +564,7 @@ const RegistrarPanel = () => {
   };
 
   // Базовый URL API
-    const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8001';
+    const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
 
   // Загрузка данных из админ панели
   const loadIntegratedData = async () => {
@@ -495,7 +572,7 @@ const RegistrarPanel = () => {
       setAppointmentsLoading(true);
       
       // Сначала устанавливаем fallback данные для врачей и услуг
-      console.log('Setting fallback doctors and services data');
+      // console.debug('Setting fallback doctors and services data');
       setDoctors([
         { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
         { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
@@ -645,12 +722,12 @@ const RegistrarPanel = () => {
         if (appointmentsData.length > 0) {
           setAppointments(appointmentsData);
           setDataSource('api');
-          console.log('✅ Загружены данные из API:', appointmentsData.length, 'записей');
+          // console.debug('Appointments loaded:', appointmentsData.length);
         } else {
           // API вернул пустой массив - показываем демо-данные
           setAppointments(DEMO_APPOINTMENTS);
           setDataSource('demo');
-          console.log('ℹ️ API вернул пустые данные, используем демо-данные');
+          // console.debug('API returned empty list, using demo data');
         }
       } else if (response.status === 401) {
         // Токен недействителен
@@ -673,9 +750,14 @@ const RegistrarPanel = () => {
     }
   };
 
+  // Первичная загрузка данных (однократно)
   useEffect(() => {
     loadAppointments();
-    loadIntegratedData(); // Загружаем данные из админ панели
+  }, []);
+
+  // Загрузка интегрированных данных (однократно)
+  useEffect(() => {
+    loadIntegratedData();
   }, []);
 
   // Автообновление очереди с возможностью паузы
@@ -719,7 +801,15 @@ const RegistrarPanel = () => {
 
   const handlePayment = async (appointment) => {
     try {
-      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || '';
+      // Проверяем, не оплачена ли уже запись
+      const paymentStatus = (appointment.payment_status || '').toLowerCase();
+      const status = (appointment.status || '').toLowerCase();
+      if (paymentStatus === 'paid' || status === 'paid') {
+        toast.info('Запись уже оплачена');
+        return appointment;
+      }
+      
+      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
       const response = await fetch(`${API_BASE}/api/v1/appointments/${appointment.id}/mark-paid`, {
         method: 'POST',
         headers: {
@@ -764,7 +854,7 @@ const RegistrarPanel = () => {
       if (status === 'complete' || status === 'done') {
         url = `${API_BASE}/api/v1/appointments/${appointmentId}/complete`;
         body = JSON.stringify({ reason });
-      } else if (status === 'paid' || status === 'mark-paid' || status === 'queued') {
+      } else if (status === 'paid' || status === 'mark-paid') {
         url = `${API_BASE}/api/v1/appointments/${appointmentId}/mark-paid`;
       } else {
         toast.error('Изменение данного статуса не поддерживается');
@@ -895,47 +985,64 @@ const RegistrarPanel = () => {
     return false;
   };
 
+  // Мемоизированные счетчики и индикаторы по отделам
+  const departmentStats = useMemo(() => {
+    const stats = {};
+    const departments = ['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'];
+    
+    departments.forEach(dept => {
+      const deptAppointments = appointments.filter(a => isInDepartment(a, dept));
+      stats[dept] = {
+        todayCount: deptAppointments.filter(a => a.date === todayStr).length,
+        hasActiveQueue: deptAppointments.some(a => a.status === 'queued'),
+        hasPendingPayments: deptAppointments.some(a => a.status === 'paid_pending')
+      };
+    });
+    
+    return stats;
+  }, [appointments, todayStr]);
+
   // Счетчик «сегодня» по отделам
-  const getDepartmentCount = (departmentKey) => {
-    return appointments.filter(a => 
-      a.date === todayStr && isInDepartment(a, departmentKey)
-    ).length;
-  };
+  const getDepartmentCount = useCallback((departmentKey) => {
+    return departmentStats[departmentKey]?.todayCount || 0;
+  }, [departmentStats]);
 
   // Индикаторы статусов по отделу
-  const hasActiveQueue = (departmentKey) => {
-    return appointments.some(a => a.status === 'queued' && isInDepartment(a, departmentKey));
-  };
+  const hasActiveQueue = useCallback((departmentKey) => {
+    return departmentStats[departmentKey]?.hasActiveQueue || false;
+  }, [departmentStats]);
 
-  const hasPendingPayments = (departmentKey) => {
-    return appointments.some(a => a.status === 'paid_pending' && isInDepartment(a, departmentKey));
-  };
+  const hasPendingPayments = useCallback((departmentKey) => {
+    return departmentStats[departmentKey]?.hasPendingPayments || false;
+  }, [departmentStats]);
 
-  // Фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
+  // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
   const searchDate = searchParams.get('date');
   const searchQuery = (searchParams.get('q') || '').toLowerCase();
-
   const statusFilter = searchParams.get('status');
-  const filteredAppointments = appointments.filter(appointment => {
-    // Фильтр по вкладке (отдел)
-    if (activeTab && !isInDepartment(appointment, activeTab)) return false;
-    // Фильтр по дате: если не задана, показываем все даты
-    if (searchDate && appointment.date !== searchDate) return false;
-    // Фильтр по статусу
-    if (statusFilter && appointment.status !== statusFilter) return false;
-    // Поиск по ФИО/телефону/услугам
-    if (searchQuery) {
-      const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
-      const inPhone = (appointment.patient_phone || '').toLowerCase().includes(searchQuery);
-      const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
-      if (!inFio && !inPhone && !inServices) return false;
-    }
-    return true;
-  });
 
-  // Компонент индикатора источника данных (для всех вкладок)
-  const DataSourceIndicator = ({ count }) => {
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter(appointment => {
+      // Фильтр по вкладке (отдел)
+      if (activeTab && !isInDepartment(appointment, activeTab)) return false;
+      // Фильтр по дате: если не задана, показываем все даты
+      if (searchDate && appointment.date !== searchDate) return false;
+      // Фильтр по статусу
+      if (statusFilter && appointment.status !== statusFilter) return false;
+      // Поиск по ФИО/телефону/услугам
+      if (searchQuery) {
+        const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
+        const inPhone = (appointment.patient_phone || '').toLowerCase().includes(searchQuery);
+        const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
+        if (!inFio && !inPhone && !inServices) return false;
+      }
+      return true;
+    });
+  }, [appointments, activeTab, searchDate, statusFilter, searchQuery]);
+
+  // Мемоизированный компонент индикатора источника данных (для всех вкладок)
+  const DataSourceIndicator = memo(({ count }) => {
     if (dataSource === 'demo') {
       return (
         <div style={{
@@ -1015,7 +1122,7 @@ const RegistrarPanel = () => {
     }
     
     return null;
-  };
+  });
 
   // Функция генерации CSV
   const generateCSV = (data) => {
@@ -1053,13 +1160,16 @@ const RegistrarPanel = () => {
     document.body.removeChild(link);
   };
 
-  // Статистика для экрана приветствия
-  const stats = {
-    totalPatients: appointments.length,
-    todayAppointments: appointments.filter(a => a.date === new Date().toISOString().split('T')[0]).length,
-    pendingPayments: appointments.filter(a => a.status === 'paid_pending').length,
-    activeQueues: appointments.filter(a => a.status === 'queued').length
-  };
+  // Мемоизированная статистика для экрана приветствия
+  const stats = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return {
+      totalPatients: appointments.length,
+      todayAppointments: appointments.filter(a => a.date === todayStr).length,
+      pendingPayments: appointments.filter(a => a.status === 'paid_pending').length,
+      activeQueues: appointments.filter(a => a.status === 'queued').length
+    };
+  }, [appointments]);
 
   // Простой режим выбора врача (для 3 специализаций)
   const simpleDoctorMode = true;
@@ -1129,15 +1239,21 @@ const RegistrarPanel = () => {
     if (validatePatient()) setWizardStep(2);
   }, [validatePatient]);
 
-  // Автопоиск по ФИО/телефону
+  // Оптимизированный автопоиск по ФИО/телефону с debounce
   useEffect(() => {
     const fio = (wizardData.patient.fio || '').trim();
     const phone = (wizardData.patient.phone || '').trim();
     const q = phone || fio;
-    if (!q || q.length < 3) { setPatientSuggestions([]); return; }
+    
+    if (!q || q.length < 3) { 
+      setPatientSuggestions([]);
+      setShowPatientSuggestions(false);
+      return; 
+    }
 
     const ctrl = new AbortController();
     const token = localStorage.getItem('auth_token');
+    
     const doFetch = async () => {
       try {
         // Пытаемся искать на сервере
@@ -1147,28 +1263,44 @@ const RegistrarPanel = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setPatientSuggestions(Array.isArray(data?.items) ? data.items : []);
-          setShowPatientSuggestions(true);
+          const suggestions = Array.isArray(data?.items) ? data.items : [];
+          setPatientSuggestions(suggestions);
+          setShowPatientSuggestions(suggestions.length > 0);
           return;
         }
-      } catch (_) {}
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.warn('Patient search API error:', error);
+        }
+      }
+      
       // Фолбэк — ищем по локальным данным записей
       const items = appointments
         .map(a => ({ id: a.id, patient_fio: a.patient_fio, phone: a.patient_phone, dob: a.patient_birth_date }))
         .filter(x => (
           (x.patient_fio && fio && x.patient_fio.toLowerCase().includes(fio.toLowerCase())) ||
           (x.phone && phone && x.phone.includes(phone.replace(/\s/g, '')))
-        ));
-      setPatientSuggestions(items.slice(0, 5));
-      setShowPatientSuggestions(true);
+        ))
+        .slice(0, 5);
+      
+      setPatientSuggestions(items);
+      setShowPatientSuggestions(items.length > 0);
     };
-    const t = setTimeout(doFetch, 300);
+    
+    // Увеличиваем debounce до 500ms для лучшей производительности
+    const debounceTimer = setTimeout(doFetch, 500);
+    
     function handleClickOutside(e) {
       if (showPatientSuggestions) setShowPatientSuggestions(false);
     }
     document.addEventListener('click', handleClickOutside, { once: true });
-    return () => { clearTimeout(t); ctrl.abort(); document.removeEventListener('click', handleClickOutside); };
-  }, [wizardData.patient.fio, wizardData.patient.phone, appointments]);
+    
+    return () => { 
+      clearTimeout(debounceTimer); 
+      ctrl.abort(); 
+      document.removeEventListener('click', handleClickOutside); 
+    };
+  }, [wizardData.patient.fio, wizardData.patient.phone, appointments, API_BASE]);
 
   
 
@@ -1176,32 +1308,60 @@ const RegistrarPanel = () => {
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
       <Toaster position="bottom-right" />
       {/* Фиксированная верхняя часть убрана - используется глобальный хедер */}
+      
+      {/* Skip to content link for screen readers */}
+      <a 
+        href="#main-content" 
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: '0',
+          zIndex: 9999,
+          padding: '8px 16px',
+          background: getColor('primary', 600),
+          color: 'white',
+          textDecoration: 'none',
+          borderRadius: '0 0 4px 4px'
+        }}
+        onFocus={(e) => {
+          e.target.style.left = '0';
+        }}
+        onBlur={(e) => {
+          e.target.style.left = '-9999px';
+        }}
+      >
+        Перейти к основному содержимому
+      </a>
 
       {/* Вкладки */}
         {(!searchParams.get('view') || (searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue')) && (
-        <div style={{
-          display: 'flex',
-          gap: isMobile ? '4px' : getSpacing('sm'),
-          background: theme === 'light' 
-            ? 'rgba(255, 255, 255, 0.8)' 
-            : 'rgba(15, 23, 42, 0.8)',
-          backdropFilter: 'blur(20px)',
-          padding: isMobile ? `${getSpacing('xs')} ${getSpacing('sm')}` : `${getSpacing('sm')} ${getSpacing('md')}`,
-          // Стили для слияния с таблицей
-          borderLeft: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-          borderRight: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-          borderTop: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-          borderBottom: 'none',
-          borderRadius: isMobile ? '12px 12px 0 0' : '20px 20px 0 0',
-          margin: `0 ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
-          boxShadow: theme === 'light' 
-            ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-          overflowX: isMobile ? 'auto' : 'visible',
-          flexWrap: isMobile ? 'nowrap' : 'wrap'
-        }}>
+        <nav 
+          role="tablist" 
+          aria-label="Фильтры по отделам"
+          style={{
+            display: 'flex',
+            gap: isMobile ? '4px' : getSpacing('sm'),
+            background: theme === 'light' 
+              ? 'rgba(255, 255, 255, 0.8)' 
+              : 'rgba(15, 23, 42, 0.8)',
+            backdropFilter: 'blur(20px)',
+            padding: isMobile ? `${getSpacing('xs')} ${getSpacing('sm')}` : `${getSpacing('sm')} ${getSpacing('md')}`,
+            // Стили для слияния с таблицей
+            borderLeft: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+            borderRight: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+            borderTop: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+            borderBottom: 'none',
+            borderRadius: isMobile ? '12px 12px 0 0' : '20px 20px 0 0',
+            margin: `0 ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
+            boxShadow: theme === 'light' 
+              ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+            overflowX: isMobile ? 'auto' : 'visible',
+            flexWrap: isMobile ? 'nowrap' : 'wrap'
+          }}>
           {/* Оставляем только отделы: Кардиолог, ЭКГ, Дерматолог, Стоматолог, Лаборатория, Процедуры */}
         <button
+          role="tab"
           className={`px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium flex items-center gap-2 interactive-element hover-lift ripple-effect focus-ring ${
             activeTab === 'cardio' 
               ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md transform -translate-y-0.5' 
@@ -1221,6 +1381,9 @@ const RegistrarPanel = () => {
           }}
           onClick={() => setActiveTab(prev => prev === 'cardio' ? null : 'cardio')}
           aria-selected={activeTab === 'cardio'}
+          aria-controls="appointments-table"
+          aria-describedby="cardio-tab-description"
+          tabIndex={activeTab === 'cardio' ? 0 : -1}
         >
             <Heart size={16} />
             {t('tabs_cardio')} ({getDepartmentCount('cardio')})
@@ -1357,9 +1520,9 @@ const RegistrarPanel = () => {
             {hasActiveQueue('procedures') && <span className="w-2 h-2 bg-green-500 rounded-full" />}
             {hasPendingPayments('procedures') && <span className="w-2 h-2 bg-yellow-500 rounded-full" />}
         </button>
-      </div>
+      </nav>
       )}
-      {/* </div> Закрытие фиксированного контейнера */}
+      {/* </nav> Закрытие навигации по вкладкам */}
 
       {/* Основной контент без отступа сверху */}
       <div style={{ overflow: 'hidden' }}>
@@ -1582,52 +1745,128 @@ const RegistrarPanel = () => {
               </Card.Header>
             
               <Card.Content>
-              {/* История: календарь + поиск */}
+              {/* Улучшенные фильтры для онлайн-очереди */}
               <div style={{
                 display: 'flex',
-                gap: '8px',
+                gap: '12px',
                 alignItems: 'center',
-                marginBottom: '16px',
-                flexWrap: 'wrap'
+                marginBottom: '20px',
+                flexWrap: 'wrap',
+                padding: '16px',
+                background: theme === 'light' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(15, 23, 42, 0.8)',
+                borderRadius: '12px',
+                border: `1px solid ${borderColor}`
               }}>
-                <input
-                  type="date"
-                  value={searchParams.get('date') || ''}
-                  onChange={(e) => {
-                    const params = new URLSearchParams(window.location.search);
-                    const val = e.target.value;
-                    if (val) params.set('date', val); else params.delete('date');
-                    params.delete('view');
-                    window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
-                  }}
-                  style={{
-                    padding: '8px 12px',
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: '8px'
-                  }}
-                />
-                <input
-                  type="search"
-                  placeholder="Поиск (ФИО/телефон/услуга)"
-                  defaultValue={searchParams.get('q') || ''}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>
+                    {t('select_date')}:
+                  </label>
+                  <input
+                    type="date"
+                    value={searchParams.get('date') || ''}
+                    onChange={(e) => {
                       const params = new URLSearchParams(window.location.search);
-                      const val = e.currentTarget.value.trim();
-                      if (val) params.set('q', val); else params.delete('q');
+                      const val = e.target.value;
+                      if (val) params.set('date', val); else params.delete('date');
                       params.delete('view');
                       window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
-                    }
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: '8px',
+                      backgroundColor: isDark ? '#374151' : 'white',
+                      color: textColor,
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>
+                    {t('search')}:
+                  </label>
+                  <input
+                    type="search"
+                    placeholder={`${t('search')} (${t('full_name')}/${t('phone')}/${t('services')})`}
+                    defaultValue={searchParams.get('q') || ''}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const params = new URLSearchParams(window.location.search);
+                        const val = e.currentTarget.value.trim();
+                        if (val) params.set('q', val); else params.delete('q');
+                        params.delete('view');
+                        window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: '8px',
+                      minWidth: '280px',
+                      backgroundColor: isDark ? '#374151' : 'white',
+                      color: textColor,
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: textColor }}>
+                    {t('doctor')}:
+                  </label>
+                  <select
+                    value={searchParams.get('doctor') || ''}
+                    onChange={(e) => {
+                      const params = new URLSearchParams(window.location.search);
+                      const val = e.target.value;
+                      if (val) params.set('doctor', val); else params.delete('doctor');
+                      params.delete('view');
+                      window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: `1px solid ${borderColor}`,
+                      borderRadius: '8px',
+                      backgroundColor: isDark ? '#374151' : 'white',
+                      color: textColor,
+                      fontSize: '14px',
+                      minWidth: '150px'
+                    }}
+                  >
+                    <option value="">{t('tabs_appointments')}</option>
+                    {doctors.map(doctor => (
+                      <option key={doctor.id} value={doctor.id}>
+                        {doctor.user?.full_name || `${t('doctor')} #${doctor.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <button
+                  className="clinic-button clinic-button-outline"
+                  onClick={() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.delete('date');
+                    params.delete('q');
+                    params.delete('doctor');
+                    params.delete('status');
+                    window.history.replaceState(null, '', `/registrar-panel?view=queue`);
                   }}
-                  style={{
-                    padding: '8px 12px',
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: '8px',
-                    minWidth: '260px'
-                  }}
-                />
+                  style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
+                >
+                  {t('clear_filter')}
+                </button>
               </div>
-                <OnlineQueueManager />
+              
+              <OnlineQueueManager 
+                selectedDate={searchParams.get('date') || new Date().toISOString().split('T')[0]}
+                selectedDoctor={searchParams.get('doctor') || ''}
+                searchQuery={searchParams.get('q') || ''}
+                onQueueUpdate={loadAppointments}
+                language={language}
+                theme={theme}
+              />
               </Card.Content>
             </Card>
           </AnimatedTransition>
@@ -1635,12 +1874,16 @@ const RegistrarPanel = () => {
 
         {/* Основная панель с записями */}
         {(!searchParams.get('view') || (searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue')) && (
-          <div style={{
-            ...tableContainerStyle, 
-            // избегаем конфликта marginTop + margin (шорткат)
-            margin: `${-1}px ${isMobile ? getSpacing('md') : getSpacing('xl')} ${getSpacing('xl')} ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
-            borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px'
-          }}>
+          <div 
+            id="main-content"
+            role="tabpanel"
+            aria-labelledby={activeTab ? `${activeTab}-tab` : undefined}
+            style={{
+              ...tableContainerStyle, 
+              // избегаем конфликта marginTop + margin (шорткат)
+              margin: `${-1}px ${isMobile ? getSpacing('md') : getSpacing('xl')} ${getSpacing('xl')} ${isMobile ? getSpacing('md') : getSpacing('xl')}`,
+              borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px'
+            }}>
             <div style={{
               ...tableContentStyle,
               padding: isMobile ? getSpacing('sm') : getSpacing('md')
@@ -1724,6 +1967,10 @@ const RegistrarPanel = () => {
                 </div>
               ) : (
                 <ResponsiveTable
+                  id="appointments-table"
+                  role="table"
+                  aria-label={`Таблица записей${activeTab ? ` - ${t('tabs_' + activeTab)}` : ''}`}
+                  aria-rowcount={filteredAppointments.length}
                   data={filteredAppointments}
                   columns={[
                     { 
@@ -1983,7 +2230,11 @@ const RegistrarPanel = () => {
                       className: 'clinic-button clinic-button-success',
                       title: 'Оплата',
                       onClick: (row) => setPaymentDialog({ open: true, row, paid: false, source: 'table' }),
-                      visible: (row) => row.status === 'paid_pending' || !row.payment_status,
+                      visible: (row) => {
+                        const s = (row.status || '').toLowerCase();
+                        const ps = (row.payment_status || '').toLowerCase();
+                        return s !== 'paid' && ps !== 'paid' && (s === 'paid_pending' || !ps);
+                      },
                       style: { padding: '6px 10px', borderRadius: 8, fontSize: 12 }
                     }
                   ]}
@@ -2012,15 +2263,48 @@ const RegistrarPanel = () => {
       {/* Мастер создания записи */}
       {/* Диалог отмены */}
       {cancelDialog.open && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in" role="dialog" aria-modal="true">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in" 
+          role="dialog" 
+          aria-modal="true"
+          aria-labelledby="cancel-dialog-title"
+          aria-describedby="cancel-dialog-description"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setCancelDialog({ open: false, row: null, reason: '' });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setCancelDialog({ open: false, row: null, reason: '' });
+            }
+          }}
+        >
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 animate-fade-in-scale" style={{ backgroundColor: cardBg }}>
             <div className="p-6">
-              <h3 className="text-xl font-semibold mb-4 text-gray-900" style={{ color: textColor }}>Отменить запись</h3>
-              <div className="mb-4 text-sm text-gray-600" style={{ color: textColor }}>
+              <h3 
+                id="cancel-dialog-title"
+                className="text-xl font-semibold mb-4 text-gray-900" 
+                style={{ color: textColor }}
+              >
+                Отменить запись
+              </h3>
+              <div 
+                id="cancel-dialog-description"
+                className="mb-4 text-sm text-gray-600" 
+                style={{ color: textColor }}
+              >
                 Пациент: <span className="font-medium">{cancelDialog.row?.patient_fio}</span>
               </div>
-              <label className="block text-sm font-medium mb-2 text-gray-700" style={{ color: textColor }}>Причина отмены</label>
+              <label 
+                htmlFor="cancel-reason-textarea"
+                className="block text-sm font-medium mb-2 text-gray-700" 
+                style={{ color: textColor }}
+              >
+                Причина отмены
+              </label>
               <textarea
+                id="cancel-reason-textarea"
                 value={cancelDialog.reason}
                 onChange={(e) => setCancelDialog(prev => ({ ...prev, reason: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none transition-all duration-200"
@@ -2031,7 +2315,17 @@ const RegistrarPanel = () => {
                 }}
                 rows="3"
                 placeholder="Укажите причину отмены записи..."
+                aria-required="true"
+                aria-describedby="cancel-reason-help"
+                autoFocus
               />
+              <div 
+                id="cancel-reason-help"
+                className="text-xs text-gray-500 mt-1"
+                style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+              >
+                Обязательное поле для отмены записи
+              </div>
             </div>
             <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end gap-3" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb' }}>
               <button 
@@ -2076,14 +2370,21 @@ const RegistrarPanel = () => {
                   </label>
                   <input 
                     type="number" 
-                    defaultValue={paymentDialog.row?.cost || ''} 
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                    defaultValue={paymentDialog.row?.cost || paymentDialog.row?.payment_amount || ''} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     style={{ 
                       borderColor: isDark ? '#374151' : '#d1d5db',
-                      backgroundColor: isDark ? '#374151' : '#f9fafb',
-                      color: isDark ? '#9ca3af' : '#6b7280'
+                      backgroundColor: isDark ? '#374151' : 'white',
+                      color: textColor
                     }}
-                    readOnly 
+                    placeholder="Введите сумму к оплате"
+                    onChange={(e) => {
+                      // Обновляем сумму в состоянии
+                      setPaymentDialog(prev => ({
+                        ...prev,
+                        row: { ...prev.row, payment_amount: parseFloat(e.target.value) || 0 }
+                      }));
+                    }}
                   />
                 </div>
                 <div>
@@ -2121,7 +2422,11 @@ const RegistrarPanel = () => {
                   <button
                     className="clinic-button clinic-button-primary interactive-element hover-lift ripple-effect action-button-hover focus-ring"
                     style={{ padding: '8px 12px', borderRadius: 8, fontSize: 14 }}
-                    onClick={() => setPrintDialog({ open: true, type: 'ticket', data: paymentDialog.row })}
+                    onClick={() => {
+                      const data = paymentDialog.row;
+                      setPaymentDialog({ open: false, row: null, paid: false });
+                      setTimeout(() => setPrintDialog({ open: true, type: 'ticket', data }), 0);
+                    }}
                   >
                     🖨️ Печать талона
                   </button>
@@ -2141,13 +2446,18 @@ const RegistrarPanel = () => {
                     onClick={async () => {
                       const updated = await handlePayment(paymentDialog.row);
                       if (updated) {
-                        await updateAppointmentStatus(paymentDialog.row.id, 'queued');
-                        const nextState = { open: true, row: { ...updated }, paid: true, source: paymentDialog.source };
+                        // Локально помечаем как оплачено, без повторного запроса mark-paid/queued
+                        setAppointments(prev => prev.map(a => (
+                          a.id === paymentDialog.row.id ? { ...a, status: 'paid', payment_status: 'paid' } : a
+                        )));
+                        const nextState = { open: true, row: { ...updated, status: 'paid', payment_status: 'paid' }, paid: true, source: paymentDialog.source };
                         setPaymentDialog(nextState);
                         toast.success('Оплата успешна. Пациент добавлен в очередь');
                         if (paymentDialog.source === 'table') {
                           // Автооткрываем печать талона
-                          setPrintDialog({ open: true, type: 'ticket', data: updated });
+                          const data = { ...updated };
+                          setPaymentDialog({ open: false, row: null, paid: false });
+                          setTimeout(() => setPrintDialog({ open: true, type: 'ticket', data }), 0);
                         }
                       }
                     }}
@@ -2474,7 +2784,7 @@ const RegistrarPanel = () => {
                         return;
                       }
                       
-                      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8001';
+                      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
                       
                       // Если пациент не выбран из существующих, создаем нового
                       let patientId = selectedPatientId;
