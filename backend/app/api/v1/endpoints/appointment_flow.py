@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.crud import appointment as crud_appointment, emr as crud_emr
+from app.crud.appointment import appointment as crud_appointment
+from app.crud import emr as crud_emr
 from app.models.enums import AppointmentStatus
 from app.models.user import User
 from app.schemas.appointment import Appointment
@@ -281,12 +282,12 @@ def mark_appointment_paid(
     """
     Отметить запись как оплаченную (переход pending -> paid)
     """
-    appointment = crud_appointment.appointment.get(db, id=appointment_id)
+    appointment = crud_appointment.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
     # Отмечаем как оплаченное
-    paid_appointment = crud_appointment.appointment.mark_paid(
+    paid_appointment = crud_appointment.mark_paid(
         db, appointment_id=appointment_id
     )
     return paid_appointment

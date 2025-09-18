@@ -48,7 +48,8 @@ const CashierPanel = () => {
 
       // Загружаем историю платежей
       try {
-        const paymentsResponse = await fetch('/api/v1/payments/?limit=50', {
+        const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+        const paymentsResponse = await fetch(`${API_BASE}/api/v1/appointments/?limit=50`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
           }
@@ -125,8 +126,9 @@ const CashierPanel = () => {
   // Функции для работы с оплатами
   const processPayment = async (appointment, paymentData) => {
     try {
+      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
       // Сначала создаем платеж
-      const paymentResponse = await fetch('/api/v1/payments/', {
+      const paymentResponse = await fetch(`${API_BASE}/api/v1/appointments/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
