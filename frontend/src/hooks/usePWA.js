@@ -4,15 +4,35 @@ import { useState, useEffect, useCallback } from 'react';
  * Hook для работы с PWA функциональностью
  */
 export const usePWA = () => {
+  // Проверяем, что мы в React контексте
+  if (typeof window === 'undefined') {
+    return {
+      isInstallable: false,
+      isInstalled: false,
+      isOnline: true,
+      isServiceWorkerReady: false,
+      updateAvailable: false,
+      installPWA: () => false,
+      updateServiceWorker: () => {},
+      requestNotificationPermission: () => Promise.resolve('not-supported'),
+      sendNotification: () => Promise.resolve(false),
+      cacheUrls: () => {},
+      shouldShowInstallPrompt: () => false,
+      capabilities: {}
+    };
+  }
+
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(navigator?.onLine ?? true);
   const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   // Проверка установки PWA
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     // Проверяем, запущено ли приложение в standalone режиме
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
                          window.navigator.standalone ||
@@ -23,6 +43,8 @@ export const usePWA = () => {
 
   // Обработка события beforeinstallprompt
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -46,6 +68,8 @@ export const usePWA = () => {
 
   // Отслеживание онлайн/офлайн статуса
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -60,39 +84,39 @@ export const usePWA = () => {
 
   // Регистрация и обновление Service Worker
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registered:', registration);
-          setIsServiceWorkerReady(true);
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('Service Worker registered:', registration);
+        setIsServiceWorkerReady(true);
 
-          // Проверка обновлений
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setUpdateAvailable(true);
-              }
-            });
+        // Проверка обновлений
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              setUpdateAvailable(true);
+            }
           });
-        })
-        .catch((error) => {
-          console.error('Service Worker registration failed:', error);
         });
-
-      // Слушаем сообщения от Service Worker
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SYNC_COMPLETE') {
-          console.log('Background sync completed');
-        }
+      })
+      .catch((error) => {
+        console.error('Service Worker registration failed:', error);
       });
-    }
+
+    // Слушаем сообщения от Service Worker
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'SYNC_COMPLETE') {
+        console.log('Background sync completed');
+      }
+    });
   }, []);
 
   // Установка PWA
   const installPWA = useCallback(async () => {
-    if (!deferredPrompt) return false;
+    if (typeof window === 'undefined' || !deferredPrompt) return false;
 
     try {
       deferredPrompt.prompt();
@@ -115,15 +139,15 @@ export const usePWA = () => {
 
   // Обновление Service Worker
   const updateServiceWorker = useCallback(() => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-      window.location.reload();
-    }
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    
+    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
   }, []);
 
   // Запрос разрешения на уведомления
   const requestNotificationPermission = useCallback(async () => {
-    if (!('Notification' in window)) {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
       return 'not-supported';
     }
 
@@ -174,23 +198,23 @@ export const usePWA = () => {
 
   // Кэширование URL в Service Worker
   const cacheUrls = useCallback(async (urls) => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'CACHE_URLS',
-        urls
-      });
-    }
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CACHE_URLS',
+      urls
+    });
   }, []);
 
   // Проверка поддержки функций
   const capabilities = {
-    serviceWorker: 'serviceWorker' in navigator,
-    notifications: 'Notification' in window,
-    backgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
-    periodicSync: 'serviceWorker' in navigator && 'periodicSync' in window.ServiceWorkerRegistration.prototype,
-    webShare: 'share' in navigator,
-    clipboard: 'clipboard' in navigator,
-    geolocation: 'geolocation' in navigator
+    serviceWorker: typeof window !== 'undefined' && 'serviceWorker' in navigator,
+    notifications: typeof window !== 'undefined' && 'Notification' in window,
+    backgroundSync: typeof window !== 'undefined' && 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+    periodicSync: typeof window !== 'undefined' && 'serviceWorker' in navigator && 'periodicSync' in window.ServiceWorkerRegistration.prototype,
+    webShare: typeof window !== 'undefined' && 'share' in navigator,
+    clipboard: typeof window !== 'undefined' && 'clipboard' in navigator,
+    geolocation: typeof window !== 'undefined' && 'geolocation' in navigator
   };
 
   // Функция для проверки, нужно ли показывать промпт установки

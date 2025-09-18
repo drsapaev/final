@@ -13,13 +13,13 @@ class DailyQueue(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     day = Column(Date, nullable=False, index=True)  # YYYY-MM-DD
-    specialist_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    specialist_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     active = Column(Boolean, default=True, nullable=False)
     opened_at = Column(DateTime(timezone=True), nullable=True)  # Факт открытия приема
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    specialist = relationship("Doctor", foreign_keys=[specialist_id])
+    specialist = relationship("User", foreign_keys=[specialist_id])
     entries = relationship("OnlineQueueEntry", back_populates="queue", cascade="all, delete-orphan")
 
 

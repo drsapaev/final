@@ -29,7 +29,7 @@ export const API_ENDPOINTS = {
   PATIENTS: {
     LIST: '/patients',
     CREATE: '/patients',
-    SEARCH: '/patients/search',
+    SEARCH: '/patients/',
     STATS: '/patients/stats'
   },
 

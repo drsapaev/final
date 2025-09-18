@@ -2,7 +2,7 @@ import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt, ConnectionStatus } from './components/pwa';
-import usePWA from './hooks/usePWA.js';
+import { usePWA } from './hooks/usePWA.js';
 import './styles/theme.css';
 
 // Компоненты которые нужны сразу (критичные)

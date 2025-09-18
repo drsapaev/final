@@ -34,11 +34,13 @@ const PrintDialog = ({
     }
   }, [isOpen]);
 
+  const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || '';
+
   const loadPrinters = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/print/printers', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const response = await fetch(`${API_BASE}/api/v1/print/printers`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       });
 
       if (response.ok) {
@@ -66,10 +68,10 @@ const PrintDialog = ({
       setLoading(true);
       
       // Получаем шаблон для предварительного просмотра
-      const response = await fetch(`/api/v1/print/templates/preview`, {
+      const response = await fetch(`${API_BASE}/api/v1/print/templates/preview`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({

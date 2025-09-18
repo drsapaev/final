@@ -42,48 +42,12 @@ def get_registrar_services(
         
         # Группируем услуги по категориям согласно документации
         grouped_services = {
-            "consultation": {
-                "cardiology": [],
-                "dermatology": [],
-                "stomatology": []
-            },
-            "procedure": {
-                "cosmetology": [],
-                "dermatology": []
-            },
-            "diagnostics": {
-                "ecg": [],
-                "echo": [],
-                "lab": []
-            },
-            "laboratory": {
-                "blood": [],
-                "biochemistry": [],
-                "hormones": []
-            }
+            "laboratory": [],     # Лабораторные анализы
+            "dermatology": [],    # Дерматологические услуги
+            "cosmetology": []     # Косметологические услуги
         }
         
-        # Маппим категории к группам
-        category_mapping = {}
-        for category in categories:
-            if category.code.startswith("consultation."):
-                specialty_key = category.code.split(".")[1]
-                if specialty_key in grouped_services["consultation"]:
-                    category_mapping[category.id] = ("consultation", specialty_key)
-            elif category.code.startswith("procedure."):
-                specialty_key = category.code.split(".")[1]
-                if specialty_key in grouped_services["procedure"]:
-                    category_mapping[category.id] = ("procedure", specialty_key)
-            elif category.code.startswith("diagnostics."):
-                diag_key = category.code.split(".")[1]
-                if diag_key in grouped_services["diagnostics"]:
-                    category_mapping[category.id] = ("diagnostics", diag_key)
-            elif category.code.startswith("laboratory."):
-                lab_key = category.code.split(".")[1]
-                if lab_key in grouped_services["laboratory"]:
-                    category_mapping[category.id] = ("laboratory", lab_key)
-        
-        # Распределяем услуги по группам
+        # Простая логика распределения услуг по трём группам
         for service in services:
             service_data = {
                 "id": service.id,
@@ -93,12 +57,44 @@ def get_registrar_services(
                 "currency": service.currency or "UZS",
                 "duration_minutes": service.duration_minutes or 30,
                 "category_id": service.category_id,
-                "doctor_id": service.doctor_id
+                "doctor_id": service.doctor_id,
+                "group": None  # Добавим группу для frontend
             }
             
-            if service.category_id and service.category_id in category_mapping:
-                group, subgroup = category_mapping[service.category_id]
-                grouped_services[group][subgroup].append(service_data)
+            # Определяем группу по коду или названию услуги
+            if service.category_id:
+                category = next((c for c in categories if c.id == service.category_id), None)
+                if category:
+                    # Маппинг на основе кода категории
+                    if "laboratory" in category.code or "lab" in category.code or "анализ" in service.name.lower():
+                        service_data["group"] = "laboratory"
+                        grouped_services["laboratory"].append(service_data)
+                    elif "dermatology" in category.code or "дерматолог" in service.name.lower():
+                        service_data["group"] = "dermatology"
+                        grouped_services["dermatology"].append(service_data)
+                    elif "cosmetology" in category.code or "косметолог" in service.name.lower():
+                        service_data["group"] = "cosmetology"
+                        grouped_services["cosmetology"].append(service_data)
+                    else:
+                        # По умолчанию добавляем в лабораторию
+                        service_data["group"] = "laboratory"
+                        grouped_services["laboratory"].append(service_data)
+            else:
+                # Если нет категории, пытаемся определить по названию
+                name_lower = service.name.lower()
+                if any(word in name_lower for word in ["анализ", "кровь", "моча", "биохим", "гормон"]):
+                    service_data["group"] = "laboratory"
+                    grouped_services["laboratory"].append(service_data)
+                elif any(word in name_lower for word in ["дерматолог", "кожа", "псориаз", "акне"]):
+                    service_data["group"] = "dermatology"
+                    grouped_services["dermatology"].append(service_data)
+                elif any(word in name_lower for word in ["косметолог", "пилинг", "чистка", "ботокс"]):
+                    service_data["group"] = "cosmetology"
+                    grouped_services["cosmetology"].append(service_data)
+                else:
+                    # По умолчанию в лабораторию
+                    service_data["group"] = "laboratory"
+                    grouped_services["laboratory"].append(service_data)
         
         return {
             "services_by_group": grouped_services,

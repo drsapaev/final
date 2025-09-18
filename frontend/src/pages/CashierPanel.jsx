@@ -191,8 +191,8 @@ const CashierPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm"><Calendar className="w-4 h-4 mr-2"/>Сегодня</Button>
-            <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2"/>Экспорт</Button>
+            <button className="clinic-button clinic-button-outline"><Calendar className="w-4 h-4 mr-2"/>Сегодня</button>
+            <button className="clinic-button clinic-button-outline"><Download className="w-4 h-4 mr-2"/>Экспорт</button>
           </div>
         </div>
 

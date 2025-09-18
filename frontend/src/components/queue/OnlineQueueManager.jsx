@@ -62,7 +62,11 @@ const OnlineQueueManager = () => {
     loadStatistics,
     openQueue,
     callPatient,
-    clearMessages
+    clearMessages,
+    setError,
+    setSuccess,
+    setQueueData,
+    setStatistics
   } = useQueueManager();
   
   // Локальные состояния для UI

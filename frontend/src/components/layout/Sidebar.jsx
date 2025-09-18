@@ -38,7 +38,8 @@ export default function Sidebar() {
   }
   if (role === 'registrar') {
     byRole.push(
-      { to: '/registrar-panel', label: 'Панель регистратора' }
+      { to: '/registrar-panel', label: 'Панель регистратора' },
+      { to: '/cashier-panel', label: 'Касса' }
     );
   }
   if (role === 'doctor') {

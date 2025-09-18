@@ -4,7 +4,7 @@
  * Согласно MASTER_TODO_LIST строка 266
  */
 import React, { useState, useRef, useEffect } from 'react';
-import {
+import { 
   Box,
   Card,
   CardContent,
@@ -21,7 +21,7 @@ import {
   CompareArrows,
   SwapHoriz,
   Fullscreen,
-  ZoomIn,
+  ZoomIn, 
   ZoomOut,
   RestartAlt,
   ViewColumn,
@@ -334,7 +334,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               <Box sx={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
                   src={beforePhoto}
-                  alt="До"
+                    alt="До"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -353,7 +353,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               <Box sx={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
                   src={afterPhoto}
-                  alt="После"
+                    alt="После"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -372,7 +372,7 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
           <Box sx={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
             <img
               src={beforePhoto}
-              alt="До"
+                    alt="До"
               style={{
                 position: 'absolute',
                 width: '100%',

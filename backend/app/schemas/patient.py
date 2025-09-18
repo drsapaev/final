@@ -16,7 +16,7 @@ class PatientBase(ORMModel):
     sex: Optional[str] = Field(None, max_length=8)  # M|F|X
     phone: Optional[str] = Field(None, max_length=32)
     email: Optional[EmailStr] = None
-    document_no: Optional[str] = Field(None, max_length=64)
+    doc_number: Optional[str] = Field(None, max_length=64)
 
 
 class PatientCreate(PatientBase):
@@ -31,7 +31,7 @@ class PatientUpdate(ORMModel):
     sex: Optional[str] = Field(None, max_length=8)
     phone: Optional[str] = Field(None, max_length=32)
     email: Optional[EmailStr] = None
-    document_no: Optional[str] = Field(None, max_length=64)
+    doc_number: Optional[str] = Field(None, max_length=64)
 
 
 class Patient(PatientBase):

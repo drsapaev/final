@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt, ConnectionStatus } from './components/pwa';
-import usePWA from './hooks/usePWA.js';
+import { usePWA } from './hooks/usePWA.js';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 
@@ -86,6 +86,7 @@ function AppShell() {
   const path = location.pathname;
   const hideSidebar = path === '/registrar-panel' || 
                      path === '/doctor-panel' || 
+                     path === '/cashier-panel' || 
                      path.startsWith('/admin');
   
   return (
