@@ -1,0 +1,207 @@
+.app-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.hdr-left, .hdr-center, .hdr-right { 
+  min-width: 0; 
+  overflow: hidden;
+}
+
+.hdr-left {
+  flex-shrink: 0;
+}
+
+.hdr-center {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.hdr-right {
+  flex-shrink: 0;
+}
+
+.hdr-nav-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.hdr-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+
+.hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.hdr-btn--icon { width: 40px; justify-content: center; border: 1px solid var(--border-color, rgba(148,163,184,.3)); }
+.hdr-btn--ghost { border: 1px solid var(--border-color, rgba(148,163,184,.3)); }
+.hdr-btn--primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; }
+.hdr-btn--danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; }
+.hdr-btn--nav { border: 1px solid var(--border-color, rgba(148,163,184,.3)); }
+.hdr-btn--nav.is-active { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.4); color: #93c5fd; }
+.hdr-btn--brand { font-weight: 800; border: none; }
+
+.hdr-title { font-weight: 800; }
+.hdr-logo { font-size: 18px; }
+
+.hdr-select {
+  height: 40px;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, rgba(148,163,184,.3));
+  background: transparent;
+  color: inherit;
+  flex: 0 0 auto;
+}
+
+/* Глобально запрещаем тянуться кнопкам в header и горизонтальный скролл */
+.app-header button { 
+  display: inline-flex; 
+  flex: 0 0 auto; 
+  width: auto; 
+  white-space: nowrap; 
+  max-width: fit-content;
+  overflow: hidden;
+}
+
+/* Принудительно убираем горизонтальный скролл */
+.app-header, .app-header * {
+  box-sizing: border-box;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
+}
+
+/* Улучшенная адаптивность */
+@media (max-width: 1024px) {
+  .hdr-hide-md { display: none; }
+}
+
+@media (max-width: 768px) {
+  .hdr-hide-sm { display: none; }
+  .app-header { 
+    padding: 6px 8px; 
+    gap: 4px;
+    grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  .hdr-nav-scroll {
+    gap: 2px;
+    overflow-x: hidden;
+    flex-wrap: nowrap;
+    justify-content: center;
+    min-width: 0;
+  }
+  
+  .hdr-btn {
+    height: 32px;
+    padding: 4px 6px;
+    font-size: 12px;
+    min-width: 32px;
+  }
+  
+  .hdr-btn--nav {
+    min-width: 32px;
+    justify-content: center;
+    padding: 4px;
+  }
+  
+  .hdr-controls {
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  
+  .hdr-select {
+    height: 32px;
+    padding: 4px;
+    font-size: 12px;
+    min-width: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hdr-hide-xs { display: none; }
+  
+  .app-header {
+    padding: 4px 6px;
+    gap: 2px;
+    grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  .hdr-nav-scroll {
+    gap: 1px;
+    overflow-x: hidden;
+    min-width: 0;
+  }
+  
+  .hdr-btn {
+    height: 28px;
+    padding: 2px 4px;
+    font-size: 11px;
+    min-width: 28px;
+  }
+  
+  .hdr-btn--nav {
+    min-width: 28px;
+    padding: 2px;
+  }
+  
+  .hdr-logo {
+    font-size: 14px;
+  }
+  
+  .hdr-title {
+    font-size: 12px;
+  }
+  
+  .hdr-controls {
+    gap: 1px;
+  }
+  
+  .hdr-select {
+    height: 28px;
+    padding: 2px;
+    font-size: 10px;
+    min-width: 35px;
+  }
+}
+
+
+
+

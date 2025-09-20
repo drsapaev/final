@@ -1,0 +1,603 @@
+/* Мастер создания записи */
+.appointment-wizard .modern-dialog-container {
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.wizard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-height: 70vh;
+}
+
+/* Индикатор шагов */
+.wizard-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  min-width: 140px;
+}
+
+.wizard-step.active {
+  background-color: #dbeafe;
+  border: 2px solid #3b82f6;
+}
+
+.wizard-step.completed {
+  background-color: #dcfce7;
+  border: 2px solid #10b981;
+}
+
+.wizard-step:not(.active):not(.completed) {
+  background-color: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  cursor: default;
+}
+
+.step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: white;
+  color: #6b7280;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.wizard-step.active .step-icon {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.wizard-step.completed .step-icon {
+  background-color: #10b981;
+  color: white;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  transition: color 0.3s ease;
+}
+
+.wizard-step.active .step-title {
+  color: #1e40af;
+}
+
+.wizard-step.completed .step-title {
+  color: #059669;
+}
+
+.step-description {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.step-connector {
+  position: absolute;
+  right: -24px;
+  width: 32px;
+  height: 2px;
+  background-color: #e5e7eb;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: -1;
+}
+
+.wizard-step.completed + .wizard-step .step-connector {
+  background-color: #10b981;
+}
+
+/* Контент шагов */
+.wizard-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 4px;
+}
+
+.wizard-step-content {
+  animation: slideIn 0.3s ease-out;
+}
+
+.wizard-step-content h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+/* Сетка форм */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 12px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background-color: white;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-field input.error,
+.form-field select.error,
+.form-field textarea.error {
+  border-color: #ef4444;
+}
+
+.error-text {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+/* Поле поиска */
+.search-field {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.suggestion-item {
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.suggestion-item:hover {
+  background-color: #f9fafb;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-name {
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.suggestion-details {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Поле с иконкой */
+.input-with-icon {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.input-with-icon input {
+  padding-left: 40px;
+}
+
+/* Услуги */
+.services-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #f9fafb;
+}
+
+.service-category {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.category-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #e5e7eb;
+}
+
+.service-item:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.service-item input[type="checkbox"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.service-name {
+  flex: 1;
+  font-size: 14px;
+  color: #374151;
+}
+
+.service-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: #059669;
+}
+
+/* Выбор пола */
+.gender-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gender-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.gender-option:hover {
+  border-color: #9ca3af;
+  background-color: #f9fafb;
+}
+
+.gender-option.selected {
+  border-color: #3b82f6;
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+/* Способы оплаты */
+.payment-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.payment-method {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: white;
+}
+
+.payment-method:hover {
+  border-color: #9ca3af;
+  background-color: #f9fafb;
+}
+
+.payment-method input[type="radio"]:checked + .method-content {
+  color: #3b82f6;
+}
+
+.payment-method:has(input[type="radio"]:checked) {
+  border-color: #3b82f6;
+  background-color: #dbeafe;
+}
+
+.payment-method input[type="radio"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.method-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.method-icon {
+  font-size: 18px;
+}
+
+.method-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Итоговая сумма */
+.total-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-radius: 12px;
+  border: 2px solid #d1d5db;
+}
+
+.total-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.total-amount {
+  font-size: 24px;
+  font-weight: 700;
+  color: #059669;
+}
+
+/* Анимации */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Темная тема */
+.dark .wizard-steps {
+  border-bottom-color: #374151;
+}
+
+.dark .wizard-step:not(.active):not(.completed) {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.dark .step-title {
+  color: #d1d5db;
+}
+
+.dark .wizard-step.active .step-title {
+  color: #60a5fa;
+}
+
+.dark .wizard-step.completed .step-title {
+  color: #34d399;
+}
+
+.dark .form-field label {
+  color: #d1d5db;
+}
+
+.dark .form-field input,
+.dark .form-field select,
+.dark .form-field textarea {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+.dark .form-field input:focus,
+.dark .form-field select:focus,
+.dark .form-field textarea:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+}
+
+.dark .suggestions-dropdown {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.dark .suggestion-item {
+  border-bottom-color: #4b5563;
+}
+
+.dark .suggestion-item:hover {
+  background-color: #4b5563;
+}
+
+.dark .suggestion-name {
+  color: #d1d5db;
+}
+
+.dark .services-grid {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.dark .service-item {
+  background-color: #4b5563;
+  border-color: #6b7280;
+}
+
+.dark .service-item:hover {
+  background-color: #6b7280;
+}
+
+.dark .service-name {
+  color: #d1d5db;
+}
+
+.dark .payment-method {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.dark .payment-method:hover {
+  background-color: #4b5563;
+  border-color: #6b7280;
+}
+
+.dark .payment-method:has(input[type="radio"]:checked) {
+  background-color: #1e3a8a;
+  border-color: #60a5fa;
+}
+
+.dark .method-label {
+  color: #d1d5db;
+}
+
+.dark .total-summary {
+  background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+  border-color: #6b7280;
+}
+
+.dark .total-label {
+  color: #d1d5db;
+}
+
+.dark .gender-option {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #d1d5db;
+}
+
+.dark .gender-option:hover {
+  background-color: #4b5563;
+  border-color: #6b7280;
+}
+
+.dark .gender-option.selected {
+  background-color: #1e3a8a;
+  border-color: #60a5fa;
+  color: #60a5fa;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .wizard-steps {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .wizard-step {
+    min-width: auto;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .step-connector {
+    display: none;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .payment-methods {
+    grid-template-columns: 1fr;
+  }
+  
+  .services-grid {
+    max-height: 200px;
+  }
+  
+  .wizard-container {
+    max-height: 80vh;
+  }
+}

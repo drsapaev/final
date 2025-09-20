@@ -1,0 +1,239 @@
+/* Современный alert */
+.modern-alert {
+  border: 1px solid;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Размеры */
+.modern-alert.small {
+  padding: 12px;
+}
+
+.modern-alert.medium {
+  padding: 16px;
+}
+
+.modern-alert.large {
+  padding: 20px;
+}
+
+/* Варианты */
+.modern-alert.outlined {
+  background: transparent !important;
+  border-width: 2px;
+}
+
+.modern-alert.minimal {
+  background: transparent !important;
+  border: none;
+  border-left: 4px solid;
+  border-radius: 0;
+  padding-left: 20px;
+}
+
+/* Состояния */
+.modern-alert.collapsed {
+  overflow: hidden;
+}
+
+.modern-alert.collapsed .alert-content {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+}
+
+/* Заголовок */
+.alert-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.alert-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.alert-title-section {
+  flex: 1;
+}
+
+.alert-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.alert-title.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.alert-title.clickable:hover {
+  opacity: 0.8;
+}
+
+.alert-toggle {
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+
+/* Кнопка закрытия */
+.alert-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin-top: 2px;
+}
+
+.alert-dismiss:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.dark .alert-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Контент */
+.alert-content {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+  max-height: 1000px;
+  opacity: 1;
+}
+
+.alert-content p {
+  margin: 0 0 8px 0;
+}
+
+.alert-content p:last-child {
+  margin-bottom: 0;
+}
+
+.alert-content ul,
+.alert-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.alert-content li {
+  margin-bottom: 4px;
+}
+
+/* Анимации */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Специальные стили для типов */
+.modern-alert.success .alert-title {
+  color: #059669;
+}
+
+.modern-alert.error .alert-title {
+  color: #dc2626;
+}
+
+.modern-alert.warning .alert-title {
+  color: #d97706;
+}
+
+.modern-alert.info .alert-title {
+  color: #0284c7;
+}
+
+.dark .modern-alert.success .alert-title {
+  color: #34d399;
+}
+
+.dark .modern-alert.error .alert-title {
+  color: #f87171;
+}
+
+.dark .modern-alert.warning .alert-title {
+  color: #fbbf24;
+}
+
+.dark .modern-alert.info .alert-title {
+  color: #38bdf8;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-alert.large {
+    padding: 16px;
+  }
+  
+  .modern-alert.medium {
+    padding: 14px;
+  }
+  
+  .modern-alert.small {
+    padding: 10px;
+  }
+  
+  .alert-header {
+    gap: 10px;
+  }
+  
+  .alert-title {
+    font-size: 13px;
+  }
+  
+  .alert-content {
+    font-size: 12px;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-alert {
+    border-radius: 6px;
+  }
+  
+  .modern-alert.large {
+    padding: 14px;
+  }
+  
+  .modern-alert.medium {
+    padding: 12px;
+  }
+  
+  .modern-alert.small {
+    padding: 8px;
+  }
+  
+  .alert-header {
+    gap: 8px;
+  }
+  
+  .alert-title {
+    font-size: 12px;
+  }
+  
+  .alert-content {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+}
+

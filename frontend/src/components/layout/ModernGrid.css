@@ -1,0 +1,33 @@
+/* Современная сетка */
+.modern-grid {
+  width: 100%;
+}
+
+.modern-grid.responsive {
+  /* Адаптивные настройки уже в JS */
+}
+
+/* Элемент сетки */
+.grid-item {
+  /* Базовые стили для элементов сетки */
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-grid.responsive {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  
+  .grid-item {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-grid.responsive {
+    gap: 8px !important;
+  }
+}
+

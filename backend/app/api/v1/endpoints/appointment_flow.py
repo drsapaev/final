@@ -29,7 +29,7 @@ router = APIRouter()
 def start_visit(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", "Doctor", "Registrar")),
 ) -> Any:
     """
     Начать прием (переход paid -> in_visit)

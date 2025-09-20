@@ -57,7 +57,7 @@ def get_patient(
     """
     Получить пациента по ID
     """
-    patient = patient_crud.get_patient(db, id=patient_id)
+    patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
     return patient
@@ -74,7 +74,7 @@ def update_patient(
     """
     Обновить данные пациента
     """
-    patient = patient_crud.get_patient(db, id=patient_id)
+    patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
@@ -87,7 +87,7 @@ def update_patient(
                 detail="Пациент с таким номером телефона уже существует",
             )
 
-    patient = patient_crud.update_patient(db=db, db_obj=patient, obj_in=patient_in)
+    patient = patient_crud.update(db=db, db_obj=patient, obj_in=patient_in)
     return patient
 
 
@@ -101,7 +101,7 @@ def delete_patient(
     """
     Удалить пациента
     """
-    patient = patient_crud.get_patient(db, id=patient_id)
+    patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 
@@ -111,7 +111,7 @@ def delete_patient(
             status_code=400, detail="Нельзя удалить пациента с активными записями"
         )
 
-    patient_crud.delete_patient(db=db, id=patient_id)
+    patient_crud.remove(db=db, id=patient_id)
     return {"message": "Пациент успешно удален"}
 
 
@@ -125,7 +125,7 @@ def get_patient_appointments(
     """
     Получить все записи пациента
     """
-    patient = patient_crud.get_patient(db, id=patient_id)
+    patient = patient_crud.get(db, id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Пациент не найден")
 

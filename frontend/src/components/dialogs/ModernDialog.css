@@ -1,0 +1,214 @@
+/* Современный диалог */
+.modern-dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 1rem;
+  animation: dialogBackdropFadeIn 0.2s ease-out;
+}
+
+.modern-dialog-container {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  animation: dialogSlideIn 0.3s ease-out;
+  transform-origin: center;
+}
+
+.modern-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0 24px;
+  min-height: 60px;
+}
+
+.modern-dialog-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.modern-dialog-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modern-dialog-close:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: scale(1.05);
+}
+
+.modern-dialog-close:active {
+  transform: scale(0.95);
+}
+
+.modern-dialog-content {
+  padding: 24px;
+}
+
+.modern-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-radius: 0 0 12px 12px;
+}
+
+.modern-dialog-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  min-height: 36px;
+}
+
+.modern-dialog-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.modern-dialog-action.primary {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.modern-dialog-action.primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.modern-dialog-action.secondary {
+  background-color: transparent;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.modern-dialog-action.secondary:hover:not(:disabled) {
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
+.modern-dialog-action.danger {
+  background-color: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.modern-dialog-action.danger:hover:not(:disabled) {
+  background-color: #dc2626;
+  border-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.modern-dialog-action.success {
+  background-color: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.modern-dialog-action.success:hover:not(:disabled) {
+  background-color: #059669;
+  border-color: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.action-icon {
+  display: flex;
+  align-items: center;
+}
+
+/* Анимации */
+@keyframes dialogBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialogSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Темная тема */
+.dark .modern-dialog-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .modern-dialog-action.secondary {
+  color: #9ca3af;
+  border-color: #374151;
+}
+
+.dark .modern-dialog-action.secondary:hover:not(:disabled) {
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+/* Адаптивность */
+@media (max-width: 640px) {
+  .modern-dialog-backdrop {
+    padding: 0.5rem;
+  }
+  
+  .modern-dialog-header {
+    padding: 16px 16px 0 16px;
+    min-height: 48px;
+  }
+  
+  .modern-dialog-title {
+    font-size: 18px;
+  }
+  
+  .modern-dialog-content {
+    padding: 16px;
+  }
+  
+  .modern-dialog-actions {
+    padding: 12px 16px;
+    flex-direction: column-reverse;
+  }
+  
+  .modern-dialog-action {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

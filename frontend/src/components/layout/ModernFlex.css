@@ -1,0 +1,29 @@
+/* Современный flex */
+.modern-flex {
+  width: 100%;
+}
+
+/* Элемент flex */
+.flex-item {
+  /* Базовые стили для flex элементов */
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-flex.responsive {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  .flex-item {
+    flex: none !important;
+    align-self: stretch !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-flex.responsive {
+    gap: 8px !important;
+  }
+}
+

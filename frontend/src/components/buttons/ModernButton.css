@@ -1,0 +1,360 @@
+/* Современная кнопка */
+.modern-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  user-select: none;
+  white-space: nowrap;
+  vertical-align: middle;
+  outline: none;
+}
+
+/* Размеры */
+.modern-button.size-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  min-height: 32px;
+}
+
+.modern-button.size-medium {
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  min-height: 40px;
+}
+
+.modern-button.size-large {
+  padding: 14px 20px;
+  font-size: 16px;
+  line-height: 1.4;
+  min-height: 48px;
+}
+
+/* Состояния */
+.modern-button:hover:not(.disabled):not(.loading) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modern-button:active:not(.disabled):not(.loading) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.modern-button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.modern-button.disabled {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.modern-button.loading {
+  pointer-events: none;
+}
+
+/* Варианты */
+.modern-button.variant-primary:hover:not(.disabled):not(.loading) {
+  background-color: #2563eb !important;
+}
+
+.modern-button.variant-secondary:hover:not(.disabled):not(.loading) {
+  background-color: #4b5563 !important;
+}
+
+.modern-button.variant-success:hover:not(.disabled):not(.loading) {
+  background-color: #059669 !important;
+}
+
+.modern-button.variant-warning:hover:not(.disabled):not(.loading) {
+  background-color: #d97706 !important;
+}
+
+.modern-button.variant-danger:hover:not(.disabled):not(.loading) {
+  background-color: #dc2626 !important;
+}
+
+.modern-button.variant-info:hover:not(.disabled):not(.loading) {
+  background-color: #0284c7 !important;
+}
+
+.modern-button.variant-light:hover:not(.disabled):not(.loading) {
+  background-color: #e5e7eb !important;
+}
+
+.modern-button.variant-dark:hover:not(.disabled):not(.loading) {
+  background-color: #111827 !important;
+}
+
+/* Outlined стиль */
+.modern-button.outlined {
+  background-color: transparent !important;
+}
+
+.modern-button.outlined:hover:not(.disabled):not(.loading) {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+.modern-button.outlined.variant-primary:hover:not(.disabled):not(.loading) {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  color: #2563eb !important;
+}
+
+.modern-button.outlined.variant-secondary:hover:not(.disabled):not(.loading) {
+  background-color: rgba(75, 85, 99, 0.1) !important;
+  color: #374151 !important;
+}
+
+.modern-button.outlined.variant-success:hover:not(.disabled):not(.loading) {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+  color: #059669 !important;
+}
+
+.modern-button.outlined.variant-warning:hover:not(.disabled):not(.loading) {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+  color: #d97706 !important;
+}
+
+.modern-button.outlined.variant-danger:hover:not(.disabled):not(.loading) {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #dc2626 !important;
+}
+
+.modern-button.outlined.variant-info:hover:not(.disabled):not(.loading) {
+  background-color: rgba(14, 165, 233, 0.1) !important;
+  color: #0284c7 !important;
+}
+
+/* Ghost стиль */
+.modern-button.ghost {
+  border-color: transparent !important;
+}
+
+.modern-button.ghost:hover:not(.disabled):not(.loading) {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .modern-button.ghost:hover:not(.disabled):not(.loading) {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Полная ширина */
+.modern-button.full-width {
+  width: 100%;
+}
+
+/* Скругленная */
+.modern-button.rounded {
+  border-radius: 50px;
+}
+
+/* Элементы кнопки */
+.button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.button-text {
+  transition: opacity 0.2s ease;
+}
+
+.button-text.loading {
+  opacity: 0.7;
+}
+
+.button-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* Ripple эффект */
+.button-ripple-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.button-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0);
+  animation: ripple 0.6s ease-out;
+  pointer-events: none;
+}
+
+/* Анимации */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Темная тема */
+.dark .modern-button.variant-light {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border-color: #4b5563 !important;
+}
+
+.dark .modern-button.variant-light:hover:not(.disabled):not(.loading) {
+  background-color: #4b5563 !important;
+}
+
+.dark .modern-button.outlined.variant-light {
+  color: #d1d5db !important;
+  border-color: #4b5563 !important;
+}
+
+.dark .modern-button.outlined.variant-light:hover:not(.disabled):not(.loading) {
+  background-color: rgba(75, 85, 99, 0.1) !important;
+  color: #f9fafb !important;
+}
+
+/* Группа кнопок */
+.button-group {
+  display: inline-flex;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.button-group .modern-button {
+  border-radius: 0;
+  border-right-width: 1px;
+  margin-left: -1px;
+}
+
+.button-group .modern-button:first-child {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+  margin-left: 0;
+}
+
+.button-group .modern-button:last-child {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  border-right-width: 2px;
+}
+
+.button-group .modern-button:hover {
+  z-index: 1;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-button.size-large {
+    padding: 12px 18px;
+    font-size: 15px;
+    min-height: 44px;
+  }
+  
+  .modern-button.size-medium {
+    padding: 9px 14px;
+    font-size: 13px;
+    min-height: 38px;
+  }
+  
+  .modern-button.size-small {
+    padding: 5px 10px;
+    font-size: 11px;
+    min-height: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-button {
+    gap: 6px;
+  }
+  
+  .modern-button.size-large {
+    padding: 10px 16px;
+    font-size: 14px;
+    min-height: 40px;
+  }
+  
+  .modern-button.size-medium {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+  
+  .modern-button.size-small {
+    padding: 4px 8px;
+    font-size: 10px;
+    min-height: 28px;
+  }
+}
+
+/* Специальные состояния */
+.modern-button.pulsing {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Кнопка с градиентом */
+.modern-button.gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  color: white !important;
+}
+
+.modern-button.gradient:hover:not(.disabled):not(.loading) {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+}
+
+/* Кнопка с тенью */
+.modern-button.elevated {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modern-button.elevated:hover:not(.disabled):not(.loading) {
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+

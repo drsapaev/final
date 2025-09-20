@@ -44,7 +44,7 @@ export const authService = {
       console.warn('Ошибка выхода:', error);
     } finally {
       // Очищаем локальные данные
-      localStorage.removeItem('token');
+      localStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       delete api.defaults.headers.common['Authorization'];

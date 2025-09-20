@@ -1,0 +1,148 @@
+/* Анимации для улучшенной таблицы записей */
+
+@keyframes spin {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
+}
+
+@keyframes fadeIn {
+  0% { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideIn {
+  0% { 
+    opacity: 0; 
+    transform: translateX(-10px); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translateX(0); 
+  }
+}
+
+/* Стили для таблицы - стыковка с вкладками Edge */
+.enhanced-table {
+  animation: fadeIn 0.3s ease-out;
+  border-top: none !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  margin-top: 0 !important;
+}
+
+.enhanced-table-row {
+  transition: all 0.2s ease;
+}
+
+.enhanced-table-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.enhanced-table-cell {
+  transition: all 0.15s ease;
+}
+
+.enhanced-table-header {
+  transition: all 0.15s ease;
+}
+
+.enhanced-table-header:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Стили для загрузчика */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Стили для контекстного меню */
+.context-menu {
+  animation: slideIn 0.15s ease-out;
+}
+
+/* Стили для кнопок действий */
+.action-button {
+  transition: all 0.15s ease;
+}
+
+.action-button:hover {
+  transform: scale(1.1);
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Стили для статусных бейджей */
+.status-badge {
+  transition: all 0.15s ease;
+}
+
+.status-badge:hover {
+  transform: scale(1.05);
+}
+
+/* Стили для пагинации */
+.pagination-button {
+  transition: all 0.15s ease;
+}
+
+.pagination-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Адаптивные стили */
+@media (max-width: 768px) {
+  .enhanced-table {
+    font-size: 14px;
+  }
+  
+  .enhanced-table-cell {
+    padding: 8px 4px;
+  }
+  
+  .enhanced-table-header {
+    padding: 8px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .enhanced-table {
+    font-size: 12px;
+  }
+  
+  .enhanced-table-cell {
+    padding: 6px 2px;
+  }
+  
+  .enhanced-table-header {
+    padding: 6px 2px;
+  }
+}
+
+/* Стили для темной темы */
+.dark-theme .enhanced-table-row:hover {
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.dark-theme .enhanced-table-header:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.dark-theme .action-button:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+}

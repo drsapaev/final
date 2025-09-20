@@ -1,0 +1,370 @@
+/* Современная текстовая область */
+.modern-textarea {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+
+.modern-textarea.expanded {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 800px;
+  height: 80vh;
+  z-index: 9999;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+}
+
+.dark .modern-textarea.expanded {
+  background: #1f2937;
+}
+
+/* Заголовок */
+.textarea-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.textarea-label {
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.textarea-label.small {
+  font-size: 12px;
+}
+
+.textarea-label.large {
+  font-size: 16px;
+}
+
+.textarea-label.focused {
+  font-weight: 600;
+}
+
+.required-mark {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.expand-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.dark .expand-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Контейнер текстовой области */
+.textarea-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.textarea-container.small {
+  min-height: 80px;
+}
+
+.textarea-container.medium {
+  min-height: 100px;
+}
+
+.textarea-container.large {
+  min-height: 120px;
+}
+
+.textarea-container:hover:not(.disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.textarea-container.focused {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.textarea-container.error {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.textarea-container.success {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.textarea-container.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.textarea-container.no-resize .textarea-field {
+  resize: none;
+}
+
+/* Расширенный режим */
+.modern-textarea.expanded .textarea-container {
+  flex: 1;
+  min-height: auto;
+}
+
+.modern-textarea.expanded .textarea-field {
+  flex: 1;
+  min-height: 400px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Поле ввода */
+.textarea-field {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 12px;
+  color: inherit;
+  transition: all 0.2s ease;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.textarea-field.small {
+  font-size: 12px;
+  padding: 8px;
+}
+
+.textarea-field.large {
+  font-size: 16px;
+  padding: 16px;
+}
+
+.textarea-field::placeholder {
+  color: #9ca3af;
+  transition: color 0.2s ease;
+}
+
+.textarea-field:focus::placeholder {
+  color: #d1d5db;
+}
+
+.textarea-field:disabled {
+  cursor: not-allowed;
+}
+
+/* Индикаторы состояния */
+.textarea-indicators {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.textarea-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.textarea-status.error {
+  color: #ef4444;
+}
+
+.textarea-status.success {
+  color: #22c55e;
+}
+
+/* Нижняя панель */
+.textarea-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.7;
+  min-height: 16px;
+}
+
+.character-counter {
+  transition: color 0.2s ease;
+}
+
+.character-counter.warning {
+  font-weight: 600;
+}
+
+.character-counter.error {
+  font-weight: 700;
+  animation: pulse 1s infinite;
+}
+
+.rows-info {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Сообщения */
+.textarea-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  animation: slideDown 0.2s ease-out;
+}
+
+.textarea-message.error {
+  color: #ef4444;
+}
+
+.textarea-message.success {
+  color: #22c55e;
+}
+
+/* Анимации */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Темная тема */
+.dark .textarea-container {
+  background: #374151;
+  border-color: #4b5563;
+}
+
+.dark .textarea-field {
+  color: #f9fafb;
+}
+
+.dark .textarea-field::placeholder {
+  color: #6b7280;
+}
+
+.dark .textarea-field:focus::placeholder {
+  color: #4b5563;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-textarea.expanded {
+    width: 95vw;
+    height: 85vh;
+    padding: 16px;
+  }
+  
+  .modern-textarea.expanded .textarea-field {
+    min-height: 300px;
+    font-size: 14px;
+  }
+  
+  .textarea-container.large {
+    min-height: 100px;
+  }
+  
+  .textarea-field.large {
+    font-size: 15px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-textarea.expanded {
+    width: 98vw;
+    height: 90vh;
+    padding: 12px;
+  }
+  
+  .textarea-container {
+    min-height: 80px;
+  }
+  
+  .textarea-field {
+    font-size: 13px;
+    padding: 10px;
+  }
+  
+  .textarea-label {
+    font-size: 13px;
+  }
+  
+  .textarea-message {
+    font-size: 11px;
+  }
+  
+  .textarea-footer {
+    font-size: 10px;
+  }
+}
+
+/* Backdrop для расширенного режима */
+.modern-textarea.expanded::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: -1;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
