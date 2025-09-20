@@ -1,0 +1,155 @@
+/* Группа кнопок */
+.button-group {
+  display: inline-flex;
+  position: relative;
+}
+
+/* Ориентация */
+.button-group.horizontal {
+  flex-direction: row;
+}
+
+.button-group.vertical {
+  flex-direction: column;
+}
+
+/* Отступы */
+.button-group.spacing-none {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.button-group.spacing-small {
+  gap: 4px;
+}
+
+.button-group.spacing-medium {
+  gap: 8px;
+}
+
+.button-group.spacing-large {
+  gap: 12px;
+}
+
+/* Элементы группы без отступов */
+.button-group.spacing-none .button-group-item {
+  border-radius: 0 !important;
+  margin: 0;
+  border-right-width: 1px;
+  border-left-width: 1px;
+}
+
+.button-group.spacing-none.horizontal .button-group-item {
+  margin-left: -1px;
+}
+
+.button-group.spacing-none.vertical .button-group-item {
+  margin-top: -1px;
+  border-top-width: 1px;
+  border-bottom-width: 1px;
+  border-right-width: 2px;
+  border-left-width: 2px;
+}
+
+/* Первый элемент */
+.button-group.spacing-none.horizontal .button-group-item.first {
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  margin-left: 0;
+  border-left-width: 2px;
+}
+
+.button-group.spacing-none.vertical .button-group-item.first {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+  margin-top: 0;
+  border-top-width: 2px;
+}
+
+/* Последний элемент */
+.button-group.spacing-none.horizontal .button-group-item.last {
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  border-right-width: 2px;
+}
+
+.button-group.spacing-none.vertical .button-group-item.last {
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  border-bottom-width: 2px;
+}
+
+/* Hover эффект для группы */
+.button-group.spacing-none .button-group-item:hover {
+  z-index: 1;
+  position: relative;
+}
+
+/* Фокус для группы */
+.button-group.spacing-none .button-group-item:focus {
+  z-index: 2;
+  position: relative;
+}
+
+/* Активная кнопка в группе */
+.button-group .button-group-item.active {
+  z-index: 1;
+  position: relative;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .button-group.horizontal {
+    flex-wrap: wrap;
+  }
+  
+  .button-group.spacing-none.horizontal {
+    flex-direction: column;
+  }
+  
+  .button-group.spacing-none.horizontal .button-group-item {
+    margin-left: 0;
+    margin-top: -1px;
+    border-right-width: 2px;
+    border-left-width: 2px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+  }
+  
+  .button-group.spacing-none.horizontal .button-group-item.first {
+    border-top-left-radius: 8px !important;
+    border-top-right-radius: 8px !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-top: 0;
+    border-top-width: 2px;
+  }
+  
+  .button-group.spacing-none.horizontal .button-group-item.last {
+    border-bottom-left-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-bottom-width: 2px;
+  }
+  
+  .button-group.spacing-none.horizontal .button-group-item.middle {
+    border-radius: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .button-group.spacing-small {
+    gap: 3px;
+  }
+  
+  .button-group.spacing-medium {
+    gap: 6px;
+  }
+  
+  .button-group.spacing-large {
+    gap: 9px;
+  }
+}
+

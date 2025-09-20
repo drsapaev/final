@@ -127,13 +127,39 @@ const PrintDialog = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 99999
+    }}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        maxWidth: '56rem',
+        width: '100%',
+        margin: '0 1rem',
+        maxHeight: '90vh',
+        overflow: 'hidden'
+      }}>
         {/* Заголовок */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <Printer size={24} className="mr-3 text-blue-600" />
-            <h2 className="text-xl font-semibold">Печать документа</h2>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '24px',
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Printer size={24} style={{ marginRight: '12px', color: '#2563eb' }} />
+            <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>Печать документа</h2>
           </div>
           <Button variant="outline" size="sm" onClick={onClose}>
             <X size={16} />
@@ -141,14 +167,30 @@ const PrintDialog = ({
         </div>
 
         {/* Контент */}
-        <div className="flex flex-col lg:flex-row max-h-[calc(90vh-120px)]">
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          maxHeight: 'calc(90vh - 120px)'
+        }}>
           {/* Левая панель - настройки печати */}
-          <div className="lg:w-1/3 p-6 border-r border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium mb-4">Настройки печати</h3>
+          <div style={{
+            width: '33.333333%',
+            padding: '24px',
+            borderRight: '1px solid #e5e7eb'
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '500', marginBottom: '16px' }}>Настройки печати</h3>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                <AlertCircle size={16} className="inline mr-2" />
+              <div style={{
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                color: '#b91c1c',
+                fontSize: '14px'
+              }}>
+                <AlertCircle size={16} style={{ display: 'inline', marginRight: '8px' }} />
                 {error}
               </div>
             )}

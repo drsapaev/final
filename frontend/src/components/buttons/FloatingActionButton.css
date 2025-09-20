@@ -1,0 +1,254 @@
+/* Плавающая кнопка действия */
+.fab-container {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Позиционирование */
+.fab-top-left {
+  top: 20px;
+  left: 20px;
+}
+
+.fab-top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.fab-bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.fab-bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+/* Основная кнопка */
+.fab-main {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.3s ease !important;
+}
+
+.fab-main:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25) !important;
+  transform: translateY(-2px) !important;
+}
+
+.fab-main.expanded {
+  transform: rotate(45deg) !important;
+}
+
+.fab-main.expanded:hover {
+  transform: rotate(45deg) translateY(-2px) !important;
+}
+
+/* Backdrop */
+.fab-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Действия */
+.fab-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.fab-actions.expanded {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.fab-action-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideInUp 0.3s ease-out both;
+}
+
+.fab-bottom-right .fab-action-item,
+.fab-bottom-left .fab-action-item {
+  flex-direction: row-reverse;
+}
+
+.fab-top-right .fab-action-item,
+.fab-top-left .fab-action-item {
+  flex-direction: row-reverse;
+}
+
+.fab-action-button {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.2s ease !important;
+}
+
+.fab-action-button:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  transform: translateY(-1px) scale(1.05) !important;
+}
+
+/* Лейблы действий */
+.fab-action-label {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid;
+  animation: slideInLabel 0.3s ease-out both;
+}
+
+.fab-bottom-left .fab-action-label,
+.fab-top-left .fab-action-label {
+  order: 2;
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideInLabel {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Темная тема */
+.dark .fab-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .fab-container {
+    gap: 10px;
+  }
+  
+  .fab-top-left,
+  .fab-top-right {
+    top: 16px;
+  }
+  
+  .fab-bottom-left,
+  .fab-bottom-right {
+    bottom: 16px;
+  }
+  
+  .fab-top-left,
+  .fab-bottom-left {
+    left: 16px;
+  }
+  
+  .fab-top-right,
+  .fab-bottom-right {
+    right: 16px;
+  }
+  
+  .fab-actions {
+    gap: 6px;
+  }
+  
+  .fab-action-item {
+    gap: 8px;
+  }
+  
+  .fab-action-label {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .fab-container {
+    gap: 8px;
+  }
+  
+  .fab-top-left,
+  .fab-top-right {
+    top: 12px;
+  }
+  
+  .fab-bottom-left,
+  .fab-bottom-right {
+    bottom: 12px;
+  }
+  
+  .fab-top-left,
+  .fab-bottom-left {
+    left: 12px;
+  }
+  
+  .fab-top-right,
+  .fab-bottom-right {
+    right: 12px;
+  }
+  
+  .fab-actions {
+    gap: 4px;
+  }
+  
+  .fab-action-item {
+    gap: 6px;
+  }
+  
+  .fab-action-label {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+}
+
+/* Специальные эффекты */
+.fab-main.pulsing {
+  animation: fabPulse 2s infinite;
+}
+
+@keyframes fabPulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+}
+

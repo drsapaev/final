@@ -1,0 +1,269 @@
+/* Современный toast */
+.modern-toast {
+  position: fixed;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 300px;
+  max-width: 500px;
+  padding: 16px;
+  border: 1px solid;
+  border-left: 4px solid;
+  border-radius: 8px;
+  z-index: 10000;
+  transform: translateX(100%);
+  opacity: 0;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+/* Позиционирование */
+.modern-toast.top-left {
+  top: 20px;
+  left: 20px;
+  transform: translateX(-100%);
+}
+
+.modern-toast.top-right {
+  top: 20px;
+  right: 20px;
+  transform: translateX(100%);
+}
+
+.modern-toast.bottom-left {
+  bottom: 20px;
+  left: 20px;
+  transform: translateX(-100%);
+}
+
+.modern-toast.bottom-right {
+  bottom: 20px;
+  right: 20px;
+  transform: translateX(100%);
+}
+
+.modern-toast.top-center {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100%);
+}
+
+.modern-toast.bottom-center {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100%);
+}
+
+/* Состояния */
+.modern-toast.visible {
+  opacity: 1;
+  transform: translateX(0) translateY(0);
+}
+
+.modern-toast.visible.top-center {
+  transform: translateX(-50%) translateY(0);
+}
+
+.modern-toast.visible.bottom-center {
+  transform: translateX(-50%) translateY(0);
+}
+
+.modern-toast.exiting {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.modern-toast.exiting.top-left,
+.modern-toast.exiting.bottom-left {
+  transform: translateX(-100%) scale(0.95);
+}
+
+.modern-toast.exiting.top-right,
+.modern-toast.exiting.bottom-right {
+  transform: translateX(100%) scale(0.95);
+}
+
+.modern-toast.exiting.top-center {
+  transform: translateX(-50%) translateY(-100%) scale(0.95);
+}
+
+.modern-toast.exiting.bottom-center {
+  transform: translateX(-50%) translateY(100%) scale(0.95);
+}
+
+/* Иконка */
+.toast-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Контент */
+.toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toast-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.toast-message {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Действие */
+.toast-action {
+  margin-top: 8px;
+}
+
+.toast-action-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  text-decoration: underline;
+  transition: opacity 0.2s ease;
+}
+
+.toast-action-btn:hover {
+  opacity: 0.8;
+}
+
+/* Кнопка закрытия */
+.toast-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin-top: 2px;
+}
+
+.toast-close:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.dark .toast-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Прогресс-бар */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 0 8px 8px;
+  transition: width 0.1s linear;
+}
+
+/* Анимации для стека */
+.toast-stack {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast-stack.top-left,
+.toast-stack.bottom-left {
+  left: 20px;
+}
+
+.toast-stack.top-right,
+.toast-stack.bottom-right {
+  right: 20px;
+}
+
+.toast-stack.top-left,
+.toast-stack.top-right,
+.toast-stack.top-center {
+  top: 20px;
+}
+
+.toast-stack.bottom-left,
+.toast-stack.bottom-right,
+.toast-stack.bottom-center {
+  bottom: 20px;
+  flex-direction: column-reverse;
+}
+
+.toast-stack.top-center,
+.toast-stack.bottom-center {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.toast-stack .modern-toast {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-toast {
+    min-width: 280px;
+    max-width: calc(100vw - 40px);
+    padding: 14px;
+  }
+  
+  .toast-stack {
+    left: 20px !important;
+    right: 20px !important;
+    transform: none !important;
+  }
+  
+  .toast-stack .modern-toast {
+    width: 100%;
+  }
+  
+  .toast-title {
+    font-size: 13px;
+  }
+  
+  .toast-message {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-toast {
+    min-width: 260px;
+    max-width: calc(100vw - 24px);
+    padding: 12px;
+  }
+  
+  .toast-stack {
+    left: 12px !important;
+    right: 12px !important;
+  }
+  
+  .toast-stack.top-left,
+  .toast-stack.top-right,
+  .toast-stack.top-center {
+    top: 12px;
+  }
+  
+  .toast-stack.bottom-left,
+  .toast-stack.bottom-right,
+  .toast-stack.bottom-center {
+    bottom: 12px;
+  }
+}
+

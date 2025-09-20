@@ -6,7 +6,8 @@ import { usePWA } from './hooks/usePWA.js';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 
-import Header from './components/layout/Header.jsx';
+// Временно переключаемся на новый хедер (старый оставляем для сравнения)
+import HeaderNew from './components/layout/HeaderNew.jsx';
 import Sidebar from './components/layout/Sidebar.jsx';
 
 import Health from './pages/Health.jsx';
@@ -91,9 +92,9 @@ function AppShell() {
   
   return (
     <div style={wrapStyle}>
-      {/* Хедер на весь экран для всех панелей */}
+      {/* Хедер на весь экран для всех панелей (новая версия) */}
       <header style={hdr}>
-        <Header />
+        <HeaderNew />
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: hideSidebar ? '1fr' : '240px 1fr' }}>
         {!hideSidebar && <Sidebar />}

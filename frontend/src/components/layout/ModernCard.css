@@ -1,0 +1,157 @@
+/* Современная карточка */
+.modern-card {
+  border: 1px solid;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.modern-card.rounded {
+  border-radius: 12px;
+}
+
+/* Варианты карточек */
+.modern-card.variant-default {
+  /* Стили уже в JS */
+}
+
+.modern-card.variant-outlined {
+  background: transparent;
+  border-width: 2px;
+}
+
+.modern-card.variant-elevated {
+  border: none;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Интерактивные состояния */
+.modern-card.hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+.modern-card.clickable {
+  user-select: none;
+}
+
+.modern-card.clickable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12) !important;
+}
+
+.modern-card.clickable:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.modern-card.clickable:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Части карточки */
+.card-header {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .card-header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.card-body {
+  flex: 1;
+}
+
+.card-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .card-footer {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.card-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.card-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+/* Темная тема */
+.dark .modern-card.variant-elevated {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .modern-card.hoverable:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .modern-card.clickable:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+.dark .modern-card.clickable:active {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-card {
+    border-radius: 8px;
+  }
+  
+  .card-header {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+  
+  .card-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  
+  .card-title {
+    font-size: 16px;
+  }
+  
+  .card-description {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-card {
+    border-radius: 6px;
+  }
+  
+  .card-header {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+  
+  .card-footer {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+  
+  .card-title {
+    font-size: 15px;
+  }
+  
+  .card-description {
+    font-size: 12px;
+  }
+}
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PhoneInput from '../components/ui/PhoneInput';
 import { Toaster, toast } from 'react-hot-toast';
@@ -65,7 +65,6 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
  
 
 const RegistrarPanel = () => {
-  console.log('🔄 RegistrarPanel component rendered at:', new Date().toISOString());
   // Адаптивные хуки
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const isTouch = useTouchDevice();
@@ -186,41 +185,14 @@ const RegistrarPanel = () => {
   const [appointments, setAppointments] = useState([]);
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [showAddressColumn, setShowAddressColumn] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
-  const [wizardStep, setWizardStep] = useState(1);
-  const [wizardData, setWizardData] = useState({
-    patient: {},
-    visit: {},
-    payment: {}
-  });
-  const [patientSuggestions, setPatientSuggestions] = useState([]);
-  const [showPatientSuggestions, setShowPatientSuggestions] = useState(false);
-  const [patientErrors, setPatientErrors] = useState({});
-  
-  // Refs для фокуса в мастере
-  const fioRef = useRef(null);
-  const dobRef = useRef(null);
-  const phoneRef = useRef(null);
   
   // Отладка состояния мастера
   useEffect(() => {
-    console.log('🎭 showWizard changed:', showWizard);
+    console.log('showWizard changed:', showWizard);
   }, [showWizard]);
-
-  // Отладка состояния загрузки
-  useEffect(() => {
-    console.log('⏳ appointmentsLoading changed:', appointmentsLoading);
-  }, [appointmentsLoading]);
-
-  // Отладка изменений appointments
-  useEffect(() => {
-    console.log('📋 appointments changed, count:', appointments.length);
-  }, [appointments]);
-
-  // Убираем дублирование - filteredAppointments уже определена ниже в коде
   const [showSlotsModal, setShowSlotsModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showAppointmentFlow, setShowAppointmentFlow] = useState(false);
@@ -628,11 +600,9 @@ const RegistrarPanel = () => {
     const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
 
   // Загрузка данных из админ панели
-  const loadIntegratedData = useCallback(async () => {
-    console.log('🔧 loadIntegratedData called at:', new Date().toISOString());
+  const loadIntegratedData = async () => {
     try {
-      // УБИРАЕМ setAppointmentsLoading(true) - это не должно влиять на загрузку записей
-      // setAppointmentsLoading(true);
+      setAppointmentsLoading(true);
       
       // Сначала устанавливаем fallback данные для врачей и услуг
       // console.debug('Setting fallback doctors and services data');
@@ -682,18 +652,17 @@ const RegistrarPanel = () => {
       });
       
       // Загружаем врачей, услуги и настройки очередей из админ панели
-      try {
-        const [doctorsRes, servicesRes, queueRes] = await Promise.all([
-          fetch(`${API_BASE}/api/v1/registrar/doctors`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-          }),
-          fetch(`${API_BASE}/api/v1/registrar/services`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-          }),
-          fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-          })
-        ]);
+      const [doctorsRes, servicesRes, queueRes] = await Promise.all([
+        fetch(`${API_BASE}/api/v1/registrar/doctors`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        }),
+        fetch(`${API_BASE}/api/v1/registrar/services`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        }),
+        fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        })
+      ]);
 
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
@@ -780,32 +749,21 @@ const RegistrarPanel = () => {
         });
       }
 
-        if (queueRes.ok) {
-          const queueData = await queueRes.json();
-          setQueueSettings(queueData);
-        }
-      } catch (fetchError) {
-        // Backend недоступен - используем демо-данные (уже установлены выше)
-        console.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+      if (queueRes.ok) {
+        const queueData = await queueRes.json();
+        setQueueSettings(queueData);
       }
 
     } catch (error) {
       console.error('Ошибка загрузки интегрированных данных:', error);
       toast.error('Ошибка загрузки данных из админ панели');
     } finally {
-      // УБИРАЕМ setAppointmentsLoading(false) - это не должно влиять на загрузку записей
-      // setAppointmentsLoading(false);
+      setAppointmentsLoading(false);
     }
-  }, []);
+  };
 
   // Функция для получения данных пациента по ID
   const fetchPatientData = useCallback(async (patientId) => {
-    // Проверяем, является ли это демо-пациентом (ID >= 1000)
-    if (patientId >= 1000) {
-      // Возвращаем null для демо-пациентов, так как их данные уже есть в записи
-      return null;
-    }
-    
     const token = localStorage.getItem('auth_token');
     if (!token) return null;
     
@@ -818,10 +776,7 @@ const RegistrarPanel = () => {
         return await response.json();
       }
     } catch (error) {
-      // Подавляем ошибки для демо-режима
-      if (error.message !== 'Failed to fetch') {
-        console.error(`Error fetching patient ${patientId}:`, error);
-      }
+      console.error(`Error fetching patient ${patientId}:`, error);
     }
     return null;
   }, [API_BASE]);
@@ -845,24 +800,18 @@ const RegistrarPanel = () => {
     return enrichedAppointments;
   }, [fetchPatientData]);
 
-  // Улучшенная загрузка записей с поддержкой тихого режима
-  const loadAppointments = useCallback(async (options = { silent: false }) => {
-    console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
-    const { silent } = options || {};
+  // Улучшенная загрузка записей с правильной обработкой ошибок
+  const loadAppointments = async () => {
     try {
-      if (!silent) {
-        setAppointmentsLoading(true);
-        setDataSource('loading');
-      }
+      setAppointmentsLoading(true);
+      setDataSource('loading');
       
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
       if (!token) {
         console.warn('Токен аутентификации отсутствует, используем демо-данные');
-        startTransition(() => {
-          if (!silent) setDataSource('demo');
-          setAppointments(DEMO_APPOINTMENTS);
-        });
+        setDataSource('demo');
+        setAppointments(DEMO_APPOINTMENTS);
         return;
       }
       
@@ -882,126 +831,62 @@ const RegistrarPanel = () => {
           const enriched = await enrichAppointmentsWithPatientData(appointmentsData);
           
           // Сохраняем локальные изменения при обновлении
-          startTransition(() => {
-            setAppointments(prev => {
-              const locallyModified = prev.filter(apt => apt._locallyModified);
-              const enrichedWithLocal = enriched.map(apt => {
-                const localVersion = locallyModified.find(local => local.id === apt.id);
-                return localVersion ? { ...apt, ...localVersion } : apt;
-              });
-              // Обновляем только если реально изменилось
-              try {
-                const prevStr = JSON.stringify(prev);
-                const nextStr = JSON.stringify(enrichedWithLocal);
-                if (prevStr === nextStr) return prev;
-              } catch (_) {}
-              return enrichedWithLocal;
+          setAppointments(prev => {
+            const locallyModified = prev.filter(apt => apt._locallyModified);
+            const enrichedWithLocal = enriched.map(apt => {
+              const localVersion = locallyModified.find(local => local.id === apt.id);
+              return localVersion ? { ...apt, ...localVersion } : apt;
             });
-            // Не триггерим обновление, если значение не меняется
-            setDataSource(prev => (prev === 'api' ? prev : 'api'));
+            return enrichedWithLocal;
           });
+          
+          setDataSource('api');
           console.debug('✅ Загружены и обогащены данные из API:', enriched.length, 'записей');
         } else {
           // API вернул пустой массив - показываем демо-данные
-          startTransition(() => {
-            setAppointments(prev => {
-              try {
-                const prevStr = JSON.stringify(prev);
-                const nextStr = JSON.stringify(DEMO_APPOINTMENTS);
-                if (prevStr === nextStr) return prev;
-              } catch (_) {}
-              return DEMO_APPOINTMENTS;
-            });
-            setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
-          });
+          setAppointments(DEMO_APPOINTMENTS);
+          setDataSource('demo');
           // console.debug('API returned empty list, using demo data');
         }
       } else if (response.status === 401) {
         // Токен недействителен
         console.warn('Токен недействителен (401), очищаем и используем демо-данные');
         localStorage.removeItem('auth_token');
-        startTransition(() => {
-          if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
-          setAppointments(prev => {
-            try {
-              const prevStr = JSON.stringify(prev);
-              const nextStr = JSON.stringify(DEMO_APPOINTMENTS);
-              if (prevStr === nextStr) return prev;
-            } catch (_) {}
-            return DEMO_APPOINTMENTS;
-          });
-        });
+        setDataSource('demo');
+        setAppointments(DEMO_APPOINTMENTS);
       } else {
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      console.warn('Backend недоступен для загрузки записей, используем демо-режим:', error.message);
-        startTransition(() => {
-          if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
-          setAppointments(prev => {
-            try {
-              const prevStr = JSON.stringify(prev);
-              const nextStr = JSON.stringify(DEMO_APPOINTMENTS);
-              if (prevStr === nextStr) return prev;
-            } catch (_) {}
-            return DEMO_APPOINTMENTS;
-          });
-        });
-      startTransition(() => {
-        if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
-        setAppointments(prev => {
-          try {
-            const prevStr = JSON.stringify(prev);
-            const nextStr = JSON.stringify(DEMO_APPOINTMENTS);
-            if (prevStr === nextStr) return prev;
-          } catch (_) {}
-          return DEMO_APPOINTMENTS;
-        });
-      });
+      console.error('Ошибка загрузки записей:', error);
+      setDataSource('demo');
+      setAppointments(DEMO_APPOINTMENTS);
       
-      // Показываем уведомление пользователю только при первой загрузке
-      if (appointments.length === 0) {
-        toast.info('Backend недоступен. Работаем в демо-режиме.');
-      }
+      // Показываем уведомление пользователю
+      toast.error('Не удалось загрузить данные с сервера. Показаны демо-данные.');
     } finally {
-      if (!silent) setAppointmentsLoading(false);
+      setAppointmentsLoading(false);
     }
-  }, [enrichAppointmentsWithPatientData]);
+  };
 
-  // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
-  const initialLoadRef = useRef(false);
+  // Первичная загрузка данных (однократно)
   useEffect(() => {
-    if (initialLoadRef.current) return;
-    initialLoadRef.current = true;
-    console.log('🚀 Starting initial data load (guarded)...');
     loadAppointments();
-    loadIntegratedData();
-    setIsInitialLoad(false);
-  }, [loadAppointments, loadIntegratedData]);
-
-  // Обработчик события из хедера для открытия мастера записи
-  useEffect(() => {
-    const handleOpenWizard = () => {
-      setShowWizard(true);
-    };
-
-    window.addEventListener('openAppointmentWizard', handleOpenWizard);
-    return () => {
-      window.removeEventListener('openAppointmentWizard', handleOpenWizard);
-    };
   }, []);
 
-  // Автообновление очереди с возможностью паузы (в тихом режиме)
+  // Загрузка интегрированных данных (однократно)
+  useEffect(() => {
+    loadIntegratedData();
+  }, []);
+
+  // Автообновление очереди с возможностью паузы
   useEffect(() => {
     // Во время мастера записи или модальных окон автообновление отключаем, чтобы не было мерцаний
     if (showWizard || paymentDialog.open || printDialog.open || cancelDialog.open) return;
     if (!autoRefresh) return;
-    
     const id = setInterval(() => {
-      // Загружаем только записи тихо, без смены индикаторов
-      loadAppointments({ silent: true });
+      loadAppointments();
     }, 15000);
-    
     return () => clearInterval(id);
   }, [autoRefresh, showWizard, paymentDialog.open, printDialog.open, cancelDialog.open]);
 
@@ -2019,8 +1904,9 @@ const RegistrarPanel = () => {
                   console.log('Экспорт статистики');
                 }}
                 onRefresh={() => {
-                  // Обновление данных - загружаем только записи
+                  // Обновление данных
                   loadAppointments();
+                  loadIntegratedData();
                 }}
               />
 
@@ -2148,6 +2034,18 @@ const RegistrarPanel = () => {
               </Card.Header>
             
               <Card.Content>
+              {/* Современная панель фильтров для онлайн-очереди */}
+              <ModernFilters
+                searchParams={searchParams}
+                onParamsChange={(params) => {
+                  params.delete('view');
+                  window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                }}
+                autoRefresh={false}
+                onAutoRefreshChange={() => {}}
+                appointmentsCount={0}
+              />
+                
               <ModernQueueManager 
                 selectedDate={searchParams.get('date') || new Date().toISOString().split('T')[0]}
                 selectedDoctor={searchParams.get('doctor') || ''}
@@ -2179,6 +2077,98 @@ const RegistrarPanel = () => {
               padding: isMobile ? getSpacing('sm') : getSpacing('md')
             }}>
               
+              {/* Современная панель фильтров */}
+              <ModernFilters
+                searchParams={searchParams}
+                onParamsChange={(params) => {
+                  params.delete('view');
+                  window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                }}
+                autoRefresh={autoRefresh}
+                onAutoRefreshChange={setAutoRefresh}
+                appointmentsCount={filteredAppointments.length}
+              />
+              
+              {/* Панель управления таблицей */}
+              <div style={{
+                display: 'flex',
+                gap: '12px', 
+                alignItems: 'center',
+                padding: '16px 0',
+                borderBottom: `1px solid ${borderColor}`,
+                marginBottom: '16px',
+                position: 'relative',
+                zIndex: 10
+              }}>
+                  <button
+                  onClick={(e) => {
+                    e.stopPropagation(); // Предотвращаем всплытие события
+                    console.log('Кнопка "Новая запись" нажата, showWizard:', showWizard);
+                    setShowWizard(true);
+                    console.log('setShowWizard(true) вызвана');
+                  }}
+                    style={{
+                    padding: '12px 20px',
+                    borderRadius: '8px',
+                      fontSize: '14px',
+                    fontWeight: '600',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
+                    position: 'relative',
+                    zIndex: 20,
+                    minWidth: '140px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 4px 8px rgba(59, 130, 246, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.3)';
+                  }}
+                >
+                  ➕ {t('new_appointment')}
+                  </button>
+                  <button
+                  className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                  onClick={() => {
+                    const csvContent = generateCSV(filteredAppointments);
+                    downloadCSV(csvContent, `appointments_${new Date().toISOString().split('T')[0]}.csv`);
+                  }}
+                  style={{ padding: '8px 16px', borderRadius: 8, fontSize: 14 }}
+                >
+                  📊 {t('export_csv')}
+                  </button>
+                  <button
+                  className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                    onClick={() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('date', new Date().toISOString().split('T')[0]);
+                    window.history.replaceState(null, '', `/registrar-panel?${params.toString()}`);
+                  }}
+                  style={{ padding: '8px 16px', borderRadius: 8, fontSize: 14 }}
+                >
+                  📅 {t('today')}
+                </button>
+                <button 
+                  className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
+                  onClick={() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.delete('date');
+                    params.delete('q');
+                    params.delete('status');
+                    setActiveTab(null);
+                    window.history.replaceState(null, '', '/registrar-panel');
+                  }}
+                  style={{ padding: '8px 16px', borderRadius: 8, fontSize: 14 }}
+                >
+                  🔄 {t('reset')}
+                  </button>
+              </div>
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
@@ -2685,22 +2675,23 @@ const RegistrarPanel = () => {
             // Создание пациента (если нужно)
             let patientId = selectedPatientId;
             if (!patientId) {
-              try {
-                const patientResponse = await fetch(`${API_BASE}/api/v1/patients/`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                  },
-                  body: JSON.stringify({
-                    last_name: wizardData.patient.fio.split(' ')[0] || '',
-                    first_name: wizardData.patient.fio.split(' ')[1] || '',
-                    middle_name: wizardData.patient.fio.split(' ').slice(2).join(' ') || null,
-                    birth_date: wizardData.patient.birth_date,
-                    phone: wizardData.patient.phone,
-                    doc_number: wizardData.patient.doc_number || null
-                  })
-                });
+              const patientResponse = await fetch(`${API_BASE}/api/v1/patients/`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                },
+                body: JSON.stringify({
+                  last_name: wizardData.patient.fio.split(' ')[0] || '',
+                  first_name: wizardData.patient.fio.split(' ')[1] || '',
+                  middle_name: wizardData.patient.fio.split(' ').slice(2).join(' ') || null,
+                  birth_date: wizardData.patient.birth_date,
+                  phone: wizardData.patient.phone,
+                  sex: wizardData.patient.sex || 'M',
+                  email: wizardData.patient.email || null,
+                  doc_number: wizardData.patient.doc_number || null
+                })
+              });
               
               if (patientResponse.ok) {
                 const patient = await patientResponse.json();
@@ -2735,110 +2726,33 @@ const RegistrarPanel = () => {
                   throw new Error('Ошибка создания пациента: ' + details);
                 }
               }
-            } catch (fetchError) {
-              // Обработка CORS и других ошибок сети
-              if (fetchError.message.includes('401') || fetchError.message.includes('Unauthorized')) {
-                console.warn('Токен недействителен, требуется повторный вход');
-                localStorage.removeItem('auth_token');
-                toast.error('Сессия истекла. Перенаправляем на страницу входа...');
-                setTimeout(() => {
-                  window.location.href = '/login';
-                }, 2000);
-                return;
-              }
-              
-              console.warn('Backend недоступен, используем демо-режим:', fetchError.message);
-              
-              // В демо-режиме создаем виртуального пациента
-              patientId = Math.floor(Math.random() * 1000) + 1000;
-              console.log('Created demo patient with ID:', patientId);
-              
-              toast.success('Запись создана в демо-режиме (backend недоступен)');
-            }
             }
             
             // Создание записи
-            try {
-              const appointmentResponse = await fetch(`${API_BASE}/api/v1/appointments/`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                },
-                body: JSON.stringify({
-                  patient_id: patientId,
-                  doctor_id: wizardData.appointment.doctor_id || null,
-                  appointment_date: wizardData.appointment.date,
-                  appointment_time: wizardData.appointment.time || '09:00',
-                  notes: wizardData.appointment.notes || '',
-                  status: 'scheduled',
-                  payment_amount: wizardData.payment.amount || 0,
-                  payment_currency: 'UZS'
-                })
-              });
-              
-              if (appointmentResponse.ok) {
-                const appointment = await appointmentResponse.json();
-                
-                // Обновляем локальный список
-                setAppointments(prev => [appointment, ...prev]);
-                
-                // Сбрасываем состояние мастера
-                setWizardStep(1);
-                setWizardData({
-                  patient: {},
-                  visit: {},
-                  payment: {}
-                });
-                setSelectedPatientId(null);
-                
-                toast.success('Запись успешно создана!');
-                
-                // Предлагаем печать талона
-                setTimeout(() => {
-                  setPrintDialog({ 
-                    open: true, 
-                    type: 'ticket', 
-                    data: appointment 
-                  });
-                }, 500);
-                
-              } else {
-                throw new Error('Ошибка создания записи');
-              }
-            } catch (fetchError) {
-              // Обработка CORS и других ошибок сети для создания записи
-              if (fetchError.message.includes('401') || fetchError.message.includes('Unauthorized')) {
-                console.warn('Токен недействителен при создании записи');
-                localStorage.removeItem('auth_token');
-                toast.error('Сессия истекла. Перенаправляем на страницу входа...');
-                setTimeout(() => {
-                  window.location.href = '/login';
-                }, 2000);
-                return;
-              }
-              
-              console.warn('Backend недоступен для создания записи, используем демо-режим:', fetchError.message);
-              
-          // Создаем демо-запись
-          const demoAppointment = {
-            id: Math.floor(Math.random() * 1000) + 2000,
-            patient_id: patientId,
-            doctor_id: wizardData.appointment.doctor_id || null,
-            appointment_date: wizardData.appointment.date,
-            appointment_time: wizardData.appointment.time || '09:00',
-            notes: wizardData.appointment.notes || '',
-            status: 'scheduled',
-            payment_amount: wizardData.payment.amount || 0,
-            payment_currency: 'UZS',
-            // Дополнительные поля для отображения
-            patient_fio: wizardData.patient.fio,
-            patient_phone: wizardData.patient.phone,
-            created_at: new Date().toISOString()
-          };
+            const appointmentResponse = await fetch(`${API_BASE}/api/v1/appointments/`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+              },
+              body: JSON.stringify({
+                patient_id: patientId,
+                doctor_id: wizardData.appointment.doctor_id,
+                services: wizardData.appointment.services,
+                appointment_date: wizardData.appointment.date,
+                appointment_time: wizardData.appointment.time || '09:00',
+                visit_type: wizardData.appointment.visit_type,
+                payment_method: wizardData.payment.method,
+                cost: wizardData.payment.amount,
+                notes: wizardData.appointment.notes || ''
+              })
+            });
+            
+            if (appointmentResponse.ok) {
+              const appointment = await appointmentResponse.json();
               
               // Обновляем локальный список
-              setAppointments(prev => [demoAppointment, ...prev]);
+              setAppointments(prev => [appointment, ...prev]);
               
               // Сбрасываем состояние мастера
               setWizardStep(1);
@@ -2849,7 +2763,19 @@ const RegistrarPanel = () => {
               });
               setSelectedPatientId(null);
               
-              toast.success('Запись создана в демо-режиме (backend недоступен)');
+              toast.success('Запись успешно создана!');
+              
+              // Предлагаем печать талона
+              setTimeout(() => {
+                setPrintDialog({ 
+                  open: true, 
+                  type: 'ticket', 
+                  data: appointment 
+                });
+              }, 500);
+              
+            } else {
+              throw new Error('Ошибка создания записи');
             }
             
           } catch (error) {

@@ -1,0 +1,207 @@
+/* Современный прогресс-бар */
+.modern-progress-bar {
+  width: 100%;
+}
+
+/* Заголовок */
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.progress-percentage {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Контейнер прогресс-бара */
+.progress-container {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.progress-container.small {
+  height: 4px;
+}
+
+.progress-container.medium {
+  height: 8px;
+}
+
+.progress-container.large {
+  height: 12px;
+}
+
+/* Полоса прогресса */
+.progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Текст внутри прогресс-бара */
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Полосатый стиль */
+.progress-container.striped .progress-bar {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 20px 20px;
+}
+
+/* Анимированные полосы */
+.progress-container.striped.animated .progress-bar {
+  animation: stripes 1s linear infinite;
+}
+
+/* Неопределенный прогресс */
+.progress-container.indeterminate .progress-bar {
+  animation: indeterminate 2s linear infinite;
+}
+
+/* Круговой прогресс-бар */
+.circular-progress-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-progress-svg {
+  transform: rotate(-90deg);
+}
+
+.progress-circle {
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.circular-progress-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.circular-progress-percentage {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.circular-progress-label {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+/* Анимации */
+@keyframes stripes {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 20px 0;
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .progress-label {
+    font-size: 13px;
+  }
+  
+  .progress-percentage {
+    font-size: 11px;
+  }
+  
+  .progress-text {
+    font-size: 9px;
+  }
+  
+  .circular-progress-percentage {
+    font-size: 16px;
+  }
+  
+  .circular-progress-label {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .progress-header {
+    margin-bottom: 6px;
+  }
+  
+  .progress-label {
+    font-size: 12px;
+  }
+  
+  .progress-percentage {
+    font-size: 10px;
+  }
+  
+  .progress-container.large {
+    height: 10px;
+  }
+  
+  .progress-container.medium {
+    height: 6px;
+  }
+  
+  .progress-container.small {
+    height: 3px;
+  }
+  
+  .progress-text {
+    font-size: 8px;
+  }
+  
+  .circular-progress-percentage {
+    font-size: 14px;
+  }
+  
+  .circular-progress-label {
+    font-size: 10px;
+  }
+}
+

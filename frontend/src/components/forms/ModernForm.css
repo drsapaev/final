@@ -1,0 +1,259 @@
+/* Современная форма */
+.modern-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Макеты формы */
+.modern-form.horizontal .form-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.modern-form.vertical .form-fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.modern-form.grid .form-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* Отступы */
+.modern-form.small {
+  gap: 12px;
+}
+
+.modern-form.small .form-fields {
+  gap: 12px;
+}
+
+.modern-form.medium {
+  gap: 20px;
+}
+
+.modern-form.medium .form-fields {
+  gap: 20px;
+}
+
+.modern-form.large {
+  gap: 28px;
+}
+
+.modern-form.large .form-fields {
+  gap: 28px;
+}
+
+/* Поля формы */
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Сообщения формы */
+.form-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: slideDown 0.3s ease-out;
+}
+
+.form-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.form-message.success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+/* Индикатор загрузки */
+.form-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* Группа полей */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.dark .form-group {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.form-group-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group-header.collapsible {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.form-group-header.collapsible:hover {
+  opacity: 0.8;
+}
+
+.form-group-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.form-group-description {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+.form-group-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Ряд полей */
+.form-row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.form-row.small {
+  gap: 8px;
+}
+
+.form-row.medium {
+  gap: 16px;
+}
+
+.form-row.large {
+  gap: 24px;
+}
+
+.form-row.start {
+  align-items: flex-start;
+}
+
+.form-row.center {
+  align-items: center;
+}
+
+.form-row.end {
+  align-items: flex-end;
+}
+
+.form-row.stretch {
+  align-items: stretch;
+}
+
+/* Колонка */
+.form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Анимации */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .modern-form.horizontal .form-fields {
+    flex-direction: column;
+  }
+  
+  .modern-form.grid .form-fields {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .form-group {
+    padding: 16px;
+  }
+  
+  .form-group-title {
+    font-size: 16px;
+  }
+  
+  .form-group-description {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-form {
+    gap: 16px;
+  }
+  
+  .form-fields {
+    gap: 16px;
+  }
+  
+  .form-group {
+    padding: 12px;
+  }
+  
+  .form-group-content {
+    gap: 12px;
+  }
+  
+  .form-column {
+    gap: 12px;
+  }
+}
+

@@ -1,0 +1,76 @@
+/* Кнопка-иконка */
+.icon-button {
+  padding: 8px !important;
+  min-width: auto !important;
+  aspect-ratio: 1;
+}
+
+.icon-button.size-small {
+  padding: 6px !important;
+  min-height: 28px !important;
+  width: 28px !important;
+}
+
+.icon-button.size-medium {
+  padding: 8px !important;
+  min-height: 36px !important;
+  width: 36px !important;
+}
+
+.icon-button.size-large {
+  padding: 10px !important;
+  min-height: 44px !important;
+  width: 44px !important;
+}
+
+/* Скрытие текста для иконочных кнопок */
+.icon-button .button-text {
+  display: none;
+}
+
+/* Центрирование иконки */
+.icon-button .button-icon {
+  margin: 0 !important;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .icon-button.size-large {
+    padding: 9px !important;
+    min-height: 40px !important;
+    width: 40px !important;
+  }
+  
+  .icon-button.size-medium {
+    padding: 7px !important;
+    min-height: 34px !important;
+    width: 34px !important;
+  }
+  
+  .icon-button.size-small {
+    padding: 5px !important;
+    min-height: 26px !important;
+    width: 26px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .icon-button.size-large {
+    padding: 8px !important;
+    min-height: 36px !important;
+    width: 36px !important;
+  }
+  
+  .icon-button.size-medium {
+    padding: 6px !important;
+    min-height: 32px !important;
+    width: 32px !important;
+  }
+  
+  .icon-button.size-small {
+    padding: 4px !important;
+    min-height: 24px !important;
+    width: 24px !important;
+  }
+}
+

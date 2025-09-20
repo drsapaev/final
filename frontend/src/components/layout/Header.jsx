@@ -476,7 +476,12 @@ export default function Header() {
         </nav>
 
         {/* Управление */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '12px',
+          whiteSpace: 'nowrap'
+        }}>
           {/* Переключатель темы */}
           <button 
             onClick={toggleTheme} 
@@ -542,7 +547,11 @@ export default function Header() {
                   transition: 'all 0.2s ease',
                   backgroundColor: theme === 'light' ? 'white' : getColor('gray', 700),
                   color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  minWidth: 'auto',
+                  maxWidth: '200px',
+                  whiteSpace: 'nowrap'
                 }}
                 title="Открыть панель регистратора"
               >
@@ -566,6 +575,7 @@ export default function Header() {
                 )}
               </button>
               <button
+                id="logout-header-btn"
                 onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
                 className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
                 style={{
@@ -582,7 +592,15 @@ export default function Header() {
                   background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
                   boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.3)',
                   border: 'none',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  flexGrow: 0,
+                  width: 'auto',
+                  minWidth: 'fit-content',
+                  maxWidth: '160px',
+                  whiteSpace: 'nowrap',
+                  alignSelf: 'center',
+                  overflow: 'visible'
                 }}
               >
                 <LogOut size={16} />
