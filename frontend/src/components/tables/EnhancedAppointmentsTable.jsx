@@ -29,7 +29,9 @@ const EnhancedAppointmentsTable = ({
   theme = 'light',
   language = 'ru',
   selectedRows: externalSelectedRows,
-  onRowSelect
+  onRowSelect,
+  services = {},
+  outerBorder = true
 }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterConfig, setFilterConfig] = useState({
@@ -80,13 +82,24 @@ const EnhancedAppointmentsTable = ({
       patient: 'Пациент',
       phone: 'Телефон',
       birthYear: 'Г.р.',
+      address: 'Адрес',
+      visitType: 'Тип',
       services: 'Услуги',
+      paymentType: 'Оплата',
       doctor: 'Врач',
       date: 'Дата',
       time: 'Время',
       status: 'Статус',
       cost: 'Стоимость',
       payment: 'Оплата',
+      // Типы обращения
+      paid: 'Платный',
+      repeat: 'Повторный',
+      free: 'Льготный',
+      // Виды оплаты
+      cash: 'Наличные',
+      card: 'Карта',
+      online: 'Онлайн',
       // Статусы
       scheduled: 'Запланирован',
       confirmed: 'Подтвержден',
@@ -96,7 +109,7 @@ const EnhancedAppointmentsTable = ({
       cancelled: 'Отменен',
       no_show: 'Неявка',
       paid_pending: 'Ожидает оплаты',
-      paid: 'Оплачен'
+      payment_paid: 'Оплачен'
     }
   }[language] || {};
 
@@ -105,8 +118,14 @@ const EnhancedAppointmentsTable = ({
     if (!sortConfig.key) return data;
     
     return [...data].sort((a, b) => {
-      const aVal = a[sortConfig.key];
-      const bVal = b[sortConfig.key];
+      let aVal = a[sortConfig.key];
+      let bVal = b[sortConfig.key];
+      
+      // Специальная обработка для стоимости
+      if (sortConfig.key === 'cost') {
+        aVal = a.cost || a.payment_amount || 0;
+        bVal = b.cost || b.payment_amount || 0;
+      }
       
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -154,14 +173,14 @@ const EnhancedAppointmentsTable = ({
     } else {
       // Используем внутреннее состояние
       setInternalSelectedRows(prev => {
-        const newSet = new Set(prev);
-        if (checked) {
-          newSet.add(id);
-        } else {
-          newSet.delete(id);
-        }
-        return newSet;
-      });
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(id);
+      } else {
+        newSet.delete(id);
+      }
+      return newSet;
+    });
     }
   }, [onRowSelect]);
 
@@ -174,26 +193,28 @@ const EnhancedAppointmentsTable = ({
       });
     } else {
       // Используем внутреннее состояние
-      if (checked) {
+    if (checked) {
         setInternalSelectedRows(new Set(paginatedData.map(row => row.id)));
-      } else {
+    } else {
         setInternalSelectedRows(new Set());
-      }
+    }
     }
   }, [paginatedData, onRowSelect]);
 
-  // Рендер статуса
+  // Рендер статуса (компактный)
   const renderStatus = useCallback((status) => {
     const statusConfig = {
-      scheduled: { color: colors.accent, bg: `${colors.accent}20`, icon: Calendar },
-      confirmed: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle },
-      queued: { color: colors.warning, bg: `${colors.warning}20`, icon: Clock },
-      in_cabinet: { color: colors.accent, bg: `${colors.accent}20`, icon: User },
-      done: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle },
-      cancelled: { color: colors.error, bg: `${colors.error}20`, icon: XCircle },
-      no_show: { color: colors.textSecondary, bg: `${colors.textSecondary}20`, icon: AlertCircle },
-      paid_pending: { color: colors.warning, bg: `${colors.warning}20`, icon: CreditCard },
-      paid: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle }
+      scheduled: { color: colors.accent, bg: `${colors.accent}20`, icon: Calendar, short: 'План' },
+      confirmed: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Подтв' },
+      queued: { color: colors.warning, bg: `${colors.warning}20`, icon: Clock, short: 'Очер' },
+      in_cabinet: { color: colors.accent, bg: `${colors.accent}20`, icon: User, short: 'Каб' },
+      done: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Готов' },
+      cancelled: { color: colors.error, bg: `${colors.error}20`, icon: XCircle, short: 'Отмен' },
+      no_show: { color: colors.textSecondary, bg: `${colors.textSecondary}20`, icon: AlertCircle, short: 'Неявка' },
+      paid_pending: { color: colors.warning, bg: `${colors.warning}20`, icon: CreditCard, short: 'Ожид' },
+      payment_paid: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Оплач' },
+      paid: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Оплач' },
+      plan: { color: colors.accent, bg: `${colors.accent}20`, icon: Calendar, short: 'План' }
     };
 
     const config = statusConfig[status] || statusConfig.scheduled;
@@ -202,69 +223,327 @@ const EnhancedAppointmentsTable = ({
     return (
       <div 
         className="status-badge"
+        title={t[status] || status} // Полное название в подсказке
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '4px',
-          padding: '4px 8px',
-          borderRadius: '6px',
+          gap: '2px',
+          padding: '2px 6px',
+          borderRadius: '4px',
           backgroundColor: config.bg,
           color: config.color,
-          fontSize: '12px',
-          fontWeight: '500'
+          fontSize: '10px',
+          fontWeight: '500',
+          cursor: 'help'
         }}>
-        <Icon size={12} />
-        {t[status] || status}
+        <Icon size={10} />
+        {config.short}
       </div>
     );
   }, [colors, t]);
 
-  // Рендер услуг
-  const renderServices = useCallback((services) => {
-    if (!Array.isArray(services)) return services;
+  // ✅ УНИВЕРСАЛЬНЫЙ МАППИНГ УСЛУГ (работает с любыми данными из админ панели)
+  const createServiceMapping = useCallback(() => {
+    const mapping = {};
+    const categoryMapping = {};
+    
+    // Преобразуем структуру services в плоские маппинги
+    Object.entries(services).forEach(([category, group]) => {
+      if (Array.isArray(group)) {
+        group.forEach(service => {
+          if (service.id && service.name) {
+            const id = String(service.id);
+            mapping[id] = service.name;
+            categoryMapping[id] = category;
+            
+            // Дополнительные алиасы для совместимости
+            if (service.service_id) {
+              mapping[String(service.service_id)] = service.name;
+              categoryMapping[String(service.service_id)] = category;
+            }
+          }
+        });
+      }
+    });
+    
+    return { mapping, categoryMapping };
+  }, [services]);
+
+  // Рендер услуг с динамическим маппингом
+  const renderServices = useCallback((appointmentServices) => {
+    if (!appointmentServices) return '—';
+    
+    const { mapping: serviceMapping, categoryMapping } = createServiceMapping();
+    
+    // Поддерживаем как массив строк, так и массив объектов
+    let servicesList = [];
+    if (Array.isArray(appointmentServices)) {
+      servicesList = appointmentServices.map(service => {
+        // Обрабатываем строки-числа (ID услуг)
+        if (typeof service === 'string' && /^\d+$/.test(service)) {
+          return serviceMapping[service] || `Услуга ${service}`;
+        }
+        // Если это просто число
+        if (typeof service === 'number') {
+          return serviceMapping[service] || serviceMapping[String(service)] || `Услуга ${service}`;
+        }
+        // Потом обычные строки
+        if (typeof service === 'string') return service;
+        if (typeof service === 'object' && service.name) return service.name;
+        if (typeof service === 'object' && service.code) {
+          // Сначала пытаемся найти по коду в маппинге
+          const foundByCode = Object.values(services).flat().find(s => s.code === service.code);
+          if (foundByCode) return foundByCode.name;
+          
+          // Fallback названия по кодам
+          const codeToName = {
+            'consultation.cardiology': 'Консультация кардиолога',
+            'echo.cardiography': 'ЭхоКГ',
+            'ecg': 'ЭКГ',
+            'consultation.dermatology': 'Консультация дерматолога',
+            'derm.skin_diagnostics': 'Дерматоскопия',
+            'cosmetology.botox': 'Ботулотоксин',
+            'cosmetology.mesotherapy': 'Мезотерапия',
+            'cosmetology.peel': 'Пилинг',
+            'cosmetology.laser': 'Лазерные процедуры',
+            'consultation.dentistry': 'Консультация стоматолога',
+            'lab.cbc': 'ОАК',
+            'lab.biochem': 'Биохимия',
+            'lab.urine': 'ОАМ',
+            'lab.coag': 'Коагулограмма',
+            'lab.hormones': 'Гормоны',
+            'lab.infection': 'Инфекции',
+            'other.general': 'Прочее'
+          };
+          
+          return codeToName[service.code] || service.code || service;
+        }
+        return String(service);
+      });
+    } else if (typeof appointmentServices === 'string') {
+      servicesList = [appointmentServices];
+    } else {
+      return String(appointmentServices);
+    }
+    
+    if (servicesList.length === 0) return '—';
+    
+    // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
+    const compactCodes = servicesList.map((serviceName, index) => {
+      // Сначала проверяем, может это уже код (K01, D02, etc)
+      if (/^[A-Z]\d{2}$/.test(serviceName)) {
+        return serviceName;
+      }
+      
+      // Найти услугу по названию и получить её код
+      for (const group of Object.values(services)) {
+        if (Array.isArray(group)) {
+          const foundService = group.find(s => s.name === serviceName);
+          if (foundService) {
+            // Используем service_code если есть, иначе генерируем из category_code
+            if (foundService.service_code) {
+              return foundService.service_code;
+            }
+            // Если есть category_code но нет service_code, генерируем временный код
+            if (foundService.category_code) {
+              return `${foundService.category_code}${String(foundService.id).padStart(2, '0')}`;
+            }
+          }
+        }
+      }
+      
+      // Если ничего не найдено, возвращаем пустую строку для скрытия
+      return '';
+    }).filter(code => code); // Убираем пустые коды
+    
+    const tooltipText = servicesList.join(', ');
     
     return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-        {services.slice(0, 2).map((service, idx) => (
+      <div 
+        style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', cursor: 'help' }}
+        title={tooltipText}
+      >
+        {compactCodes.map((code, idx) => (
           <span
             key={idx}
             style={{
               padding: '2px 6px',
               borderRadius: '4px',
               fontSize: '11px',
-              backgroundColor: colors.bgSecondary,
-              color: colors.textSecondary,
-              border: `1px solid ${colors.border}`
+              fontWeight: 'bold',
+              backgroundColor: colors.accent + '20',
+              color: colors.accent,
+              border: `1px solid ${colors.accent}40`
             }}
           >
-            {service}
+            {code}
           </span>
         ))}
-        {services.length > 2 && (
-          <span style={{ fontSize: '11px', color: colors.textSecondary }}>
-            +{services.length - 2}
+      </div>
+    );
+  }, [colors, createServiceMapping, services]);
+
+  // Рендер типа обращения
+  const renderVisitType = useCallback((visitType) => {
+    const typeColors = {
+      paid: colors.accent,
+      repeat: colors.success,
+      free: colors.warning
+    };
+
+    const typeText = t[visitType] || visitType;
+    const color = typeColors[visitType] || colors.textSecondary;
+
+    return (
+      <span style={{
+        padding: '3px 6px',
+        borderRadius: '8px',
+        fontSize: '11px',
+        fontWeight: '600',
+        backgroundColor: `${color}15`,
+        color: color,
+        border: `1px solid ${color}30`
+      }}>
+        {typeText}
+      </span>
+    );
+  }, [colors, t]);
+
+  // Рендер вида оплаты
+  const renderPaymentType = useCallback((paymentType, paymentStatus) => {
+    const paymentIcons = {
+      cash: '💵',
+      card: '💳',
+      online: '🌐'
+    };
+
+    const paymentColors = {
+      cash: colors.success,
+      card: colors.accent,
+      online: '#8b5cf6'
+    };
+
+    const statusColors = {
+      paid: colors.success,
+      pending: colors.warning,
+      failed: colors.error
+    };
+
+    const typeText = t[paymentType] || paymentType;
+    const icon = paymentIcons[paymentType] || '💰';
+    const color = paymentColors[paymentType] || colors.textSecondary;
+    const statusColor = statusColors[paymentStatus] || colors.textSecondary;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <span style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '2px 6px',
+          borderRadius: '6px',
+          fontSize: '11px',
+          fontWeight: '500',
+          backgroundColor: `${color}15`,
+          color: color,
+          border: `1px solid ${color}30`
+        }}>
+          <span>{icon}</span>
+          {typeText}
+        </span>
+        {paymentStatus && (
+          <span style={{
+            fontSize: '10px',
+            color: statusColor,
+            fontWeight: '500'
+          }}>
+            {paymentStatus === 'paid' ? '✅ Оплачено' : 
+             paymentStatus === 'pending' ? '⏳ Ожидает' : 
+             paymentStatus === 'failed' ? '❌ Ошибка' : paymentStatus}
           </span>
         )}
       </div>
     );
-  }, [colors]);
+  }, [colors, t]);
 
   // Экспорт данных
   const handleExport = useCallback(() => {
+    // Функция для преобразования услуг в строку для CSV
+    const formatServicesForCsv = (services) => {
+      if (!services) return '';
+      
+      let servicesList = [];
+      if (Array.isArray(services)) {
+        servicesList = services.map(service => {
+          if (typeof service === 'string') return service;
+          if (typeof service === 'object' && service.name) return service.name;
+          if (typeof service === 'object' && service.code) {
+            const codeToName = {
+              'consultation.cardiology': 'Консультация кардиолога',
+              'echo.cardiography': 'ЭхоКГ',
+              'ecg': 'ЭКГ',
+              'consultation.dermatology': 'Консультация дерматолога',
+              'derm.skin_diagnostics': 'Дерматоскопия',
+              'cosmetology.botox': 'Ботулотоксин',
+              'cosmetology.mesotherapy': 'Мезотерапия',
+              'cosmetology.peel': 'Пилинг',
+              'cosmetology.laser': 'Лазерные процедуры',
+              'consultation.dentistry': 'Консультация стоматолога',
+              'lab.cbc': 'ОАК',
+              'lab.biochem': 'Биохимия',
+              'lab.urine': 'ОАМ',
+              'lab.coag': 'Коагулограмма',
+              'lab.hormones': 'Гормоны',
+              'lab.infection': 'Инфекции',
+              'other.general': 'Прочее'
+            };
+            
+            const idToName = {
+              '1': 'Консультация кардиолога', '2': 'ЭхоКГ', '3': 'ЭКГ',
+              '4': 'Консультация дерматолога', '5': 'Дерматоскопия',
+              '6': 'Ботулотоксин', '7': 'Мезотерапия', '8': 'Пилинг',
+              '9': 'Лазерные процедуры', '10': 'Консультация стоматолога',
+              '11': 'ОАК', '12': 'Биохимия', '13': 'ОАМ',
+              '14': 'Коагулограмма', '15': 'Гормоны', '16': 'Инфекции',
+              '17': 'Прочее', '29': 'Процедура 29', '30': 'Процедура 30'
+            };
+            
+            return codeToName[service.code] || idToName[service.code] || idToName[service] || service.code || service;
+          }
+          return String(service);
+        });
+      } else if (typeof services === 'string') {
+        servicesList = [services];
+      } else {
+        return String(services);
+      }
+      
+      return servicesList.join('; ');
+    };
+
     const csvContent = [
       // Заголовки
-      [t.number, t.patient, t.phone, t.birthYear, t.services, t.date, t.time, t.status, t.cost].join(','),
+      [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
       // Данные
       ...filteredData.map((row, index) => [
         index + 1,
         row.patient_fio || '',
         row.patient_phone || '',
         row.patient_birth_year || '',
-        Array.isArray(row.services) ? row.services.join('; ') : row.services || '',
+        row.address || '',
+        (() => {
+          const discountMode = row.discount_mode;
+          if (discountMode === 'benefit') return t.free;
+          if (discountMode === 'repeat') return t.repeat;
+          if (discountMode === 'all_free') return t.free;
+          return t.paid;
+        })(),
+        formatServicesForCsv(row.services),
+        t[row.payment_type] || row.payment_type || '',
         row.appointment_date || '',
         row.appointment_time || '',
         t[row.status] || row.status || '',
-        row.cost || ''
+        row.total_amount || row.cost || row.payment_amount || ''
       ].join(','))
     ].join('\n');
 
@@ -306,9 +585,9 @@ const EnhancedAppointmentsTable = ({
       className={`enhanced-table ${isDark ? 'dark-theme' : ''}`}
       style={{
         backgroundColor: colors.bg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: '12px',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        border: outerBorder ? `1px solid ${colors.border}` : 'none',
+        borderRadius: outerBorder ? '12px' : '0'
       }}>
       {/* Панель инструментов */}
       <div style={{
@@ -415,7 +694,9 @@ const EnhancedAppointmentsTable = ({
       <div style={{ overflowX: 'auto' }}>
         <table style={{
           width: '100%',
-          borderCollapse: 'collapse'
+          borderCollapse: 'collapse',
+          tableLayout: 'fixed',
+          maxWidth: '100%'
         }}>
           <thead>
             <tr style={{ backgroundColor: colors.bgSecondary }}>
@@ -493,7 +774,9 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  width: '80px'
+                  width: '60px',
+                  minWidth: '60px',
+                  maxWidth: '60px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -502,6 +785,34 @@ const EnhancedAppointmentsTable = ({
                     sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                   )}
                 </div>
+              </th>
+
+              {/* Адрес */}
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'left',
+                borderBottom: `1px solid ${colors.border}`,
+                color: colors.text,
+                fontWeight: '600',
+                fontSize: '14px',
+                minWidth: '150px'
+              }}
+              className="hide-on-mobile"
+              >
+                {t.address}
+              </th>
+
+              {/* Тип обращения */}
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'center',
+                borderBottom: `1px solid ${colors.border}`,
+                color: colors.text,
+                fontWeight: '600',
+                fontSize: '14px',
+                minWidth: '100px'
+              }}>
+                {t.visitType}
               </th>
 
               {/* Услуги */}
@@ -515,6 +826,19 @@ const EnhancedAppointmentsTable = ({
                 minWidth: '200px'
               }}>
                 {t.services}
+              </th>
+
+              {/* Вид оплаты */}
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'center',
+                borderBottom: `1px solid ${colors.border}`,
+                color: colors.text,
+                fontWeight: '600',
+                fontSize: '14px',
+                minWidth: '120px'
+              }}>
+                {t.paymentType}
               </th>
 
               {/* Дата и время */}
@@ -550,7 +874,9 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '130px'
+                  minWidth: '90px',
+                  maxWidth: '90px',
+                  width: '90px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -591,7 +917,9 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                width: '100px'
+                width: '80px',
+                minWidth: '80px',
+                maxWidth: '80px'
               }}>
                 {t.actions}
               </th>
@@ -699,14 +1027,55 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: colors.text,
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    width: '60px',
+                    minWidth: '60px',
+                    maxWidth: '60px'
                   }}>
                     {row.patient_birth_year || '—'}
+                  </td>
+
+                  {/* Адрес */}
+                  <td style={{
+                    padding: '12px 8px',
+                    color: colors.text,
+                    fontSize: '14px',
+                    maxWidth: '150px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  className="hide-on-mobile"
+                  title={row.address}
+                  >
+                    {row.address || '—'}
+                  </td>
+
+                  {/* Тип обращения */}
+                  <td style={{
+                    padding: '12px 8px',
+                    textAlign: 'center'
+                  }}>
+                    {renderVisitType((() => {
+                      const discountMode = row.discount_mode;
+                      if (discountMode === 'benefit') return 'free';
+                      if (discountMode === 'repeat') return 'repeat';
+                      if (discountMode === 'all_free') return 'free';
+                      return 'paid';
+                    })())}
                   </td>
 
                   {/* Услуги */}
                   <td style={{ padding: '12px 8px' }}>
                     {renderServices(row.services)}
+                  </td>
+
+                  {/* Вид оплаты */}
+                  <td style={{
+                    padding: '12px 8px',
+                    textAlign: 'center'
+                  }}>
+                    {renderPaymentType(row.payment_type || 'cash', row.payment_status)}
                   </td>
 
                   {/* Дата и время */}
@@ -741,7 +1110,13 @@ const EnhancedAppointmentsTable = ({
                   {/* Статус */}
                   <td style={{
                     padding: '12px 8px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    minWidth: '90px',
+                    maxWidth: '90px',
+                    width: '90px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}>
                     {renderStatus(row.status)}
                   </td>
@@ -754,13 +1129,19 @@ const EnhancedAppointmentsTable = ({
                     fontSize: '14px',
                     fontWeight: '600'
                   }}>
-                    {row.cost ? `${row.cost.toLocaleString()} ₽` : '—'}
+                    {(() => {
+                      const amount = row.total_amount || row.cost || row.payment_amount || 0;
+                      return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
+                    })()}
                   </td>
 
                   {/* Действия */}
                   <td style={{
                     padding: '12px 8px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    width: '80px',
+                    minWidth: '80px',
+                    maxWidth: '80px'
                   }}>
                     <div style={{
                       display: 'flex',
@@ -770,12 +1151,23 @@ const EnhancedAppointmentsTable = ({
                       flexWrap: 'wrap'
                     }}>
                       {/* Оплата */}
-                      {(row.status === 'paid_pending' || row.payment_status === 'pending') && (
-                        <button
-                          className="action-button"
+                      {(() => {
+                        const status = (row.status || '').toLowerCase();
+                        const paymentStatus = (row.payment_status || '').toLowerCase();
+                        // Показываем кнопку оплаты если запись не оплачена
+                        return (
+                          status === 'paid_pending' || 
+                          paymentStatus === 'pending' || 
+                          (status === 'scheduled' && paymentStatus !== 'paid') ||
+                          (status === 'confirmed' && paymentStatus !== 'paid') ||
+                          (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'cancelled')
+                        );
+                      })() && (
+                      <button
+                        className="action-button"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            e.stopPropagation();
+                          e.stopPropagation();
                             onActionClick?.('payment', row, e);
                           }}
                           style={{
@@ -852,29 +1244,29 @@ const EnhancedAppointmentsTable = ({
                             e.preventDefault();
                             e.stopPropagation();
                             onActionClick?.('print', row, e);
-                          }}
-                          style={{
-                            padding: '4px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
                             color: colors.primary,
                             cursor: 'pointer',
                             pointerEvents: 'auto'
-                          }}
+                        }}
                           title="Печать"
-                        >
+                      >
                           <FileText size={14} />
-                        </button>
+                      </button>
                       )}
                       
                       {/* Завершить */}
                       {row.status === 'in_cabinet' && (
-                        <button
-                          className="action-button"
+                      <button
+                        className="action-button"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                            e.stopPropagation();
+                          e.stopPropagation();
                             onActionClick?.('complete', row, e);
                           }}
                           style={{

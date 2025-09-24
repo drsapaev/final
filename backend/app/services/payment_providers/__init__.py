@@ -3,12 +3,12 @@
 """
 from .base import BasePaymentProvider
 from .click import ClickProvider
-from .payme import PaymeProvider
+from .payme import PayMeProvider
 from .kaspi import KaspiProvider
 
 __all__ = [
     "BasePaymentProvider",
     "ClickProvider", 
-    "PaymeProvider",
+    "PayMeProvider",
     "KaspiProvider"
 ]

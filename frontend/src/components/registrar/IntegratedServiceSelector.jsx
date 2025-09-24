@@ -31,66 +31,75 @@ const IntegratedServiceSelector = ({
   const [error, setError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
 
-  // Демо-данные для услуг (fallback) - 3 категории
+  // Базовый справочник услуг согласно утвержденному плану
   const DEMO_SERVICES = {
-    laboratory: [
-      { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 5, name: 'Анализ на сахар', price: 8000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 6, name: 'Анализ на холестерин', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 7, name: 'Анализ на гормоны', price: 30000, specialty: 'laboratory', group: 'laboratory' },
-      { id: 8, name: 'Анализ на инфекции', price: 20000, specialty: 'laboratory', group: 'laboratory' }
+    cardiology: [
+      { id: 1, code: 'consultation.cardiology', name: 'Консультация кардиолога', price: 50000, specialty: 'cardiology', group: 'cardiology' },
+      { id: 2, code: 'echo.cardiography', name: 'ЭхоКГ', price: 80000, specialty: 'cardiology', group: 'cardiology' },
+      { id: 3, code: 'ecg', name: 'ЭКГ', price: 25000, specialty: 'cardiology', group: 'cardiology' }
     ],
     dermatology: [
-      { id: 9, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 10, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 11, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 12, name: 'Биопсия кожи', price: 50000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 13, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 14, name: 'Лечение псориаза', price: 80000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 15, name: 'Удаление родинок', price: 45000, specialty: 'dermatology', group: 'dermatology' },
-      { id: 16, name: 'Лечение экземы', price: 70000, specialty: 'dermatology', group: 'dermatology' }
+      { id: 4, code: 'consultation.dermatology', name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
+      { id: 5, code: 'derm.skin_diagnostics', name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' }
     ],
     cosmetology: [
-      { id: 17, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 18, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 19, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 20, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 21, name: 'Ботокс', price: 150000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 22, name: 'Филлеры', price: 200000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 23, name: 'Лазерная эпиляция', price: 80000, specialty: 'cosmetology', group: 'cosmetology' },
-      { id: 24, name: 'Удаление татуировок', price: 100000, specialty: 'cosmetology', group: 'cosmetology' }
+      { id: 6, code: 'cosmetology.botox', name: 'Ботулотоксин', price: 150000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 7, code: 'cosmetology.mesotherapy', name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 8, code: 'cosmetology.peel', name: 'Пилинг', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
+      { id: 9, code: 'cosmetology.laser', name: 'Лазерные процедуры', price: 80000, specialty: 'cosmetology', group: 'cosmetology' }
+    ],
+    dentistry: [
+      { id: 10, code: 'consultation.dentistry', name: 'Консультация стоматолога', price: 35000, specialty: 'dentistry', group: 'dentistry' }
+    ],
+    laboratory: [
+      { id: 11, code: 'lab.cbc', name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 12, code: 'lab.biochem', name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 13, code: 'lab.urine', name: 'Общий анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 14, code: 'lab.coag', name: 'Коагулограмма', price: 20000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 15, code: 'lab.hormones', name: 'Гормоны', price: 30000, specialty: 'laboratory', group: 'laboratory' },
+      { id: 16, code: 'lab.infection', name: 'Инфекции/серология', price: 25000, specialty: 'laboratory', group: 'laboratory' }
+    ],
+    other: [
+      { id: 17, code: 'other.general', name: 'Прочие процедуры', price: 20000, specialty: 'other', group: 'other' }
     ]
   };
 
   const DEMO_CATEGORIES = [
-    { id: 1, name_ru: 'Лаборатория', code: 'laboratory', specialty: 'laboratory' },
-    { id: 2, name_ru: 'Дерматологические услуги', code: 'dermatology', specialty: 'dermatology' },
-    { id: 3, name_ru: 'Косметологические услуги', code: 'cosmetology', specialty: 'cosmetology' }
+    { id: 1, name_ru: 'Кардиология', code: 'cardiology', specialty: 'cardiology' },
+    { id: 2, name_ru: 'Дерматология', code: 'dermatology', specialty: 'dermatology' },
+    { id: 3, name_ru: 'Косметология', code: 'cosmetology', specialty: 'cosmetology' },
+    { id: 4, name_ru: 'Стоматология', code: 'dentistry', specialty: 'dentistry' },
+    { id: 5, name_ru: 'Лаборатория', code: 'laboratory', specialty: 'laboratory' },
+    { id: 6, name_ru: 'Прочее', code: 'other', specialty: 'other' }
   ];
 
   // Иконки по специальностям из документации
   const specialtyIcons = {
-    laboratory: TestTube,
+    cardiology: Heart,
     dermatology: Stethoscope,
     cosmetology: Activity,
-    general: User
+    dentistry: Scissors,
+    laboratory: TestTube,
+    other: User
   };
 
   const specialtyColors = {
-    laboratory: 'text-green-600',
+    cardiology: 'text-red-600',
     dermatology: 'text-orange-600', 
     cosmetology: 'text-pink-600',
-    general: 'text-gray-600'
+    dentistry: 'text-blue-600',
+    laboratory: 'text-green-600',
+    other: 'text-gray-600'
   };
 
   // Названия групп услуг из detail.md
   const groupNames = {
-    laboratory: 'Лабораторные анализы',
-    dermatology: 'Дерматологические услуги',
-    cosmetology: 'Косметологические услуги'
+    cardiology: 'Кардиология',
+    dermatology: 'Дерматология',
+    cosmetology: 'Косметология',
+    dentistry: 'Стоматология',
+    laboratory: 'Лаборатория',
+    other: 'Прочие услуги'
   };
 
   const hasLoadedRef = useRef(false);
@@ -192,6 +201,7 @@ const IntegratedServiceSelector = ({
       // Добавляем услугу
       const newServices = [...selectedServices, {
         id: serviceId,
+        code: serviceData.code,
         name: serviceData.name,
         price: serviceData.price,
         specialty: serviceData.specialty,
@@ -299,6 +309,61 @@ const IntegratedServiceSelector = ({
           </div>
         </div>
       )}
+
+      {/* Быстрые тумблеры для кардиологии */}
+      <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <h3 className="text-sm font-semibold text-red-900 mb-3 flex items-center">
+          <Heart className="w-4 h-4 mr-2" />
+          Быстрый выбор кардиологии
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {/* ЭКГ тумблер */}
+          {(() => {
+            const ecgService = filteredServices.cardiology?.find(s => s.code === 'ecg');
+            const isEcgSelected = selectedServices.some(s => s.code === 'ecg');
+            
+            if (!ecgService) return null;
+            
+            return (
+              <button
+                onClick={() => handleServiceToggle(ecgService.id, ecgService)}
+                className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${
+                  isEcgSelected
+                    ? 'bg-red-100 border-red-300 text-red-700'
+                    : 'bg-white border-red-200 text-red-700 hover:bg-red-50'
+                }`}
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                <span className="text-sm font-medium">ЭКГ</span>
+                {isEcgSelected && <CheckCircle className="w-4 h-4 ml-2" />}
+              </button>
+            );
+          })()}
+          
+          {/* ЭхоКГ тумблер */}
+          {(() => {
+            const echoService = filteredServices.cardiology?.find(s => s.code === 'echo.cardiography');
+            const isEchoSelected = selectedServices.some(s => s.code === 'echo.cardiography');
+            
+            if (!echoService) return null;
+            
+            return (
+              <button
+                onClick={() => handleServiceToggle(echoService.id, echoService)}
+                className={`flex items-center px-3 py-2 rounded-lg border transition-colors ${
+                  isEchoSelected
+                    ? 'bg-red-100 border-red-300 text-red-700'
+                    : 'bg-white border-red-200 text-red-700 hover:bg-red-50'
+                }`}
+              >
+                <Heart className="w-4 h-4 mr-2" />
+                <span className="text-sm font-medium">ЭхоКГ</span>
+                {isEchoSelected && <CheckCircle className="w-4 h-4 ml-2" />}
+              </button>
+            );
+          })()}
+        </div>
+      </div>
 
       {/* Группы услуг */}
       <div className="space-y-4">

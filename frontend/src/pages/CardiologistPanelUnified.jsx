@@ -31,15 +31,7 @@ import EchoForm from '../components/cardiology/EchoForm';
  * Объединяет: очередь + специализированные функции + AI + ЭКГ/ЭхоКГ
  */
 const CardiologistPanelUnified = () => {
-  // Проверяем демо-режим только для специальных демо-страниц
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('CardiologistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
-  
+  // Всегда вызываем хуки первыми
   const { theme, isDark, getColor } = useTheme();
   
   const [activeTab, setActiveTab] = useState('queue');
@@ -103,6 +95,15 @@ const CardiologistPanelUnified = () => {
       loadPatientData();
     }
   }, [selectedPatient]);
+
+  // Проверяем демо-режим после всех хуков
+  const isDemoMode = window.location.pathname.includes('/medilab-demo');
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('CardiologistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
 
   const loadPatientData = async () => {
     if (!selectedPatient?.patient?.id) return;

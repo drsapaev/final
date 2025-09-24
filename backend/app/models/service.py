@@ -30,14 +30,29 @@ class Service(Base):
         DateTime(timezone=True), nullable=True
     )
     
+    # ✅ НОВЫЕ ПОЛЯ ДЛЯ КЛАССИФИКАЦИИ
+    category_code: Mapped[Optional[str]] = mapped_column(
+        String(1), nullable=True, index=True
+    )  # K, D, C, L, S, O
+    service_code: Mapped[Optional[str]] = mapped_column(
+        String(10), nullable=True, unique=True, index=True
+    )  # K01, D02, C03, etc.
+    
     # Новые поля для админ панели
     category_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("service_categories.id"), nullable=True)
     duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, default=30, nullable=True)
     doctor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("doctors.id"), nullable=True)
     
+    # ✅ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
+    requires_doctor: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    queue_tag: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
+    is_consultation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    allow_doctor_price_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    
     # Relationships
     category = relationship("ServiceCategory", back_populates="services")
     doctor = relationship("Doctor", back_populates="services")
+    price_overrides = relationship("DoctorPriceOverride", back_populates="service")
 
 
 class ServiceCatalog(Base):

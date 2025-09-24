@@ -37,14 +37,8 @@ import PaymentSuccess from './pages/PaymentSuccess.jsx';
 import PaymentCancel from './pages/PaymentCancel.jsx';
 import PaymentTest from './pages/PaymentTest.jsx';
 
-// Новые компоненты - ПОШАГОВОЕ ДОБАВЛЕНИЕ
-import TestComponent from './components/TestComponent.jsx';
-import SimpleDashboard from './components/dashboard/SimpleDashboard.jsx';
-import SimpleUserManagement from './components/admin/SimpleUserManagement.jsx';
-import SimpleEMR from './components/medical/SimpleEMR.jsx';
-import SimpleFileManager from './components/SimpleFileManager.jsx';
+// Стилизованные компоненты
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
-import NewComponentsNav from './components/NewComponentsNav.jsx'; // Навигация по новым компонентам
 
 // Скрытые компоненты для интеграции
 import TelegramManager from './components/TelegramManager.jsx';
@@ -117,7 +111,6 @@ function AppContent() {
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/new-login" element={<LoginFormStyled />} />
-      <Route path="/components" element={<NewComponentsNav />} />
       <Route path="/health" element={<Health />} />
       <Route path="/" element={<Landing />} />
       <Route path="/medilab-demo" element={<MediLabDemo />} />
@@ -141,6 +134,10 @@ function AppContent() {
           <Route path="admin/services" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/patients" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/appointments" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+          <Route path="admin/all-free" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+          <Route path="admin/benefit-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+          <Route path="admin/wizard-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+          <Route path="admin/payment-providers" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
           <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
@@ -170,12 +167,6 @@ function AppContent() {
           <Route path="visits/:id"    element={<VisitDetails />} />
           <Route path="search"        element={<Search />} />
           
-          {/* Новые маршруты для созданных компонентов - ПОШАГОВОЕ ДОБАВЛЕНИЕ */}
-          <Route path="test"           element={<TestComponent />} />
-          <Route path="simple-dashboard" element={<SimpleDashboard />} />
-          <Route path="simple-users"   element={<SimpleUserManagement />} />
-          <Route path="simple-emr"     element={<SimpleEMR />} />
-          <Route path="simple-files"   element={<SimpleFileManager />} />
           
           {/* Интегрированные скрытые компоненты */}
           <Route path="advanced-users"     element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />

@@ -39,6 +39,8 @@ from .file_system import (
     FileStorage, FileQuota, FileType, FileStatus, FilePermission
 )
 from .telegram_config import TelegramConfig, TelegramTemplate, TelegramUser, TelegramMessage
+from .doctor_price_override import DoctorPriceOverride
+from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 
 # Make sure all models are available
 __all__ = [
@@ -114,4 +116,7 @@ __all__ = [
     "TelegramTemplate",
     "TelegramUser", 
     "TelegramMessage",
+    "DoctorPriceOverride",
+    "PaymentInvoice",
+    "PaymentInvoiceVisit",
 ]

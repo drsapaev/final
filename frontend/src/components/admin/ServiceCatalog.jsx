@@ -57,14 +57,14 @@ const ServiceCatalog = () => {
       
       // Загружаем услуги, категории и врачей параллельно
       const [servicesRes, categoriesRes, doctorsRes] = await Promise.all([
-        fetch('/api/v1/services', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        fetch('http://localhost:8000/api/v1/services', {
+          // headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         }),
-        fetch('/api/v1/admin/service-categories', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        fetch('http://localhost:8000/api/v1/services/categories', {
+          // headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         }),
-        fetch('/api/v1/admin/doctors', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        fetch('http://localhost:8000/api/v1/services/admin/doctors', {
+          // headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
         })
       ]);
 
@@ -102,15 +102,17 @@ const ServiceCatalog = () => {
 
   const handleSaveService = async (serviceData) => {
     try {
+      console.log('🔄 Отправляем данные услуги:', serviceData);
+      
       const method = editingService ? 'PUT' : 'POST';
       const url = editingService 
-        ? `/api/v1/services/${editingService.id}`
-        : '/api/v1/services';
+        ? `http://localhost:8000/api/v1/services/${editingService.id}`
+        : 'http://localhost:8000/api/v1/services';
 
       const response = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          // 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(serviceData)
@@ -125,7 +127,9 @@ const ServiceCatalog = () => {
         setShowAddForm(false);
         await loadData();
       } else {
-        throw new Error('Ошибка сохранения услуги');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Ошибка API:', response.status, errorData);
+        throw new Error(`Ошибка сохранения услуги: ${response.status}`);
       }
     } catch (error) {
       console.error('Ошибка сохранения:', error);
@@ -137,10 +141,10 @@ const ServiceCatalog = () => {
     if (!confirm('Удалить услугу?')) return;
 
     try {
-      const response = await fetch(`/api/v1/services/${serviceId}`, {
+      const response = await fetch(`http://localhost:8000/api/v1/services/${serviceId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          // 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -443,7 +447,14 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
     currency: service?.currency || 'UZS',
     duration_minutes: service?.duration_minutes || 30,
     doctor_id: service?.doctor_id || '',
-    active: service?.active !== undefined ? service.active : true
+    active: service?.active !== undefined ? service.active : true,
+    // ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
+    category_code: service?.category_code || '',
+    service_code: service?.service_code || '',
+    requires_doctor: service?.requires_doctor || false,
+    queue_tag: service?.queue_tag || '',
+    is_consultation: service?.is_consultation || false,
+    allow_doctor_price_override: service?.allow_doctor_price_override || false
   });
 
   const handleSubmit = (e) => {
@@ -455,7 +466,24 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
       return;
     }
 
-    onSave(formData);
+    // Подготавливаем данные для API
+    const apiData = {
+      ...formData,
+      price: formData.price ? parseFloat(formData.price) : null,
+      category_id: formData.category_id ? parseInt(formData.category_id) : null,
+      doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
+      duration_minutes: parseInt(formData.duration_minutes) || 30
+    };
+    
+    // Убираем пустые строки
+    Object.keys(apiData).forEach(key => {
+      if (apiData[key] === '' || apiData[key] === 'null') {
+        apiData[key] = null;
+      }
+    });
+    
+    console.log('📝 Подготовленные данные для API:', apiData);
+    onSave(apiData);
   };
 
   const handleChange = (field, value) => {
@@ -569,6 +597,114 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">
+            Настройки для мастера регистрации
+          </h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Код категории (K/D/C/L/S/O)
+              </label>
+              <select
+                value={formData.category_code}
+                onChange={(e) => handleChange('category_code', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Выберите категорию</option>
+                <option value="K">K - Кардиология</option>
+                <option value="D">D - Дерматология</option>
+                <option value="C">C - Косметология</option>
+                <option value="L">L - Лабораторные анализы</option>
+                <option value="S">S - Стоматология</option>
+                <option value="O">O - Другие услуги</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Код услуги (например: K01, L002)
+              </label>
+              <input
+                type="text"
+                value={formData.service_code}
+                onChange={(e) => handleChange('service_code', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="K01"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Тег очереди
+              </label>
+              <select
+                value={formData.queue_tag}
+                onChange={(e) => handleChange('queue_tag', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Без очереди</option>
+                <option value="ecg">ECG (отдельная очередь)</option>
+                <option value="cardiology_common">Кардиология (общая)</option>
+                <option value="stomatology">Стоматология</option>
+                <option value="dermatology">Дерматология</option>
+                <option value="cosmetology">Косметология</option>
+                <option value="lab">Лаборатория</option>
+              </select>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="requires_doctor"
+                  checked={formData.requires_doctor}
+                  onChange={(e) => handleChange('requires_doctor', e.target.checked)}
+                  className="mr-2"
+                />
+                <label htmlFor="requires_doctor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Требует врача
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_consultation"
+                  checked={formData.is_consultation}
+                  onChange={(e) => handleChange('is_consultation', e.target.checked)}
+                  className="mr-2"
+                />
+                <label htmlFor="is_consultation" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Это консультация
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="allow_doctor_price_override"
+                  checked={formData.allow_doctor_price_override}
+                  onChange={(e) => handleChange('allow_doctor_price_override', e.target.checked)}
+                  className="mr-2"
+                />
+                <label htmlFor="allow_doctor_price_override" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Врач может изменить цену
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mt-4">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Подсказка:</strong> Только ЭхоКГ (кардиолог) и Рентгенография зуб (стоматолог) требуют врача. 
+              Консультации участвуют в расчёте льгот и повторных визитов.
+            </p>
           </div>
         </div>
 

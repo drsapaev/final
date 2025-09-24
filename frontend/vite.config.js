@@ -103,8 +103,8 @@ export default defineConfig({
         }
       }
     },
-    // Увеличиваем лимит для больших файлов
-    chunkSizeWarningLimit: 1000,
+    // Увеличиваем лимит для больших файлов (vendor чанк может быть большим)
+    chunkSizeWarningLimit: 1500,
     // Минификация
     minify: 'terser',
     terserOptions: {

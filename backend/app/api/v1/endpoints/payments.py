@@ -20,6 +20,27 @@ from app.services.payment_providers.base import PaymentResult, PaymentStatus
 
 router = APIRouter()
 
+# ===================== МОДЕЛИ ДЛЯ МОДУЛЯ ОПЛАТЫ =====================
+
+class PaymentInvoiceCreateRequest(BaseModel):
+    amount: Decimal = Field(..., gt=0, description="Сумма к оплате")
+    currency: str = Field(default="UZS", description="Валюта")
+    provider: str = Field(..., pattern="^(click|payme)$", description="Платежный провайдер")
+    description: Optional[str] = Field(None, description="Описание платежа")
+    patient_info: Optional[Dict[str, Any]] = Field(None, description="Информация о пациенте")
+
+class PaymentInvoiceResponse(BaseModel):
+    invoice_id: int
+    amount: Decimal
+    currency: str
+    provider: str
+    status: str
+    description: Optional[str]
+    created_at: datetime
+
+class PendingInvoicesResponse(BaseModel):
+    invoices: List[PaymentInvoiceResponse]
+
 # Инициализация менеджера провайдеров
 payment_manager = None
 
@@ -528,4 +549,83 @@ def download_receipt(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка скачивания квитанции: {str(e)}"
+        )
+
+
+# ===================== ЭНДПОИНТЫ ДЛЯ МОДУЛЯ ОПЛАТЫ =====================
+
+@router.post("/invoice/create", response_model=PaymentInvoiceResponse)
+async def create_payment_invoice(
+    request: PaymentInvoiceCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_user)
+):
+    """Создание счета для оплаты из модуля оплаты"""
+    try:
+        from app.models.payment_invoice import PaymentInvoice
+        
+        # Создаем новый счет
+        invoice = PaymentInvoice(
+            amount=request.amount,
+            currency=request.currency,
+            provider=request.provider,
+            status="pending",
+            description=request.description,
+            payment_method=request.provider,
+            created_by_id=current_user.id
+        )
+        
+        db.add(invoice)
+        db.commit()
+        db.refresh(invoice)
+        
+        return PaymentInvoiceResponse(
+            invoice_id=invoice.id,
+            amount=invoice.amount,
+            currency=invoice.currency,
+            provider=invoice.provider,
+            status=invoice.status,
+            description=invoice.description,
+            created_at=invoice.created_at
+        )
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка создания счета: {str(e)}"
+        )
+
+
+@router.get("/invoices/pending", response_model=List[PaymentInvoiceResponse])
+async def get_pending_invoices(
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_user)
+):
+    """Получение списка неоплаченных счетов"""
+    try:
+        from app.models.payment_invoice import PaymentInvoice
+        
+        # Получаем неоплаченные счета
+        invoices = db.query(PaymentInvoice).filter(
+            PaymentInvoice.status.in_(["pending", "processing"])
+        ).order_by(PaymentInvoice.created_at.desc()).limit(50).all()
+        
+        return [
+            PaymentInvoiceResponse(
+                invoice_id=invoice.id,
+                amount=invoice.amount,
+                currency=invoice.currency,
+                provider=invoice.provider,
+                status=invoice.status,
+                description=invoice.description,
+                created_at=invoice.created_at
+            )
+            for invoice in invoices
+        ]
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения счетов: {str(e)}"
         )

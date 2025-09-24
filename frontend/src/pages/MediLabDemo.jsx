@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
+import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucide-react';
 
 // Новые унифицированные компоненты
 import UnifiedLayout from '../components/layout/UnifiedLayout';
@@ -357,7 +358,7 @@ const MediLabDemo = () => {
          {/* Today's Summary */}
          <MedicalCard className="h-48 animate-fade-in-scale animate-delay-400 card-responsive">
            <h3 className="text-responsive-lg font-semibold mb-4" style={{ color: isDark ? '#f8fafc' : '#1e293b' }}>
-             Today's Summary
+             Today&apos;s Summary
            </h3>
            <div className="space-y-3">
              <div className="flex justify-between items-center animate-fade-in-left animate-delay-100">

@@ -120,7 +120,9 @@ export default function DisplayBoardUnified({
       setLastUpdatedAt(timeNow());
       try {
         localStorage.setItem(`board.stats.${qs.department}`, JSON.stringify(s || {}));
-      } catch (_) {}
+      } catch (_) {
+        // Игнорируем ошибки localStorage
+      }
     } catch (e) {
       setErr(e?.message || 'Ошибка загрузки');
       // fallback из кэша
@@ -130,7 +132,9 @@ export default function DisplayBoardUnified({
           const cached = JSON.parse(raw);
           if (cached && typeof cached === 'object') setStats({ ...stats, ...cached });
         }
-      } catch (_) {}
+      } catch (_) {
+        // Игнорируем ошибки localStorage
+      }
     }
   }
 
@@ -158,7 +162,9 @@ export default function DisplayBoardUnified({
         if (soundInitial === undefined && typeof st.sound_default !== 'undefined') {
           setBoardSettings(prev => ({ ...prev, soundEnabled: st.sound_default !== false }));
         }
-        try { localStorage.setItem('board.state', JSON.stringify(st)); } catch(_){}
+        try { localStorage.setItem('board.state', JSON.stringify(st)); } catch(_){
+          // Игнорируем ошибки localStorage
+        }
       }
     } catch (_) {
       // fallback из кэша
@@ -185,7 +191,9 @@ export default function DisplayBoardUnified({
             });
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Игнорируем ошибки localStorage
+      }
     }
   }
 
