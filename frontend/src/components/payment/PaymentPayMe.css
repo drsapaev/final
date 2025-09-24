@@ -1,0 +1,308 @@
+/* PayMe Payment Dialog Styles */
+.payment-payme-dialog {
+  --payme-primary: #00b4d8;
+  --payme-secondary: #0077b6;
+  --payme-accent: #90e0ef;
+}
+
+.payment-payme-container {
+  padding: 1.5rem;
+}
+
+/* Payment Header */
+.payment-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.payment-icon {
+  margin-bottom: 1rem;
+  color: var(--payme-primary);
+}
+
+.payment-icon.payme {
+  color: var(--payme-primary);
+}
+
+.payment-icon.processing {
+  color: var(--warning-color, #f59e0b);
+  animation: pulse 2s infinite;
+}
+
+.payment-icon.polling {
+  color: var(--info-color, #3b82f6);
+  animation: spin 2s linear infinite;
+}
+
+.payment-icon.success {
+  color: var(--success-color, #10b981);
+}
+
+.payment-icon.failed {
+  color: var(--error-color, #ef4444);
+}
+
+/* Payment Details */
+.payment-details {
+  background: var(--surface-color, #f8fafc);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.detail-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--text-secondary, #64748b);
+}
+
+.detail-value {
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+/* Payment Info */
+.payment-info {
+  background: var(--info-bg, #dbeafe);
+  border: 1px solid var(--info-border, #93c5fd);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.payment-info p {
+  margin: 0;
+  color: var(--info-text, #1e40af);
+  line-height: 1.5;
+}
+
+.payment-info p:not(:last-child) {
+  margin-bottom: 0.5rem;
+}
+
+/* Payment Link */
+.payment-link {
+  text-align: center;
+  margin: 1.5rem 0;
+}
+
+.payment-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--payme-primary);
+  color: white;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.payment-url:hover {
+  background: var(--payme-secondary);
+}
+
+/* Payment Instructions */
+.payment-instructions {
+  background: var(--surface-color, #f8fafc);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.payment-instructions p {
+  margin: 0 0 0.5rem 0;
+  font-weight: 500;
+}
+
+.payment-instructions ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.payment-instructions li {
+  margin-bottom: 0.25rem;
+  color: var(--text-secondary, #64748b);
+}
+
+/* Polling Status */
+.polling-status {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.polling-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-top: 2px solid var(--payme-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.polling-info p {
+  margin: 0.25rem 0;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.875rem;
+}
+
+/* Success Info */
+.success-info {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.success-info p {
+  margin: 0.5rem 0;
+  color: var(--success-text, #059669);
+  font-weight: 500;
+}
+
+/* Print Tickets */
+.print-tickets {
+  background: var(--surface-color, #f8fafc);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.print-tickets h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary, #1e293b);
+}
+
+.tickets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ticket-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 0.375rem;
+}
+
+.ticket-info {
+  flex: 1;
+}
+
+.ticket-patient {
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 0.25rem;
+}
+
+.ticket-details {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.print-ticket-btn {
+  padding: 0.5rem;
+  background: var(--payme-primary);
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.print-ticket-btn:hover {
+  background: var(--payme-secondary);
+}
+
+/* Error Info */
+.error-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--error-bg, #fef2f2);
+  border: 1px solid var(--error-border, #fecaca);
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--error-text, #dc2626);
+}
+
+/* Failure Info */
+.failure-info {
+  text-align: center;
+}
+
+.failure-info p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary, #64748b);
+}
+
+.failure-info ul {
+  text-align: left;
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.failure-info li {
+  margin-bottom: 0.25rem;
+  color: var(--text-secondary, #64748b);
+}
+
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .payment-payme-container {
+    padding: 1rem;
+  }
+  
+  .payment-header {
+    margin-bottom: 1.5rem;
+  }
+  
+  .payment-details,
+  .payment-info,
+  .payment-instructions,
+  .print-tickets {
+    margin-bottom: 1rem;
+  }
+}

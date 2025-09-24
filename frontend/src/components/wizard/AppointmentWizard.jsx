@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   User, 
   Calendar, 
@@ -57,6 +57,38 @@ const AppointmentWizard = ({
     }
   });
 
+  // Сброс данных при открытии мастера
+  useEffect(() => {
+    if (isOpen) {
+      setWizardData({
+        patient: {
+          fio: '',
+          birth_date: '',
+          phone: '',
+          email: '',
+          address: ''
+        },
+        appointment: {
+          doctor_id: '',
+          services: [],
+          date: new Date().toISOString().split('T')[0],
+          time: '',
+          visit_type: 'Платный',
+          notes: ''
+        },
+        payment: {
+          method: 'Карта',
+          amount: 0
+        }
+      });
+      setCurrentStep(1);
+      setSelectedPatientId(null);
+      setPatientSuggestions([]);
+      setShowSuggestions(false);
+      setErrors({});
+    }
+  }, [isOpen]);
+
   // Ошибки валидации
   const [errors, setErrors] = useState({});
   
@@ -113,15 +145,15 @@ const AppointmentWizard = ({
     const newErrors = {};
     
     if (step === 1) {
-      if (!wizardData.patient.fio.trim()) {
+      if (!(wizardData.patient?.fio || '').trim()) {
         newErrors.fio = 'Введите ФИО пациента';
       }
-      if (!wizardData.patient.birth_date) {
+      if (!wizardData.patient?.birth_date) {
         newErrors.birth_date = 'Укажите дату рождения';
       }
-      if (!wizardData.patient.phone.trim()) {
+      if (!(wizardData.patient?.phone || '').trim()) {
         newErrors.phone = 'Введите номер телефона';
-      } else if (!/^\+?[0-9\s\-\(\)]{10,}$/.test(wizardData.patient.phone)) {
+      } else if (!/^\+?[0-9\s\-\(\)]{10,}$/.test(wizardData.patient?.phone || '')) {
         newErrors.phone = 'Некорректный формат телефона';
       }
     }
@@ -211,7 +243,7 @@ const AppointmentWizard = ({
   };
 
   // Обновление данных
-  const updateWizardData = (section, field, value) => {
+  const updateWizardData = useCallback((section, field, value) => {
     setWizardData(prev => ({
       ...prev,
       [section]: {
@@ -221,10 +253,78 @@ const AppointmentWizard = ({
     }));
     
     // Очистка ошибки при изменении поля
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
+    setErrors(prev => {
+      if (prev[field]) {
+        return { ...prev, [field]: null };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Простые стабильные обработчики без зависимостей
+  const handleFioChange = useCallback((e) => {
+    const value = e.target.value;
+    setWizardData(prev => ({
+      ...prev,
+      patient: { ...prev.patient, fio: value }
+    }));
+    // Поиск пациентов вызываем отдельно
+    if (value.trim()) {
+      searchPatients(value);
     }
-  };
+  }, []);
+
+  const handlePhoneChange = useCallback((e) => {
+    let value = e.target.value.replace(/\D/g, ''); // Только цифры
+    
+    // Форматирование для Узбекистана +998-xx-xxx-xx-xx
+    if (value.length === 0) {
+      setWizardData(prev => ({
+        ...prev,
+        patient: { ...prev.patient, phone: '' }
+      }));
+      return;
+    }
+    
+    // Автоматически добавляем +998 если не указан код страны
+    if (!value.startsWith('998')) {
+      value = '998' + value;
+    }
+    
+    // Форматирование
+    let formatted = '+998';
+    if (value.length > 3) {
+      formatted += ' (' + value.slice(3, 5);
+      if (value.length > 5) {
+        formatted += ') ' + value.slice(5, 8);
+        if (value.length > 8) {
+          formatted += '-' + value.slice(8, 10);
+          if (value.length > 10) {
+            formatted += '-' + value.slice(10, 12);
+          }
+        }
+      }
+    }
+    
+    setWizardData(prev => ({
+      ...prev,
+      patient: { ...prev.patient, phone: formatted }
+    }));
+  }, []);
+
+  const handleBirthDateChange = useCallback((e) => {
+    setWizardData(prev => ({
+      ...prev,
+      patient: { ...prev.patient, birth_date: e.target.value }
+    }));
+  }, []);
+
+  const handleAddressChange = useCallback((e) => {
+    setWizardData(prev => ({
+      ...prev,
+      patient: { ...prev.patient, address: e.target.value }
+    }));
+  }, []);
 
   // Навигация по шагам
   const goToStep = (step) => {
@@ -286,11 +386,61 @@ const AppointmentWizard = ({
     }, 0);
   }, [wizardData.appointment.services, services]);
 
+  // Проверка, есть ли введенные данные
+  const hasUserData = useMemo(() => {
+    const { patient, appointment } = wizardData;
+    
+    // Проверяем только значимые поля, которые пользователь мог изменить
+    const hasPatientData = (patient?.fio || '').trim() !== '' ||
+                          (patient?.phone || '').trim() !== '' ||
+                          (patient?.birth_date || '').trim() !== '';
+    
+    const hasAppointmentData = (appointment?.services || []).length > 0 ||
+                              (appointment?.doctor_id || '').trim() !== '';
+    
+    return hasPatientData || hasAppointmentData;
+  }, [
+    wizardData.patient?.fio,
+    wizardData.patient?.phone,
+    wizardData.patient?.birth_date,
+    wizardData.appointment?.services,
+    wizardData.appointment?.doctor_id
+  ]);
+
+  // Безопасное закрытие с подтверждением
+  const handleSafeClose = useCallback(() => {
+    if (hasUserData && !isProcessing) {
+      const shouldClose = window.confirm(
+        'У вас есть несохраненные данные. Вы уверены, что хотите закрыть мастер регистрации?'
+      );
+      if (shouldClose) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  }, [hasUserData, isProcessing, onClose]);
+
+  // Обработчик клавиши Escape
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen && !isProcessing) {
+        e.preventDefault();
+        handleSafeClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen, isProcessing, handleSafeClose]);
+
   const actions = [
     {
       label: 'Отмена',
       variant: 'secondary',
-      onClick: onClose,
+      onClick: handleSafeClose,
       disabled: isProcessing
     },
     ...(currentStep > 1 ? [{
@@ -314,15 +464,15 @@ const AppointmentWizard = ({
   ];
 
   return (
-    <ModernDialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Новая запись"
-      actions={actions}
-      maxWidth="42rem"
-      closeOnBackdrop={!isProcessing}
-      closeOnEscape={!isProcessing}
-      className="appointment-wizard"
+      <ModernDialog
+        isOpen={isOpen}
+        onClose={handleSafeClose}
+        title="Новая запись"
+        actions={actions}
+        maxWidth="42rem"
+        closeOnBackdrop={false}
+        closeOnEscape={false}
+        className="appointment-wizard"
     >
       <div className="wizard-container">
         {/* Индикатор шагов */}
@@ -358,6 +508,10 @@ const AppointmentWizard = ({
               showSuggestions={showSuggestions}
               onUpdate={(field, value) => updateWizardData('patient', field, value)}
               onSearch={searchPatients}
+              handleFioChange={handleFioChange}
+              handlePhoneChange={handlePhoneChange}
+              handleBirthDateChange={handleBirthDateChange}
+              handleAddressChange={handleAddressChange}
               onSelectPatient={(patient) => {
                 setWizardData(prev => ({
                   ...prev,
@@ -405,19 +559,23 @@ const AppointmentWizard = ({
 };
 
 // Компонент шага "Пациент"
-const PatientStep = ({ 
-  data, 
-  errors, 
-  suggestions, 
-  showSuggestions, 
-  onUpdate, 
-  onSearch, 
-  onSelectPatient,
-  fioRef,
-  phoneRef,
-  theme,
-  getColor 
-}) => (
+  const PatientStep = React.memo(({
+    data,
+    errors,
+    suggestions,
+    showSuggestions,
+    onUpdate,
+    onSearch,
+    onSelectPatient,
+    fioRef,
+    phoneRef,
+    theme,
+    getColor,
+    handleFioChange,
+    handlePhoneChange,
+    handleBirthDateChange,
+    handleAddressChange
+  }) => (
   <div className="wizard-step-content">
     <h3 style={{ color: getColor('textPrimary'), marginBottom: '24px' }}>
       Данные пациента
@@ -429,13 +587,11 @@ const PatientStep = ({
         <label>ФИО пациента *</label>
         <div className="search-field">
           <input
+            key="fio-input"
             ref={fioRef}
             type="text"
             value={data.fio}
-            onChange={(e) => {
-              onUpdate('fio', e.target.value);
-              onSearch(e.target.value);
-            }}
+            onChange={handleFioChange}
             placeholder="Введите ФИО для поиска..."
             className={errors.fio ? 'error' : ''}
           />
@@ -464,11 +620,12 @@ const PatientStep = ({
       {/* Дата рождения */}
       <div className="form-field">
         <label>Дата рождения *</label>
-        <input
-          type="date"
-          value={data.birth_date}
-          onChange={(e) => onUpdate('birth_date', e.target.value)}
-          className={errors.birth_date ? 'error' : ''}
+          <input
+            key="birth-date-input"
+            type="date"
+            value={data.birth_date}
+            onChange={handleBirthDateChange}
+            className={errors.birth_date ? 'error' : ''}
         />
         {errors.birth_date && <span className="error-text">{errors.birth_date}</span>}
       </div>
@@ -479,44 +636,12 @@ const PatientStep = ({
         <label>Телефон *</label>
         <div className="input-with-icon">
           <Phone size={16} className="input-icon" />
-          <input
-            ref={phoneRef}
-            type="tel"
+            <input
+              key="phone-input"
+              ref={phoneRef}
+              type="tel"
             value={data.phone}
-            onChange={(e) => {
-              let value = e.target.value.replace(/\D/g, ''); // Только цифры
-              
-              // Форматирование для Узбекистана +998-xx-xxx-xx-xx
-              if (value.startsWith('998')) {
-                if (value.length <= 3) {
-                  value = `+998`;
-                } else if (value.length <= 5) {
-                  value = `+998-${value.slice(3)}`;
-                } else if (value.length <= 8) {
-                  value = `+998-${value.slice(3, 5)}-${value.slice(5)}`;
-                } else if (value.length <= 10) {
-                  value = `+998-${value.slice(3, 5)}-${value.slice(5, 8)}-${value.slice(8)}`;
-                } else {
-                  value = `+998-${value.slice(3, 5)}-${value.slice(5, 8)}-${value.slice(8, 10)}-${value.slice(10, 12)}`;
-                }
-              } else if (value.length > 0) {
-                // Автоматически добавляем +998 если не указан код страны
-                value = '998' + value;
-                if (value.length <= 3) {
-                  value = `+998`;
-                } else if (value.length <= 5) {
-                  value = `+998-${value.slice(3)}`;
-                } else if (value.length <= 8) {
-                  value = `+998-${value.slice(3, 5)}-${value.slice(5)}`;
-                } else if (value.length <= 10) {
-                  value = `+998-${value.slice(3, 5)}-${value.slice(5, 8)}-${value.slice(8)}`;
-                } else {
-                  value = `+998-${value.slice(3, 5)}-${value.slice(5, 8)}-${value.slice(8, 10)}-${value.slice(10, 12)}`;
-                }
-              }
-              
-              onUpdate('phone', value);
-            }}
+            onChange={handlePhoneChange}
             placeholder="+998-xx-xxx-xx-xx"
             className={errors.phone ? 'error' : ''}
             maxLength={17}
@@ -532,16 +657,17 @@ const PatientStep = ({
         <div className="input-with-icon">
           <MapPin size={16} className="input-icon" />
           <input
+            key="address-input"
             type="text"
             value={data.address}
-            onChange={(e) => onUpdate('address', e.target.value)}
+            onChange={handleAddressChange}
             placeholder="Адрес проживания"
           />
         </div>
       </div>
     </div>
   </div>
-);
+));
 
 // Компонент шага "Запись"
 const AppointmentStep = ({ 
@@ -602,10 +728,11 @@ const AppointmentStep = ({
       {/* Дата и время */}
       <div className="form-field">
         <label>Дата приема *</label>
-        <input
-          type="date"
-          value={data.date}
-          onChange={(e) => onUpdate('date', e.target.value)}
+          <input
+            key="appointment-date-input"
+            type="date"
+            value={data.date}
+            onChange={(e) => onUpdate('date', e.target.value)}
           min={new Date().toISOString().split('T')[0]}
           className={errors.date ? 'error' : ''}
         />

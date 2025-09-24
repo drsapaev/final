@@ -33,6 +33,7 @@ import PhotoUploader from '../components/dermatology/PhotoUploader';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
 import ProcedureTemplates from '../components/dermatology/ProcedureTemplates';
 import SkinAnalysis from '../components/dermatology/SkinAnalysis';
+import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
 import QueueIntegration from '../components/QueueIntegration';
@@ -43,15 +44,7 @@ import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
  * Объединяет: очередь + фото до/после + косметология + AI
  */
 const DermatologistPanelUnified = () => {
-  // Проверяем демо-режим в самом начале
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('DermatologistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
-  
+  // Всегда вызываем хуки первыми
   const { theme, isDark, getColor } = useTheme();
   
   const [activeTab, setActiveTab] = useState('queue');
@@ -93,6 +86,7 @@ const DermatologistPanelUnified = () => {
   const [showCosmeticForm, setShowCosmeticForm] = useState(false);
   const [skinExaminations, setSkinExaminations] = useState([]);
   const [cosmeticProcedures, setCosmeticProcedures] = useState([]);
+  const [photoData, setPhotoData] = useState([]);
   
   // Дополнительные состояния из старого файла
   const [patients, setPatients] = useState([]);
@@ -100,6 +94,10 @@ const DermatologistPanelUnified = () => {
   const [emr, setEmr] = useState(null);
   const [prescription, setPrescription] = useState(null);
   const [doctorPrice, setDoctorPrice] = useState('');
+  
+  // Состояние для PriceOverrideManager
+  const [showPriceOverride, setShowPriceOverride] = useState(false);
+  const [selectedServiceForPriceOverride, setSelectedServiceForPriceOverride] = useState(null);
   
   // Локальный справочник цен для дерма/косметологии
   const dermaPriceMap = useMemo(() => ({
@@ -145,6 +143,15 @@ const DermatologistPanelUnified = () => {
       loadPatientData();
     }
   }, [selectedPatient]);
+
+  // Проверяем демо-режим после всех хуков
+  const isDemoMode = window.location.pathname.includes('/medilab-demo');
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('DermatologistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
 
   const authHeader = () => ({
     Authorization: `Bearer ${localStorage.getItem('auth_token') || localStorage.getItem('token') || ''}`,
@@ -1292,16 +1299,36 @@ const DermatologistPanelUnified = () => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Стоимость от врача (UZS)
                     </label>
-                    <div className="relative">
-                      <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        value={doctorPrice}
-                        onChange={(e) => setDoctorPrice(e.target.value)}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        placeholder="Например: 50000"
-                        inputMode="numeric"
-                      />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <DollarSign size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={doctorPrice}
+                          onChange={(e) => setDoctorPrice(e.target.value)}
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          placeholder="Например: 50000"
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (selectedServices.length > 0) {
+                            setSelectedServiceForPriceOverride({
+                              id: selectedServices[0].id || 1,
+                              name: selectedServices[0].name || 'Выбранная услуга',
+                              price: selectedServices[0].price || 50000
+                            });
+                            setShowPriceOverride(true);
+                          } else {
+                            alert('Сначала выберите услугу');
+                          }
+                        }}
+                        className="px-3 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 flex items-center"
+                        title="Изменить цену процедуры"
+                      >
+                        <DollarSign size={16} />
+                      </button>
                     </div>
                   </div>
                   
@@ -1411,6 +1438,25 @@ const DermatologistPanelUnified = () => {
           </div>
         )}
       </div>
+      
+      {/* PriceOverrideManager Modal */}
+      {showPriceOverride && selectedServiceForPriceOverride && (
+        <PriceOverrideManager
+          visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
+          serviceId={selectedServiceForPriceOverride.id}
+          serviceName={selectedServiceForPriceOverride.name}
+          originalPrice={selectedServiceForPriceOverride.price}
+          isOpen={showPriceOverride}
+          onClose={() => {
+            setShowPriceOverride(false);
+            setSelectedServiceForPriceOverride(null);
+          }}
+          onPriceOverrideCreated={(override) => {
+            console.log('Price override created:', override);
+            // Можно добавить логику обновления состояния
+          }}
+        />
+      )}
     </div>
   );
 };

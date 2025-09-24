@@ -7,7 +7,7 @@ import logging
 
 from .base import BasePaymentProvider, PaymentResult
 from .click import ClickProvider
-from .payme import PaymeProvider
+from .payme import PayMeProvider
 from .kaspi import KaspiProvider
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class PaymentProviderManager:
         
         provider_classes = {
             "click": ClickProvider,
-            "payme": PaymeProvider,
+            "payme": PayMeProvider,
             "kaspi": KaspiProvider
         }
         

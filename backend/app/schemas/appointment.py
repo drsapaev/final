@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import Field
 
@@ -18,6 +18,11 @@ class AppointmentBase(ORMModel):
     status: str = Field(
         default="scheduled", max_length=16
     )  # scheduled, confirmed, cancelled, completed
+
+    # Дополнительные поля для регистратуры
+    visit_type: Optional[str] = Field(default="paid", max_length=16)  # paid, repeat, free
+    payment_type: Optional[str] = Field(default="cash", max_length=16)  # cash, card, online
+    services: Optional[List[str]] = Field(default_factory=list)  # Список услуг
 
     # Поля для интеграции с платежами
     payment_amount: Optional[float] = None
@@ -39,6 +44,11 @@ class AppointmentUpdate(ORMModel):
     appointment_time: Optional[str] = Field(None, max_length=8)
     notes: Optional[str] = Field(None, max_length=1000)
     status: Optional[str] = Field(None, max_length=16)
+
+    # Дополнительные поля для регистратуры
+    visit_type: Optional[str] = Field(None, max_length=16)  # paid, repeat, free
+    payment_type: Optional[str] = Field(None, max_length=16)  # cash, card, online
+    services: Optional[List[str]] = None  # Список услуг
 
     # Поля для интеграции с платежами
     payment_amount: Optional[float] = None

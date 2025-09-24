@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     ai,  # Новый AI модуль
     analytics,
     telegram_bot,  # Telegram Bot
+    payment_settings,  # Настройки платежных провайдеров
     analytics_kpi,
     analytics_predictive,
     api_documentation,
@@ -58,6 +59,7 @@ from app.api.v1.endpoints import (
     # online_queue_new,  # Временно отключено
     patients,
     registrar_integration,
+    registrar_wizard,  # Новый мастер регистрации
     doctor_integration,
     print_templates,
     print_api,
@@ -90,7 +92,7 @@ api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
-api_router.include_router(services.router, prefix="/services", tags=["services"])
+api_router.include_router(services.router, prefix="/services")
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(payments_new_router, prefix="/payments", tags=["payments-new"])
 api_router.include_router(payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"])
@@ -99,6 +101,7 @@ api_router.include_router(appointments.router, tags=["appointments"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
 # api_router.include_router(online_queue_new.router, tags=["online-queue-new"])  # Временно отключено
 api_router.include_router(registrar_integration.router, tags=["registrar"])
+api_router.include_router(registrar_wizard.router, tags=["registrar-wizard"])
 api_router.include_router(doctor_integration.router, tags=["doctor-integration"])
 api_router.include_router(print_templates.router, prefix="/print/templates", tags=["print-templates"])
 api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
@@ -114,6 +117,7 @@ api_router.include_router(payment_webhook.router, tags=["webhooks"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
 api_router.include_router(clinic_management.router, prefix="/clinic", tags=["clinic-management"])
+api_router.include_router(payment_settings.router, tags=["payment-settings"])
 api_router.include_router(admin_display.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_doctors.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_providers.router, tags=["admin"])

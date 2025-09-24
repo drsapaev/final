@@ -40,6 +40,9 @@ import {
 } from 'lucide-react';
 import '../styles/animations.css';
 
+// ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
+import useModal from '../hooks/useModal';
+
 const DoctorPanel = () => {
   const location = useLocation();
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
@@ -50,8 +53,8 @@ const DoctorPanel = () => {
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [showPatientModal, setShowPatientModal] = useState(false);
+  // ✅ УЛУЧШЕНИЕ: Универсальный хук вместо дублированных состояний
+  const patientModal = useModal();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   
@@ -358,9 +361,9 @@ const DoctorPanel = () => {
     return statusMap[status] || status;
   };
 
+  // ✅ УЛУЧШЕНИЕ: Обработчик с универсальным хуком
   const handlePatientClick = (patient) => {
-    setSelectedPatient(patient);
-    setShowPatientModal(true);
+    patientModal.openModal(patient);
   };
 
   const filteredPatients = patients.filter(patient => {
@@ -1073,6 +1076,131 @@ const DoctorPanel = () => {
           </AnimatedTransition>
         )}
       </main>
+
+      {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
+      {patientModal.isOpen && patientModal.selectedItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '500px',
+            margin: '16px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                Информация о пациенте
+              </h3>
+              <button 
+                onClick={patientModal.closeModal}
+                style={{ 
+                  color: '#9CA3AF', 
+                  cursor: 'pointer', 
+                  border: 'none', 
+                  background: 'none',
+                  padding: '4px',
+                  borderRadius: '4px'
+                }}
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  backgroundColor: '#3B82F6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '18px',
+                  fontWeight: '600'
+                }}>
+                  {patientModal.selectedItem.name?.charAt(0) || 'П'}
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                    {patientModal.selectedItem.name || 'Неизвестно'}
+                  </h4>
+                  <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>
+                    {patientModal.selectedItem.phone || 'Телефон не указан'}
+                  </p>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Возраст
+                  </p>
+                  <p style={{ fontSize: '16px', color: '#111827', margin: 0, fontWeight: '500' }}>
+                    {patientModal.selectedItem.age || 'Не указан'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Статус
+                  </p>
+                  <p style={{ fontSize: '16px', color: '#111827', margin: 0, fontWeight: '500' }}>
+                    {patientModal.selectedItem.status === 'active' ? 'Активный' : 
+                     patientModal.selectedItem.status === 'waiting' ? 'Ожидает' : 
+                     patientModal.selectedItem.status || 'Неизвестно'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+              <button
+                onClick={patientModal.closeModal}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Закрыть
+              </button>
+              <button
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  backgroundColor: '#3B82F6',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Редактировать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

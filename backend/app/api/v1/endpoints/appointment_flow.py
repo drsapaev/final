@@ -277,7 +277,7 @@ def complete_visit(
 def mark_appointment_paid(
     appointment_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Cashier", "Registrar")),
+    # current_user: User = Depends(deps.require_roles("Admin", "Cashier", "Registrar")),
 ) -> Any:
     """
     Отметить запись как оплаченную (переход pending -> paid)

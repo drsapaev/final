@@ -42,9 +42,12 @@ def get_registrar_services(
         
         # Группируем услуги по категориям согласно документации
         grouped_services = {
-            "laboratory": [],     # Лабораторные анализы
-            "dermatology": [],    # Дерматологические услуги
-            "cosmetology": []     # Косметологические услуги
+            "laboratory": [],     # L - Лабораторные анализы
+            "dermatology": [],    # D - Дерматологические услуги
+            "cosmetology": [],    # C - Косметологические услуги
+            "cardiology": [],     # K - Кардиология
+            "stomatology": [],    # S - Стоматология
+            "procedures": []      # O - Прочие процедуры
         }
         
         # Простая логика распределения услуг по трём группам
@@ -58,29 +61,42 @@ def get_registrar_services(
                 "duration_minutes": service.duration_minutes or 30,
                 "category_id": service.category_id,
                 "doctor_id": service.doctor_id,
+                # ✅ НОВЫЕ ПОЛЯ ДЛЯ КЛАССИФИКАЦИИ
+                "category_code": getattr(service, 'category_code', None),
+                "service_code": getattr(service, 'service_code', None),
+                "is_consultation": getattr(service, 'is_consultation', False),  # Добавляем поле is_consultation
                 "group": None  # Добавим группу для frontend
             }
             
-            # Определяем группу по коду или названию услуги
-            if service.category_id:
-                category = next((c for c in categories if c.id == service.category_id), None)
-                if category:
-                    # Маппинг на основе кода категории
-                    if "laboratory" in category.code or "lab" in category.code or "анализ" in service.name.lower():
-                        service_data["group"] = "laboratory"
-                        grouped_services["laboratory"].append(service_data)
-                    elif "dermatology" in category.code or "дерматолог" in service.name.lower():
-                        service_data["group"] = "dermatology"
-                        grouped_services["dermatology"].append(service_data)
-                    elif "cosmetology" in category.code or "косметолог" in service.name.lower():
-                        service_data["group"] = "cosmetology"
-                        grouped_services["cosmetology"].append(service_data)
-                    else:
-                        # По умолчанию добавляем в лабораторию
-                        service_data["group"] = "laboratory"
-                        grouped_services["laboratory"].append(service_data)
+            # ✅ НОВАЯ ЛОГИКА: определяем группу по category_code
+            category_code = getattr(service, 'category_code', None)
+            
+            if category_code:
+                # Используем новую систему кодов
+                if category_code == 'L':
+                    service_data["group"] = "laboratory"
+                    grouped_services["laboratory"].append(service_data)
+                elif category_code == 'D':
+                    service_data["group"] = "dermatology"
+                    grouped_services["dermatology"].append(service_data)
+                elif category_code == 'C':
+                    service_data["group"] = "cosmetology"
+                    grouped_services["cosmetology"].append(service_data)
+                elif category_code == 'K':
+                    service_data["group"] = "cardiology"
+                    grouped_services["cardiology"].append(service_data)
+                elif category_code == 'S':
+                    service_data["group"] = "stomatology"
+                    grouped_services["stomatology"].append(service_data)
+                elif category_code == 'O':
+                    service_data["group"] = "procedures"
+                    grouped_services["procedures"].append(service_data)
+                else:
+                    # Неизвестный код - в прочие
+                    service_data["group"] = "procedures"
+                    grouped_services["procedures"].append(service_data)
             else:
-                # Если нет категории, пытаемся определить по названию
+                # Fallback: если нет category_code, пытаемся определить по названию
                 name_lower = service.name.lower()
                 if any(word in name_lower for word in ["анализ", "кровь", "моча", "биохим", "гормон"]):
                     service_data["group"] = "laboratory"
@@ -91,10 +107,16 @@ def get_registrar_services(
                 elif any(word in name_lower for word in ["косметолог", "пилинг", "чистка", "ботокс"]):
                     service_data["group"] = "cosmetology"
                     grouped_services["cosmetology"].append(service_data)
+                elif any(word in name_lower for word in ["кардиолог", "экг", "эхокг", "холтер"]):
+                    service_data["group"] = "cardiology"
+                    grouped_services["cardiology"].append(service_data)
+                elif any(word in name_lower for word in ["стоматолог", "зуб", "кариес"]):
+                    service_data["group"] = "stomatology"
+                    grouped_services["stomatology"].append(service_data)
                 else:
-                    # По умолчанию в лабораторию
-                    service_data["group"] = "laboratory"
-                    grouped_services["laboratory"].append(service_data)
+                    # По умолчанию в прочие процедуры
+                    service_data["group"] = "procedures"
+                    grouped_services["procedures"].append(service_data)
         
         return {
             "services_by_group": grouped_services,

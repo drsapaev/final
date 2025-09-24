@@ -276,7 +276,7 @@ export default function Header() {
         padding: '12px 24px',
         maxWidth: '100%'
       }}>
-        {/* Логотип */}
+      {/* Логотип */}
         <button 
           className="interactive-element hover-lift focus-ring"
           onClick={() => navigate('/')}
@@ -291,18 +291,18 @@ export default function Header() {
             color: textColor 
           }}
         >
-          <Hospital size={24} color={getColor('primary', 500)} />
+        <Hospital size={24} color={getColor('primary', 500)} />
           <span style={{ fontSize: '20px', fontWeight: 'bold' }}>Clinic</span>
           <span style={{ fontSize: '12px', fontWeight: 'normal', opacity: 0.6 }}>v0.1.0</span>
         </button>
 
-        {/* Навигация */}
+      {/* Навигация */}
         <nav style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {navItems.map(item => {
-            const isActive = location.pathname === item.to;
-            return (
-              <button 
-                key={item.to} 
+        {navItems.map(item => {
+          const isActive = location.pathname === item.to;
+          return (
+            <button 
+              key={item.to} 
                 className="interactive-element hover-lift ripple-effect focus-ring"
                 style={{
                   height: '40px',
@@ -328,13 +328,13 @@ export default function Header() {
                     boxShadow: 'none'
                   })
                 }}
-                onClick={() => navigate(item.to)}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+              onClick={() => navigate(item.to)}
+            >
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
 
           {/* Быстрые ссылки для регистратора внутри панели */}
           {roleLower === 'registrar' && location.pathname === '/registrar-panel' && (
@@ -469,22 +469,22 @@ export default function Header() {
                       }}
                     />
                   </div>
-                </div>
+      </div>
               )}
             </>
           )}
         </nav>
 
-        {/* Управление */}
+      {/* Управление */}
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: '12px',
           whiteSpace: 'nowrap'
         }}>
-          {/* Переключатель темы */}
-          <button 
-            onClick={toggleTheme} 
+        {/* Переключатель темы */}
+        <button 
+          onClick={toggleTheme} 
             className="interactive-element hover-lift ripple-effect focus-ring"
             style={{
               width: '40px',
@@ -499,15 +499,15 @@ export default function Header() {
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
               cursor: 'pointer'
             }}
-            title="Переключить тему"
-          >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+          title="Переключить тему"
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
 
-          {/* Переключатель языка */}
-          <select 
-            value={lang} 
-            onChange={(e) => changeLang(e.target.value)} 
+        {/* Переключатель языка */}
+        <select 
+          value={lang} 
+          onChange={(e) => changeLang(e.target.value)} 
             className="interactive-element focus-ring"
             style={{
               height: '40px',
@@ -522,15 +522,15 @@ export default function Header() {
               color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
               cursor: 'pointer'
             }}
-          >
-            <option value="ru">RU</option>
-            <option value="uz">UZ</option>
-            <option value="en">EN</option>
-          </select>
+        >
+          <option value="ru">RU</option>
+          <option value="uz">UZ</option>
+          <option value="en">EN</option>
+        </select>
 
-          {/* Информация о пользователе */}
-          {user ? (
-            <>
+        {/* Информация о пользователе */}
+        {user ? (
+          <>
               <button
                 onClick={() => navigate('/registrar-panel')}
                 className="interactive-element hover-lift ripple-effect focus-ring user-profile-button"
@@ -555,9 +555,9 @@ export default function Header() {
                 }}
                 title="Открыть панель регистратора"
               >
-                <User size={16} />
+              <User size={16} />
                 <span style={{ fontWeight: '700' }}>{displayName}</span>
-                {showRoleBadge && (
+              {showRoleBadge && (
                   <span 
                     className="role-badge"
                     style={{
@@ -574,9 +574,9 @@ export default function Header() {
                   </span>
                 )}
               </button>
-              <button
+            <button
                 id="logout-header-btn"
-                onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
+              onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
                 className="interactive-element hover-lift ripple-effect action-button-hover focus-ring logout-button"
                 style={{
                   height: '40px',
@@ -602,16 +602,16 @@ export default function Header() {
                   alignSelf: 'center',
                   overflow: 'visible'
                 }}
-              >
-                <LogOut size={16} />
-                <span>Выйти</span>
-              </button>
-            </>
-          ) : (
-            <button 
-              onClick={() => navigate('/login')} 
+            >
+              <LogOut size={16} />
+              <span>Выйти</span>
+            </button>
+          </>
+        ) : (
+          <button 
+            onClick={() => navigate('/login')} 
               className="interactive-element hover-lift ripple-effect action-button-hover focus-ring"
-              style={{
+            style={{
                 height: '40px',
                 padding: '8px 12px',
                 display: 'flex',
@@ -622,18 +622,18 @@ export default function Header() {
                 fontWeight: '500',
                 color: 'white',
                 transition: 'all 0.2s ease',
-                background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+              background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
                 boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
-                border: 'none',
+              border: 'none',
                 cursor: 'pointer'
-              }}
-            >
-              <User size={16} />
-              <span>Войти</span>
-            </button>
-          )}
-        </div>
+            }}
+          >
+            <User size={16} />
+            <span>Войти</span>
+          </button>
+        )}
       </div>
+    </div>
     </header>
   );
 }

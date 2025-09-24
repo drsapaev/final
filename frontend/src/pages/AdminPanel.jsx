@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -14,9 +14,7 @@ import {
   CheckCircle,
   Clock,
   UserPlus,
-  Database,
   Activity,
-  Bell,
   Search,
   Filter,
   Download,
@@ -25,9 +23,6 @@ import {
   Edit,
   Trash2,
   Plus,
-  MoreHorizontal,
-  ChevronDown,
-  ChevronUp,
   RefreshCw,
   Package,
   Brain,
@@ -46,6 +41,15 @@ import { Card, Badge, Button, Skeleton } from '../design-system/components';
 import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
 import { useFade, useSlide, useScale } from '../design-system/hooks/useAnimation';
 import { useTheme } from '../contexts/ThemeContext';
+
+// ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
+import useModal from '../hooks/useModal';
+import useAsyncAction from '../hooks/useAsyncAction';
+
+// ✅ УЛУЧШЕНИЕ: Унифицированные компоненты (будут использованы в следующих итерациях)
+// import UnifiedLayout from '../components/layout/UnifiedLayout';
+// import { MedicalCard, MetricCard, MedicalTable } from '../components/medical';
+// import AdminSection from '../components/admin/AdminSection';
 import KPICard from '../components/admin/KPICard';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import ErrorBoundary from '../components/admin/ErrorBoundary';
@@ -77,6 +81,10 @@ import DisplayBoardSettings from '../components/admin/DisplayBoardSettings';
 import ActivationSystem from '../components/admin/ActivationSystem';
 import SecuritySettings from '../components/admin/SecuritySettings';
 import SecurityMonitor from '../components/admin/SecurityMonitor';
+import AllFreeApproval from '../components/admin/AllFreeApproval';
+import BenefitSettings from '../components/admin/BenefitSettings';
+import WizardSettings from '../components/admin/WizardSettings';
+import PaymentProviderSettings from '../components/admin/PaymentProviderSettings';
 import { useAdminHotkeys } from '../hooks/useHotkeys';
 import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
@@ -87,17 +95,14 @@ import '../styles/dark-theme-visibility-fix.css';
 const AdminPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const screenSize = useScreenSize();
   
   // Состояние для UX улучшений
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Обработчики горячих клавиш
   const hotkeyHandlers = {
     save: () => {
       // Логика сохранения для текущего раздела
-      console.log('Сохранение через горячую клавишу');
     },
     search: () => {
       // Фокус на поле поиска
@@ -107,11 +112,10 @@ const AdminPanel = () => {
       }
     },
     refresh: async () => {
-      setIsRefreshing(true);
       try {
         await refreshStats();
-      } finally {
-        setIsRefreshing(false);
+      } catch (error) {
+        console.error('Ошибка обновления:', error);
       }
     },
     dashboard: () => navigate('/admin'),
@@ -170,10 +174,8 @@ const AdminPanel = () => {
     deleteUser
   } = useUsers();
   
-  // Состояние модального окна пользователей
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [userModalLoading, setUserModalLoading] = useState(false);
+  // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном пользователей
+  const userModal = useModal();
   
   // Хук для управления врачами
   const {
@@ -193,10 +195,8 @@ const AdminPanel = () => {
     deleteDoctor
   } = useDoctors();
   
-  // Состояние модального окна врачей
-  const [showDoctorModal, setShowDoctorModal] = useState(false);
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [doctorModalLoading, setDoctorModalLoading] = useState(false);
+  // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном врачей
+  const doctorModal = useModal();
   
   // Хук для управления пациентами
   const {
@@ -217,10 +217,8 @@ const AdminPanel = () => {
     calculateAge
   } = usePatients();
   
-  // Состояние модального окна пациентов
-  const [showPatientModal, setShowPatientModal] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [patientModalLoading, setPatientModalLoading] = useState(false);
+  // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном пациентов
+  const patientModal = useModal();
   
   // Хук для управления записями
   const {
@@ -243,10 +241,8 @@ const AdminPanel = () => {
     getTomorrowAppointments
   } = useAppointments();
   
-  // Состояние модального окна записей
-  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [appointmentModalLoading, setAppointmentModalLoading] = useState(false);
+  // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном записей
+  const appointmentModal = useModal();
   
   // Хук для управления финансами
   const {
@@ -271,10 +267,11 @@ const AdminPanel = () => {
     getDailyStats
   } = useFinance();
   
-  // Состояние модального окна финансов
-  const [showFinanceModal, setShowFinanceModal] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [financeModalLoading, setFinanceModalLoading] = useState(false);
+  // ✅ УЛУЧШЕНИЕ: Универсальное управление модальным окном финансов
+  const financeModal = useModal();
+
+  // ✅ УЛУЧШЕНИЕ: Универсальный хук для async действий
+  const asyncAction = useAsyncAction();
   
   // Хук для управления отчетами
   const {
@@ -402,37 +399,24 @@ const AdminPanel = () => {
     }
   ]);
   
-  const { isMobile, isTablet } = useBreakpoint();
-  const isTouchDevice = useTouchDevice();
   const { 
-    theme, 
-    isDark, 
-    isLight, 
-    toggleTheme, 
-    getColor, 
     getSpacing, 
     getFontSize 
   } = useTheme();
   
-  // Анимации
-  const { isVisible: fadeIn, fadeIn: startFadeIn } = useFade(false);
-  const { isVisible: slideIn, slideIn: startSlideIn } = useSlide(false, 'up');
-  const { isVisible: scaleIn, scaleIn: startScaleIn } = useScale(false);
+  // Анимации (используются в компонентах)
   const [animationsStarted, setAnimationsStarted] = useState(false);
 
   useEffect(() => {
     // Запуск анимаций при загрузке компонента
     if (!animationsStarted) {
       const timer = setTimeout(() => {
-        startFadeIn(300);
-        startSlideIn(400);
-        startScaleIn(500);
         setAnimationsStarted(true);
       }, 100);
       
       return () => clearTimeout(timer);
     }
-  }, [animationsStarted, startFadeIn, startSlideIn, startScaleIn]);
+  }, [animationsStarted]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('ru-RU', {
@@ -442,44 +426,52 @@ const AdminPanel = () => {
     }).format(amount);
   };
 
-  // Обработчики для отчетов
-  const handleGenerateReport = async (reportConfig) => {
-    try {
-      await generateReport(reportConfig);
-      setShowReportGenerator(false);
-    } catch (error) {
-      console.error('Ошибка генерации отчета:', error);
-      alert('Ошибка при генерации отчета');
-    }
-  };
-
-  const handleDownloadReport = async (reportId) => {
-    try {
-      await downloadReport(reportId);
-    } catch (error) {
-      console.error('Ошибка скачивания отчета:', error);
-      alert('Ошибка при скачивании отчета');
-    }
-  };
-
-  const handleDeleteReport = async (reportId) => {
-    if (window.confirm('Вы уверены, что хотите удалить этот отчет?')) {
-      try {
-        await deleteReport(reportId);
-      } catch (error) {
-        console.error('Ошибка удаления отчета:', error);
-        alert('Ошибка при удалении отчета');
+  // ✅ УЛУЧШЕНИЕ: Обработчики для отчетов с универсальным async хуком
+  const handleGenerateReport = (reportConfig) => {
+    return asyncAction.executeAction(
+      () => generateReport(reportConfig),
+      {
+        loadingMessage: 'Генерация отчета...',
+        successMessage: 'Отчет успешно сгенерирован',
+        errorMessage: 'Ошибка при генерации отчета',
+        onSuccess: () => setShowReportGenerator(false)
       }
+    );
+  };
+
+  const handleDownloadReport = (reportId) => {
+    return asyncAction.executeAction(
+      () => downloadReport(reportId),
+      {
+        loadingMessage: 'Скачивание отчета...',
+        successMessage: 'Отчет успешно скачан',
+        errorMessage: 'Ошибка при скачивании отчета'
+      }
+    );
+  };
+
+  const handleDeleteReport = (reportId) => {
+    if (window.confirm('Вы уверены, что хотите удалить этот отчет?')) {
+      return asyncAction.executeAction(
+        () => deleteReport(reportId),
+        {
+          loadingMessage: 'Удаление отчета...',
+          successMessage: 'Отчет успешно удален',
+          errorMessage: 'Ошибка при удалении отчета'
+        }
+      );
     }
   };
 
-  const handleRegenerateReport = async (reportId) => {
-    try {
-      await regenerateReport(reportId);
-    } catch (error) {
-      console.error('Ошибка повторной генерации отчета:', error);
-      alert('Ошибка при повторной генерации отчета');
-    }
+  const handleRegenerateReport = (reportId) => {
+    return asyncAction.executeAction(
+      () => regenerateReport(reportId),
+      {
+        loadingMessage: 'Повторная генерация отчета...',
+        successMessage: 'Отчет успешно регенерирован',
+        errorMessage: 'Ошибка при повторной генерации отчета'
+      }
+    );
   };
 
   const handleOpenReportGenerator = () => {
@@ -616,15 +608,13 @@ const AdminPanel = () => {
     return <Clock className="w-4 h-4" style={{ color: colorMap.default }} />;
   };
 
-  // Обработчики для пользователей
+  // ✅ УЛУЧШЕНИЕ: Обработчики для пользователей с универсальным хуком
   const handleCreateUser = () => {
-    setSelectedUser(null);
-    setShowUserModal(true);
+    userModal.openModal(null);
   };
 
   const handleEditUser = (user) => {
-    setSelectedUser(user);
-    setShowUserModal(true);
+    userModal.openModal(user);
   };
 
   const handleDeleteUser = async (user) => {
@@ -639,24 +629,24 @@ const AdminPanel = () => {
   };
 
   const handleSaveUser = async (userData) => {
-    setUserModalLoading(true);
+    userModal.setModalLoading(true);
     try {
-      if (selectedUser) {
-        await updateUser(selectedUser.id, userData);
+      if (userModal.selectedItem) {
+        await updateUser(userModal.selectedItem.id, userData);
       } else {
         await createUser(userData);
       }
+      userModal.closeModal();
     } catch (error) {
       console.error('Ошибка сохранения пользователя:', error);
       throw error;
     } finally {
-      setUserModalLoading(false);
+      userModal.setModalLoading(false);
     }
   };
 
   const handleCloseUserModal = () => {
-    setShowUserModal(false);
-    setSelectedUser(null);
+    userModal.closeModal();
   };
 
   const getRoleLabel = (role) => {
@@ -681,15 +671,13 @@ const AdminPanel = () => {
     return colorMap[status] || 'var(--text-tertiary)';
   };
 
-  // Обработчики для врачей
+  // ✅ УЛУЧШЕНИЕ: Обработчики для врачей с универсальным хуком
   const handleCreateDoctor = () => {
-    setSelectedDoctor(null);
-    setShowDoctorModal(true);
+    doctorModal.openModal(null);
   };
 
   const handleEditDoctor = (doctor) => {
-    setSelectedDoctor(doctor);
-    setShowDoctorModal(true);
+    doctorModal.openModal(doctor);
   };
 
   const handleDeleteDoctor = async (doctor) => {
@@ -704,24 +692,24 @@ const AdminPanel = () => {
   };
 
   const handleSaveDoctor = async (doctorData) => {
-    setDoctorModalLoading(true);
+    doctorModal.setModalLoading(true);
     try {
-      if (selectedDoctor) {
-        await updateDoctor(selectedDoctor.id, doctorData);
+      if (doctorModal.selectedItem) {
+        await updateDoctor(doctorModal.selectedItem.id, doctorData);
       } else {
         await createDoctor(doctorData);
       }
+      doctorModal.closeModal();
     } catch (error) {
       console.error('Ошибка сохранения врача:', error);
       throw error;
     } finally {
-      setDoctorModalLoading(false);
+      doctorModal.setModalLoading(false);
     }
   };
 
   const handleCloseDoctorModal = () => {
-    setShowDoctorModal(false);
-    setSelectedDoctor(null);
+    doctorModal.closeModal();
   };
 
   const getDepartmentLabel = (department) => {
@@ -755,15 +743,13 @@ const AdminPanel = () => {
     return colorMap[status] || 'var(--text-tertiary)';
   };
 
-  // Обработчики для пациентов
+  // ✅ УЛУЧШЕНИЕ: Обработчики для пациентов с универсальным хуком
   const handleCreatePatient = () => {
-    setSelectedPatient(null);
-    setShowPatientModal(true);
+    patientModal.openModal(null);
   };
 
   const handleEditPatient = (patient) => {
-    setSelectedPatient(patient);
-    setShowPatientModal(true);
+    patientModal.openModal(patient);
   };
 
   const handleDeletePatient = async (patient) => {
@@ -778,24 +764,24 @@ const AdminPanel = () => {
   };
 
   const handleSavePatient = async (patientData) => {
-    setPatientModalLoading(true);
+    patientModal.setModalLoading(true);
     try {
-      if (selectedPatient) {
-        await updatePatient(selectedPatient.id, patientData);
+      if (patientModal.selectedItem) {
+        await updatePatient(patientModal.selectedItem.id, patientData);
       } else {
         await createPatient(patientData);
       }
+      patientModal.closeModal();
     } catch (error) {
       console.error('Ошибка сохранения пациента:', error);
       throw error;
     } finally {
-      setPatientModalLoading(false);
+      patientModal.setModalLoading(false);
     }
   };
 
   const handleClosePatientModal = () => {
-    setShowPatientModal(false);
-    setSelectedPatient(null);
+    patientModal.closeModal();
   };
 
   const getGenderLabel = (gender) => {
@@ -818,14 +804,13 @@ const AdminPanel = () => {
   };
 
   // Обработчики для записей
+  // ✅ УЛУЧШЕНИЕ: Обработчики для записей с универсальным хуком
   const handleCreateAppointment = () => {
-    setSelectedAppointment(null);
-    setShowAppointmentModal(true);
+    appointmentModal.openModal(null);
   };
 
   const handleEditAppointment = (appointment) => {
-    setSelectedAppointment(appointment);
-    setShowAppointmentModal(true);
+    appointmentModal.openModal(appointment);
   };
 
   const handleDeleteAppointment = async (appointment) => {
@@ -840,24 +825,24 @@ const AdminPanel = () => {
   };
 
   const handleSaveAppointment = async (appointmentData) => {
-    setAppointmentModalLoading(true);
+    appointmentModal.setModalLoading(true);
     try {
-      if (selectedAppointment) {
-        await updateAppointment(selectedAppointment.id, appointmentData);
+      if (appointmentModal.selectedItem) {
+        await updateAppointment(appointmentModal.selectedItem.id, appointmentData);
       } else {
         await createAppointment(appointmentData);
       }
+      appointmentModal.closeModal();
     } catch (error) {
       console.error('Ошибка сохранения записи:', error);
       throw error;
     } finally {
-      setAppointmentModalLoading(false);
+      appointmentModal.setModalLoading(false);
     }
   };
 
   const handleCloseAppointmentModal = () => {
-    setShowAppointmentModal(false);
-    setSelectedAppointment(null);
+    appointmentModal.closeModal();
   };
 
   const getAppointmentStatusLabel = (status) => {
@@ -899,15 +884,13 @@ const AdminPanel = () => {
     return variantMap[status] || 'secondary';
   };
 
-  // Обработчики для финансов
+  // ✅ УЛУЧШЕНИЕ: Обработчики для финансов с универсальным хуком
   const handleCreateTransaction = () => {
-    setSelectedTransaction(null);
-    setShowFinanceModal(true);
+    financeModal.openModal(null);
   };
 
   const handleEditTransaction = (transaction) => {
-    setSelectedTransaction(transaction);
-    setShowFinanceModal(true);
+    financeModal.openModal(transaction);
   };
 
   const handleDeleteTransaction = async (transaction) => {
@@ -922,24 +905,24 @@ const AdminPanel = () => {
   };
 
   const handleSaveTransaction = async (transactionData) => {
-    setFinanceModalLoading(true);
+    financeModal.setModalLoading(true);
     try {
-      if (selectedTransaction) {
-        await updateTransaction(selectedTransaction.id, transactionData);
+      if (financeModal.selectedItem) {
+        await updateTransaction(financeModal.selectedItem.id, transactionData);
       } else {
         await createTransaction(transactionData);
       }
+      financeModal.closeModal();
     } catch (error) {
       console.error('Ошибка сохранения транзакции:', error);
       throw error;
     } finally {
-      setFinanceModalLoading(false);
+      financeModal.setModalLoading(false);
     }
   };
 
   const handleCloseFinanceModal = () => {
-    setShowFinanceModal(false);
-    setSelectedTransaction(null);
+    financeModal.closeModal();
   };
 
   const getTransactionTypeLabel = (type) => {
@@ -996,7 +979,11 @@ const AdminPanel = () => {
         { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
         { to: '/admin/services', label: 'Услуги', icon: Package },
         { to: '/admin/patients', label: 'Пациенты', icon: Users },
-        { to: '/admin/appointments', label: 'Записи', icon: Calendar }
+        { to: '/admin/appointments', label: 'Записи', icon: Calendar },
+        { to: '/admin/all-free', label: 'Заявки All Free', icon: AlertTriangle },
+        { to: '/admin/benefit-settings', label: 'Настройки льгот', icon: Settings },
+        { to: '/admin/wizard-settings', label: 'Настройки мастера', icon: Monitor },
+        { to: '/admin/payment-providers', label: 'Платежные провайдеры', icon: CreditCard }
       ]
     },
     {
@@ -1263,8 +1250,8 @@ const AdminPanel = () => {
               type="users"
               title="Пользователи не найдены"
               description={searchTerm || filterRole || filterStatus 
-                ? "Попробуйте изменить параметры поиска" 
-                : "В системе пока нет пользователей"
+                ? 'Попробуйте изменить параметры поиска' 
+                : 'В системе пока нет пользователей'
               }
               action={
                 <Button onClick={handleCreateUser}>
@@ -1345,13 +1332,13 @@ const AdminPanel = () => {
         </div>
       </Card>
 
-      {/* Модальное окно пользователя */}
+      {/* ✅ УЛУЧШЕНИЕ: Модальное окно пользователя с универсальным хуком */}
       <UserModal
-        isOpen={showUserModal}
+        isOpen={userModal.isOpen}
         onClose={handleCloseUserModal}
-        user={selectedUser}
+        user={userModal.selectedItem}
         onSave={handleSaveUser}
-        loading={userModalLoading}
+        loading={userModal.loading}
       />
     </div>
   );
@@ -1521,6 +1508,14 @@ const AdminPanel = () => {
         return renderPatients();
       case 'appointments':
         return renderAppointments();
+      case 'all-free':
+        return <AllFreeApproval />;
+      case 'benefit-settings':
+        return <BenefitSettings />;
+      case 'wizard-settings':
+        return <WizardSettings />;
+      case 'payment-providers':
+        return <PaymentProviderSettings />;
       case 'finance':
         return renderFinance();
       case 'reports':
@@ -1641,8 +1636,8 @@ const AdminPanel = () => {
               type="users"
               title="Врачи не найдены"
               description={doctorsSearchTerm || filterSpecialization || filterDepartment || doctorsFilterStatus 
-                ? "Попробуйте изменить параметры поиска" 
-                : "В системе пока нет врачей"
+                ? 'Попробуйте изменить параметры поиска' 
+                : 'В системе пока нет врачей'
               }
               action={
                 <Button onClick={handleCreateDoctor}>
@@ -1734,13 +1729,13 @@ const AdminPanel = () => {
         </div>
       </Card>
 
-      {/* Модальное окно врача */}
+      {/* ✅ УЛУЧШЕНИЕ: Модальное окно врача с универсальным хуком */}
       <DoctorModal
-        isOpen={showDoctorModal}
+        isOpen={doctorModal.isOpen}
         onClose={handleCloseDoctorModal}
-        doctor={selectedDoctor}
+        doctor={doctorModal.selectedItem}
         onSave={handleSaveDoctor}
-        loading={doctorModalLoading}
+        loading={doctorModal.loading}
       />
     </div>
   );
@@ -1831,8 +1826,8 @@ const AdminPanel = () => {
               type="users"
               title="Пациенты не найдены"
               description={patientsSearchTerm || filterGender || filterAgeRange || filterBloodType 
-                ? "Попробуйте изменить параметры поиска" 
-                : "В системе пока нет пациентов"
+                ? 'Попробуйте изменить параметры поиска' 
+                : 'В системе пока нет пациентов'
               }
               action={
                 <Button onClick={handleCreatePatient}>
@@ -1935,12 +1930,13 @@ const AdminPanel = () => {
       </Card>
 
       {/* Модальное окно пациента */}
+      {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
       <PatientModal
-        isOpen={showPatientModal}
+        isOpen={patientModal.isOpen}
         onClose={handleClosePatientModal}
-        patient={selectedPatient}
+        patient={patientModal.selectedItem}
         onSave={handleSavePatient}
-        loading={patientModalLoading}
+        loading={patientModal.loading}
       />
     </div>
   );
@@ -2072,8 +2068,8 @@ const AdminPanel = () => {
                 type="calendar"
                 title="Записи не найдены"
                 description={appointmentsSearchTerm || appointmentFilterStatus || appointmentFilterDate || appointmentFilterDoctor 
-                  ? "Попробуйте изменить параметры поиска" 
-                  : "В системе пока нет записей"
+                  ? 'Попробуйте изменить параметры поиска' 
+                  : 'В системе пока нет записей'
                 }
                 action={
                   <Button onClick={handleCreateAppointment}>
@@ -2170,12 +2166,13 @@ const AdminPanel = () => {
         </Card>
 
         {/* Модальное окно записи */}
+        {/* ✅ УЛУЧШЕНИЕ: Модальное окно записи с универсальным хуком */}
         <AppointmentModal
-          isOpen={showAppointmentModal}
+          isOpen={appointmentModal.isOpen}
           onClose={handleCloseAppointmentModal}
-          appointment={selectedAppointment}
+          appointment={appointmentModal.selectedItem}
           onSave={handleSaveAppointment}
-          loading={appointmentModalLoading}
+          loading={appointmentModal.loading}
           doctors={doctors}
           patients={patients}
         />
@@ -2337,8 +2334,8 @@ const AdminPanel = () => {
                 type="creditcard"
                 title="Транзакции не найдены"
                 description={financeSearchTerm || filterType || filterCategory || filterDateRange || financeFilterStatus 
-                  ? "Попробуйте изменить параметры поиска" 
-                  : "В системе пока нет транзакций"
+                  ? 'Попробуйте изменить параметры поиска' 
+                  : 'В системе пока нет транзакций'
                 }
                 action={
                   <Button onClick={handleCreateTransaction}>
@@ -2436,12 +2433,13 @@ const AdminPanel = () => {
         </Card>
 
         {/* Модальное окно транзакции */}
+        {/* ✅ УЛУЧШЕНИЕ: Модальное окно финансов с универсальным хуком */}
         <FinanceModal
-          isOpen={showFinanceModal}
+          isOpen={financeModal.isOpen}
           onClose={handleCloseFinanceModal}
-          transaction={selectedTransaction}
+          transaction={financeModal.selectedItem}
           onSave={handleSaveTransaction}
-          loading={financeModalLoading}
+          loading={financeModal.loading}
           patients={patients}
           doctors={doctors}
         />
@@ -2608,8 +2606,8 @@ const AdminPanel = () => {
                 type="filetext"
                 title="Отчеты не найдены"
                 description={reportsSearchTerm || reportFilterType || reportFilterStatus || reportFilterDateRange 
-                  ? "Попробуйте изменить параметры поиска" 
-                  : "В системе пока нет отчетов"
+                  ? 'Попробуйте изменить параметры поиска' 
+                  : 'В системе пока нет отчетов'
                 }
                 action={
                   <Button onClick={handleOpenReportGenerator}>
@@ -2963,9 +2961,7 @@ const AdminPanel = () => {
 
   const pageStyle = {
     minHeight: '100vh',
-    background: theme === 'light' 
-      ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
-      : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     padding: 0,
     margin: 0,
     fontFamily: 'system-ui, -apple-system, sans-serif'
@@ -3015,8 +3011,8 @@ const AdminPanel = () => {
 
         {/* Основной контент */}
         <div style={{ 
-          opacity: fadeIn ? 1 : 0, 
-          transform: slideIn ? 'translateY(0)' : 'translateY(20px)',
+          opacity: animationsStarted ? 1 : 0, 
+          transform: animationsStarted ? 'translateY(0)' : 'translateY(20px)',
           transition: 'opacity 0.3s ease, transform 0.4s ease'
         }}>
           {renderContent()}

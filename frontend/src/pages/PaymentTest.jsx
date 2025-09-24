@@ -321,7 +321,7 @@ const PaymentTest = () => {
                 <Box textAlign="center">
                   <PaymentIcon sx={{ fontSize: 80, color: 'grey.400', mb: 2 }} />
                   <Typography variant="h6" color="textSecondary">
-                    Нажмите "Запустить тест" для отображения виджета
+                    Нажмите &quot;Запустить тест&quot; для отображения виджета
                   </Typography>
                 </Box>
               </CardContent>

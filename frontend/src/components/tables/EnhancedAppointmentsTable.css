@@ -40,6 +40,12 @@
   margin-top: 0 !important;
 }
 
+/* Убираем внешнюю рамку таблицы только на основном экране registrar-panel */
+#main-content .enhanced-table {
+  border: none !important;
+  border-radius: 0 !important;
+}
+
 .enhanced-table-row {
   transition: all 0.2s ease;
 }
@@ -117,6 +123,11 @@
   
   .enhanced-table-header {
     padding: 8px 4px;
+  }
+  
+  /* Скрываем адрес на мобильных */
+  .hide-on-mobile {
+    display: none !important;
   }
 }
 

@@ -3,6 +3,9 @@ import AIAssistant from '../components/ai/AIAssistant';
 import LabResultsManager from '../components/laboratory/LabResultsManager';
 import LabReportGenerator from '../components/laboratory/LabReportGenerator';
 
+// ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
+import useModal from '../hooks/useModal';
+
 const LabPanel = () => {
   const [activeTab, setActiveTab] = useState('tests');
   const [tests, setTests] = useState([]);
@@ -11,8 +14,9 @@ const LabPanel = () => {
   const [loading, setLoading] = useState(false);
   const [showTestForm, setShowTestForm] = useState(false);
   const [showResultForm, setShowResultForm] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState(null);
-  const [selectedVisit, setSelectedVisit] = useState(null);
+  // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
+  const patientModal = useModal();
+  const visitModal = useModal();
 
   const [testForm, setTestForm] = useState({ patient_id: '', test_date: '', test_type: '', sample_type: '', notes: '' });
   const [resultForm, setResultForm] = useState({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' });
@@ -176,8 +180,8 @@ const LabPanel = () => {
         <div>
           {/* Новый компонент управления результатами */}
           <LabResultsManager
-            patientId={selectedPatient?.id || 'demo-patient-1'}
-            visitId={selectedVisit?.id || 'demo-visit-1'}
+            patientId={patientModal.selectedItem?.id || 'demo-patient-1'}
+            visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
             onUpdate={() => {
               console.log('Результаты обновлены');
               // Обновляем список результатов
@@ -190,10 +194,10 @@ const LabPanel = () => {
             <div style={{ marginTop: '20px' }}>
               <LabReportGenerator
                 results={results}
-                patient={selectedPatient || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
+                patient={patientModal.selectedItem || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
                 doctor={{ name: 'Доктор Иванов', specialty: 'Терапевт' }}
                 clinic={{ name: 'Медицинская клиника' }}
-                visitId={selectedVisit?.id || 'demo-visit-1'}
+                visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
               />
             </div>
           )}

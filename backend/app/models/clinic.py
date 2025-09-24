@@ -45,6 +45,8 @@ class Doctor(Base):
     user = relationship("User", foreign_keys=[user_id])
     schedules = relationship("Schedule", back_populates="doctor", cascade="all, delete-orphan")
     services = relationship("Service", back_populates="doctor")
+    visits = relationship("Visit", back_populates="doctor")
+    price_overrides = relationship("DoctorPriceOverride", back_populates="doctor")
 
 
 class Schedule(Base):

@@ -4,30 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
  * Hook для работы с PWA функциональностью
  */
 export const usePWA = () => {
-  // Проверяем, что мы в React контексте
-  if (typeof window === 'undefined') {
-    return {
-      isInstallable: false,
-      isInstalled: false,
-      isOnline: true,
-      isServiceWorkerReady: false,
-      updateAvailable: false,
-      installPWA: () => false,
-      updateServiceWorker: () => {},
-      requestNotificationPermission: () => Promise.resolve('not-supported'),
-      sendNotification: () => Promise.resolve(false),
-      cacheUrls: () => {},
-      shouldShowInstallPrompt: () => false,
-      capabilities: {}
-    };
-  }
-
+  // ✅ ИСПРАВЛЕНИЕ: Всегда вызываем хуки первыми
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator?.onLine ?? true);
+  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator?.onLine ?? true : true);
   const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  // Проверяем, что мы в браузере
+  const isClient = typeof window !== 'undefined';
 
   // Проверка установки PWA
   useEffect(() => {
@@ -224,22 +210,22 @@ export const usePWA = () => {
 
   return {
     // Состояние
-    isInstallable,
-    isInstalled,
-    isOnline,
-    isServiceWorkerReady,
-    updateAvailable,
+    isInstallable: isClient ? isInstallable : false,
+    isInstalled: isClient ? isInstalled : false,
+    isOnline: isClient ? isOnline : true,
+    isServiceWorkerReady: isClient ? isServiceWorkerReady : false,
+    updateAvailable: isClient ? updateAvailable : false,
     
     // Методы
-    installPWA,
-    updateServiceWorker,
-    requestNotificationPermission,
-    sendNotification,
-    cacheUrls,
-    shouldShowInstallPrompt,
+    installPWA: isClient ? installPWA : () => Promise.resolve(false),
+    updateServiceWorker: isClient ? updateServiceWorker : () => {},
+    requestNotificationPermission: isClient ? requestNotificationPermission : () => Promise.resolve('not-supported'),
+    sendNotification: isClient ? sendNotification : () => Promise.resolve(false),
+    cacheUrls: isClient ? cacheUrls : () => {},
+    shouldShowInstallPrompt: isClient ? shouldShowInstallPrompt : () => false,
     
     // Возможности
-    capabilities
+    capabilities: isClient ? capabilities : {}
   };
 };
 

@@ -15,6 +15,7 @@ import TeethChart from '../components/dental/TeethChart';
 import ToothModal from '../components/dental/ToothModal';
 import TreatmentPlanner from '../components/dental/TreatmentPlanner';
 import PatientCard from '../components/dental/PatientCard';
+import DentalPriceManager from '../components/dental/DentalPriceManager';
 import ExaminationForm from '../components/dental/ExaminationForm';
 import DiagnosisForm from '../components/dental/DiagnosisForm';
 import VisitProtocol from '../components/dental/VisitProtocol';
@@ -70,15 +71,7 @@ import '../styles/animations.css';
  * - Современный UI
  */
 const DentistPanelUnified = () => {
-  // Проверяем демо-режим в самом начале
-  const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('DentistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
-  
+  // Всегда вызываем хуки первыми
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const isTouch = useTouchDevice();
   const [authState, setAuthState] = useState(auth.getState());
@@ -114,6 +107,10 @@ const DentistPanelUnified = () => {
   const [showTreatmentForm, setShowTreatmentForm] = useState(false);
   const [showProstheticForm, setShowProstheticForm] = useState(false);
   const [dentalChartData, setDentalChartData] = useState(null);
+  
+  // Состояние для DentalPriceManager
+  const [showPriceManager, setShowPriceManager] = useState(false);
+  const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
   const [currentTreatmentPlan, setCurrentTreatmentPlan] = useState(null);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
@@ -202,6 +199,15 @@ const DentistPanelUnified = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Проверяем демо-режим после всех хуков
+  const isDemoMode = window.location.pathname.includes('/medilab-demo');
+  
+  // В демо-режиме не рендерим компонент
+  if (isDemoMode) {
+    console.log('DentistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
 
   const authHeader = () => ({
     Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`,
@@ -1779,6 +1785,23 @@ const DentistPanelUnified = () => {
                   <Button
                     type="button"
                     variant="outline"
+                    onClick={() => {
+                      // Открываем менеджер цен для указания итоговой стоимости
+                      setSelectedServiceForPrice({
+                        id: 1, // ID услуги - в реальном приложении получать из формы
+                        name: treatmentForm.procedure_type || 'Стоматологическое лечение',
+                        price: Number(treatmentForm.cost) || 50000
+                      });
+                      setShowPriceManager(true);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    Указать цену
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setShowTreatmentForm(false)}
                   >
                     Отмена
@@ -1965,6 +1988,25 @@ const DentistPanelUnified = () => {
           }}
           patientId={selectedPatient?.id}
           visitId={selectedPatient?.visitId || 'demo-visit-1'}
+        />
+      )}
+      
+      {/* DentalPriceManager Modal */}
+      {showPriceManager && selectedServiceForPrice && (
+        <DentalPriceManager
+          visitId={selectedPatient?.id || 1} // Используем ID пациента как visitId для демо
+          serviceId={selectedServiceForPrice.id}
+          serviceName={selectedServiceForPrice.name}
+          originalPrice={selectedServiceForPrice.price}
+          isOpen={showPriceManager}
+          onClose={() => {
+            setShowPriceManager(false);
+            setSelectedServiceForPrice(null);
+          }}
+          onPriceSet={(priceData) => {
+            console.log('Price set:', priceData);
+            // Можно добавить логику обновления состояния
+          }}
         />
       )}
     </div>

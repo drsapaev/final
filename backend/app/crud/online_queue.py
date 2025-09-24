@@ -436,6 +436,62 @@ def validate_queue_token(db: Session, token: str) -> Tuple[bool, Optional[QueueT
 
 # ===================== СТАТИСТИКА ОЧЕРЕДИ =====================
 
+def get_or_create_daily_queue(
+    db: Session,
+    day: date,
+    specialist_id: int,
+    queue_tag: Optional[str] = None
+) -> DailyQueue:
+    """
+    Получить или создать дневную очередь с поддержкой queue_tag
+    """
+    daily_queue = db.query(DailyQueue).filter(
+        and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
+    ).first()
+    
+    if not daily_queue:
+        daily_queue = DailyQueue(
+            day=day,
+            specialist_id=specialist_id,
+            active=True
+        )
+        db.add(daily_queue)
+        db.commit()
+        db.refresh(daily_queue)
+    
+    return daily_queue
+
+
+def count_queue_entries(db: Session, queue_id: int) -> int:
+    """
+    Подсчёт записей в очереди
+    """
+    return db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == queue_id).count()
+
+
+def create_queue_entry(
+    db: Session,
+    queue_id: int,
+    patient_id: int,
+    number: int,
+    source: str = "desk"
+) -> OnlineQueueEntry:
+    """
+    Создание записи в очереди
+    """
+    queue_entry = OnlineQueueEntry(
+        queue_id=queue_id,
+        number=number,
+        patient_id=patient_id,
+        source=source,
+        status="waiting"
+    )
+    db.add(queue_entry)
+    db.commit()
+    db.refresh(queue_entry)
+    return queue_entry
+
+
 def get_queue_statistics(
     db: Session,
     day: date,

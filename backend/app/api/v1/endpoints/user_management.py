@@ -70,8 +70,8 @@ async def create_user(
 async def get_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    role: Optional[str] = Query(None, regex="^(Admin|Doctor|Nurse|Receptionist|Patient)$"),
-    status: Optional[str] = Query(None, regex="^(active|inactive|suspended|pending|locked)$"),
+    role: Optional[str] = Query(None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"),
+    status: Optional[str] = Query(None, pattern="^(active|inactive|suspended|pending|locked)$"),
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None, min_length=1, max_length=100),
     db: Session = Depends(get_db),

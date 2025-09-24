@@ -44,14 +44,8 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess.jsx'));
 const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 
-// Новые компоненты
-const TestComponent = lazy(() => import('./components/TestComponent.jsx'));
-const SimpleDashboard = lazy(() => import('./components/dashboard/SimpleDashboard.jsx'));
-const SimpleUserManagement = lazy(() => import('./components/admin/SimpleUserManagement.jsx'));
-const SimpleEMR = lazy(() => import('./components/medical/SimpleEMR.jsx'));
-const SimpleFileManager = lazy(() => import('./components/SimpleFileManager.jsx'));
+// Стилизованные компоненты
 const LoginFormStyled = lazy(() => import('./components/auth/LoginFormStyled.jsx'));
-const NewComponentsNav = lazy(() => import('./components/NewComponentsNav.jsx'));
 
 // Мобильные страницы
 const MobilePatientDashboard = lazy(() => import('./pages/MobilePatientDashboard.jsx'));
@@ -138,9 +132,6 @@ function AppContent() {
           <LazyWrapper><LoginFormStyled /></LazyWrapper>
         } />
         
-        <Route path="/components" element={
-          <LazyWrapper><NewComponentsNav /></LazyWrapper>
-        } />
 
         {/* Основные панели */}
         <Route path="/admin" element={
@@ -273,9 +264,6 @@ function AppContent() {
           <LazyWrapper><MediLabDemo /></LazyWrapper>
         } />
         
-        <Route path="/test" element={
-          <LazyWrapper><TestComponent /></LazyWrapper>
-        } />
         
         <Route path="/new-app" element={
           <LazyWrapper><NewApp /></LazyWrapper>
@@ -286,22 +274,6 @@ function AppContent() {
           <LazyWrapper><Activation /></LazyWrapper>
         } />
 
-        {/* Новые компоненты */}
-        <Route path="/simple-dashboard" element={
-          <LazyWrapper><SimpleDashboard /></LazyWrapper>
-        } />
-        
-        <Route path="/simple-users" element={
-          <LazyWrapper><SimpleUserManagement /></LazyWrapper>
-        } />
-        
-        <Route path="/simple-emr" element={
-          <LazyWrapper><SimpleEMR /></LazyWrapper>
-        } />
-        
-        <Route path="/simple-files" element={
-          <LazyWrapper><SimpleFileManager /></LazyWrapper>
-        } />
 
         {/* Редирект по умолчанию */}
         <Route path="*" element={<Navigate to="/login" replace />} />

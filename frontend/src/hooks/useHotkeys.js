@@ -16,7 +16,7 @@ export const useHotkeys = (shortcuts = {}) => {
     if (isCtrl) combination += 'ctrl+';
     if (isShift) combination += 'shift+';
     if (isAlt) combination += 'alt+';
-    combination += event.key.toLowerCase();
+    combination += (event.key || '').toLowerCase();
     
     // Ищем соответствующий shortcut
     const shortcut = shortcuts[combination];

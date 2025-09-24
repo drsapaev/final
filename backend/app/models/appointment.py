@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 
-from sqlalchemy import Date, DateTime, Float, Integer, String, Text
+from sqlalchemy import Date, DateTime, Float, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base
@@ -22,6 +22,11 @@ class Appointment(Base):
     )  # HH:MM
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="scheduled")
+
+    # Дополнительные поля для регистратуры
+    visit_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default="paid")  # paid, repeat, free
+    payment_type: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default="cash")  # cash, card, online
+    services: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)  # Список услуг в JSON
 
     # Поля для интеграции с платежами
     payment_amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
