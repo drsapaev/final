@@ -14,6 +14,7 @@ class DailyQueue(Base):
     id = Column(Integer, primary_key=True, index=True)
     day = Column(Date, nullable=False, index=True)  # YYYY-MM-DD
     specialist_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    queue_tag = Column(String(32), nullable=True, index=True)  # ecg, lab, cardiology_common, etc.
     active = Column(Boolean, default=True, nullable=False)
     opened_at = Column(DateTime(timezone=True), nullable=True)  # Факт открытия приема
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -37,8 +38,11 @@ class OnlineQueueEntry(Base):
     phone = Column(String(20), nullable=True, index=True)  # Для уникальности
     telegram_id = Column(BigInteger, nullable=True, index=True)  # Для уникальности
     
+    # Связь с визитом (для подтвержденных визитов)
+    visit_id = Column(Integer, ForeignKey("visits.id"), nullable=True, index=True)
+    
     # Источник записи
-    source = Column(String(20), default="online", nullable=False)  # online, desk, telegram
+    source = Column(String(20), default="online", nullable=False)  # online, desk, telegram, confirmation, morning_assignment
     
     # Статус
     status = Column(String(20), default="waiting", nullable=False)  # waiting, called, served, no_show
@@ -49,6 +53,7 @@ class OnlineQueueEntry(Base):
     # Relationships
     queue = relationship("DailyQueue", back_populates="entries")
     patient = relationship("Patient", foreign_keys=[patient_id])
+    visit = relationship("Visit", foreign_keys=[visit_id])
 
 
 class QueueToken(Base):

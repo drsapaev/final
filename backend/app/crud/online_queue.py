@@ -444,15 +444,26 @@ def get_or_create_daily_queue(
 ) -> DailyQueue:
     """
     Получить или создать дневную очередь с поддержкой queue_tag
+    Теперь очереди уникальны по (day, specialist_id, queue_tag)
     """
-    daily_queue = db.query(DailyQueue).filter(
-        and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
-    ).first()
+    # Ищем очередь с учетом queue_tag
+    query_filters = [
+        DailyQueue.day == day, 
+        DailyQueue.specialist_id == specialist_id
+    ]
+    
+    if queue_tag:
+        query_filters.append(DailyQueue.queue_tag == queue_tag)
+    else:
+        query_filters.append(DailyQueue.queue_tag.is_(None))
+    
+    daily_queue = db.query(DailyQueue).filter(and_(*query_filters)).first()
     
     if not daily_queue:
         daily_queue = DailyQueue(
             day=day,
             specialist_id=specialist_id,
+            queue_tag=queue_tag,
             active=True
         )
         db.add(daily_queue)

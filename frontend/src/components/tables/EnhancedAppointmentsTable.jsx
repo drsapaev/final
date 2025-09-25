@@ -90,6 +90,7 @@ const EnhancedAppointmentsTable = ({
       date: 'Дата',
       time: 'Время',
       status: 'Статус',
+      confirmation: 'Подтверждение',
       cost: 'Стоимость',
       payment: 'Оплата',
       // Типы обращения
@@ -526,10 +527,13 @@ const EnhancedAppointmentsTable = ({
 
     const csvContent = [
       // Заголовки
-      [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
+      [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.confirmation, t.cost].join(','),
       // Данные
       ...filteredData.map((row, index) => [
-        index + 1,
+        // Номера очередей для CSV
+        row.queue_numbers && row.queue_numbers.length > 0 
+          ? row.queue_numbers.map(q => `${q.queue_name}: №${q.number}`).join('; ')
+          : index + 1,
         row.patient_fio || '',
         row.patient_phone || '',
         row.patient_birth_year || '',
@@ -546,6 +550,9 @@ const EnhancedAppointmentsTable = ({
         row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : (row.appointment_date || ''),
         row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (row.appointment_time || ''),
         t[row.status] || row.status || '',
+        row.confirmation_status === 'confirmed' ? 'Подтвержден' : 
+        row.confirmation_status === 'pending' ? 'Ожидает' : 
+        row.confirmation_status === 'expired' ? 'Истек' : '—',
         row.total_amount || row.cost || row.payment_amount || ''
       ].join(','))
     ].join('\n');
@@ -582,6 +589,191 @@ const EnhancedAppointmentsTable = ({
       </div>
     );
   }
+
+  // Функция для отображения номеров очередей
+  const renderQueueNumbers = useCallback((row) => {
+    // Если есть номера очередей из нового API
+    if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {row.queue_numbers.map((queue, index) => {
+            // Определяем цвета и иконки для статусов
+            const statusConfig = {
+              waiting: { 
+                bg: colors.warning, 
+                icon: '⏳', 
+                text: 'Ожидает',
+                pulse: true 
+              },
+              called: { 
+                bg: colors.accent, 
+                icon: '📢', 
+                text: 'Вызван',
+                pulse: true 
+              },
+              served: { 
+                bg: colors.success, 
+                icon: '✅', 
+                text: 'Обслужен',
+                pulse: false 
+              },
+              no_show: { 
+                bg: colors.error, 
+                icon: '❌', 
+                text: 'Не явился',
+                pulse: false 
+              }
+            };
+            
+            const config = statusConfig[queue.status] || statusConfig.waiting;
+            
+            return (
+              <div 
+                key={index} 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  padding: '2px',
+                  borderRadius: '6px',
+                  backgroundColor: config.bg + '10',
+                  border: `1px solid ${config.bg}30`
+                }}
+                title={`${queue.queue_name}: №${queue.number} (${config.text})`}
+              >
+                <span style={{
+                  padding: '3px 6px',
+                  backgroundColor: config.bg,
+                  color: 'white',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  minWidth: '24px',
+                  textAlign: 'center',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  animation: config.pulse ? 'pulse 2s infinite' : 'none'
+                }}>
+                  {queue.number}
+                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span style={{
+                    fontSize: '10px',
+                    color: config.bg,
+                    fontWeight: '600',
+                    maxWidth: '70px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {queue.queue_name}
+                  </span>
+                  <span style={{
+                    fontSize: '9px',
+                    color: colors.textSecondary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }}>
+                    <span>{config.icon}</span>
+                    <span>{config.text}</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    
+    // Fallback для старых записей - показываем порядковый номер
+    const fallbackIndex = data.findIndex(item => item.id === row.id) + 1;
+    return (
+      <span style={{ 
+        color: colors.textSecondary, 
+        fontSize: '12px',
+        padding: '2px 6px',
+        backgroundColor: colors.textSecondary + '10',
+        borderRadius: '4px'
+      }}>
+        #{fallbackIndex}
+      </span>
+    );
+  }, [data, colors]);
+
+  // Функция для отображения статуса подтверждения
+  const renderConfirmationStatus = useCallback((row) => {
+    const confirmationStatus = row.confirmation_status;
+    
+    if (!confirmationStatus || confirmationStatus === 'none') {
+      return (
+        <span style={{
+          padding: '2px 6px',
+          backgroundColor: colors.textSecondary + '20',
+          color: colors.textSecondary,
+          borderRadius: '4px',
+          fontSize: '11px',
+          fontWeight: '500'
+        }}>
+          —
+        </span>
+      );
+    }
+    
+    const statusConfig = {
+      pending: { 
+        color: colors.warning, 
+        bg: colors.warning + '20', 
+        text: 'Ожидает',
+        icon: '⏳'
+      },
+      confirmed: { 
+        color: colors.success, 
+        bg: colors.success + '20', 
+        text: 'Подтвержден',
+        icon: '✅'
+      },
+      expired: { 
+        color: colors.error, 
+        bg: colors.error + '20', 
+        text: 'Истек',
+        icon: '❌'
+      }
+    };
+    
+    const config = statusConfig[confirmationStatus] || statusConfig.pending;
+    
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <span style={{
+          padding: '2px 6px',
+          backgroundColor: config.bg,
+          color: config.color,
+          borderRadius: '4px',
+          fontSize: '11px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2px'
+        }}>
+          <span>{config.icon}</span>
+          <span>{config.text}</span>
+        </span>
+        {row.confirmed_at && (
+          <span style={{
+            fontSize: '10px',
+            color: colors.textSecondary
+          }}>
+            {new Date(row.confirmed_at).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </span>
+        )}
+      </div>
+    );
+  }, [colors]);
 
   return (
     <div 
@@ -890,6 +1082,19 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
+              {/* Подтверждение */}
+              <th style={{
+                padding: '12px 8px',
+                textAlign: 'center',
+                borderBottom: `1px solid ${colors.border}`,
+                color: colors.text,
+                fontWeight: '600',
+                fontSize: '14px',
+                minWidth: '120px'
+              }}>
+                {t.confirmation}
+              </th>
+
               {/* Стоимость */}
               <th 
                 onClick={() => handleSort('cost')}
@@ -985,7 +1190,7 @@ const EnhancedAppointmentsTable = ({
                     color: colors.textSecondary,
                     fontSize: '14px'
                   }}>
-                    {(currentPage - 1) * pageSize + index + 1}
+                    {renderQueueNumbers(row)}
                   </td>
 
                   {/* Пациент */}
@@ -1151,6 +1356,15 @@ const EnhancedAppointmentsTable = ({
                     whiteSpace: 'nowrap'
                   }}>
                     {renderStatus(row.status)}
+                  </td>
+
+                  {/* Подтверждение */}
+                  <td style={{
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    fontSize: '14px'
+                  }}>
+                    {renderConfirmationStatus(row)}
                   </td>
 
                   {/* Стоимость */}

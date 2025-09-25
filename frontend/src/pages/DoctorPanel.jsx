@@ -42,6 +42,7 @@ import '../styles/animations.css';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal';
+import ScheduleNextModal from '../components/common/ScheduleNextModal';
 
 const DoctorPanel = () => {
   const location = useLocation();
@@ -55,6 +56,7 @@ const DoctorPanel = () => {
   const [loading, setLoading] = useState(true);
   // ✅ УЛУЧШЕНИЕ: Универсальный хук вместо дублированных состояний
   const patientModal = useModal();
+  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   
@@ -912,9 +914,12 @@ const DoctorPanel = () => {
                       <option value="completed">Завершены</option>
                       <option value="cancelled">Отменены</option>
                     </select>
-                    <Button variant="primary">
+                    <Button 
+                      variant="primary"
+                      onClick={() => setScheduleNextModal({ open: true, patient: null })}
+                    >
                       <Plus size={16} />
-                      {!isMobile && <span>Новая запись</span>}
+                      {!isMobile && <span>Назначить следующий визит</span>}
                     </Button>
                   </div>
                 </div>
@@ -1200,6 +1205,16 @@ const DoctorPanel = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Модальное окно Schedule Next */}
+      {scheduleNextModal.open && (
+        <ScheduleNextModal
+          isOpen={scheduleNextModal.open}
+          onClose={() => setScheduleNextModal({ open: false, patient: null })}
+          patient={scheduleNextModal.patient}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
+        />
       )}
     </div>
   );

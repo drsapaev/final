@@ -39,6 +39,13 @@ class Visit(Base):
     visit_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     department: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    
+    # ✅ ПОЛЯ ДЛЯ ПОДТВЕРЖДЕНИЯ ВИЗИТОВ
+    confirmation_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    confirmation_channel: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # phone|telegram|pwa
+    confirmation_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmed_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # user_id, telegram_id, или phone
 
     services: Mapped[list["VisitService"]] = relationship(
         back_populates="visit", cascade="all, delete-orphan"

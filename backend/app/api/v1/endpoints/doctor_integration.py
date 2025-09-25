@@ -2,20 +2,52 @@
 API endpoints для интеграции панелей врачей с системой
 Основа: passport.md стр. 1141-2063
 """
-from datetime import date, datetime
+import logging
+from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.visit import Visit, VisitService
+from app.models.service import Service
 from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
+
+# ===================== МОДЕЛИ ДАННЫХ =====================
+
+class ScheduleNextVisitService(BaseModel):
+    service_id: int
+    quantity: int = 1
+    custom_price: Optional[float] = None
+
+class ScheduleNextVisitRequest(BaseModel):
+    patient_id: int
+    services: List[ScheduleNextVisitService]
+    visit_date: date
+    visit_time: Optional[str] = None
+    discount_mode: str = Field(default="none", pattern="^(none|repeat|benefit|all_free)$")
+    all_free: bool = False
+    notes: Optional[str] = None
+    confirmation_channel: str = Field(default="phone", pattern="^(phone|telegram|pwa|auto)$")
+
+class ScheduleNextVisitResponse(BaseModel):
+    success: bool
+    message: str
+    visit_id: int
+    status: str  # pending_confirmation
+    confirmation: Dict[str, Any]
 
 # ===================== ОЧЕРЕДЬ ВРАЧА =====================
 
@@ -586,4 +618,151 @@ def get_doctor_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения статистики врача: {str(e)}"
+        )
+
+
+# ===================== НАЗНАЧЕНИЕ СЛЕДУЮЩЕГО ВИЗИТА =====================
+
+@router.post("/doctor/visits/schedule-next", response_model=ScheduleNextVisitResponse)
+async def schedule_next_visit(
+    request: ScheduleNextVisitRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+):
+    """
+    Назначение следующего визита врачом (без номера в очереди)
+    Номер будет присвоен только после подтверждения пациентом
+    """
+    try:
+        # Получаем врача
+        doctor = db.query(Doctor).filter(
+            and_(Doctor.user_id == current_user.id, Doctor.active == True)
+        ).first()
+        
+        if not doctor and current_user.role != "Admin":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Профиль врача не найден"
+            )
+        
+        # Проверяем что дата не в прошлом
+        if request.visit_date < date.today():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя назначить визит на прошедшую дату"
+            )
+        
+        # Проверяем существование пациента
+        from app.models.patient import Patient
+        patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
+        if not patient:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Пациент не найден"
+            )
+        
+        # Проверяем существование услуг
+        service_ids = [s.service_id for s in request.services]
+        services = db.query(Service).filter(Service.id.in_(service_ids)).all()
+        
+        if len(services) != len(service_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Некоторые услуги не найдены"
+            )
+        
+        # Генерируем токен подтверждения
+        confirmation_token = str(uuid.uuid4())
+        expires_at = datetime.utcnow() + timedelta(hours=48)  # 48 часов на подтверждение
+        
+        # Создаем визит со статусом pending_confirmation
+        visit = Visit(
+            patient_id=request.patient_id,
+            doctor_id=doctor.id if doctor else None,
+            visit_date=request.visit_date,
+            visit_time=request.visit_time,
+            status="pending_confirmation",  # Ожидает подтверждения
+            discount_mode=request.discount_mode,
+            department="mixed",  # Будет определен по услугам
+            notes=request.notes,
+            confirmation_token=confirmation_token,
+            confirmation_channel=request.confirmation_channel,
+            confirmation_expires_at=expires_at
+        )
+        db.add(visit)
+        db.flush()  # Получаем ID визита
+        
+        # Добавляем услуги к визиту
+        total_amount = 0
+        for service_req in request.services:
+            service = next(s for s in services if s.id == service_req.service_id)
+            
+            # Вычисляем цену
+            service_price = service_req.custom_price or (float(service.price) if service.price else 0)
+            
+            # Применяем скидки для консультаций
+            if service.is_consultation:
+                if request.discount_mode in ["repeat", "benefit"] or request.all_free:
+                    service_price = 0
+            
+            # All Free делает всё бесплатным
+            if request.all_free:
+                service_price = 0
+            
+            visit_service = VisitService(
+                visit_id=visit.id,
+                service_id=service.id,
+                name=service.name,
+                code=service.code or service.service_code,
+                qty=service_req.quantity,
+                price=service_price,
+                currency="UZS"
+            )
+            db.add(visit_service)
+            
+            total_amount += service_price * service_req.quantity
+        
+        db.commit()
+        db.refresh(visit)
+        
+        # Отправляем приглашение на подтверждение
+        notification_service = NotificationService(db)
+        try:
+            notification_result = await notification_service.send_visit_confirmation_invitation(
+                visit=visit,
+                channel=request.confirmation_channel
+            )
+            logger.info(f"Приглашение отправлено для визита {visit.id}: {notification_result}")
+        except Exception as e:
+            logger.error(f"Ошибка отправки приглашения для визита {visit.id}: {e}")
+            # Не прерываем выполнение, визит уже создан
+        
+        # Формируем ответ
+        confirmation_data = {
+            "token": confirmation_token,
+            "channel": request.confirmation_channel,
+            "expires_at": expires_at.isoformat(),
+            "patient_name": patient.short_name(),
+            "visit_date": request.visit_date.isoformat(),
+            "visit_time": request.visit_time,
+            "total_amount": total_amount,
+            "services_count": len(request.services),
+            "notification_sent": notification_result.get("success", False) if 'notification_result' in locals() else False
+        }
+        
+        return ScheduleNextVisitResponse(
+            success=True,
+            message=f"Визит назначен на {request.visit_date}. Ожидает подтверждения пациентом.",
+            visit_id=visit.id,
+            status="pending_confirmation",
+            confirmation=confirmation_data
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка назначения визита: {str(e)}"
         )

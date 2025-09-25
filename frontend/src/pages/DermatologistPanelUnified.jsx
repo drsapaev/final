@@ -28,6 +28,7 @@ import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
+import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EMRSystem from '../components/medical/EMRSystem';
 import PhotoUploader from '../components/dermatology/PhotoUploader';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
@@ -58,6 +59,7 @@ const DermatologistPanelUnified = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
 
   // Специализированные данные дерматолога
   const [skinExamination, setSkinExamination] = useState({
@@ -517,6 +519,17 @@ const DermatologistPanelUnified = () => {
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Унифицированная панель с фото до/после, осмотрами кожи и косметологией
             </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="primary"
+              onClick={() => setScheduleNextModal({ open: true, patient: selectedPatient?.patient || null })}
+              className="flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Назначить следующий визит
+            </Button>
           </div>
           
           {selectedPatient && (
@@ -1455,6 +1468,17 @@ const DermatologistPanelUnified = () => {
             console.log('Price override created:', override);
             // Можно добавить логику обновления состояния
           }}
+        />
+      )}
+
+      {/* Модальное окно Schedule Next */}
+      {scheduleNextModal.open && (
+        <ScheduleNextModal
+          isOpen={scheduleNextModal.open}
+          onClose={() => setScheduleNextModal({ open: false, patient: null })}
+          patient={scheduleNextModal.patient}
+          theme={{ isDark, getColor, getSpacing: (size) => theme.spacing[size], getFontSize: (size) => theme.fontSize[size] }}
+          specialtyFilter="dermatology"
         />
       )}
     </div>
