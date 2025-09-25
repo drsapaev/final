@@ -103,46 +103,39 @@ const ModernQueueManager = ({
     
     setLoading(true);
     try {
-      // Мок данных для демонстрации
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch(`/api/v1/queue/status/${selectedDoctor}?target_date=${selectedDate}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка загрузки статуса очереди');
+      }
+
+      const queueStatus = await response.json();
       
-      const mockQueue = {
-        id: 1,
-        is_open: true,
-        total_entries: 8,
-        waiting_entries: 3,
-        entries: [
-          {
-            id: 1,
-            number: 1,
-            patient_name: 'Иванов И.И.',
-            phone: '+998901234567',
-            status: 'called',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 2,
-            number: 2,
-            patient_name: 'Петров П.П.',
-            phone: '+998901234568',
-            status: 'waiting',
-            created_at: new Date(Date.now() - 300000).toISOString()
-          },
-          {
-            id: 3,
-            number: 3,
-            patient_name: 'Сидоров С.С.',
-            phone: '+998901234569',
-            status: 'waiting',
-            created_at: new Date(Date.now() - 600000).toISOString()
-          }
-        ]
+      const queueData = {
+        id: selectedDoctor,
+        is_open: queueStatus.active,
+        total_entries: queueStatus.entries.length,
+        waiting_entries: queueStatus.queue_length,
+        current_number: queueStatus.current_number,
+        entries: queueStatus.entries.map(entry => ({
+          id: entry.number,
+          number: entry.number,
+          patient_name: entry.patient_name,
+          phone: entry.phone || '',
+          status: entry.status,
+          source: entry.source,
+          created_at: entry.created_at
+        }))
       };
       
-      setQueueData(mockQueue);
+      setQueueData(queueData);
     } catch (error) {
       console.error('Error loading queue:', error);
-      toast.error('Ошибка загрузки очереди');
+      toast.error(error.message || 'Ошибка загрузки очереди');
     } finally {
       setLoading(false);
     }
@@ -179,23 +172,45 @@ const ModernQueueManager = ({
     
     setLoading(true);
     try {
-      // Мок данных для демонстрации
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Определяем отделение на основе врача
+      const doctor = doctors.find(d => d.id == selectedDoctor);
+      const department = doctor?.department || 'general';
       
-      const mockQrData = {
-        token: 'mock-token-123',
-        specialist_name: doctors.find(d => d.id == selectedDoctor)?.full_name || 'Врач',
-        day: selectedDate,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        url: `${window.location.origin}/queue/join?token=mock-token-123`
+      const response = await fetch('/api/v1/admin/qr-tokens/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          specialist_id: parseInt(selectedDoctor),
+          department: department,
+          expires_hours: 24
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Ошибка генерации QR токена');
+      }
+
+      const qrTokenData = await response.json();
+      
+      const qrData = {
+        token: qrTokenData.token,
+        specialist_name: doctor?.full_name || doctor?.name || 'Врач',
+        department: qrTokenData.department,
+        expires_at: qrTokenData.expires_at,
+        qr_code_base64: qrTokenData.qr_code_base64,
+        url: qrTokenData.qr_url
       };
       
-      setQrData(mockQrData);
+      setQrData(qrData);
       setShowQrDialog(true);
       toast.success('QR код сгенерирован');
     } catch (error) {
       console.error('Error generating QR:', error);
-      toast.error('Ошибка генерации QR кода');
+      toast.error(error.message || 'Ошибка генерации QR кода');
     } finally {
       setLoading(false);
     }
@@ -229,28 +244,37 @@ const ModernQueueManager = ({
 
   // Вызов пациента
   const callPatient = async (entryId) => {
+    if (!selectedDoctor) {
+      toast.error('Выберите врача');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Мок для демонстрации
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      setQueueData(prev => {
-        if (!prev) return prev;
-        
-        return {
-          ...prev,
-          entries: prev.entries.map(entry => 
-            entry.id === entryId 
-              ? { ...entry, status: 'called' }
-              : entry
-          )
-        };
+      const response = await fetch(`/api/v1/queue/${selectedDoctor}/call-next`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Ошибка вызова пациента');
+      }
+
+      const result = await response.json();
       
-      toast.success('Пациент вызван');
+      if (result.success) {
+        toast.success(`Вызван пациент: ${result.patient.name} (№${result.patient.number})`);
+        // Обновляем данные очереди
+        await loadQueue();
+      } else {
+        toast.info(result.message || 'Нет пациентов в очереди');
+      }
     } catch (error) {
       console.error('Error calling patient:', error);
-      toast.error('Ошибка вызова пациента');
+      toast.error(error.message || 'Ошибка вызова пациента');
     } finally {
       setLoading(false);
     }
@@ -288,12 +312,12 @@ const ModernQueueManager = ({
 
   // Скачивание QR кода
   const downloadQR = () => {
-    if (!qrData) return;
+    if (!qrData || !qrData.qr_code_base64) return;
     
-    // Создаем ссылку для скачивания
+    // Создаем ссылку для скачивания изображения
     const link = document.createElement('a');
-    link.download = `qr-queue-${selectedDate}-${qrData.specialist_name}.txt`;
-    link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(qrData.url)}`;
+    link.download = `qr-queue-${selectedDate}-${qrData.specialist_name.replace(/\s+/g, '_')}.png`;
+    link.href = qrData.qr_code_base64;
     link.click();
     
     toast.success('QR код скачан');
@@ -632,12 +656,25 @@ const ModernQueueManager = ({
             </div>
             
             <div className="qr-code-container">
-              <div className="qr-placeholder">
-                <QrCode size={200} style={{ color: getColor('textSecondary') }} />
-                <p style={{ color: getColor('textSecondary') }}>
-                  QR код будет здесь
-                </p>
-              </div>
+              {qrData.qr_code_base64 ? (
+                <img 
+                  src={qrData.qr_code_base64} 
+                  alt="QR Code" 
+                  style={{ 
+                    width: '200px', 
+                    height: '200px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px'
+                  }} 
+                />
+              ) : (
+                <div className="qr-placeholder">
+                  <QrCode size={200} style={{ color: getColor('textSecondary') }} />
+                  <p style={{ color: getColor('textSecondary') }}>
+                    QR код будет здесь
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="qr-actions">

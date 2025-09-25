@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from './Button';
+import Button from './Button';
 import { SIZES, VARIANTS } from './types';
 
 // More on how to set up stories at: https://storybook.js.org/docs/writing-stories#default-export

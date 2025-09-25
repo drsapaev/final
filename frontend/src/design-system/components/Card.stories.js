@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card } from './Card';
-import { Button } from './Button';
+import Card from './Card';
+import Button from './Button';
 import { VARIANTS } from './types';
 
 export default {

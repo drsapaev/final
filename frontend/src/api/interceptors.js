@@ -48,6 +48,16 @@ export function setupInterceptors() {
     },
     async (error) => {
       const originalRequest = error.config;
+      
+      // Импортируем обработчик ошибок
+      const { handleError } = await import('../utils/errorHandler');
+      
+      // Обрабатываем ошибку централизованно
+      const errorInfo = handleError(error, {
+        context: `API ${originalRequest.method?.toUpperCase()} ${originalRequest.url}`,
+        showToast: !originalRequest.silent, // Поддержка silent режима
+        logError: true
+      });
 
       // Логируем ошибки
       console.error(`❌ API Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`, {

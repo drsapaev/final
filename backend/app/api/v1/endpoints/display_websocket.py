@@ -130,6 +130,114 @@ async def call_patient_to_board(
         )
 
 
+# ===================== WEBSOCKET ДЛЯ ОТДЕЛЕНИЙ =====================
+
+@router.websocket("/ws/queue/{department}")
+async def websocket_queue_department(
+    websocket: WebSocket,
+    department: str,
+    token: Optional[str] = None
+):
+    """
+    WebSocket подключение для очереди по отделению
+    Согласно требованию: WS /ws/queue/{department}
+    
+    События:
+    - queue.created: новая запись в очереди
+    - queue.called: пациент вызван
+    - queue.completed: пациент обслужен
+    - queue.cancelled: запись отменена
+    """
+    manager = get_display_manager()
+    
+    # Используем department как board_id для совместимости с существующей системой
+    board_id = f"dept_{department}"
+    
+    try:
+        await manager.connect(websocket, board_id)
+        
+        # Отправляем начальное состояние очереди отделения
+        await _send_department_queue_state(websocket, department)
+        
+        try:
+            while True:
+                # Ожидаем сообщения от клиента
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                
+                # Обрабатываем команды
+                if message.get("type") == "ping":
+                    await websocket.send_text(json.dumps({
+                        "type": "pong",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "department": department
+                    }))
+                elif message.get("type") == "request_update":
+                    # Запрос обновления состояния очереди отделения
+                    await _send_department_queue_state(websocket, department)
+                elif message.get("type") == "subscribe_events":
+                    # Подписка на события очереди
+                    logger.info(f"Client subscribed to events for department {department}")
+                    
+        except WebSocketDisconnect:
+            pass
+            
+    except Exception as e:
+        logger.error(f"WebSocket error for department {department}: {e}")
+    finally:
+        await manager.disconnect(websocket, board_id)
+
+
+async def _send_department_queue_state(websocket: WebSocket, department: str):
+    """Отправляет текущее состояние очереди отделения"""
+    try:
+        from app.db.session import SessionLocal
+        from datetime import date
+        
+        db = SessionLocal()
+        
+        # Получаем очереди отделения на сегодня
+        today = date.today()
+        
+        # Получаем записи очереди
+        queue_entries = db.query(OnlineQueueEntry).join(DailyQueue).filter(
+            DailyQueue.day == today,
+            DailyQueue.active == True
+        ).all()
+        
+        # Фильтруем по отделению (упрощенная логика)
+        filtered_entries = []
+        for entry in queue_entries:
+            # Здесь можно добавить более сложную логику фильтрации по отделению
+            filtered_entries.append({
+                "id": entry.id,
+                "number": entry.number,
+                "patient_name": entry.patient_name,
+                "status": entry.status,
+                "source": entry.source,
+                "created_at": entry.created_at.isoformat() if entry.created_at else None
+            })
+        
+        # Отправляем состояние
+        await websocket.send_text(json.dumps({
+            "type": "queue_state",
+            "department": department,
+            "timestamp": datetime.utcnow().isoformat(),
+            "entries": filtered_entries,
+            "total_waiting": len([e for e in filtered_entries if e["status"] == "waiting"]),
+            "current_number": max([e["number"] for e in filtered_entries], default=0)
+        }))
+        
+        db.close()
+        
+    except Exception as e:
+        logger.error(f"Error sending department queue state: {e}")
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "message": "Ошибка получения состояния очереди"
+        }))
+
+
 @router.post("/announcement")
 async def send_announcement_to_board(
     request: Dict[str, Any],

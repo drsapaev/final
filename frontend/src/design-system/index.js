@@ -209,6 +209,15 @@ export * from './styles';
 // Экспорт темы
 export * from './theme';
 
+// Экспорт медицинской темы
+export * from './theme/medical';
+
+// Экспорт макетов
+export { default as ResponsiveLayout, SidebarNav, QuickActions } from './layouts/ResponsiveLayout';
+
+// Экспорт медицинских компонентов
+export { default as MedicalCard } from './components/MedicalCard';
+
 // Тема экспортируется из contexts/ThemeContext.jsx
 
 export default designTokens;

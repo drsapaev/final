@@ -28,6 +28,8 @@ from app.api.v1.endpoints import (
     board as board_ep,
     cardio,
     dental,
+    feature_flags,  # Фича-флаги
+    qr_queue,  # QR очереди
     derma,
     docs,
     health as health_ep,
@@ -120,6 +122,10 @@ api_router.include_router(security_management_router, tags=["security-management
 
 # Эндпоинты управления миграциями (только админ)
 api_router.include_router(migration_management_router, tags=["migration-management"])
+# Эндпоинты управления фича-флагами
+api_router.include_router(feature_flags.router, tags=["feature-flags"])
+# Эндпоинты QR очередей
+api_router.include_router(qr_queue.router, tags=["qr-queue"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
@@ -199,3 +205,11 @@ api_router.include_router(health_ep.router, tags=["health"])
 api_router.include_router(activation_ep.router, tags=["activation"])
 api_router.include_router(authentication.router, prefix="/authentication", tags=["authentication"])
 api_router.include_router(user_management.router, prefix="/users", tags=["user-management"])
+
+# Legacy API для совместимости с документацией
+from app.api.v1.endpoints import online_queue_legacy
+api_router.include_router(online_queue_legacy.router, prefix="/online-queue", tags=["online-queue-legacy"])
+
+# Автозакрытие очередей
+from app.api.v1.endpoints import queue_auto_close
+api_router.include_router(queue_auto_close.router, prefix="/admin/queue-auto-close", tags=["queue-auto-close"])

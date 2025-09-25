@@ -28,11 +28,11 @@ import DentistPanelUnified from './pages/DentistPanelUnified.jsx';
 import LabPanel from './pages/LabPanel.jsx';
 import UserSelect from './pages/UserSelect.jsx';
 import Search from './pages/Search.jsx';
+import QueueJoin from './pages/QueueJoin.jsx';
 import PatientPanel from './pages/PatientPanel.jsx';
 import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import MediLabDemo from './pages/MediLabDemo.jsx';
-import QueueJoin from './pages/QueueJoin.jsx';
 import PaymentSuccess from './pages/PaymentSuccess.jsx';
 import PaymentCancel from './pages/PaymentCancel.jsx';
 import PaymentTest from './pages/PaymentTest.jsx';
@@ -120,6 +120,8 @@ function AppContent() {
       <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
       <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
       <Route path="/queue/join" element={<QueueJoin />} />
+        <Route path="/queue/join/:token" element={<QueueJoin />} />
+        <Route path="/pwa/queue" element={<QueueJoin />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/payment/cancel" element={<PaymentCancel />} />
       <Route path="/payment/test" element={<PaymentTest />} />
