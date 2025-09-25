@@ -386,7 +386,29 @@ class DisplayWebSocketManager:
         except Exception as e:
             logger.error(f"Ошибка трансляции обновления очереди: {e}")
 
-# Глобальный менеджер WebSocket
+    async def broadcast_queue_event(self, department: str, event_type: str, data: Dict[str, Any]) -> None:
+        """
+        Отправляет события очереди всем подключенным табло отделения
+        
+        Args:
+            department: Отделение (cardiology, dermatology, etc.)
+            event_type: Тип события (queue.created, queue.called, queue.completed, queue.cancelled)
+            data: Данные события
+        """
+        board_id = f"dept_{department}"
+        
+        message = {
+            "type": "queue_event",
+            "event": event_type,
+            "department": department,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": data
+        }
+        
+        await self.broadcast_to_board(board_id, message)
+        logger.info(f"Broadcasted {event_type} event to department {department}")
+
+
 display_manager = DisplayWebSocketManager()
 
 def get_display_manager() -> DisplayWebSocketManager:

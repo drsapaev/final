@@ -1,232 +1,338 @@
 /**
- * Единая система обработки ошибок
- * Централизованное логирование и отображение ошибок
+ * Централизованная система обработки ошибок
  */
+
+import { toast } from 'react-hot-toast';
 
 /**
  * Типы ошибок
  */
-export const ErrorTypes = {
+export const ERROR_TYPES = {
   NETWORK: 'network',
-  AUTH: 'auth',
+  AUTHENTICATION: 'authentication',
+  AUTHORIZATION: 'authorization',
   VALIDATION: 'validation',
   SERVER: 'server',
-  PERMISSION: 'permission',
-  NOT_FOUND: 'not_found',
   UNKNOWN: 'unknown'
 };
 
 /**
- * Определение типа ошибки
+ * Коды ошибок HTTP
  */
-function getErrorType(error) {
+export const HTTP_STATUS = {
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  UNPROCESSABLE_ENTITY: 422,
+  INTERNAL_SERVER_ERROR: 500,
+  BAD_GATEWAY: 502,
+  SERVICE_UNAVAILABLE: 503
+};
+
+/**
+ * Определяет тип ошибки по HTTP статусу и содержимому
+ */
+export function getErrorType(error) {
   if (!error.response) {
-    return ErrorTypes.NETWORK;
+    return ERROR_TYPES.NETWORK;
   }
 
   const status = error.response.status;
-  
-  if (status === 401) return ErrorTypes.AUTH;
-  if (status === 403) return ErrorTypes.PERMISSION;
-  if (status === 404) return ErrorTypes.NOT_FOUND;
-  if (status === 422) return ErrorTypes.VALIDATION;
-  if (status >= 500) return ErrorTypes.SERVER;
-  
-  return ErrorTypes.UNKNOWN;
+
+  switch (status) {
+    case HTTP_STATUS.UNAUTHORIZED:
+      return ERROR_TYPES.AUTHENTICATION;
+    case HTTP_STATUS.FORBIDDEN:
+      return ERROR_TYPES.AUTHORIZATION;
+    case HTTP_STATUS.BAD_REQUEST:
+    case HTTP_STATUS.UNPROCESSABLE_ENTITY:
+      return ERROR_TYPES.VALIDATION;
+    case HTTP_STATUS.INTERNAL_SERVER_ERROR:
+    case HTTP_STATUS.BAD_GATEWAY:
+    case HTTP_STATUS.SERVICE_UNAVAILABLE:
+      return ERROR_TYPES.SERVER;
+    default:
+      return ERROR_TYPES.UNKNOWN;
+  }
 }
 
 /**
- * Получение пользовательского сообщения об ошибке
+ * Извлекает сообщение об ошибке из ответа сервера
  */
-function getUserMessage(error, errorType) {
-  // Если есть детальное сообщение от сервера, используем его
-  const serverMessage = error.response?.data?.detail || error.response?.data?.message;
-  
-  if (serverMessage && typeof serverMessage === 'string') {
-    return serverMessage;
+export function getErrorMessage(error) {
+  // Сетевая ошибка
+  if (!error.response) {
+    return 'Ошибка подключения к серверу. Проверьте интернет-соединение.';
   }
 
-  // Стандартные сообщения по типам ошибок
-  const defaultMessages = {
-    [ErrorTypes.NETWORK]: 'Проблемы с подключением к серверу. Проверьте интернет-соединение.',
-    [ErrorTypes.AUTH]: 'Требуется авторизация. Пожалуйста, войдите в систему.',
-    [ErrorTypes.PERMISSION]: 'Недостаточно прав для выполнения операции.',
-    [ErrorTypes.NOT_FOUND]: 'Запрашиваемый ресурс не найден.',
-    [ErrorTypes.VALIDATION]: 'Проверьте правильность введенных данных.',
-    [ErrorTypes.SERVER]: 'Серверная ошибка. Попробуйте позже или обратитесь к администратору.',
-    [ErrorTypes.UNKNOWN]: 'Произошла неизвестная ошибка. Попробуйте еще раз.'
-  };
+  const { status, data } = error.response;
 
-  return defaultMessages[errorType] || defaultMessages[ErrorTypes.UNKNOWN];
+  // Сообщение от сервера
+  if (data?.detail) {
+    if (typeof data.detail === 'string') {
+      return data.detail;
+    }
+    
+    // Обработка массива ошибок валидации
+    if (Array.isArray(data.detail)) {
+      return data.detail.map(err => {
+        if (err.msg && err.loc) {
+          const field = err.loc[err.loc.length - 1];
+          return `${field}: ${err.msg}`;
+        }
+        return err.msg || 'Ошибка валидации';
+      }).join(', ');
+    }
+  }
+
+  if (data?.message) {
+    return data.message;
+  }
+
+  if (data?.error) {
+    return data.error;
+  }
+
+  // Стандартные сообщения по HTTP статусам
+  switch (status) {
+    case HTTP_STATUS.BAD_REQUEST:
+      return 'Некорректный запрос';
+    case HTTP_STATUS.UNAUTHORIZED:
+      return 'Необходима авторизация';
+    case HTTP_STATUS.FORBIDDEN:
+      return 'Недостаточно прав для выполнения операции';
+    case HTTP_STATUS.NOT_FOUND:
+      return 'Запрашиваемый ресурс не найден';
+    case HTTP_STATUS.UNPROCESSABLE_ENTITY:
+      return 'Ошибка валидации данных';
+    case HTTP_STATUS.INTERNAL_SERVER_ERROR:
+      return 'Внутренняя ошибка сервера';
+    case HTTP_STATUS.BAD_GATEWAY:
+      return 'Ошибка шлюза';
+    case HTTP_STATUS.SERVICE_UNAVAILABLE:
+      return 'Сервис временно недоступен';
+    default:
+      return `Ошибка сервера (${status})`;
+  }
 }
 
 /**
- * Логирование ошибки
+ * Определяет, нужно ли показывать уведомление пользователю
  */
-function logError(error, context = '') {
-  const errorInfo = {
-    timestamp: new Date().toISOString(),
-    context,
-    url: error.config?.url,
-    method: error.config?.method,
-    status: error.response?.status,
-    statusText: error.response?.statusText,
-    data: error.response?.data,
-    message: error.message
-  };
+export function shouldShowNotification(errorType, options = {}) {
+  const { silent = false, showNetworkErrors = true } = options;
 
-  // В development выводим подробную информацию
-  if (process.env.NODE_ENV === 'development') {
-    console.group(`❌ Error Handler: ${context || 'Unknown context'}`);
-    console.error('Error details:', errorInfo);
-    console.error('Original error:', error);
-    console.groupEnd();
-  }
-
-  // В production отправляем ошибки в систему мониторинга
-  if (process.env.NODE_ENV === 'production') {
-    // TODO: Интеграция с системой мониторинга (Sentry, LogRocket, etc.)
-    console.error('Production error:', errorInfo);
+  if (silent) return false;
+  
+  switch (errorType) {
+    case ERROR_TYPES.NETWORK:
+      return showNetworkErrors;
+    case ERROR_TYPES.AUTHENTICATION:
+      return false; // Обрабатывается interceptor'ом
+    case ERROR_TYPES.AUTHORIZATION:
+    case ERROR_TYPES.VALIDATION:
+    case ERROR_TYPES.SERVER:
+    case ERROR_TYPES.UNKNOWN:
+      return true;
+    default:
+      return true;
   }
 }
 
 /**
  * Основная функция обработки ошибок
  */
-export function handleError(error, context = '', options = {}) {
+export function handleError(error, options = {}) {
   const {
     showToast = true,
-    logError: shouldLog = true,
-    customMessage = null
+    logError = true,
+    customMessage = null,
+    onError = null,
+    context = 'Unknown'
   } = options;
 
-  // Логируем ошибку
-  if (shouldLog) {
-    logError(error, context);
-  }
-
-  // Определяем тип ошибки
   const errorType = getErrorType(error);
-  
-  // Получаем сообщение для пользователя
-  const userMessage = customMessage || getUserMessage(error, errorType);
+  const errorMessage = customMessage || getErrorMessage(error);
 
-  // Показываем уведомление пользователю
-  if (showToast && window.showToast) {
-    const toastType = errorType === ErrorTypes.VALIDATION ? 'warning' : 'error';
-    window.showToast(userMessage, toastType);
+  // Логирование
+  if (logError) {
+    console.error(`[${context}] ${errorType.toUpperCase()} Error:`, {
+      message: errorMessage,
+      status: error.response?.status,
+      data: error.response?.data,
+      originalError: error
+    });
   }
 
-  // Возвращаем структурированную информацию об ошибке
+  // Уведомление пользователя
+  if (showToast && shouldShowNotification(errorType, options)) {
+    switch (errorType) {
+      case ERROR_TYPES.VALIDATION:
+        toast.error(errorMessage, { duration: 6000 });
+        break;
+      case ERROR_TYPES.SERVER:
+        toast.error('Ошибка сервера. Попробуйте позже.', { duration: 4000 });
+        break;
+      case ERROR_TYPES.NETWORK:
+        toast.error('Проблемы с подключением', { duration: 3000 });
+        break;
+      default:
+        toast.error(errorMessage, { duration: 4000 });
+    }
+  }
+
+  // Кастомный обработчик
+  if (onError && typeof onError === 'function') {
+    onError(error, errorType, errorMessage);
+  }
+
   return {
     type: errorType,
-    message: userMessage,
-    originalError: error,
+    message: errorMessage,
     status: error.response?.status,
-    data: error.response?.data
+    originalError: error
   };
 }
 
 /**
- * Обработчик для async/await функций
+ * Хук для обработки ошибок в компонентах
  */
-export function withErrorHandler(asyncFunction, context = '') {
+export function useErrorHandler(context = 'Component') {
+  return (error, options = {}) => {
+    return handleError(error, { ...options, context });
+  };
+}
+
+/**
+ * Обработчик ошибок для async/await
+ */
+export function withErrorHandling(asyncFn, options = {}) {
   return async (...args) => {
     try {
-      return await asyncFunction(...args);
+      return await asyncFn(...args);
     } catch (error) {
-      const errorInfo = handleError(error, context);
-      
-      // Возвращаем результат с ошибкой вместо выброса исключения
-      return {
-        success: false,
-        error: errorInfo.message,
-        errorType: errorInfo.type,
-        errorDetails: errorInfo
-      };
+      handleError(error, options);
+      throw error;
     }
   };
 }
 
 /**
- * React Hook для обработки ошибок в компонентах
+ * Retry логика для сетевых запросов
  */
-export function useErrorHandler() {
-  return (error, context = '') => {
-    return handleError(error, context);
-  };
-}
+export async function retryRequest(requestFn, options = {}) {
+  const {
+    maxRetries = 3,
+    delay = 1000,
+    backoff = 2,
+    shouldRetry = (error) => getErrorType(error) === ERROR_TYPES.NETWORK
+  } = options;
 
-/**
- * Валидация данных форм
- */
-export function validateFormData(data, rules) {
-  const errors = {};
+  let lastError;
   
-  for (const field in rules) {
-    const rule = rules[field];
-    const value = data[field];
-    
-    // Проверка обязательности
-    if (rule.required && (!value || (typeof value === 'string' && !value.trim()))) {
-      errors[field] = rule.message || `Поле "${field}" обязательно для заполнения`;
-      continue;
-    }
-    
-    // Проверка минимальной длины
-    if (rule.minLength && value && value.length < rule.minLength) {
-      errors[field] = rule.message || `Минимальная длина: ${rule.minLength} символов`;
-      continue;
-    }
-    
-    // Проверка максимальной длины
-    if (rule.maxLength && value && value.length > rule.maxLength) {
-      errors[field] = rule.message || `Максимальная длина: ${rule.maxLength} символов`;
-      continue;
-    }
-    
-    // Проверка паттерна (email, телефон и т.д.)
-    if (rule.pattern && value && !rule.pattern.test(value)) {
-      errors[field] = rule.message || `Неверный формат поля "${field}"`;
-      continue;
-    }
-    
-    // Кастомная валидация
-    if (rule.validator && value) {
-      const customError = rule.validator(value, data);
-      if (customError) {
-        errors[field] = customError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await requestFn();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === maxRetries || !shouldRetry(error)) {
+        throw error;
       }
+      
+      // Ждем перед повтором
+      await new Promise(resolve => 
+        setTimeout(resolve, delay * Math.pow(backoff, attempt))
+      );
     }
   }
+  
+  throw lastError;
+}
+
+/**
+ * Валидаторы форм
+ */
+export const validators = {
+  required: (value, fieldName = 'Поле') => {
+    if (!value || (typeof value === 'string' && !value.trim())) {
+      return `${fieldName} обязательно для заполнения`;
+    }
+    return null;
+  },
+
+  email: (value) => {
+    if (!value) return null;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
+      return 'Некорректный email адрес';
+    }
+    return null;
+  },
+
+  phone: (value) => {
+    if (!value) return null;
+    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    if (!phoneRegex.test(value)) {
+      return 'Некорректный номер телефона';
+    }
+    return null;
+  },
+
+  minLength: (min) => (value, fieldName = 'Поле') => {
+    if (!value) return null;
+    if (value.length < min) {
+      return `${fieldName} должно содержать минимум ${min} символов`;
+    }
+    return null;
+  },
+
+  maxLength: (max) => (value, fieldName = 'Поле') => {
+    if (!value) return null;
+    if (value.length > max) {
+      return `${fieldName} должно содержать максимум ${max} символов`;
+    }
+    return null;
+  },
+
+  number: (value, fieldName = 'Поле') => {
+    if (!value) return null;
+    if (isNaN(Number(value))) {
+      return `${fieldName} должно быть числом`;
+    }
+    return null;
+  },
+
+  positive: (value, fieldName = 'Поле') => {
+    if (!value) return null;
+    if (Number(value) <= 0) {
+      return `${fieldName} должно быть положительным числом`;
+    }
+    return null;
+  }
+};
+
+/**
+ * Функция валидации формы
+ */
+export function validateForm(data, rules) {
+  const errors = {};
+  
+  Object.entries(rules).forEach(([field, fieldRules]) => {
+    const value = data[field];
+    
+    for (const rule of fieldRules) {
+      const error = rule(value, field);
+      if (error) {
+        errors[field] = error;
+        break; // Первая ошибка для поля
+      }
+    }
+  });
   
   return {
     isValid: Object.keys(errors).length === 0,
     errors
   };
 }
-
-/**
- * Предустановленные правила валидации
- */
-export const ValidationRules = {
-  email: {
-    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    message: 'Введите корректный email адрес'
-  },
-  
-  phone: {
-    pattern: /^\+?[1-9]\d{1,14}$/,
-    message: 'Введите корректный номер телефона'
-  },
-  
-  password: {
-    minLength: 6,
-    message: 'Пароль должен содержать минимум 6 символов'
-  },
-  
-  required: {
-    required: true,
-    message: 'Это поле обязательно для заполнения'
-  }
-};

@@ -20,6 +20,7 @@ from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 from app.models.doctor_price_override import DoctorPriceOverride
 from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
+from app.services.feature_flags import is_feature_enabled
 
 router = APIRouter()
 
@@ -455,6 +456,21 @@ def create_cart_appointments(
                 cart_data.patient_id, visit_req.doctor_id
             )
             
+            # Проверяем фича-флаг для режима подтверждения
+            confirmation_required = is_feature_enabled(db, "confirmation_before_queue", default=True)
+            
+            # Определяем статус визита в зависимости от фича-флага
+            if confirmation_required and cart_data.discount_mode != "all_free":
+                # Новый режим: требуется подтверждение пациентом
+                visit_status = "pending_confirmation"
+                confirmed_at = None
+                confirmed_by = None
+            else:
+                # Старый режим: сразу подтвержден регистратором
+                visit_status = "confirmed"
+                confirmed_at = datetime.utcnow()
+                confirmed_by = f"registrar_{current_user.id}"
+            
             # Создаём визит
             visit = Visit(
                 patient_id=cart_data.patient_id,
@@ -463,11 +479,11 @@ def create_cart_appointments(
                 visit_time=visit_req.visit_time,
                 department=visit_req.department,
                 notes=visit_req.notes,
-                status="confirmed",  # Сразу подтвержден (регистратор создал)
+                status=visit_status,
                 discount_mode=cart_data.discount_mode,
                 approval_status="approved" if cart_data.discount_mode != "all_free" else "pending",
-                confirmed_at=datetime.utcnow(),  # Время подтверждения
-                confirmed_by=f"registrar_{current_user.id}"  # Кто подтвердил
+                confirmed_at=confirmed_at,
+                confirmed_by=confirmed_by
             )
             db.add(visit)
             db.flush()  # Получаем ID визита
