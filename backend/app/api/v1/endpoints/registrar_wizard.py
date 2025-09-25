@@ -51,7 +51,7 @@ class CartResponse(BaseModel):
     invoice_id: int
     visit_ids: List[int]
     total_amount: Decimal
-    queue_numbers: Dict[int, int]  # visit_id -> queue_number
+    queue_numbers: Dict[int, List[Dict]]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
     print_tickets: List[Dict[str, Any]]
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
@@ -137,49 +137,74 @@ def _create_queue_entries(
         if visit.visit_date != today:
             continue
             
-        # Определяем тег очереди по услугам
+        # Определяем все уникальные типы очередей для услуг визита
         visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
         service_ids = [vs.service_id for vs in visit_services]
         services = db.query(Service).filter(Service.id.in_(service_ids)).all()
         
-        # Приоритет очередей: ecg > специализированные > общие
-        queue_tag = "general"
+        # Собираем все уникальные queue_tag для создания отдельных очередей
+        unique_queue_tags = set()
         for service in services:
-            if service.queue_tag == "ecg":
-                queue_tag = "ecg"
-                break
-            elif service.queue_tag in ["cardiology_common", "stomatology", "dermatology", "cosmetology"]:
-                queue_tag = service.queue_tag
-            elif service.queue_tag == "lab":
-                queue_tag = "lab"
+            if service.queue_tag:
+                unique_queue_tags.add(service.queue_tag)
+            else:
+                unique_queue_tags.add("general")  # По умолчанию
         
-        # Создаём запись в очереди
+        # Создаём отдельную запись в очереди для каждого типа услуг
+        visit_queue_numbers = []
         try:
-            # Используем существующую логику из online_queue
-            if visit.doctor_id:
-                doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
-                if doctor:
-                    daily_queue = crud_queue.get_or_create_daily_queue(
-                        db, today, visit.doctor_id, queue_tag
-                    )
-                    
-                    # Вычисляем номер
-                    current_count = crud_queue.count_queue_entries(db, daily_queue.id)
-                    start_number = queue_settings.get("start_numbers", {}).get(doctor.specialty, 1)
-                    next_number = start_number + current_count
-                    
-                    # Создаём запись
-                    queue_entry = crud_queue.create_queue_entry(
-                        db, 
-                        queue_id=daily_queue.id,
-                        patient_id=visit.patient_id,
-                        number=next_number,
-                        source="desk"
-                    )
-                    
-                    queue_numbers[visit.id] = next_number
+            for queue_tag in unique_queue_tags:
+                # Определяем врача для очереди
+                doctor_id = visit.doctor_id
+                
+                # Для очередей без конкретного врача (ЭКГ, лаборатория) используем врача визита
+                # или первого доступного врача, так как specialist_id не может быть NULL
+                if queue_tag in ["ecg", "lab"] and not doctor_id:
+                    # Ищем любого активного врача для создания очереди
+                    from app.models.user import User
+                    fallback_doctor = db.query(User).filter(
+                        User.role.in_(["Doctor", "doctor"]),
+                        User.is_active == True
+                    ).first()
+                    if fallback_doctor:
+                        doctor_id = fallback_doctor.id
+                    else:
+                        # Если нет врачей, используем админа
+                        admin_user = db.query(User).filter(User.role == "Admin").first()
+                        if admin_user:
+                            doctor_id = admin_user.id
+                        else:
+                            continue  # Пропускаем создание очереди если нет пользователей
+                
+                daily_queue = crud_queue.get_or_create_daily_queue(
+                    db, today, doctor_id, queue_tag
+                )
+                
+                # Вычисляем номер
+                current_count = crud_queue.count_queue_entries(db, daily_queue.id)
+                start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
+                next_number = start_number + current_count
+                
+                # Создаём запись
+                queue_entry = crud_queue.create_queue_entry(
+                    db, 
+                    queue_id=daily_queue.id,
+                    patient_id=visit.patient_id,
+                    number=next_number,
+                    source="desk"
+                )
+                
+                visit_queue_numbers.append({
+                    "queue_tag": queue_tag,
+                    "number": next_number,
+                    "queue_id": daily_queue.id
+                })
+            
+            # Сохраняем все номера очередей для визита
+            queue_numbers[visit.id] = visit_queue_numbers
+            
         except Exception as e:
-            print(f"Warning: Could not create queue entry for visit {visit.id}: {e}")
+            print(f"Warning: Could not create queue entries for visit {visit.id}: {e}")
     
     return queue_numbers
 
@@ -501,20 +526,36 @@ def create_cart_appointments(
         
         db.commit()
         
-        # Формируем данные для печати талонов
+        # Формируем данные для печати талонов (отдельный талон для каждой очереди)
         print_tickets = []
         for visit in created_visits:
             if visit.id in queue_numbers:
-                doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
-                print_tickets.append({
-                    "visit_id": visit.id,
-                    "queue_number": queue_numbers[visit.id],
-                    "patient_id": visit.patient_id,
-                    "doctor_name": doctor.user.full_name if doctor and doctor.user else "Без врача",
-                    "department": visit.department,
-                    "visit_date": visit.visit_date.isoformat(),
-                    "visit_time": visit.visit_time
-                })
+                visit_queues = queue_numbers[visit.id]
+                for queue_info in visit_queues:
+                    # Определяем название очереди для печати
+                    queue_names = {
+                        "ecg": "ЭКГ",
+                        "cardiology_common": "Кардиолог",
+                        "dermatology": "Дерматолог", 
+                        "stomatology": "Стоматолог",
+                        "cosmetology": "Косметолог",
+                        "lab": "Лаборатория",
+                        "general": "Общая очередь"
+                    }
+                    
+                    doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
+                    print_tickets.append({
+                        "visit_id": visit.id,
+                        "queue_tag": queue_info["queue_tag"],
+                        "queue_name": queue_names.get(queue_info["queue_tag"], queue_info["queue_tag"]),
+                        "queue_number": queue_info["number"],
+                        "queue_id": queue_info["queue_id"],
+                        "patient_id": visit.patient_id,
+                        "doctor_name": doctor.user.full_name if doctor and doctor.user else "Без врача",
+                        "department": visit.department,
+                        "visit_date": visit.visit_date.isoformat(),
+                        "visit_time": visit.visit_time
+                    })
         
         return CartResponse(
             success=True,

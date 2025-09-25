@@ -356,7 +356,10 @@ const EnhancedAppointmentsTable = ({
       return '';
     }).filter(code => code); // Убираем пустые коды
     
-    const tooltipText = servicesList.join(', ');
+    // Создаем tooltip в виде списка для лучшей читаемости
+    const tooltipText = servicesList.length > 1 
+      ? `Услуги:\n${servicesList.map((service, idx) => `${idx + 1}. ${service}`).join('\n')}`
+      : servicesList[0] || '';
     
     return (
       <div 
@@ -540,8 +543,8 @@ const EnhancedAppointmentsTable = ({
         })(),
         formatServicesForCsv(row.services),
         t[row.payment_type] || row.payment_type || '',
-        row.appointment_date || '',
-        row.appointment_time || '',
+        row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : (row.appointment_date || ''),
+        row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (row.appointment_time || ''),
         t[row.status] || row.status || '',
         row.total_amount || row.cost || row.payment_amount || ''
       ].join(','))
@@ -1078,7 +1081,7 @@ const EnhancedAppointmentsTable = ({
                     {renderPaymentType(row.payment_type || 'cash', row.payment_status)}
                   </td>
 
-                  {/* Дата и время */}
+                  {/* Дата и время регистрации */}
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
@@ -1086,22 +1089,51 @@ const EnhancedAppointmentsTable = ({
                     fontSize: '14px'
                   }}>
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                        <Calendar size={12} style={{ color: colors.textSecondary }} />
-                        {row.appointment_date || '—'}
-                      </div>
-                      {row.appointment_time && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          justifyContent: 'center',
-                          marginTop: '2px',
-                          fontSize: '12px',
-                          color: colors.textSecondary
-                        }}>
-                          <Clock size={10} />
-                          {row.appointment_time}
+                      {/* Дата и время регистрации */}
+                      {row.created_at ? (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                            <Calendar size={12} style={{ color: colors.textSecondary }} />
+                            {new Date(row.created_at).toLocaleDateString('ru-RU')}
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            justifyContent: 'center',
+                            marginTop: '2px',
+                            fontSize: '12px',
+                            color: colors.textSecondary
+                          }}>
+                            <Clock size={10} />
+                            {new Date(row.created_at).toLocaleTimeString('ru-RU', { 
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        /* Fallback для старых записей без created_at */
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                            <Calendar size={12} style={{ color: colors.textSecondary }} />
+                            {row.appointment_date || '—'}
+                          </div>
+                          {row.appointment_time && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              justifyContent: 'center',
+                              marginTop: '2px',
+                              fontSize: '12px',
+                              color: colors.textSecondary
+                            }}>
+                              <Clock size={10} />
+                              {row.appointment_time}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

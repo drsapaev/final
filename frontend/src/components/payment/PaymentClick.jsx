@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Printer
 } from 'lucide-react';
+import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { toast } from 'react-hot-toast';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import ModernDialog from '../dialogs/ModernDialog';
@@ -34,6 +35,7 @@ const PaymentClick = ({
   const [pollingInterval, setPollingInterval] = useState(null);
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [printTickets, setPrintTickets] = useState([]);
+  const [showTicketPrinter, setShowTicketPrinter] = useState(false);
   
   const maxPollingAttempts = 60; // 5 минут при интервале 5 сек
   const pollingIntervalMs = 5000; // 5 секунд
@@ -173,6 +175,11 @@ const PaymentClick = ({
         
         toast.success('Платёж успешно завершён!');
         
+        // Показываем принтер талонов если есть талоны для печати
+        if (printTickets.length > 0) {
+          setShowTicketPrinter(true);
+        }
+        
         if (onSuccess) {
           onSuccess(data);
         }
@@ -195,15 +202,33 @@ const PaymentClick = ({
   
   const loadPrintTickets = async () => {
     try {
-      // В реальной реализации здесь будет запрос к API для получения данных талонов
-      // Пока используем заглушку
+      // Получаем данные о талонах из последнего ответа API
+      // Данные должны приходить в onSuccess callback
+      // Пока оставляем mock данные для тестирования множественных талонов
       const mockTickets = [
         {
           visit_id: 1,
+          queue_tag: "cardiology_common",
+          queue_name: "Кардиолог",
           queue_number: 15,
-          patient_name: 'Иванов И.И.',
-          doctor_name: 'Кардиолог',
-          department: 'Кардиология',
+          queue_id: 1,
+          patient_id: 1,
+          patient_name: "Юля Михайловна",
+          doctor_name: "Д-р Петров",
+          department: "Кардиология",
+          visit_date: new Date().toISOString().split('T')[0],
+          visit_time: '10:30'
+        },
+        {
+          visit_id: 1,
+          queue_tag: "dermatology",
+          queue_name: "Дерматолог",
+          queue_number: 8,
+          queue_id: 2,
+          patient_id: 1,
+          patient_name: "Юля Михайловна",
+          doctor_name: "Д-р Смирнова",
+          department: "Дерматология",
           visit_date: new Date().toISOString().split('T')[0],
           visit_time: '10:30'
         }
@@ -557,6 +582,7 @@ const PaymentClick = ({
   };
   
   return (
+    <>
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
@@ -571,6 +597,28 @@ const PaymentClick = ({
         {renderContent()}
       </div>
     </ModernDialog>
+
+    {/* Принтер множественных талонов */}
+    {showTicketPrinter && printTickets.length > 0 && (
+      <ModernDialog
+        isOpen={showTicketPrinter}
+        onClose={() => setShowTicketPrinter(false)}
+        title="Печать талонов"
+        maxWidth="50rem"
+        closeOnBackdrop={false}
+        className="ticket-printer-dialog"
+      >
+        <MultipleTicketsPrinter
+          tickets={printTickets}
+          onClose={() => setShowTicketPrinter(false)}
+          onAllPrinted={() => {
+            setShowTicketPrinter(false);
+            toast.success('Все талоны напечатаны!');
+          }}
+        />
+      </ModernDialog>
+    )}
+  </>
   );
 };
 

@@ -1541,9 +1541,8 @@ const RegistrarPanel = () => {
     
     // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий
     const departmentCategoryMapping = {
-      'cardio': ['K'],           // Кардиология
-      'echokg': ['K'],           // ЭКГ это часть кардиологии  
-      'ecg': ['K'],              // ЭКГ это часть кардиологии
+      'cardio': ['K'],           // Кардиология (консультации кардиолога)
+      'echokg': ['ECG'],         // ЭКГ - отдельная категория
       'derma': ['D'],            // Дерматология
       'dental': ['S'],           // Стоматология
       'lab': ['L'],              // Лаборатория
@@ -1553,14 +1552,35 @@ const RegistrarPanel = () => {
     // Получаем коды категорий для данного отдела
     const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
     
-    // Маппинг кодов услуг к категориям (на основе префиксов)
+    // Маппинг кодов услуг к категориям (поддерживает разные форматы)
     const getServiceCategoryByCode = (serviceCode) => {
-      if (serviceCode.startsWith('CONS_CARD') || serviceCode.startsWith('CARD_')) return 'K';
-      if (serviceCode.startsWith('CONS_DERMA') || serviceCode.startsWith('DERMA_')) return 'D';
+      if (!serviceCode) return null;
+      
+      // ЭКГ - отдельная категория
+      if (serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
+      
+      // ЭхоКГ - тоже кардиология, но отдельно от ЭКГ
+      if (serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO')) return 'K';
+      
+      // Новый формат кодов (K11, D01, S05, L12, etc.)
+      if (serviceCode.match(/^K\d+$/)) return 'K';  // K11, K12 -> Кардиология
+      if (serviceCode.match(/^D\d+$/)) return 'D';  // D01, D02 -> Дерматология  
+      if (serviceCode.match(/^S\d+$/)) return 'S';  // S01, S02 -> Стоматология
+      if (serviceCode.match(/^L\d+$/)) return 'L';  // L01, L02 -> Лаборатория
+      if (serviceCode.match(/^C\d+$/)) return 'C';  // C01, C02 -> Косметология
+      if (serviceCode.match(/^O\d+$/)) return 'O';  // O01, O02 -> Прочие процедуры
+      
+      // Старый формат кодов (префиксы)
+      if (serviceCode.startsWith('CONS_CARD')) return 'K';
+      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'D';
       if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'S';
       if (serviceCode.startsWith('LAB_')) return 'L';
       if (serviceCode.startsWith('COSM_')) return 'C';
       if (serviceCode.startsWith('PROC_')) return 'O';
+      
+      // Дополнительные паттерны для кардиологии
+      if (serviceCode.startsWith('CARD_')) return 'K';
+      
       return null;
     };
     
@@ -1569,6 +1589,7 @@ const RegistrarPanel = () => {
                                (departmentKey === 'derma' && (dept.includes('dermat') || dept.includes('dermatology'))) ||
                                (departmentKey === 'dental' && (dept.includes('dental') || dept.includes('stoma') || dept.includes('dentistry'))) ||
                                (departmentKey === 'cardio' && dept.includes('cardiology')) ||
+                               (departmentKey === 'echokg' && (dept.includes('ecg') || dept.includes('экг'))) ||
                                (departmentKey === 'lab' && (dept.includes('lab') || dept.includes('laboratory'))) ||
                                (departmentKey === 'procedures' && (dept.includes('procedures') || dept.includes('cosmetology')));
     
@@ -1576,6 +1597,7 @@ const RegistrarPanel = () => {
                               (departmentKey === 'derma' && specialty.includes('dermat')) ||
                               (departmentKey === 'dental' && (specialty.includes('dental') || specialty.includes('stoma'))) ||
                               (departmentKey === 'cardio' && specialty.includes('cardio')) ||
+                              (departmentKey === 'echokg' && (specialty.includes('ecg') || specialty.includes('экг'))) ||
                               (departmentKey === 'lab' && (specialty.includes('lab') || specialty.includes('laboratory')));
     
     // ✅ НОВАЯ ЛОГИКА: проверяем по кодам услуг
