@@ -36,6 +36,46 @@ class ClinicTelegramBot:
         self.queue_service = QueueBusinessService()
         self._setup_handlers()
     
+    async def send_confirmation_invitation(
+        self, 
+        chat_id: int, 
+        message: str, 
+        keyboard: list
+    ) -> Dict[str, Any]:
+        """Отправляет приглашение на подтверждение визита"""
+        try:
+            if not self.bot:
+                return {"success": False, "error": "Telegram bot не инициализирован"}
+            
+            # Создаем inline клавиатуру
+            inline_keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=button["text"], 
+                                        callback_data=button.get("callback_data"),
+                                        url=button.get("url")) 
+                     for button in row]
+                    for row in keyboard
+                ]
+            )
+            
+            # Отправляем сообщение
+            sent_message = await self.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                reply_markup=inline_keyboard,
+                parse_mode="Markdown"
+            )
+            
+            return {
+                "success": True,
+                "message_id": sent_message.message_id,
+                "chat_id": chat_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Ошибка отправки Telegram приглашения: {e}")
+            return {"success": False, "error": str(e)}
+    
     def _setup_handlers(self):
         """Настройка обработчиков команд"""
         if not self.dp:
@@ -50,6 +90,11 @@ class ClinicTelegramBot:
         @self.dp.message(Command("queue"))
         async def queue_handler(message: types.Message):
             await self.handle_queue(message)
+        
+        # Обработчик callback'ов для подтверждения визитов
+        @self.dp.callback_query()
+        async def callback_handler(callback: types.CallbackQuery):
+            await self.handle_callback(callback)
         
         # Команда /appointment - запись на прием
         @self.dp.message(Command("appointment"))
@@ -372,7 +417,114 @@ class ClinicTelegramBot:
             dispatcher=self.dp,
             bot=self.bot
         )
+    
+    async def handle_callback(self, callback: types.CallbackQuery):
+        """Обработчик callback'ов для подтверждения визитов"""
+        try:
+            callback_data = callback.data
+            
+            if callback_data.startswith("confirm_visit:"):
+                # Подтверждение визита
+                token = callback_data.split(":", 1)[1]
+                await self._handle_visit_confirmation(callback, token, True)
+                
+            elif callback_data.startswith("cancel_visit:"):
+                # Отмена визита
+                token = callback_data.split(":", 1)[1]
+                await self._handle_visit_confirmation(callback, token, False)
+                
+            else:
+                # Неизвестный callback
+                await callback.answer("Неизвестная команда", show_alert=True)
+                
+        except Exception as e:
+            logger.error(f"Ошибка обработки callback: {e}")
+            await callback.answer("Произошла ошибка", show_alert=True)
+    
+    async def _handle_visit_confirmation(
+        self, 
+        callback: types.CallbackQuery, 
+        token: str, 
+        confirm: bool
+    ):
+        """Обрабатывает подтверждение или отмену визита"""
+        try:
+            if confirm:
+                # Подтверждаем визит через API
+                result = await self._confirm_visit_via_api(token, callback.from_user.id)
+                
+                if result.get("success"):
+                    message = "✅ Визит успешно подтвержден!"
+                    if result.get("queue_numbers"):
+                        queue_info = ", ".join([f"{q['queue_name']}: №{q['number']}" 
+                                              for q in result["queue_numbers"]])
+                        message += f"\n\n🎫 Ваши номера в очередях:\n{queue_info}"
+                    
+                    await callback.message.edit_text(
+                        text=f"{callback.message.text}\n\n{message}",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    await callback.answer(
+                        f"Ошибка подтверждения: {result.get('message', 'Неизвестная ошибка')}", 
+                        show_alert=True
+                    )
+            else:
+                # Отменяем визит
+                await callback.message.edit_text(
+                    text=f"{callback.message.text}\n\n❌ Визит отменен",
+                    parse_mode="Markdown"
+                )
+                
+            await callback.answer()
+            
+        except Exception as e:
+            logger.error(f"Ошибка подтверждения визита: {e}")
+            await callback.answer("Произошла ошибка при подтверждении", show_alert=True)
+    
+    async def _confirm_visit_via_api(self, token: str, telegram_user_id: int) -> Dict[str, Any]:
+        """Подтверждает визит через API"""
+        try:
+            # Здесь должен быть вызов API подтверждения
+            # Пока возвращаем заглушку
+            import requests
+            
+            response = requests.post(
+                f"{settings.API_BASE_URL}/telegram/visits/confirm",
+                json={
+                    "token": token,
+                    "channel": "telegram"
+                },
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {"success": False, "message": f"HTTP {response.status_code}"}
+                
+        except Exception as e:
+            logger.error(f"Ошибка API подтверждения: {e}")
+            return {"success": False, "message": str(e)}
 
 
 # Глобальный экземпляр бота
 telegram_bot = ClinicTelegramBot()
+
+class TelegramBotService:
+    """Сервис для работы с Telegram ботом"""
+    
+    def __init__(self):
+        self.bot = telegram_bot
+    
+    async def send_confirmation_invitation(
+        self, 
+        chat_id: int, 
+        message: str, 
+        keyboard: list
+    ) -> Dict[str, Any]:
+        """Отправляет приглашение на подтверждение визита"""
+        if not self.bot or not self.bot.bot:
+            return {"success": False, "error": "Telegram bot не доступен"}
+        
+        return await self.bot.send_confirmation_invitation(chat_id, message, keyboard)

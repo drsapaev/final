@@ -22,6 +22,7 @@ import VisitProtocol from '../components/dental/VisitProtocol';
 import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
+import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import { 
   User, 
   Calendar, 
@@ -92,6 +93,7 @@ const DentistPanelUnified = () => {
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -1217,7 +1219,7 @@ const DentistPanelUnified = () => {
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
               <Stethoscope className="h-6 w-6 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-bold text-slate-900">
                 Стоматология
               </h1>
@@ -1225,6 +1227,19 @@ const DentistPanelUnified = () => {
                 {user?.name || 'Доктор'}
               </p>
             </div>
+          </div>
+          
+          {/* Кнопка назначить следующий визит */}
+          <div className="mt-4">
+            <Button 
+              variant="primary"
+              onClick={() => setScheduleNextModal({ open: true, patient: selectedPatient })}
+              className="w-full flex items-center justify-center gap-2 text-sm"
+              size="sm"
+            >
+              <Plus size={14} />
+              Назначить следующий визит
+            </Button>
           </div>
         </div>
 
@@ -2007,6 +2022,17 @@ const DentistPanelUnified = () => {
             console.log('Price set:', priceData);
             // Можно добавить логику обновления состояния
           }}
+        />
+      )}
+
+      {/* Модальное окно Schedule Next */}
+      {scheduleNextModal.open && (
+        <ScheduleNextModal
+          isOpen={scheduleNextModal.open}
+          onClose={() => setScheduleNextModal({ open: false, patient: null })}
+          patient={scheduleNextModal.patient}
+          theme={{ isDark, getColor, getSpacing: (size) => theme.spacing[size], getFontSize: (size) => theme.fontSize[size] }}
+          specialtyFilter="dentistry"
         />
       )}
     </div>

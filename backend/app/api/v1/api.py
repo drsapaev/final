@@ -86,6 +86,18 @@ from app.api.v1.endpoints.queue_simple import router as simple_queue_router
 from app.api.v1.endpoints.payments import router as payments_new_router
 from app.api.v1.endpoints.payment_webhooks import router as payment_webhooks_router
 
+# Импортируем эндпоинты подтверждения визитов
+from app.api.v1.endpoints.visit_confirmation import router as visit_confirmation_router
+
+# Импортируем эндпоинты утренней сборки
+from app.api.v1.endpoints.morning_assignment import router as morning_assignment_router
+
+# Импортируем эндпоинты управления безопасностью
+from app.api.v1.endpoints.security_management import router as security_management_router
+
+# Импортируем эндпоинты управления миграциями
+from app.api.v1.endpoints.migration_management import router as migration_management_router
+
 api_router = APIRouter()
 
 # Auth (/login, /me и т.д.)
@@ -96,6 +108,18 @@ api_router.include_router(services.router, prefix="/services")
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(payments_new_router, prefix="/payments", tags=["payments-new"])
 api_router.include_router(payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"])
+
+# Эндпоинты подтверждения визитов (публичные, без авторизации)
+api_router.include_router(visit_confirmation_router, tags=["visit-confirmation"])
+
+# Эндпоинты утренней сборки (админ/регистратор)
+api_router.include_router(morning_assignment_router, tags=["morning-assignment"])
+
+# Эндпоинты управления безопасностью (только админ)
+api_router.include_router(security_management_router, tags=["security-management"])
+
+# Эндпоинты управления миграциями (только админ)
+api_router.include_router(migration_management_router, tags=["migration-management"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено

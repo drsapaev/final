@@ -25,6 +25,7 @@ import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ECGViewer from '../components/cardiology/ECGViewer';
 import EchoForm from '../components/cardiology/EchoForm';
+import ScheduleNextModal from '../components/common/ScheduleNextModal';
 
 /**
  * Унифицированная панель кардиолога
@@ -45,6 +46,7 @@ const CardiologistPanelUnified = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
 
   // Специализированные данные кардиолога
   const [ecgForm, setEcgForm] = useState({
@@ -322,6 +324,17 @@ const CardiologistPanelUnified = () => {
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Унифицированная панель с очередью, ЭКГ, анализами и AI помощником
             </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="primary"
+              onClick={() => setScheduleNextModal({ open: true, patient: selectedPatient?.patient || null })}
+              className="flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Назначить следующий визит
+            </Button>
           </div>
           
           {selectedPatient && (
@@ -759,6 +772,17 @@ const CardiologistPanelUnified = () => {
           </Card>
         )}
       </div>
+
+      {/* Модальное окно Schedule Next */}
+      {scheduleNextModal.open && (
+        <ScheduleNextModal
+          isOpen={scheduleNextModal.open}
+          onClose={() => setScheduleNextModal({ open: false, patient: null })}
+          patient={scheduleNextModal.patient}
+          theme={{ isDark, getColor, getSpacing: (size) => theme.spacing[size], getFontSize: (size) => theme.fontSize[size] }}
+          specialtyFilter="cardiology"
+        />
+      )}
     </div>
   );
 };
