@@ -90,7 +90,6 @@ const EnhancedAppointmentsTable = ({
       date: 'Дата',
       time: 'Время',
       status: 'Статус',
-      confirmation: 'Подтверждение',
       cost: 'Стоимость',
       payment: 'Оплата',
       // Типы обращения
@@ -468,7 +467,30 @@ const EnhancedAppointmentsTable = ({
         )}
       </div>
     );
-  }, [colors, t]);
+    }, [colors, t]);
+
+  // Функция для форматирования номера телефона
+  const formatPhoneNumber = useCallback((phone) => {
+    if (!phone) return '—';
+    
+    // Убираем все нецифровые символы
+    const digits = phone.replace(/\D/g, '');
+    
+    // Если номер начинается с 998, добавляем +
+    if (digits.startsWith('998')) {
+      const formatted = `+998 (${digits.slice(3, 5)}) ${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10, 12)}`;
+      return formatted;
+    }
+    
+    // Если номер начинается с 9 (без кода страны)
+    if (digits.startsWith('9') && digits.length >= 9) {
+      const formatted = `+998 (${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7, 9)}`;
+      return formatted;
+    }
+    
+    // Если номер короткий или нестандартный, возвращаем как есть
+    return phone;
+  }, []);
 
   // Экспорт данных
   const handleExport = useCallback(() => {
@@ -527,7 +549,7 @@ const EnhancedAppointmentsTable = ({
 
     const csvContent = [
       // Заголовки
-      [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.confirmation, t.cost].join(','),
+      [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
       // Данные
       ...filteredData.map((row, index) => [
         // Номера очередей для CSV
@@ -535,7 +557,7 @@ const EnhancedAppointmentsTable = ({
           ? row.queue_numbers.map(q => `${q.queue_name}: №${q.number}`).join('; ')
           : index + 1,
         row.patient_fio || '',
-        row.patient_phone || '',
+          formatPhoneNumber(row.patient_phone),
         row.patient_birth_year || '',
         row.address || '',
         (() => {
@@ -550,9 +572,6 @@ const EnhancedAppointmentsTable = ({
         row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : (row.appointment_date || ''),
         row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (row.appointment_time || ''),
         t[row.status] || row.status || '',
-        row.confirmation_status === 'confirmed' ? 'Подтвержден' : 
-        row.confirmation_status === 'pending' ? 'Ожидает' : 
-        row.confirmation_status === 'expired' ? 'Истек' : '—',
         row.total_amount || row.cost || row.payment_amount || ''
       ].join(','))
     ].join('\n');
@@ -702,78 +721,6 @@ const EnhancedAppointmentsTable = ({
     );
   }, [data, colors]);
 
-  // Функция для отображения статуса подтверждения
-  const renderConfirmationStatus = useCallback((row) => {
-    const confirmationStatus = row.confirmation_status;
-    
-    if (!confirmationStatus || confirmationStatus === 'none') {
-      return (
-        <span style={{
-          padding: '2px 6px',
-          backgroundColor: colors.textSecondary + '20',
-          color: colors.textSecondary,
-          borderRadius: '4px',
-          fontSize: '11px',
-          fontWeight: '500'
-        }}>
-          —
-        </span>
-      );
-    }
-    
-    const statusConfig = {
-      pending: { 
-        color: colors.warning, 
-        bg: colors.warning + '20', 
-        text: 'Ожидает',
-        icon: '⏳'
-      },
-      confirmed: { 
-        color: colors.success, 
-        bg: colors.success + '20', 
-        text: 'Подтвержден',
-        icon: '✅'
-      },
-      expired: { 
-        color: colors.error, 
-        bg: colors.error + '20', 
-        text: 'Истек',
-        icon: '❌'
-      }
-    };
-    
-    const config = statusConfig[confirmationStatus] || statusConfig.pending;
-    
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <span style={{
-          padding: '2px 6px',
-          backgroundColor: config.bg,
-          color: config.color,
-          borderRadius: '4px',
-          fontSize: '11px',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '2px'
-        }}>
-          <span>{config.icon}</span>
-          <span>{config.text}</span>
-        </span>
-        {row.confirmed_at && (
-          <span style={{
-            fontSize: '10px',
-            color: colors.textSecondary
-          }}>
-            {new Date(row.confirmed_at).toLocaleTimeString('ru-RU', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            })}
-          </span>
-        )}
-      </div>
-    );
-  }, [colors]);
 
   return (
     <div 
@@ -934,7 +881,9 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '200px'
+                  minWidth: '200px',
+                  maxWidth: '200px',
+                  width: '200px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -953,9 +902,11 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                minWidth: '140px'
-              }}>
-                {t.phone}
+                  minWidth: '170px',
+                  maxWidth: '170px',
+                  width: '170px'
+                }}>
+                  {t.phone}
               </th>
 
               {/* Год рождения */}
@@ -990,9 +941,11 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                minWidth: '150px'
-              }}
-              className="hide-on-mobile"
+                  minWidth: '140px',
+                  maxWidth: '140px',
+                  width: '140px'
+                }}
+                className="hide-on-mobile"
               >
                 {t.address}
               </th>
@@ -1005,9 +958,11 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                minWidth: '100px'
-              }}>
-                {t.visitType}
+                  minWidth: '80px',
+                  maxWidth: '80px',
+                  width: '80px'
+                }}>
+                  {t.visitType}
               </th>
 
               {/* Услуги */}
@@ -1018,9 +973,11 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                minWidth: '200px'
-              }}>
-                {t.services}
+                  minWidth: '180px',
+                  maxWidth: '180px',
+                  width: '180px'
+                }}>
+                  {t.services}
               </th>
 
               {/* Вид оплаты */}
@@ -1031,9 +988,11 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                minWidth: '120px'
-              }}>
-                {t.paymentType}
+                  minWidth: '100px',
+                  maxWidth: '100px',
+                  width: '100px'
+                }}>
+                  {t.paymentType}
               </th>
 
               {/* Дата и время */}
@@ -1047,7 +1006,9 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '120px'
+                  minWidth: '100px',
+                  maxWidth: '100px',
+                  width: '100px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -1069,9 +1030,9 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '90px',
-                  maxWidth: '90px',
-                  width: '90px'
+                  minWidth: '80px',
+                  maxWidth: '80px',
+                  width: '80px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -1082,18 +1043,6 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Подтверждение */}
-              <th style={{
-                padding: '12px 8px',
-                textAlign: 'center',
-                borderBottom: `1px solid ${colors.border}`,
-                color: colors.text,
-                fontWeight: '600',
-                fontSize: '14px',
-                minWidth: '120px'
-              }}>
-                {t.confirmation}
-              </th>
 
               {/* Стоимость */}
               <th 
@@ -1106,7 +1055,9 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '100px'
+                  minWidth: '90px',
+                  maxWidth: '90px',
+                  width: '90px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
@@ -1125,11 +1076,11 @@ const EnhancedAppointmentsTable = ({
                 color: colors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                width: '80px',
-                minWidth: '80px',
-                maxWidth: '80px'
-              }}>
-                {t.actions}
+                  width: '165px',
+                  minWidth: '165px',
+                  maxWidth: '165px'
+                }}>
+                  {t.actions}
               </th>
             </tr>
           </thead>
@@ -1198,7 +1149,13 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     color: colors.text,
                     fontSize: '14px',
-                    fontWeight: '500'
+                    fontWeight: '500',
+                    minWidth: '200px',
+                    maxWidth: '200px',
+                    width: '200px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}>
                     <div>
                       <div>{row.patient_fio || '—'}</div>
@@ -1218,15 +1175,21 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     color: colors.text,
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    minWidth: '170px',
+                    maxWidth: '170px',
+                    width: '170px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}>
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px'
+                      gap: '8px'
                     }}>
-                      <Phone size={14} style={{ color: colors.textSecondary }} />
-                      {row.patient_phone || '—'}
+                      <Phone size={18} style={{ color: colors.accent, fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
+                      {formatPhoneNumber(row.patient_phone)}
                     </div>
                   </td>
 
@@ -1248,10 +1211,13 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     color: colors.text,
                     fontSize: '14px',
-                    maxWidth: '150px',
+                    minWidth: '140px',
+                    maxWidth: '140px',
+                    width: '140px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'normal',
+                    lineHeight: '1.4'
                   }}
                   className="hide-on-mobile"
                   title={row.address}
@@ -1262,7 +1228,10 @@ const EnhancedAppointmentsTable = ({
                   {/* Тип обращения */}
                   <td style={{
                     padding: '12px 8px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    minWidth: '80px',
+                    maxWidth: '80px',
+                    width: '80px'
                   }}>
                     {renderVisitType((() => {
                       const discountMode = row.discount_mode;
@@ -1274,14 +1243,22 @@ const EnhancedAppointmentsTable = ({
                   </td>
 
                   {/* Услуги */}
-                  <td style={{ padding: '12px 8px' }}>
+                  <td style={{ 
+                    padding: '12px 8px',
+                    minWidth: '180px',
+                    maxWidth: '180px',
+                    width: '180px'
+                  }}>
                     {renderServices(row.services)}
                   </td>
 
                   {/* Вид оплаты */}
                   <td style={{
                     padding: '12px 8px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    minWidth: '100px',
+                    maxWidth: '100px',
+                    width: '100px'
                   }}>
                     {renderPaymentType(row.payment_type || 'cash', row.payment_status)}
                   </td>
@@ -1291,7 +1268,10 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'center',
                     color: colors.text,
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    minWidth: '100px',
+                    maxWidth: '100px',
+                    width: '100px'
                   }}>
                     <div>
                       {/* Дата и время регистрации */}
@@ -1348,9 +1328,9 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    minWidth: '90px',
-                    maxWidth: '90px',
-                    width: '90px',
+                    minWidth: '80px',
+                    maxWidth: '80px',
+                    width: '80px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
@@ -1358,14 +1338,6 @@ const EnhancedAppointmentsTable = ({
                     {renderStatus(row.status)}
                   </td>
 
-                  {/* Подтверждение */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    fontSize: '14px'
-                  }}>
-                    {renderConfirmationStatus(row)}
-                  </td>
 
                   {/* Стоимость */}
                   <td style={{
@@ -1373,7 +1345,10 @@ const EnhancedAppointmentsTable = ({
                     textAlign: 'right',
                     color: colors.success,
                     fontSize: '14px',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    minWidth: '90px',
+                    maxWidth: '90px',
+                    width: '90px'
                   }}>
                     {(() => {
                       const amount = row.total_amount || row.cost || row.payment_amount || 0;
@@ -1385,9 +1360,9 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    width: '80px',
-                    minWidth: '80px',
-                    maxWidth: '80px'
+                    width: '165px',
+                    minWidth: '165px',
+                    maxWidth: '165px'
                   }}>
                     <div style={{
                       display: 'flex',
@@ -1428,32 +1403,7 @@ const EnhancedAppointmentsTable = ({
                           }}
                           title="Оплата"
                         >
-                          💳 Оплата
-                        </button>
-                      )}
-                      
-                      {/* В кабинет */}
-                      {(row.status === 'confirmed' || row.status === 'queued') && (
-                        <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('in_cabinet', row, e);
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            border: `1px solid ${colors.primary}`,
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
-                            color: colors.primary,
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500'
-                          }}
-                          title="В кабинет"
-                        >
-                          🚪 В кабинет
+                          💸 Оплата
                         </button>
                       )}
                       

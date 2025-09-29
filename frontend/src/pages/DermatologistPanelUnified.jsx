@@ -634,7 +634,7 @@ const DermatologistPanelUnified = () => {
                           </div>
                           <div className="text-sm text-gray-600 space-y-1">
                             <div className="flex items-center">
-                              <Phone size={14} className="mr-2" />
+                              <Phone size={18} className="mr-2" style={{ color: '#3b82f6', fontWeight: 'bold' }} />
                               {patient.phone}
                             </div>
                             <div className="flex items-center">
