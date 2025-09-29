@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
-import { PWAInstallPrompt, ConnectionStatus } from './components/pwa';
+import { PWAInstallPrompt } from './components/pwa';
 import { usePWA } from './hooks/usePWA.js';
 import { ThemeProvider } from './theme';
 import './styles/theme.css';
@@ -110,7 +110,6 @@ function AppContent() {
 
   return (
     <>
-      <ConnectionStatus />
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
       <Route path="/login" element={<LoginFormStyled />} />
