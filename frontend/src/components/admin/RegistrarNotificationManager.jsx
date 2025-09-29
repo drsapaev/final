@@ -343,7 +343,7 @@ const RegistrarNotificationManager = () => {
                 )}
                 {registrar.phone && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                    <Phone size={14} />
+                    <Phone size={18} style={{ color: '#3b82f6', fontWeight: 'bold' }} />
                     {registrar.phone}
                   </span>
                 )}

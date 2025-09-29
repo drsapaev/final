@@ -412,7 +412,7 @@ const DoctorQueuePanel = ({
                         </div>
                         {entry.phone && (
                           <div className="flex items-center text-sm text-gray-500">
-                            <Phone size={14} className="mr-1" />
+                            <Phone size={18} className="mr-1" style={{ color: '#3b82f6', fontWeight: 'bold' }} />
                             {entry.phone}
                           </div>
                         )}
