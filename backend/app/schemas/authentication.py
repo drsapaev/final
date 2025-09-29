@@ -150,7 +150,7 @@ class UserProfileResponse(BaseModel):
     is_superuser: bool
     email_verified: bool
     phone_verified: bool
-    created_at: datetime
+    created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
     two_factor_enabled: bool = False
 

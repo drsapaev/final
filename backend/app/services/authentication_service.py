@@ -514,8 +514,8 @@ class AuthenticationService:
                 )
             ).first() is not None
             
-            # Проверяем 2FA
-            two_factor_enabled = user.two_factor_auth and user.two_factor_auth.totp_enabled
+            # Проверяем 2FA (строго булево значение)
+            two_factor_enabled = bool(user.two_factor_auth and getattr(user.two_factor_auth, 'totp_enabled', False))
             
             return {
                 "id": user.id,
