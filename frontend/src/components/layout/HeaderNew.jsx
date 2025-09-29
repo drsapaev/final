@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
+import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 
 import {
   Home,
@@ -146,6 +147,9 @@ export default function HeaderNew() {
         <option value="uz">UZ</option>
         <option value="en">EN</option>
       </select>
+
+      {/* Индикатор подключения */}
+      <CompactConnectionStatus className="mr-2" />
 
       {user ? (
         <>
