@@ -1147,7 +1147,7 @@ class WizardSettingsRequest(BaseModel):
 @router.get("/admin/wizard-settings", summary="Получить настройки мастера регистрации")
 def get_wizard_settings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin", "Registrar"]))
+    current_user: User = Depends(require_roles("Admin", "Registrar"))
 ):
     """Получить настройки мастера регистрации"""
     try:
@@ -1179,7 +1179,7 @@ def get_wizard_settings(
 def update_wizard_settings(
     settings_data: WizardSettingsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["Admin"]))
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Обновить настройки мастера регистрации"""
     try:
