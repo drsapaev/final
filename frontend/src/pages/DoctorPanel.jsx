@@ -32,10 +32,7 @@ import {
 import '../styles/animations.css';
 
 // UI компоненты
-import Button from '../components/ui/native/Button';
-import Card from '../components/ui/native/Card';
-import Badge from '../components/ui/native/Badge';
-import AnimatedTransition from '../components/ui/native/AnimatedTransition';
+import { Button, Card, Badge, AnimatedTransition } from '../components/ui/native';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal';
