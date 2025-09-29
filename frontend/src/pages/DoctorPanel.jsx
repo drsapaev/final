@@ -32,7 +32,7 @@ import {
 import '../styles/animations.css';
 
 // UI компоненты
-import { Button, Card, Badge, AnimatedTransition } from '../components/ui/native';
+import { Button, Card, CardHeader, CardContent, Badge, AnimatedTransition } from '../components/ui/native';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal';
@@ -663,7 +663,7 @@ const DoctorPanel = () => {
               {/* Быстрые действия */}
               <AnimatedTransition type="fade" delay={600}>
                 <Card style={{ marginBottom: getSpacing('xl') }}>
-                  <Card.Header>
+                  <CardHeader>
                     <h2 style={{ 
                       fontSize: getFontSize('xl'), 
                       fontWeight: '700',
@@ -672,8 +672,8 @@ const DoctorPanel = () => {
                     }}>
                       Быстрые действия
                     </h2>
-                  </Card.Header>
-                  <Card.Content>
+                  </CardHeader>
+                  <CardContent>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
@@ -696,7 +696,7 @@ const DoctorPanel = () => {
                         Экспорт данных
                       </Button>
                     </div>
-                  </Card.Content>
+                  </CardContent>
                 </Card>
               </AnimatedTransition>
             </div>
@@ -706,7 +706,7 @@ const DoctorPanel = () => {
         {activeTab === 'patients' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
-              <Card.Header style={tableHeaderStyle}>
+              <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <h2 style={{ 
                     fontSize: getFontSize('xl'), 
@@ -756,8 +756,8 @@ const DoctorPanel = () => {
                     </Button>
                   </div>
                 </div>
-              </Card.Header>
-              <Card.Content style={{ padding: 0 }}>
+              </CardHeader>
+              <CardContent style={{ padding: 0 }}>
                 {loading ? (
                   <Skeleton.Table rows={5} columns={6} />
                 ) : (
@@ -856,7 +856,7 @@ const DoctorPanel = () => {
                     </tbody>
                   </table>
                 )}
-              </Card.Content>
+              </CardContent>
             </Card>
           </AnimatedTransition>
         )}
@@ -864,7 +864,7 @@ const DoctorPanel = () => {
         {activeTab === 'appointments' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card style={patientsTableStyle}>
-              <Card.Header style={tableHeaderStyle}>
+              <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
                   <h2 style={{ 
                     fontSize: getFontSize('xl'), 
@@ -918,8 +918,8 @@ const DoctorPanel = () => {
                     </Button>
                   </div>
                 </div>
-              </Card.Header>
-              <Card.Content style={{ padding: 0 }}>
+              </CardHeader>
+              <CardContent style={{ padding: 0 }}>
                 {loading ? (
                   <Skeleton.Table rows={5} columns={6} />
                 ) : (
@@ -997,7 +997,7 @@ const DoctorPanel = () => {
                     </tbody>
                   </table>
                 )}
-              </Card.Content>
+              </CardContent>
             </Card>
           </AnimatedTransition>
         )}
@@ -1005,7 +1005,7 @@ const DoctorPanel = () => {
         {activeTab === 'ai' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card>
-              <Card.Header>
+              <CardHeader>
                 <h2 style={{ 
                   fontSize: getFontSize('xl'), 
                   fontWeight: '700',
@@ -1014,15 +1014,15 @@ const DoctorPanel = () => {
                 }}>
                   AI Помощник врача
                 </h2>
-              </Card.Header>
-              <Card.Content>
+              </CardHeader>
+              <CardContent>
                 <AIAssistant
                   specialty="general"
                   onSuggestionSelect={(type, suggestion) => {
                     console.log('AI предложение для общего врача:', type, suggestion);
                   }}
                 />
-              </Card.Content>
+              </CardContent>
             </Card>
           </AnimatedTransition>
         )}
@@ -1030,7 +1030,7 @@ const DoctorPanel = () => {
         {activeTab === 'reports' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card>
-              <Card.Header>
+              <CardHeader>
                 <h2 style={{ 
                   fontSize: getFontSize('xl'), 
                   fontWeight: '700',
@@ -1039,8 +1039,8 @@ const DoctorPanel = () => {
                 }}>
                   Отчеты и аналитика
                 </h2>
-              </Card.Header>
-              <Card.Content>
+              </CardHeader>
+              <CardContent>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
@@ -1071,7 +1071,7 @@ const DoctorPanel = () => {
                     Экспорт всех данных
                   </Button>
                 </div>
-              </Card.Content>
+              </CardContent>
             </Card>
           </AnimatedTransition>
         )}
