@@ -190,23 +190,7 @@ export default function Landing() {
             {t.login}
           </button>
           <button 
-            onClick={() => navigate('/new-login')} 
-            style={buttonSecondaryStyle}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-          >
-            ✨ Новый вход
-          </button>
-          <button 
-            onClick={() => navigate('/components')} 
-            style={buttonSecondaryStyle}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-          >
-            🚀 Компоненты
-          </button>
-          <button 
-            onClick={() => navigate('/activation')} 
+            onClick={() => navigate('/admin/activation')} 
             style={buttonSecondaryStyle}
             onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
             onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
