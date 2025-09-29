@@ -7,7 +7,7 @@ import sys
 
 import requests
 
-BASE_URL = "http://127.0.0.1:8003"
+BASE_URL = "http://127.0.0.1:8000"
 
 
 def test_user_login_and_role(username, password, expected_role, expected_redirect=None):
@@ -25,9 +25,14 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
             return False
 
         token_data = response.json()
+        # Новая система аутентификации возвращает токены в объекте tokens
         token = token_data.get("access_token")
+        if not token and token_data.get("tokens"):
+            token = token_data["tokens"].get("access_token")
+        
         if not token:
             print("ОШИБКА: Токен не получен")
+            print(f"DEBUG: Response data: {token_data}")
             return False
 
         # Получение профиля

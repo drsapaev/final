@@ -62,8 +62,8 @@ def check_api_endpoints():
     try:
         # Получаем токен админа
         response = requests.post(
-            "http://127.0.0.1:8000/api/v1/auth/login",
-            data={
+            "http://127.0.0.1:8000/api/v1/authentication/login",
+            json={
                 "username": "admin",
                 "password": "admin123",
                 "grant_type": "password",
