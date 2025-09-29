@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, B
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.api.deps import get_current_user, require_admin, require_staff
+from app.api.deps import get_current_user, require_roles, require_staff
 from app.models.user import User
 from app.services.user_management_service import get_user_management_service, UserManagementService
 from app.crud.user_management import (
@@ -34,7 +34,7 @@ async def create_user(
     user_data: UserCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Создать нового пользователя"""
     try:
@@ -146,7 +146,7 @@ async def update_user(
     user_data: UserUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Обновить пользователя"""
     try:
@@ -183,7 +183,7 @@ async def delete_user(
     user_id: int,
     transfer_to: Optional[int] = Query(None, description="ID пользователя для передачи данных"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Удалить пользователя"""
     try:
@@ -692,7 +692,7 @@ async def bulk_action_users(
     action_data: UserBulkActionRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Выполнить массовые действия с пользователями"""
     try:
@@ -727,7 +727,7 @@ async def export_users(
     export_data: UserExportRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Экспорт пользователей"""
     try:
@@ -784,7 +784,7 @@ async def export_users(
 
 @router.get("/users/export/files")
 async def list_export_files(
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Получить список файлов экспорта"""
     try:
@@ -829,7 +829,7 @@ async def list_export_files(
 @router.get("/users/export/download/{filename}")
 async def download_export_file(
     filename: str,
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Скачать файл экспорта"""
     try:
@@ -884,7 +884,7 @@ async def download_export_file(
 @router.delete("/users/export/files/{filename}")
 async def delete_export_file(
     filename: str,
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles("Admin"))
 ):
     """Удалить файл экспорта"""
     try:
