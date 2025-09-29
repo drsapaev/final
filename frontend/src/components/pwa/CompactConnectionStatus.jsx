@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Cloud, Sync } from 'lucide-react';
+import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
 
 const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
@@ -29,7 +29,7 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
 
   const getConnectionIcon = () => {
     if (!isOnline) return WifiOff;
-    if (isSyncing) return Sync;
+    if (isSyncing) return RefreshCw;
     if (isServiceWorkerReady) return Cloud;
     return Wifi;
   };
