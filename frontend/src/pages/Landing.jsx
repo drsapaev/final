@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import AppActivation from '../components/activation/AppActivation';
 
 export default function Landing() {
   const navigate = useNavigate();
   const [language, setLanguage] = useState('RU');
+  const [showActivation, setShowActivation] = useState(false);
   
   // Используем централизованную систему темизации
   const { 
@@ -190,7 +192,7 @@ export default function Landing() {
             {t.login}
           </button>
           <button 
-            onClick={() => navigate('/admin/activation')} 
+            onClick={() => setShowActivation(true)} 
             style={buttonSecondaryStyle}
             onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
             onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
@@ -222,6 +224,11 @@ export default function Landing() {
       }}>
         {t.footer}
       </div>
+
+      {/* Модальное окно активации */}
+      {showActivation && (
+        <AppActivation onClose={() => setShowActivation(false)} />
+      )}
     </div>
   );
 }
