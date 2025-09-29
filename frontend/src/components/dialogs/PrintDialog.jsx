@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Printer, Check, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 const PrintDialog = ({ 
   isOpen, 
@@ -371,3 +371,4 @@ const PrintDialog = ({
 };
 
 export default PrintDialog;
+

@@ -26,8 +26,8 @@ class DisplayWebSocketManager:
         # Последнее состояние каждого табло
         self.board_states: Dict[str, Dict[str, Any]] = {}
         
-    async def connect(self, websocket: WebSocket, board_id: str) -> None:
-        """Подключение нового WebSocket"""
+    async def connect(self, websocket: WebSocket, board_id: str, user=None) -> None:
+        """Подключение нового WebSocket с опциональной аутентификацией"""
         try:
             await websocket.accept()
             
@@ -36,7 +36,17 @@ class DisplayWebSocketManager:
             
             self.connections[board_id].add(websocket)
             
-            logger.info(f"WebSocket подключен к табло {board_id}. Всего соединений: {len(self.connections[board_id])}")
+            # Сохраняем информацию о пользователе для этого соединения
+            if user:
+                if not hasattr(websocket, '_user_info'):
+                    websocket._user_info = {}
+                websocket._user_info['user'] = user
+                websocket._user_info['authenticated'] = True
+                logger.info(f"Аутентифицированный WebSocket подключен к табло {board_id} (пользователь: {user.username})")
+            else:
+                logger.info(f"Анонимный WebSocket подключен к табло {board_id}")
+            
+            logger.info(f"Всего соединений к табло {board_id}: {len(self.connections[board_id])}")
             
             # Отправляем текущее состояние табло
             await self._send_current_state(websocket, board_id)

@@ -129,3 +129,4 @@ export default function QueueTable({ department }) {
 QueueTable.propTypes = {
   department: PropTypes.string.isRequired,
 };
+

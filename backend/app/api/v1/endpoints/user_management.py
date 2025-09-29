@@ -12,7 +12,7 @@ from app.models.user import User
 from app.services.user_management_service import get_user_management_service, UserManagementService
 from app.crud.user_management import (
     user_profile, user_preferences, user_notification_settings,
-    user_role, user_permission, user_group, user_group_member,
+    user_role, user_permission, user_group,
     user_audit_log, user_extended
 )
 from app.schemas.user_management import (
@@ -731,22 +731,194 @@ async def export_users(
 ):
     """Экспорт пользователей"""
     try:
-        # TODO: Реализовать экспорт пользователей
-        # Это может включать создание файла в фоновом режиме
-        # и отправку ссылки на скачивание
+        service = get_user_management_service()
+        
+        # Получаем пользователей для экспорта
+        users_query = db.query(User)
+        
+        # Применяем фильтры если есть
+        if export_data.filters:
+            if export_data.filters.username:
+                users_query = users_query.filter(User.username.contains(export_data.filters.username))
+            if export_data.filters.email:
+                users_query = users_query.filter(User.email.contains(export_data.filters.email))
+            if export_data.filters.role:
+                users_query = users_query.filter(User.role == export_data.filters.role)
+            if export_data.filters.is_active is not None:
+                users_query = users_query.filter(User.is_active == export_data.filters.is_active)
+            if export_data.filters.created_from:
+                users_query = users_query.filter(User.created_at >= export_data.filters.created_from)
+            if export_data.filters.created_to:
+                users_query = users_query.filter(User.created_at <= export_data.filters.created_to)
+        
+        users = users_query.all()
+        
+        if not users:
+            return UserExportResponse(
+                success=False,
+                message="Нет пользователей для экспорта",
+                record_count=0
+            )
+        
+        # Запускаем экспорт в фоновом режиме
+        background_tasks.add_task(
+            service.export_users_background,
+            users,
+            export_data,
+            current_user.id,
+            db
+        )
         
         return UserExportResponse(
             success=True,
-            message="Экспорт запущен в фоновом режиме",
-            file_url=None,
-            file_size=None,
-            record_count=0
+            message=f"Экспорт {len(users)} пользователей запущен в фоновом режиме",
+            record_count=len(users)
         )
         
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка экспорта: {str(e)}"
+        )
+
+
+@router.get("/users/export/files")
+async def list_export_files(
+    current_user: User = Depends(require_admin)
+):
+    """Получить список файлов экспорта"""
+    try:
+        from pathlib import Path
+        import os
+        
+        export_dir = Path("exports/users")
+        if not export_dir.exists():
+            return {
+                "success": True,
+                "message": "Нет файлов экспорта",
+                "files": []
+            }
+        
+        files = []
+        for file_path in export_dir.iterdir():
+            if file_path.is_file():
+                stat = file_path.stat()
+                files.append({
+                    "filename": file_path.name,
+                    "size": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+        
+        # Сортируем по дате создания (новые первыми)
+        files.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        return {
+            "success": True,
+            "message": f"Найдено {len(files)} файлов экспорта",
+            "files": files
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения файлов экспорта: {str(e)}"
+        )
+
+
+@router.get("/users/export/download/{filename}")
+async def download_export_file(
+    filename: str,
+    current_user: User = Depends(require_admin)
+):
+    """Скачать файл экспорта"""
+    try:
+        from pathlib import Path
+        from fastapi.responses import FileResponse
+        import os
+        
+        # Проверяем безопасность пути
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Недопустимое имя файла"
+            )
+        
+        export_dir = Path("exports/users")
+        file_path = export_dir / filename
+        
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Файл не найден"
+            )
+        
+        # Определяем MIME тип
+        mime_type = "application/octet-stream"
+        if filename.endswith('.csv'):
+            mime_type = "text/csv"
+        elif filename.endswith('.json'):
+            mime_type = "application/json"
+        elif filename.endswith('.xlsx'):
+            mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif filename.endswith('.pdf'):
+            mime_type = "application/pdf"
+        elif filename.endswith('.txt'):
+            mime_type = "text/plain"
+        
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type=mime_type
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка скачивания файла: {str(e)}"
+        )
+
+
+@router.delete("/users/export/files/{filename}")
+async def delete_export_file(
+    filename: str,
+    current_user: User = Depends(require_admin)
+):
+    """Удалить файл экспорта"""
+    try:
+        from pathlib import Path
+        
+        # Проверяем безопасность пути
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Недопустимое имя файла"
+            )
+        
+        export_dir = Path("exports/users")
+        file_path = export_dir / filename
+        
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Файл не найден"
+            )
+        
+        file_path.unlink()
+        
+        return {
+            "success": True,
+            "message": f"Файл {filename} успешно удален"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка удаления файла: {str(e)}"
         )
 
 

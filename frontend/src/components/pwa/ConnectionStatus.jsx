@@ -195,3 +195,4 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
 };
 
 export default ConnectionStatus;
+

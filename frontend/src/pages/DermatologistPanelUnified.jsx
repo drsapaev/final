@@ -22,7 +22,6 @@ import {
   DollarSign,
   Clock
 } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';

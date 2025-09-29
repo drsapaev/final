@@ -10,7 +10,7 @@ import {
   Printer
 } from 'lucide-react';
 import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import ModernDialog from '../dialogs/ModernDialog';
 import './PaymentPayMe.css';
@@ -623,3 +623,4 @@ const PaymentPayMe = ({
 };
 
 export default PaymentPayMe;
+

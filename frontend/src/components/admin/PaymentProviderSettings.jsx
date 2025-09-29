@@ -10,7 +10,7 @@ import {
   XCircle,
   AlertTriangle
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import './PaymentProviderSettings.css';
 
@@ -420,3 +420,4 @@ const PaymentProviderSettings = () => {
 };
 
 export default PaymentProviderSettings;
+

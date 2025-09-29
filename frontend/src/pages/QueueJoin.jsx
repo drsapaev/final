@@ -21,7 +21,7 @@ const QueueJoin = () => {
   const token = paramToken || searchParams.get('token');
   
   // Состояния
-  const [step, setStep] = useState('loading'); // loading, info, form, success, error
+  const [step, setStep] = useState('loading'); // loading, waiting, info, form, success, error
   const [queueInfo, setQueueInfo] = useState(null);
   const [sessionToken, setSessionToken] = useState(null);
   const [formData, setFormData] = useState({
@@ -32,6 +32,7 @@ const QueueJoin = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(null);
 
   // Загрузка информации о токене при монтировании
   useEffect(() => {
@@ -39,6 +40,32 @@ const QueueJoin = () => {
       loadTokenInfo();
     }
   }, [token]);
+
+  // Обратный отсчет до открытия очереди
+  useEffect(() => {
+    let interval;
+    
+    if (step === 'waiting' && queueInfo?.minutes_until_open) {
+      setCountdown(queueInfo.minutes_until_open * 60); // переводим в секунды
+      
+      interval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            // Время истекло, перезагружаем информацию
+            loadTokenInfo();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [step, queueInfo?.minutes_until_open]);
 
   const loadTokenInfo = async () => {
     try {
@@ -61,8 +88,8 @@ const QueueJoin = () => {
       
       // Проверяем временные ограничения
       if (tokenInfo.status === 'before_start_time') {
-        setError(`Запись откроется в ${tokenInfo.start_time}`);
-        setStep('error');
+        setQueueInfo(tokenInfo);
+        setStep('waiting');
         return;
       } else if (tokenInfo.status === 'after_end_time') {
         setError(`Запись закрыта в ${tokenInfo.end_time}`);
@@ -174,6 +201,20 @@ const QueueJoin = () => {
     return `${hours} ч ${mins} мин`;
   };
 
+  const formatCountdown = (seconds) => {
+    if (!seconds) return '00:00:00';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+  };
+
   // Компонент загрузки
   if (step === 'loading') {
     return (
@@ -201,6 +242,76 @@ const QueueJoin = () => {
           >
             На главную
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Компонент ожидания открытия очереди
+  if (step === 'waiting') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Clock className="h-16 w-16 text-orange-500 mx-auto mb-4 animate-pulse" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Очередь скоро откроется</h2>
+          <p className="text-gray-600 mb-6">
+            Запись в очередь откроется в {queueInfo?.start_time}
+          </p>
+          
+          {/* Обратный отсчет */}
+          <div className="bg-orange-50 rounded-xl p-6 mb-6">
+            <div className="text-4xl font-bold text-orange-600 mb-2 font-mono">
+              {formatCountdown(countdown)}
+            </div>
+            <p className="text-gray-600">до открытия записи</p>
+          </div>
+          
+          {/* Информация о враче и кабинете */}
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center">
+                <User className="h-5 w-5 text-gray-500 mr-2" />
+                <span className="text-gray-600">Специалист</span>
+              </div>
+              <span className="font-semibold text-sm">{queueInfo?.specialist_name}</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center">
+                <MapPin className="h-5 w-5 text-gray-500 mr-2" />
+                <span className="text-gray-600">Отделение</span>
+              </div>
+              <span className="font-semibold text-sm">{queueInfo?.department_name}</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center">
+                <Calendar className="h-5 w-5 text-gray-500 mr-2" />
+                <span className="text-gray-600">Текущее время</span>
+              </div>
+              <span className="font-semibold">{queueInfo?.current_time}</span>
+            </div>
+          </div>
+          
+          <div className="text-sm text-gray-500 mb-6">
+            <p className="mb-2">📱 Оставьте эту страницу открытой</p>
+            <p>Мы автоматически перенаправим вас, когда запись откроется</p>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              На главную
+            </button>
+            <button
+              onClick={loadTokenInfo}
+              className="flex-1 bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              Обновить
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -328,7 +439,7 @@ const QueueJoin = () => {
                     onChange={(e) => handleInputChange('patientName', e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Введите ваше ФИО"
-                    required
+            required
                   />
                 </div>
               </div>
@@ -342,7 +453,7 @@ const QueueJoin = () => {
                   <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input
                     type="tel"
-                    value={formData.phone}
+            value={formData.phone}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="+998901234567"
@@ -385,7 +496,7 @@ const QueueJoin = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
+            disabled={loading}
                   className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Присоединяемся...' : 'Присоединиться'}

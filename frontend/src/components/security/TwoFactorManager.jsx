@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 import { 
   Shield, 
   Smartphone, 
@@ -667,3 +667,4 @@ const TwoFactorManager = () => {
 };
 
 export default TwoFactorManager;
+

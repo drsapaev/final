@@ -529,3 +529,4 @@ const TwoFactorSetup = ({ onComplete, onCancel }) => {
 };
 
 export default TwoFactorSetup;
+

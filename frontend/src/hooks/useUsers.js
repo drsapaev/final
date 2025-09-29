@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import api from '../utils/api';
+const API_BASE = import.meta.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
+import { toast } from 'react-toastify';
 
 const useUsers = () => {
   const [users, setUsers] = useState([]);
@@ -7,71 +10,47 @@ const useUsers = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-
-  // Моковые данные для демонстрации
-  const mockUsers = [
-    {
-      id: 1,
-      name: 'Ахмедов Алишер',
-      email: 'ahmedov@clinic.uz',
-      role: 'admin',
-      status: 'active',
-      lastLogin: '2 минуты назад',
-      createdAt: '2024-01-15'
-    },
-    {
-      id: 2,
-      name: 'Иванов Иван',
-      email: 'ivanov@clinic.uz',
-      role: 'doctor',
-      status: 'active',
-      lastLogin: '1 час назад',
-      createdAt: '2024-01-20'
-    },
-    {
-      id: 3,
-      name: 'Петрова Мария',
-      email: 'petrova@clinic.uz',
-      role: 'registrar',
-      status: 'active',
-      lastLogin: '30 минут назад',
-      createdAt: '2024-01-25'
-    },
-    {
-      id: 4,
-      name: 'Сидоров Сергей',
-      email: 'sidorov@clinic.uz',
-      role: 'cashier',
-      status: 'inactive',
-      lastLogin: '2 дня назад',
-      createdAt: '2024-01-10'
-    },
-    {
-      id: 5,
-      name: 'Козлова Анна',
-      email: 'kozlova@clinic.uz',
-      role: 'lab',
-      status: 'active',
-      lastLogin: '15 минут назад',
-      createdAt: '2024-02-01'
-    }
-  ];
+  const [pagination, setPagination] = useState({
+    page: 1,
+    per_page: 20,
+    total: 0,
+    total_pages: 0
+  });
 
   // Загрузка пользователей
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUsers(mockUsers);
+      const params = {
+        page,
+        per_page: pagination.per_page,
+      };
+      if (searchTerm) params.search = searchTerm;
+      if (filterRole) params.role = filterRole;
+      if (filterStatus) params.is_active = filterStatus;
+
+      // Используем относительный путь, так как api уже настроен на API_BASE
+      const response = await api.get('/users/users', { params });
+      
+      if (response.data) {
+        setUsers(response.data.users || []);
+        setPagination({
+          page: response.data.page || 1,
+          per_page: response.data.per_page || 20,
+          total: response.data.total || 0,
+          total_pages: response.data.total_pages || 0
+        });
+      }
     } catch (err) {
+      console.error('Ошибка загрузки пользователей:', err);
       setError(err);
+      toast.error('Ошибка загрузки пользователей');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchTerm, filterRole, filterStatus, pagination.per_page]);
 
   // Создание пользователя
   const createUser = useCallback(async (userData) => {
@@ -79,25 +58,24 @@ const useUsers = () => {
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.post('/users/users', userData);
       
-      const newUser = {
-        id: Date.now(),
-        ...userData,
-        lastLogin: 'Никогда',
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      
-      setUsers(prev => [newUser, ...prev]);
-      return newUser;
+      if (response.data) {
+        toast.success('Пользователь успешно создан');
+        // Перезагружаем список пользователей
+        await loadUsers(pagination.page);
+        return response.data;
+      }
     } catch (err) {
+      console.error('Ошибка создания пользователя:', err);
       setError(err);
+      const errorMessage = err.response?.data?.detail || 'Ошибка создания пользователя';
+      toast.error(errorMessage);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadUsers, pagination.page]);
 
   // Обновление пользователя
   const updateUser = useCallback(async (id, userData) => {
@@ -105,23 +83,24 @@ const useUsers = () => {
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.put(`/users/users/${id}`, userData);
       
-      setUsers(prev => prev.map(user => 
-        user.id === id 
-          ? { ...user, ...userData }
-          : user
-      ));
-      
-      return { id, ...userData };
+      if (response.data) {
+        toast.success('Пользователь успешно обновлен');
+        // Перезагружаем список пользователей
+        await loadUsers(pagination.page);
+        return response.data;
+      }
     } catch (err) {
+      console.error('Ошибка обновления пользователя:', err);
       setError(err);
+      const errorMessage = err.response?.data?.detail || 'Ошибка обновления пользователя';
+      toast.error(errorMessage);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadUsers, pagination.page]);
 
   // Удаление пользователя
   const deleteUser = useCallback(async (id) => {
@@ -129,38 +108,43 @@ const useUsers = () => {
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await api.delete(`/users/users/${id}`);
       
-      setUsers(prev => prev.filter(user => user.id !== id));
+      toast.success('Пользователь успешно удален');
+      // Перезагружаем список пользователей
+      await loadUsers(pagination.page);
     } catch (err) {
+      console.error('Ошибка удаления пользователя:', err);
       setError(err);
+      const errorMessage = err.response?.data?.detail || 'Ошибка удаления пользователя';
+      toast.error(errorMessage);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadUsers, pagination.page]);
 
-  // Фильтрация пользователей
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = !searchTerm || 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = !filterRole || user.role === filterRole;
-    const matchesStatus = !filterStatus || user.status === filterStatus;
-    
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // Поиск с дебаунсом
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadUsers(1); // Сбрасываем на первую страницу при поиске
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, filterRole, filterStatus]);
 
   // Загрузка при монтировании
   useEffect(() => {
     loadUsers();
+  }, []);
+
+  // Функция для смены страницы
+  const changePage = useCallback((newPage) => {
+    loadUsers(newPage);
   }, [loadUsers]);
 
   return {
-    users: filteredUsers,
-    allUsers: users,
+    users,
     loading,
     error,
     searchTerm,
@@ -169,6 +153,8 @@ const useUsers = () => {
     setFilterRole,
     filterStatus,
     setFilterStatus,
+    pagination,
+    changePage,
     createUser,
     updateUser,
     deleteUser,

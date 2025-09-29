@@ -7,14 +7,40 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from jose import JWTError, jwt
 
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.services.display_websocket import get_display_manager, DisplayWebSocketManager
 from app.models.online_queue import OnlineQueueEntry
 from app.crud import display_config as crud_display
+from app.core.config import settings
+from app.crud import user as crud_user
+from app.db.session import SessionLocal
 
 router = APIRouter()
+
+# ===================== WEBSOCKET АУТЕНТИФИКАЦИЯ =====================
+
+async def authenticate_websocket_token(token: Optional[str], db: Session) -> Optional[User]:
+    """
+    Аутентификация WebSocket соединения по JWT токену
+    """
+    if not token:
+        return None
+    
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+    
+    user = crud_user.get(db, id=user_id)
+    return user
 
 # ===================== WEBSOCKET ПОДКЛЮЧЕНИЯ =====================
 
@@ -25,14 +51,21 @@ async def websocket_display_board(
     token: Optional[str] = None
 ):
     """
-    WebSocket подключение для табло очереди
+    WebSocket подключение для табло очереди с аутентификацией
     """
     manager = get_display_manager()
+    db = SessionLocal()
     
     try:
-        # TODO: Добавить аутентификацию по токену если нужно
+        # Аутентификация по токену (опциональная для публичных табло)
+        authenticated_user = None
+        if token:
+            authenticated_user = await authenticate_websocket_token(token, db)
+            if not authenticated_user:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
+                return
         
-        await manager.connect(websocket, board_id)
+        await manager.connect(websocket, board_id, authenticated_user)
         
         try:
             while True:

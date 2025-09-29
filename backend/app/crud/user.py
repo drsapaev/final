@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Optional, List
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -160,3 +160,27 @@ def create_access_token(data: dict) -> str:
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.AUTH_SECRET, algorithm=settings.AUTH_ALGORITHM)
     return encoded_jwt
+
+
+def search_users(db: Session, query: str, limit: int = 10) -> List[User]:
+    """
+    Поиск пользователей по имени, телефону или email
+    """
+    search_pattern = f"%{query}%"
+    
+    stmt = select(User).where(
+        or_(
+            User.full_name.ilike(search_pattern),
+            User.username.ilike(search_pattern),
+            User.email.ilike(search_pattern),
+            User.phone.ilike(search_pattern)
+        )
+    ).limit(limit)
+    
+    result = db.execute(stmt)
+    return result.scalars().all()
+
+
+def get(db: Session, id: int) -> Optional[User]:
+    """Получить пользователя по ID"""
+    return db.query(User).filter(User.id == id).first()

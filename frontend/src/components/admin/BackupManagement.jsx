@@ -18,7 +18,7 @@ import {
   Archive,
   FileText
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const BackupManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -655,3 +655,4 @@ const BackupManagement = () => {
 };
 
 export default BackupManagement;
+

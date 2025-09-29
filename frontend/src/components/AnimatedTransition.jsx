@@ -269,3 +269,4 @@ export const AnimatedCard = ({
 };
 
 export default AnimatedTransition;
+

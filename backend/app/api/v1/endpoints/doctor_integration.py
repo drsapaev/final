@@ -21,6 +21,7 @@ from app.models.visit import Visit, VisitService
 from app.models.service import Service
 from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
+from app.crud import visit as crud_visit
 from app.services.notification_service import NotificationService
 
 router = APIRouter()
@@ -280,8 +281,17 @@ def start_patient_visit(
         # Обновляем статус
         queue_entry.status = "in_progress"
         
-        # Здесь будет создание или обновление визита
-        # TODO: Интеграция с таблицей visits
+        # Создаем или обновляем визит в таблице visits
+        visit = crud_visit.find_or_create_today_visit(
+            db=db,
+            patient_id=queue_entry.patient_id,
+            doctor_id=current_user.id,
+            department=queue_entry.queue.department if hasattr(queue_entry, 'queue') else "general"
+        )
+        
+        # Обновляем время начала приема
+        visit.visit_time = datetime.now().strftime("%H:%M")
+        visit.notes = f"Прием начат в {datetime.now().strftime('%H:%M')}"
         
         db.commit()
         
@@ -324,8 +334,20 @@ def complete_patient_visit(
         # Обновляем статус на завершен
         queue_entry.status = "served"
         
-        # Здесь будет сохранение данных визита
-        # TODO: Сохранение в таблицу visits с медицинскими данными
+        # Завершаем визит в таблице visits
+        visit = crud_visit.find_or_create_today_visit(
+            db=db,
+            patient_id=queue_entry.patient_id,
+            doctor_id=current_user.id,
+            department=queue_entry.queue.department if hasattr(queue_entry, 'queue') else "general"
+        )
+        
+        # Завершаем визит с медицинскими данными
+        crud_visit.complete_visit(
+            db=db,
+            visit_id=visit.id,
+            medical_data=visit_data
+        )
         
         db.commit()
         
@@ -756,6 +778,305 @@ async def schedule_next_visit(
             visit_id=visit.id,
             status="pending_confirmation",
             confirmation=confirmation_data
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Ошибка назначения следующего визита: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка назначения визита: {str(e)}"
+        )
+
+
+# ===================== УПРАВЛЕНИЕ ВИЗИТАМИ =====================
+
+@router.get("/doctor/visits/today")
+def get_today_visits(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+):
+    """Получить сегодняшние визиты врача"""
+    try:
+        visits = crud_visit.get_today_visits_by_doctor(db=db, doctor_id=current_user.id)
+        
+        result = []
+        for visit in visits:
+            # Получаем услуги визита
+            visit_services = crud_visit.get_visit_services(db=db, visit_id=visit.id)
+            
+            services_data = []
+            total_amount = 0
+            
+            for vs in visit_services:
+                service = db.query(Service).filter(Service.id == vs.service_id).first()
+                service_data = {
+                    "id": vs.id,
+                    "service_id": vs.service_id,
+                    "service_name": service.name if service else f"Услуга #{vs.service_id}",
+                    "quantity": vs.quantity,
+                    "price": vs.price,
+                    "custom_price": vs.custom_price,
+                    "total": vs.price * vs.quantity
+                }
+                services_data.append(service_data)
+                total_amount += service_data["total"]
+            
+            result.append({
+                "id": visit.id,
+                "patient_id": visit.patient_id,
+                "visit_date": visit.visit_date.isoformat() if visit.visit_date else None,
+                "visit_time": visit.visit_time,
+                "status": visit.status,
+                "department": visit.department,
+                "discount_mode": visit.discount_mode,
+                "notes": visit.notes,
+                "services": services_data,
+                "total_amount": total_amount,
+                "created_at": visit.created_at.isoformat() if visit.created_at else None
+            })
+        
+        return {
+            "success": True,
+            "visits": result,
+            "total_count": len(result)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения визитов: {str(e)}"
+        )
+
+
+@router.get("/doctor/visits/{visit_id}")
+def get_visit_details(
+    visit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+):
+    """Получить детали визита"""
+    try:
+        visit = crud_visit.get_visit(db=db, visit_id=visit_id)
+        
+        if not visit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Визит не найден"
+            )
+        
+        # Проверяем права доступа
+        if current_user.role not in ["Admin"] and visit.doctor_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к этому визиту"
+            )
+        
+        # Получаем услуги визита
+        visit_services = crud_visit.get_visit_services(db=db, visit_id=visit.id)
+        
+        services_data = []
+        total_amount = 0
+        
+        for vs in visit_services:
+            service = db.query(Service).filter(Service.id == vs.service_id).first()
+            service_data = {
+                "id": vs.id,
+                "service_id": vs.service_id,
+                "service_name": service.name if service else f"Услуга #{vs.service_id}",
+                "service_code": service.code if service else None,
+                "quantity": vs.quantity,
+                "price": vs.price,
+                "custom_price": vs.custom_price,
+                "total": vs.price * vs.quantity
+            }
+            services_data.append(service_data)
+            total_amount += service_data["total"]
+        
+        return {
+            "success": True,
+            "visit": {
+                "id": visit.id,
+                "patient_id": visit.patient_id,
+                "doctor_id": visit.doctor_id,
+                "visit_date": visit.visit_date.isoformat() if visit.visit_date else None,
+                "visit_time": visit.visit_time,
+                "status": visit.status,
+                "department": visit.department,
+                "discount_mode": visit.discount_mode,
+                "approval_status": visit.approval_status,
+                "notes": visit.notes,
+                "services": services_data,
+                "total_amount": total_amount,
+                "created_at": visit.created_at.isoformat() if visit.created_at else None,
+                "confirmed_at": visit.confirmed_at.isoformat() if visit.confirmed_at else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения визита: {str(e)}"
+        )
+
+
+@router.put("/doctor/visits/{visit_id}/add-service")
+def add_service_to_visit(
+    visit_id: int,
+    service_id: int,
+    quantity: int = 1,
+    custom_price: Optional[float] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+):
+    """Добавить услугу к визиту"""
+    try:
+        visit = crud_visit.get_visit(db=db, visit_id=visit_id)
+        
+        if not visit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Визит не найден"
+            )
+        
+        # Проверяем права доступа
+        if current_user.role not in ["Admin"] and visit.doctor_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к этому визиту"
+            )
+        
+        # Проверяем, что услуга существует
+        service = db.query(Service).filter(Service.id == service_id).first()
+        if not service:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Услуга не найдена"
+            )
+        
+        # Добавляем услугу
+        visit_service = crud_visit.add_visit_service(
+            db=db,
+            visit_id=visit_id,
+            service_id=service_id,
+            quantity=quantity,
+            custom_price=custom_price
+        )
+        
+        return {
+            "success": True,
+            "message": "Услуга добавлена к визиту",
+            "visit_service": {
+                "id": visit_service.id,
+                "service_id": visit_service.service_id,
+                "service_name": service.name,
+                "quantity": visit_service.quantity,
+                "price": visit_service.price,
+                "custom_price": visit_service.custom_price,
+                "total": visit_service.price * visit_service.quantity
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка добавления услуги: {str(e)}"
+        )
+
+
+@router.delete("/doctor/visits/{visit_id}/services/{visit_service_id}")
+def remove_service_from_visit(
+    visit_id: int,
+    visit_service_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+):
+    """Удалить услугу из визита"""
+    try:
+        visit = crud_visit.get_visit(db=db, visit_id=visit_id)
+        
+        if not visit:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Визит не найден"
+            )
+        
+        # Проверяем права доступа
+        if current_user.role not in ["Admin"] and visit.doctor_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к этому визиту"
+            )
+        
+        # Удаляем услугу
+        success = crud_visit.remove_visit_service(db=db, visit_service_id=visit_service_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Услуга в визите не найдена"
+            )
+        
+        return {
+            "success": True,
+            "message": "Услуга удалена из визита"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка удаления услуги: {str(e)}"
+        )
+
+
+@router.get("/doctor/visits/statistics")
+def get_visit_statistics(
+    date_from: Optional[str] = Query(None, description="Дата начала в формате YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="Дата окончания в формате YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+):
+    """Получить статистику визитов врача"""
+    try:
+        from datetime import datetime
+        
+        date_from_obj = None
+        date_to_obj = None
+        
+        if date_from:
+            date_from_obj = datetime.strptime(date_from, "%Y-%m-%d").date()
+        
+        if date_to:
+            date_to_obj = datetime.strptime(date_to, "%Y-%m-%d").date()
+        
+        stats = crud_visit.get_visit_statistics(
+            db=db,
+            doctor_id=current_user.id,
+            date_from=date_from_obj,
+            date_to=date_to_obj
+        )
+        
+        return {
+            "success": True,
+            "statistics": stats,
+            "period": {
+                "date_from": date_from,
+                "date_to": date_to
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения статистики: {str(e)}"
         )
         
     except HTTPException:

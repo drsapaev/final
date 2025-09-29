@@ -20,7 +20,7 @@ import {
   User,
   Activity
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const ActivationSystem = () => {
   const [loading, setLoading] = useState(true);
@@ -569,3 +569,4 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
 };
 
 export default ActivationSystem;
+

@@ -13,7 +13,7 @@ import {
   CreditCard,
   Settings
 } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from '../components/ui/native';
 import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
 import OfflineIndicator from '../components/mobile/OfflineIndicator';

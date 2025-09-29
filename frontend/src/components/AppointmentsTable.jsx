@@ -679,3 +679,4 @@ const AppointmentsTable = ({
 };
 
 export default AppointmentsTable;
+

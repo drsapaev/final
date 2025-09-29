@@ -646,3 +646,4 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
 };
 
 export default LabResultsManager;
+

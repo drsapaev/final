@@ -172,3 +172,8 @@ class AIManager:
 
 # Глобальный экземпляр менеджера
 ai_manager = AIManager()
+
+
+def get_ai_manager() -> AIManager:
+    """Получить глобальный экземпляр AI менеджера"""
+    return ai_manager

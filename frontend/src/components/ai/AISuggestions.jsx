@@ -197,3 +197,4 @@ const AISuggestions = ({
 };
 
 export default AISuggestions;
+

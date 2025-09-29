@@ -1,28 +1,709 @@
-/* Мастер регистрации V2 - Windows 11 дизайн */\n\n.appointment-wizard-v2 .modern-dialog-container {\n  max-height: 95vh;\n  overflow: hidden;\n  border-radius: 12px;\n  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);\n  backdrop-filter: blur(16px);\n}\n\n.wizard-container-v2 {\n  display: flex;\n  flex-direction: column;\n  gap: 24px;\n  max-height: 80vh;\n  padding: 0;\n}\n\n/* ===================== ИНДИКАТОР ШАГОВ ===================== */\n\n.wizard-steps-v2 {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  gap: 8px;\n  padding: 24px 32px 16px;\n  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);\n  border-bottom: 1px solid #e2e8f0;\n  border-radius: 12px 12px 0 0;\n}\n\n.wizard-step-v2 {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 12px 16px;\n  border-radius: 8px;\n  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);\n  cursor: pointer;\n  position: relative;\n  min-width: 120px;\n  background: rgba(255, 255, 255, 0.7);\n  border: 1px solid transparent;\n}\n\n.wizard-step-v2:hover {\n  background: rgba(255, 255, 255, 0.9);\n  transform: translateY(-1px);\n}\n\n.wizard-step-v2.active {\n  background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);\n  color: white;\n  border: 1px solid #0078d4;\n  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);\n}\n\n.wizard-step-v2.completed {\n  background: linear-gradient(135deg, #107c10 0%, #0e6e0e 100%);\n  color: white;\n  border: 1px solid #107c10;\n}\n\n.wizard-step-v2:not(.active):not(.completed) {\n  background: rgba(255, 255, 255, 0.5);\n  color: #64748b;\n  cursor: default;\n}\n\n.step-icon-v2 {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border-radius: 6px;\n  background: rgba(255, 255, 255, 0.2);\n  flex-shrink: 0;\n  transition: all 0.2s ease;\n}\n\n.wizard-step-v2.active .step-icon-v2,\n.wizard-step-v2.completed .step-icon-v2 {\n  background: rgba(255, 255, 255, 0.25);\n}\n\n.step-content-v2 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.step-title-v2 {\n  font-size: 13px;\n  font-weight: 600;\n  line-height: 1.2;\n}\n\n.step-description-v2 {\n  font-size: 11px;\n  opacity: 0.8;\n  line-height: 1.2;\n}\n\n.step-connector-v2 {\n  position: absolute;\n  right: -4px;\n  width: 8px;\n  height: 1px;\n  background: #cbd5e1;\n  z-index: 1;\n}\n\n.wizard-step-v2.completed + .wizard-step-v2 .step-connector-v2 {\n  background: #107c10;\n}\n\n/* ===================== КОНТЕНТ ШАГОВ ===================== */\n\n.wizard-content-v2 {\n  flex: 1;\n  overflow-y: auto;\n  padding: 0 32px 24px;\n  min-height: 400px;\n}\n\n.step-content {\n  display: flex;\n  flex-direction: column;\n  gap: 24px;\n  animation: slideIn 0.3s ease-out;\n}\n\n@keyframes slideIn {\n  from {\n    opacity: 0;\n    transform: translateX(20px);\n  }\n  to {\n    opacity: 1;\n    transform: translateX(0);\n  }\n}\n\n.step-heading {\n  font-size: 20px;\n  font-weight: 600;\n  color: #1e293b;\n  margin: 0 0 8px;\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.step-heading::before {\n  content: '';\n  width: 4px;\n  height: 24px;\n  background: linear-gradient(135deg, #0078d4, #106ebe);\n  border-radius: 2px;\n}\n\n/* ===================== ФОРМЫ ===================== */\n\n.form-grid {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 20px;\n  align-items: start;\n}\n\n.form-field {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.form-field.full-width {\n  grid-column: 1 / -1;\n}\n\n.form-field label {\n  font-size: 14px;\n  font-weight: 500;\n  color: #374151;\n}\n\n.form-field input,\n.form-field select,\n.form-field textarea {\n  padding: 12px 16px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 14px;\n  transition: all 0.2s ease;\n  background: white;\n}\n\n.form-field input:focus,\n.form-field select:focus,\n.form-field textarea:focus {\n  outline: none;\n  border-color: #0078d4;\n  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);\n}\n\n.form-field input.error {\n  border-color: #dc2626;\n  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);\n}\n\n.error-text {\n  font-size: 12px;\n  color: #dc2626;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n/* ===================== ПОИСК ПАЦИЕНТОВ ===================== */\n\n.search-field {\n  position: relative;\n}\n\n.search-icon {\n  position: absolute;\n  right: 12px;\n  top: 50%;\n  transform: translateY(-50%);\n  color: #6b7280;\n  pointer-events: none;\n}\n\n.suggestions-dropdown {\n  position: absolute;\n  top: 100%;\n  left: 0;\n  right: 0;\n  background: white;\n  border: 1px solid #d1d5db;\n  border-top: none;\n  border-radius: 0 0 6px 6px;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);\n  z-index: 1000;\n  max-height: 200px;\n  overflow-y: auto;\n}\n\n.suggestion-item {\n  padding: 12px 16px;\n  cursor: pointer;\n  transition: background-color 0.15s ease;\n  border-bottom: 1px solid #f3f4f6;\n}\n\n.suggestion-item:hover {\n  background-color: #f8fafc;\n}\n\n.suggestion-item:last-child {\n  border-bottom: none;\n}\n\n.suggestion-name {\n  font-weight: 500;\n  color: #1f2937;\n  margin-bottom: 4px;\n}\n\n.suggestion-details {\n  font-size: 12px;\n  color: #6b7280;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n/* ===================== КОРЗИНА ===================== */\n\n.cart-layout {\n  display: grid;\n  grid-template-columns: 1fr 400px;\n  gap: 24px;\n  height: 500px;\n}\n\n.services-panel {\n  border: 1px solid #e5e7eb;\n  border-radius: 8px;\n  overflow: hidden;\n  background: white;\n}\n\n.services-header {\n  padding: 16px 20px;\n  background: #f8fafc;\n  border-bottom: 1px solid #e5e7eb;\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n\n.services-header h4 {\n  margin: 0;\n  font-size: 16px;\n  font-weight: 600;\n  color: #1f2937;\n}\n\n.toggle-services-btn {\n  padding: 6px 12px;\n  background: #0078d4;\n  color: white;\n  border: none;\n  border-radius: 4px;\n  font-size: 12px;\n  cursor: pointer;\n  transition: background-color 0.2s ease;\n}\n\n.toggle-services-btn:hover {\n  background: #106ebe;\n}\n\n.services-list {\n  max-height: 420px;\n  overflow-y: auto;\n  padding: 0;\n}\n\n.service-category {\n  border-bottom: 1px solid #f3f4f6;\n}\n\n.category-title {\n  padding: 12px 20px;\n  margin: 0;\n  font-size: 14px;\n  font-weight: 600;\n  color: #374151;\n  background: #f9fafb;\n  border-bottom: 1px solid #e5e7eb;\n  position: sticky;\n  top: 0;\n  z-index: 10;\n}\n\n.service-item {\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  padding: 12px 20px;\n  border-bottom: 1px solid #f3f4f6;\n  transition: background-color 0.15s ease;\n}\n\n.service-item:hover {\n  background-color: #f8fafc;\n}\n\n.service-info {\n  flex: 1;\n}\n\n.service-name {\n  font-size: 14px;\n  font-weight: 500;\n  color: #1f2937;\n  margin-bottom: 4px;\n}\n\n.service-details {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  font-size: 12px;\n}\n\n.service-price {\n  color: #059669;\n  font-weight: 600;\n}\n\n.requires-doctor {\n  color: #7c3aed;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n\n.add-service-btn {\n  width: 32px;\n  height: 32px;\n  border: 1px solid #d1d5db;\n  background: white;\n  border-radius: 6px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  transition: all 0.2s ease;\n  color: #6b7280;\n}\n\n.add-service-btn:hover {\n  background: #0078d4;\n  border-color: #0078d4;\n  color: white;\n}\n\n/* ===================== ПАНЕЛЬ КОРЗИНЫ ===================== */\n\n.cart-panel {\n  border: 1px solid #e5e7eb;\n  border-radius: 8px;\n  background: white;\n  display: flex;\n  flex-direction: column;\n}\n\n.cart-panel h4 {\n  margin: 0;\n  padding: 16px 20px;\n  font-size: 16px;\n  font-weight: 600;\n  color: #1f2937;\n  background: #f8fafc;\n  border-bottom: 1px solid #e5e7eb;\n}\n\n.empty-cart {\n  flex: 1;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  gap: 12px;\n  color: #6b7280;\n  padding: 40px 20px;\n}\n\n.empty-icon {\n  opacity: 0.3;\n}\n\n.empty-hint {\n  font-size: 12px;\n  opacity: 0.7;\n  margin: 0;\n}\n\n.cart-items {\n  flex: 1;\n  overflow-y: auto;\n  padding: 0;\n}\n\n.cart-item {\n  padding: 16px 20px;\n  border-bottom: 1px solid #f3f4f6;\n}\n\n.item-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  margin-bottom: 12px;\n}\n\n.item-name {\n  font-size: 14px;\n  font-weight: 500;\n  color: #1f2937;\n  flex: 1;\n  line-height: 1.4;\n}\n\n.remove-item-btn {\n  width: 24px;\n  height: 24px;\n  border: none;\n  background: #fee2e2;\n  color: #dc2626;\n  border-radius: 4px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  transition: all 0.2s ease;\n  flex-shrink: 0;\n}\n\n.remove-item-btn:hover {\n  background: #fecaca;\n}\n\n.item-controls {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  margin-bottom: 8px;\n}\n\n.quantity-control {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.quantity-control button {\n  width: 28px;\n  height: 28px;\n  border: 1px solid #d1d5db;\n  background: white;\n  border-radius: 4px;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  cursor: pointer;\n  transition: all 0.2s ease;\n  color: #6b7280;\n}\n\n.quantity-control button:hover {\n  background: #f3f4f6;\n  border-color: #9ca3af;\n}\n\n.quantity-control span {\n  min-width: 24px;\n  text-align: center;\n  font-weight: 500;\n}\n\n.doctor-select {\n  padding: 8px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 4px;\n  font-size: 13px;\n  background: white;\n}\n\n.item-price {\n  text-align: right;\n  font-size: 14px;\n  font-weight: 600;\n  color: #059669;\n}\n\n/* ===================== РАСПИСАНИЕ ===================== */\n\n.schedule-items {\n  display: flex;\n  flex-direction: column;\n  gap: 16px;\n}\n\n.schedule-item {\n  padding: 20px;\n  border: 1px solid #e5e7eb;\n  border-radius: 8px;\n  background: white;\n}\n\n.item-info {\n  margin-bottom: 16px;\n}\n\n.item-info .service-name {\n  font-size: 16px;\n  font-weight: 600;\n  color: #1f2937;\n  margin-bottom: 4px;\n}\n\n.doctor-name {\n  font-size: 14px;\n  color: #6b7280;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n\n.schedule-controls {\n  display: flex;\n  gap: 24px;\n  align-items: flex-end;\n}\n\n.date-control,\n.time-control {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.date-control label,\n.time-control label {\n  font-size: 13px;\n  font-weight: 500;\n  color: #374151;\n}\n\n.date-buttons {\n  display: flex;\n  gap: 8px;\n}\n\n.date-buttons button {\n  padding: 8px 16px;\n  border: 1px solid #d1d5db;\n  background: white;\n  border-radius: 6px;\n  font-size: 13px;\n  cursor: pointer;\n  transition: all 0.2s ease;\n}\n\n.date-buttons button:hover {\n  background: #f3f4f6;\n}\n\n.date-buttons button.active {\n  background: #0078d4;\n  border-color: #0078d4;\n  color: white;\n}\n\n.time-control input {\n  padding: 8px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 13px;\n}\n\n/* ===================== ОПЛАТА ===================== */\n\n.payment-layout {\n  display: grid;\n  grid-template-columns: 1fr 400px;\n  gap: 24px;\n}\n\n.order-summary {\n  padding: 20px;\n  border: 1px solid #e5e7eb;\n  border-radius: 8px;\n  background: white;\n  height: fit-content;\n}\n\n.order-summary h4 {\n  margin: 0 0 16px;\n  font-size: 16px;\n  font-weight: 600;\n  color: #1f2937;\n}\n\n.summary-items {\n  display: flex;\n  flex-direction: column;\n  gap: 12px;\n  margin-bottom: 16px;\n}\n\n.summary-item {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 8px 0;\n  border-bottom: 1px solid #f3f4f6;\n}\n\n.item-details {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.item-quantity {\n  color: #6b7280;\n  font-size: 13px;\n}\n\n.item-total {\n  font-weight: 500;\n  color: #059669;\n}\n\n.summary-total {\n  padding: 12px 0;\n  border-top: 2px solid #e5e7eb;\n  font-size: 18px;\n  text-align: right;\n}\n\n.payment-options {\n  display: flex;\n  flex-direction: column;\n  gap: 24px;\n}\n\n.payment-options h4 {\n  margin: 0 0 12px;\n  font-size: 16px;\n  font-weight: 600;\n  color: #1f2937;\n}\n\n.visit-type-options,\n.payment-method-options {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.radio-option,\n.checkbox-option {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 12px;\n  border: 1px solid #e5e7eb;\n  border-radius: 6px;\n  cursor: pointer;\n  transition: all 0.2s ease;\n  background: white;\n}\n\n.radio-option:hover,\n.checkbox-option:hover {\n  background: #f8fafc;\n  border-color: #d1d5db;\n}\n\n.radio-option input,\n.checkbox-option input {\n  margin: 0;\n}\n\n.all-free-option {\n  margin-top: 8px;\n}\n\n.warning-message {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 8px 12px;\n  background: #fef3c7;\n  border: 1px solid #f59e0b;\n  border-radius: 4px;\n  color: #92400e;\n  font-size: 12px;\n  margin-top: 8px;\n}\n\n.notes-field {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.notes-field textarea {\n  resize: vertical;\n  min-height: 80px;\n}\n\n/* ===================== АДАПТИВНОСТЬ ===================== */\n\n@media (max-width: 1200px) {\n  .cart-layout,\n  .payment-layout {\n    grid-template-columns: 1fr;\n    gap: 16px;\n  }\n  \n  .cart-layout {\n    height: auto;\n  }\n  \n  .services-panel,\n  .cart-panel {\n    height: 300px;\n  }\n}\n\n@media (max-width: 768px) {\n  .wizard-steps-v2 {\n    flex-wrap: wrap;\n    gap: 4px;\n  }\n  \n  .wizard-step-v2 {\n    min-width: 100px;\n    padding: 8px 12px;\n  }\n  \n  .step-title-v2 {\n    font-size: 12px;\n  }\n  \n  .step-description-v2 {\n    font-size: 10px;\n  }\n  \n  .form-grid {\n    grid-template-columns: 1fr;\n  }\n  \n  .schedule-controls {\n    flex-direction: column;\n    gap: 16px;\n    align-items: stretch;\n  }\n}\n\n/* ===================== ТЕМНАЯ ТЕМА ===================== */\n\n[data-theme=\"dark\"] .appointment-wizard-v2 {\n  /* Переопределения для темной темы */\n}\n\n[data-theme=\"dark\"] .wizard-steps-v2 {\n  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);\n  border-bottom-color: #475569;\n}\n\n[data-theme=\"dark\"] .wizard-step-v2 {\n  background: rgba(30, 41, 59, 0.7);\n  color: #e2e8f0;\n}\n\n[data-theme=\"dark\"] .wizard-step-v2:hover {\n  background: rgba(30, 41, 59, 0.9);\n}\n\n[data-theme=\"dark\"] .step-heading {\n  color: #f1f5f9;\n}\n\n[data-theme=\"dark\"] .form-field input,\n[data-theme=\"dark\"] .form-field select,\n[data-theme=\"dark\"] .form-field textarea {\n  background: #334155;\n  border-color: #475569;\n  color: #e2e8f0;\n}\n\n[data-theme=\"dark\"] .services-panel,\n[data-theme=\"dark\"] .cart-panel,\n[data-theme=\"dark\"] .order-summary {\n  background: #1e293b;\n  border-color: #475569;\n}\n\n[data-theme=\"dark\"] .services-header,\n[data-theme=\"dark\"] .cart-panel h4 {\n  background: #334155;\n  color: #f1f5f9;\n}\n\n[data-theme=\"dark\"] .service-item:hover {\n  background-color: #334155;\n}\n\n[data-theme=\"dark\"] .service-name,\n[data-theme=\"dark\"] .item-name {\n  color: #f1f5f9;\n}"
+/* Мастер регистрации V2 - Windows 11 дизайн */
 
-
-/* ===================== КОМПАКТНЫЙ РЕЖИМ УСЛУГ ===================== */
-
-.services-compact .service-item {
-  padding: 6px 12px;
+.appointment-wizard-v2 .modern-dialog-container {
+  max-height: 95vh;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(16px);
 }
 
-.services-compact .service-name {
+.wizard-container-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-height: 80vh;
+  padding: 0;
+}
+
+/* ===================== ИНДИКАТОР ШАГОВ ===================== */
+
+.wizard-steps-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 32px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 12px 12px 0 0;
+}
+
+.wizard-step-v2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  min-width: 120px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid transparent;
+}
+
+.wizard-step-v2:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.wizard-step-v2.active {
+  background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+  color: white;
+  border: 1px solid #0078d4;
+  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+}
+
+.wizard-step-v2.completed {
+  background: linear-gradient(135deg, #107c10 0%, #0e6e0e 100%);
+  color: white;
+  border: 1px solid #107c10;
+}
+
+.wizard-step-v2:not(.active):not(.completed) {
+  background: rgba(255, 255, 255, 0.5);
+  color: #64748b;
+  cursor: default;
+}
+
+.step-icon-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.wizard-step-v2.active .step-icon-v2,
+.wizard-step-v2.completed .step-icon-v2 {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.step-content-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step-title-v2 {
   font-size: 13px;
-  margin-bottom: 2px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
-.services-compact .service-details {
+.step-description-v2 {
   font-size: 11px;
+  opacity: 0.8;
+  line-height: 1.2;
+}
+
+/* ===================== КОНТЕНТ ШАГОВ ===================== */
+
+.wizard-content-v2 {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 32px 24px;
+  min-height: 400px;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.step-heading {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.step-heading::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  background: linear-gradient(135deg, #0078d4, #106ebe);
+  border-radius: 2px;
+}
+
+/* ===================== ФОРМЫ ===================== */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.services-compact .add-service-btn {
-  width: 28px;
-  height: 28px;
+.form-field.full-width {
+  grid-column: 1 / -1;
 }
 
-.services-compact .category-title {
-  padding: 8px 16px;
-  font-size: 13px;
+.form-field label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
 }
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #0078d4;
+  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+}
+
+.form-field input.error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.error-text {
+  font-size: 12px;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ===================== ПОИСК ПАЦИЕНТОВ ===================== */
+
+.search-field {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.suggestion-item:hover {
+  background-color: #f8fafc;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-name {
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.suggestion-details {
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===================== КОРЗИНА ===================== */
+
+.cart-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  height: 500px;
+}
+
+.services-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.services-header {
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.services-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.toggle-services-btn {
+  padding: 6px 12px;
+  background: #0078d4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.toggle-services-btn:hover {
+  background: #106ebe;
+}
+
+.services-list {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.service-category {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.category-title {
+  padding: 12px 20px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s ease;
+}
+
+.service-item:hover {
+  background-color: #f8fafc;
+}
+
+.service-info {
+  flex: 1;
+}
+
+.service-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.service-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.service-price {
+  color: #059669;
+  font-weight: 600;
+}
+
+.requires-doctor {
+  color: #7c3aed;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.add-service-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.add-service-btn:hover {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: white;
+}
+
+/* ===================== ПАНЕЛЬ КОРЗИНЫ ===================== */
+
+.cart-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-panel h4 {
+  margin: 0;
+  padding: 16px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.empty-cart {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #6b7280;
+  padding: 40px 20px;
+}
+
+.empty-icon {
+  opacity: 0.3;
+}
+
+.empty-hint {
+  font-size: 12px;
+  opacity: 0.7;
+  margin: 0;
+}
+
+.cart-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.cart-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.remove-item-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.remove-item-btn:hover {
+  background: #fecaca;
+}
+
+.item-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quantity-control button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.quantity-control button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.quantity-control span {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.doctor-select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+}
+
+.item-price {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.summary-total {
+  padding: 12px 0;
+  border-top: 2px solid #e5e7eb;
+  font-size: 18px;
+  text-align: right;
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.payment-options h4 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.visit-type-options,
+.payment-method-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio-option,
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.radio-option:hover,
+.checkbox-option:hover {
+  background: #f8fafc;
+  border-color: #d1d5db;
+}
+
+.radio-option input,
+.checkbox-option input {
+  margin: 0;
+}
+
+.all-free-option {
+  margin-top: 8px;
+}
+
+.warning-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  color: #92400e;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.notes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notes-field textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* ===================== АДАПТИВНОСТЬ ===================== */
+
+@media (max-width: 1200px) {
+  .cart-layout,
+  .payment-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .cart-layout {
+    height: auto;
+  }
+  
+  .services-panel,
+  .cart-panel {
+    height: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .wizard-steps-v2 {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .wizard-step-v2 {
+    min-width: 100px;
+    padding: 8px 12px;
+  }
+  
+  .step-title-v2 {
+    font-size: 12px;
+  }
+  
+  .step-description-v2 {
+    font-size: 10px;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================== ТЕМНАЯ ТЕМА ===================== */
+
+[data-theme="dark"] .wizard-steps-v2 {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-bottom-color: #475569;
+}
+
+[data-theme="dark"] .wizard-step-v2 {
+  background: rgba(30, 41, 59, 0.7);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .wizard-step-v2:hover {
+  background: rgba(30, 41, 59, 0.9);
+}
+
+[data-theme="dark"] .step-heading {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .form-field input,
+[data-theme="dark"] .form-field select,
+[data-theme="dark"] .form-field textarea {
+  background: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .services-panel,
+[data-theme="dark"] .cart-panel {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .services-header,
+[data-theme="dark"] .cart-panel h4 {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .service-item:hover {
+  background-color: #334155;
+}
+
+[data-theme="dark"] .service-name,
+[data-theme="dark"] .item-name {
+  color: #f1f5f9;
+}
+
+

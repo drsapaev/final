@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../ui';
 import { Settings, ToggleLeft, ToggleRight, Save, AlertCircle, CheckCircle } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 const WizardSettings = () => {
   const [settings, setSettings] = useState({
@@ -240,3 +240,4 @@ const WizardSettings = () => {
 };
 
 export default WizardSettings;
+

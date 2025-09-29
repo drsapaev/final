@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
-import { Button, Card } from '../../design-system/components';
+import { Button, Card } from '../ui/native';
 
 /**
  * Компонент для предложения установки PWA
@@ -149,3 +149,4 @@ const PWAInstallPrompt = () => {
 };
 
 export default PWAInstallPrompt;
+

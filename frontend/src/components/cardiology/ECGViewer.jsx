@@ -617,3 +617,4 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
 };
 
 export default ECGViewer;
+

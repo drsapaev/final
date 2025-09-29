@@ -18,7 +18,7 @@ import {
   BarChart3,
   TestTube
 } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from '../components/ui/native';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';

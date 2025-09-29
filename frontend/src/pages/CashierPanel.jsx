@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '../design-system/components';
-import { useBreakpoint } from '../design-system/hooks';
+import { Card, Badge, Button, Skeleton, useBreakpoint } from '../components/ui/native';
 import PaymentWidget from '../components/payment/PaymentWidget';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования

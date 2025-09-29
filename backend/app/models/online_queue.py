@@ -18,6 +18,11 @@ class DailyQueue(Base):
     active = Column(Boolean, default=True, nullable=False)
     opened_at = Column(DateTime(timezone=True), nullable=True)  # Факт открытия приема
     
+    # Информация о кабинете
+    cabinet_number = Column(String(20), nullable=True, index=True)  # Номер кабинета
+    cabinet_floor = Column(Integer, nullable=True)  # Этаж
+    cabinet_building = Column(String(50), nullable=True)  # Корпус/здание
+    
     # Временные ограничения для онлайн записи
     online_start_time = Column(String(5), default="07:00", nullable=False)  # HH:MM
     online_end_time = Column(String(5), default="09:00", nullable=False)    # HH:MM или null если до opened_at

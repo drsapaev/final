@@ -21,9 +21,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./clinic.db"
 
     # --- Auth / JWT ---
-    SECRET_KEY: str = Field(
-        default_factory=lambda: secrets.token_urlsafe(32)
-    )  # dev-значение; лучше задать в .env
+    SECRET_KEY: str = Field(default="dev-secret-key-for-clinic-management-system-change-in-production")  # фиксированный ключ для разработки
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 
@@ -48,6 +46,42 @@ class Settings(BaseSettings):
 
     # ESC/POS settings (may be missing in env; safe defaults)
     PRINTER_TYPE: Optional[str] = None  # none|network|usb
+    
+    # --- SMS Providers ---
+    # Eskiz SMS (Узбекистан)
+    ESKIZ_EMAIL: Optional[str] = None
+    ESKIZ_PASSWORD: Optional[str] = None
+    
+    # PlayMobile SMS (Узбекистан)
+    PLAYMOBILE_API_KEY: Optional[str] = None
+    PLAYMOBILE_API_SECRET: Optional[str] = None
+    
+    # SMS общие настройки
+    SMS_SENDER: str = "Clinic"
+    SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock
+    
+    # --- Firebase Cloud Messaging (FCM) ---
+    FCM_SERVER_KEY: Optional[str] = None
+    FCM_SENDER_ID: Optional[str] = None
+    FCM_PROJECT_ID: Optional[str] = None
+    FCM_ENABLED: bool = False
+    
+    # --- Email Settings ---
+    SMTP_SERVER: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USE_TLS: bool = True
+    
+    # --- Cloud Printing Settings ---
+    # Microsoft Universal Print
+    MICROSOFT_PRINT_TENANT_ID: Optional[str] = None
+    MICROSOFT_PRINT_CLIENT_ID: Optional[str] = None
+    MICROSOFT_PRINT_CLIENT_SECRET: Optional[str] = None
+    
+    # Cloud Printing общие настройки
+    CLOUD_PRINTING_ENABLED: bool = True
+    CLOUD_PRINTING_DEFAULT_PROVIDER: str = "mock"  # microsoft, mock
     PRINTER_NET_HOST: Optional[str] = None
     PRINTER_NET_PORT: Optional[int] = None
     PRINTER_USB_VID: Optional[int] = None

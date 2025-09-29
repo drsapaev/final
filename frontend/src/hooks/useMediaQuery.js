@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Хук для проверки медиа-запросов
 export const useMediaQuery = (query) => {

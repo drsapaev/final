@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from '../../design-system/components';
+import { Card } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /**
@@ -95,4 +95,5 @@ const AdminSection = ({
 };
 
 export default AdminSection;
+
 

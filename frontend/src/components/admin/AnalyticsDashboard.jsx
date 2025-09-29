@@ -13,7 +13,7 @@ import {
   Award,
   AlertCircle
 } from 'lucide-react';
-import { Card, Badge } from '../../design-system/components';
+import { Card, Badge } from '../ui/native';
 
 const AnalyticsDashboard = ({ 
   data = {},
@@ -485,3 +485,4 @@ const AnalyticsDashboard = ({
 };
 
 export default AnalyticsDashboard;
+

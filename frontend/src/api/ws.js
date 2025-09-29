@@ -64,7 +64,9 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
   function connect() {
     try {
       const base = buildWsBase();
-      const url = `${base}/api/v1/display/ws/board/${encodeURIComponent(boardId)}`;
+      const token = localStorage.getItem('access_token');
+      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+      const url = `${base}/api/v1/display/ws/board/${encodeURIComponent(boardId)}${tokenParam}`;
       
       console.log(`🔌 Подключаемся к WebSocket: ${url}`);
       

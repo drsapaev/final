@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from './ui/native';
 import { 
   APPOINTMENT_STATUS, 
   STATUS_LABELS, 
@@ -222,3 +222,4 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
 };
 
 export default AppointmentFlow;
+

@@ -10,7 +10,7 @@ export const authService = {
    */
   async login(credentials) {
     try {
-      const response = await api.post('/authentication/login', credentials);
+      const response = await api.post('/auth/login', credentials);
       
       if (response.data.access_token) {
         // Сохраняем токен
@@ -39,7 +39,7 @@ export const authService = {
    */
   async logout() {
     try {
-      await api.post('/authentication/logout');
+      await api.post('/auth/logout');
     } catch (error) {
       console.warn('Ошибка выхода:', error);
     } finally {
@@ -59,7 +59,7 @@ export const authService = {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) return false;
 
-      const response = await api.post('/authentication/refresh', {
+      const response = await api.post('/auth/refresh', {
         refresh_token: refreshToken
       });
 
@@ -82,7 +82,7 @@ export const authService = {
    */
   async getProfile() {
     try {
-      const response = await api.get('/authentication/profile');
+      const response = await api.get('/auth/me');
       return {
         success: true,
         data: response.data

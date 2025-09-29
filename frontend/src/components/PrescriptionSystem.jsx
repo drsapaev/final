@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from './ui/native';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../constants/appointmentStatus';
 
 const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
@@ -384,3 +384,4 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
 };
 
 export default PrescriptionSystem;
+

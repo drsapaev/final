@@ -20,6 +20,8 @@ from app.models.two_factor_auth import (
 from app.models.user import User
 from app.core.config import settings
 from app.core.security import verify_password
+from app.services.sms_providers import get_sms_manager, SMSProviderType
+from app.services.email_sms_enhanced import EmailSMSEnhancedService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,8 @@ class TwoFactorService:
         self.recovery_token_length = 32  # Длина токена восстановления
         self.session_expiry_hours = 24  # Время жизни сессии
         self.recovery_expiry_hours = 1  # Время жизни токена восстановления
+        self.sms_manager = get_sms_manager()
+        self.email_service = EmailSMSEnhancedService()
 
     def generate_totp_secret(self) -> str:
         """Генерирует секретный ключ для TOTP"""
@@ -527,6 +531,170 @@ class TwoFactorService:
             db.rollback()
             logger.error(f"Error regenerating backup codes: {e}")
             raise
+
+    async def send_sms_code(
+        self, 
+        phone: str, 
+        code: str, 
+        provider_type: Optional[SMSProviderType] = None
+    ) -> Dict[str, Any]:
+        """Отправить SMS код для 2FA"""
+        try:
+            response = await self.sms_manager.send_2fa_code(
+                phone=phone,
+                code=code,
+                provider_type=provider_type
+            )
+            
+            return {
+                "success": response.success,
+                "message_id": response.message_id,
+                "error": response.error,
+                "provider": response.provider
+            }
+            
+        except Exception as e:
+            logger.error(f"Error sending SMS code: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "provider": "unknown"
+            }
+
+    async def send_email_code(
+        self, 
+        email: str, 
+        code: str, 
+        user_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Отправить email код для 2FA"""
+        try:
+            subject = "Код подтверждения двухфакторной аутентификации"
+            
+            # HTML шаблон для email
+            html_content = f"""
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #0078d4, #106ebe); padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">🔐 Код подтверждения</h1>
+                </div>
+                
+                <div style="padding: 30px; background: #f8fafc;">
+                    <p>Здравствуйте{', ' + user_name if user_name else ''}!</p>
+                    
+                    <p>Ваш код подтверждения для двухфакторной аутентификации:</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <div style="display: inline-block; background: #0078d4; color: white; padding: 15px 30px; border-radius: 8px; font-size: 24px; font-weight: bold; letter-spacing: 3px;">
+                            {code}
+                        </div>
+                    </div>
+                    
+                    <p style="color: #dc2626; font-weight: bold;">⚠️ Важно:</p>
+                    <ul style="color: #6b7280;">
+                        <li>Код действителен в течение 5 минут</li>
+                        <li>Никому не сообщайте этот код</li>
+                        <li>Если вы не запрашивали код, проигнорируйте это письмо</li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
+                        С уважением,<br>
+                        Команда клиники
+                    </p>
+                </div>
+                
+                <div style="background: #e5e7eb; padding: 15px; text-align: center; color: #6b7280; font-size: 12px;">
+                    Это автоматическое сообщение. Пожалуйста, не отвечайте на него.
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Текстовая версия
+            text_content = f"""
+            Код подтверждения двухфакторной аутентификации
+            
+            Здравствуйте{', ' + user_name if user_name else ''}!
+            
+            Ваш код подтверждения: {code}
+            
+            Важно:
+            - Код действителен в течение 5 минут
+            - Никому не сообщайте этот код
+            - Если вы не запрашивали код, проигнорируйте это письмо
+            
+            С уважением,
+            Команда клиники
+            """
+            
+            result = await self.email_service.send_email(
+                to_email=email,
+                subject=subject,
+                html_content=html_content,
+                text_content=text_content
+            )
+            
+            return {
+                "success": result.get("success", False),
+                "message_id": result.get("message_id"),
+                "error": result.get("error"),
+                "provider": "email"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error sending email code: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "provider": "email"
+            }
+
+    def generate_verification_code(self, length: int = 6) -> str:
+        """Генерирует код верификации"""
+        return ''.join([str(secrets.randbelow(10)) for _ in range(length)])
+
+    async def send_verification_code(
+        self,
+        method: str,  # 'sms' или 'email'
+        contact: str,  # номер телефона или email
+        user_name: Optional[str] = None,
+        provider_type: Optional[SMSProviderType] = None
+    ) -> Dict[str, Any]:
+        """Отправить код верификации по SMS или email"""
+        try:
+            code = self.generate_verification_code()
+            
+            if method == 'sms':
+                result = await self.send_sms_code(
+                    phone=contact,
+                    code=code,
+                    provider_type=provider_type
+                )
+            elif method == 'email':
+                result = await self.send_email_code(
+                    email=contact,
+                    code=code,
+                    user_name=user_name
+                )
+            else:
+                return {
+                    "success": False,
+                    "error": "Invalid method. Use 'sms' or 'email'",
+                    "provider": "unknown"
+                }
+            
+            if result["success"]:
+                result["code"] = code  # Возвращаем код для сохранения в сессии
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error sending verification code: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "provider": "unknown"
+            }
 
 
 # Глобальный экземпляр сервиса

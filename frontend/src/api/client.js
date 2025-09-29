@@ -10,7 +10,7 @@
 
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -85,7 +85,7 @@ async function login(username, password) {
     remember_me: false
   };
 
-  const resp = await api.post('/authentication/login', credentials);
+  const resp = await api.post('/auth/login', credentials);
   
   return resp.data;
 }

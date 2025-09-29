@@ -21,13 +21,14 @@ class LoginResponse(BaseModel):
     """Схема для ответа входа"""
     model_config = ConfigDict(protected_namespaces=())
     
-    access_token: str
-    refresh_token: str
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     expires_in: int
     user: Dict[str, Any]
     requires_2fa: bool = False
     two_factor_method: Optional[str] = None
+    pending_2fa_token: Optional[str] = None
 
 
 class RefreshTokenRequest(BaseModel):

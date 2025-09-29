@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const useWizardSettings = () => {
   const [settings, setSettings] = useState({
@@ -26,7 +26,8 @@ const useWizardSettings = () => {
         return;
       }
       
-      const response = await fetch(`/api/v1/admin/wizard-settings`, {
+      // Используем абсолютный URL для обхода dev proxy
+      const response = await fetch('http://localhost:8000/api/v1/admin/wizard-settings', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

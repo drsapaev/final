@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { HelpCircle, Keyboard, X } from 'lucide-react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 
 /**
  * Компонент контекстных подсказок для админ панели
@@ -157,3 +157,4 @@ export const HotkeysModal = ({ isOpen, onClose }) => {
 };
 
 export default HelpTooltip;
+

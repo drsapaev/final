@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Save, Plus, X, Camera, Upload, AlertCircle, CheckCircle, Brain } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../../constants/appointmentStatus';
 import { AIButton, AISuggestions, AIAssistant } from '../ai';
 import { useEMRAI } from '../../hooks/useEMRAI';
@@ -458,3 +458,4 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 };
 
 export default EMRSystem;
+

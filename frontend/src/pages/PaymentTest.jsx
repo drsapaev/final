@@ -60,13 +60,13 @@ const PaymentTest = () => {
       };
       
       console.log('📤 Отправляем запрос авторизации:', {
-        url: 'http://localhost:8000/api/v1/authentication/login',
+        url: 'http://localhost:8000/api/v1/auth/login',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginData)
       });
 
-      const response = await fetch('http://localhost:8000/api/v1/authentication/login', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

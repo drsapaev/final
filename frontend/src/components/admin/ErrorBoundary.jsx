@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -85,3 +85,4 @@ class ErrorBoundary extends React.Component {
 }
 
 export default ErrorBoundary;
+

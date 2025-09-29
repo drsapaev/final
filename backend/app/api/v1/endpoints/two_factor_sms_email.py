@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.services.two_factor_service import get_two_factor_service, TwoFactorService
+from app.services.sms_providers import get_sms_manager, SMSProviderType
 from app.services.notifications import notification_service
 
 router = APIRouter()
@@ -22,55 +23,45 @@ async def send_verification_code(
     method: str = Query(..., description="Метод отправки: sms или email"),
     phone_number: Optional[str] = Query(None, description="Номер телефона для SMS"),
     email_address: Optional[str] = Query(None, description="Email адрес"),
+    provider: Optional[str] = Query(None, description="SMS провайдер: eskiz, playmobile, mock"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Отправить код подтверждения по SMS или Email"""
     try:
         service = get_two_factor_service()
-        # notification_service уже импортирован
         
-        # Генерируем 6-значный код
-        code = ''.join(random.choices(string.digits, k=6))
-        
-        # Сохраняем код в базе данных
-        service.save_verification_code(
-            db=db,
-            user_id=current_user.id,
-            method=method,
-            code=code,
-            expires_at=datetime.utcnow() + timedelta(minutes=5)
-        )
-        
-        # Отправляем код
+        # Определяем контакт для отправки
         if method == 'sms' and phone_number:
-            # Отправка SMS
-            success = await notification_service.send_sms(
-                phone_number=phone_number,
-                message=f"Ваш код подтверждения: {code}. Код действителен 5 минут."
-            )
-            if not success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Ошибка отправки SMS"
-                )
-                
+            contact = phone_number
         elif method == 'email' and email_address:
-            # Отправка Email
-            success = await notification_service.send_email(
-                to_email=email_address,
-                subject="Код подтверждения",
-                body=f"Ваш код подтверждения: {code}. Код действителен 5 минут."
-            )
-            if not success:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Ошибка отправки Email"
-                )
+            contact = email_address
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Неверный метод или отсутствуют контактные данные"
+                detail="Необходимо указать номер телефона для SMS или email адрес"
+            )
+        
+        # Определяем SMS провайдер
+        provider_type = None
+        if method == 'sms' and provider:
+            try:
+                provider_type = SMSProviderType(provider)
+            except ValueError:
+                provider_type = None
+        
+        # Отправляем код через новый сервис
+        result = await service.send_verification_code(
+            method=method,
+            contact=contact,
+            user_name=current_user.username,
+            provider_type=provider_type
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ошибка отправки {method.upper()}: {result.get('error', 'Unknown error')}"
             )
         
         return {

@@ -23,7 +23,7 @@ import {
   Plus,
   Edit
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -638,3 +638,4 @@ const DisplayBoardSettings = () => {
 };
 
 export default DisplayBoardSettings;
+

@@ -18,7 +18,7 @@ import {
   Webhook,
   BarChart3
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const TelegramSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -516,3 +516,4 @@ const TelegramSettings = () => {
 };
 
 export default TelegramSettings;
+

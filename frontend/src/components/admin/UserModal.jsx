@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User, Mail, Lock, Shield, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 
 const UserModal = ({ 
   isOpen, 
@@ -10,10 +10,11 @@ const UserModal = ({
   loading = false 
 }) => {
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     email: '',
-    role: 'user',
-    status: 'active',
+    full_name: '',
+    role: 'Patient',
+    is_active: true,
     password: '',
     confirmPassword: ''
   });
@@ -25,19 +26,21 @@ const UserModal = ({
     if (isOpen) {
       if (user) {
         setFormData({
-          name: user.name || '',
+          username: user.username || '',
           email: user.email || '',
-          role: user.role || 'user',
-          status: user.status || 'active',
+          full_name: user.profile?.full_name || user.full_name || '',
+          role: user.role || 'Patient',
+          is_active: user.is_active !== undefined ? user.is_active : true,
           password: '',
           confirmPassword: ''
         });
       } else {
         setFormData({
-          name: '',
+          username: '',
           email: '',
-          role: 'user',
-          status: 'active',
+          full_name: '',
+          role: 'Patient',
+          is_active: true,
           password: '',
           confirmPassword: ''
         });
@@ -49,8 +52,10 @@ const UserModal = ({
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Имя обязательно';
+    if (!formData.username.trim()) {
+      newErrors.username = 'Имя пользователя обязательно';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Имя пользователя должно содержать минимум 3 символа';
     }
 
     if (!formData.email.trim()) {
@@ -63,8 +68,8 @@ const UserModal = ({
       newErrors.password = 'Пароль обязателен';
     }
 
-    if (formData.password && formData.password.length < 6) {
-      newErrors.password = 'Пароль должен содержать минимум 6 символов';
+    if (formData.password && formData.password.length < 8) {
+      newErrors.password = 'Пароль должен содержать минимум 8 символов';
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -83,10 +88,11 @@ const UserModal = ({
     setIsSubmitting(true);
     try {
       const userData = {
-        name: formData.name.trim(),
+        username: formData.username.trim(),
         email: formData.email.trim(),
+        full_name: formData.full_name.trim(),
         role: formData.role,
-        status: formData.status
+        is_active: formData.is_active
       };
 
       if (formData.password) {
@@ -131,35 +137,54 @@ const UserModal = ({
 
           {/* Форма */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Имя */}
+            {/* Имя пользователя */}
             <div>
               <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                Имя *
+                Имя пользователя *
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
                       style={{ color: 'var(--text-tertiary)' }} />
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
+                  value={formData.username}
+                  onChange={(e) => handleChange('username', e.target.value)}
                   className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.name ? 'border-red-500' : 'border-gray-300'
+                    errors.username ? 'border-red-500' : 'border-gray-300'
                   }`}
                   style={{ 
                     background: 'var(--bg-primary)', 
                     color: 'var(--text-primary)',
-                    borderColor: errors.name ? 'var(--danger-color)' : 'var(--border-color)'
+                    borderColor: errors.username ? 'var(--danger-color)' : 'var(--border-color)'
                   }}
-                  placeholder="Введите имя"
+                  placeholder="Введите имя пользователя"
                 />
               </div>
-              {errors.name && (
+              {errors.username && (
                 <p className="text-sm text-red-500 mt-1 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.name}
+                  {errors.username}
                 </p>
               )}
+            </div>
+
+            {/* Полное имя */}
+            <div>
+              <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                Полное имя
+              </label>
+              <input
+                type="text"
+                value={formData.full_name}
+                onChange={(e) => handleChange('full_name', e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{ 
+                  background: 'var(--bg-primary)', 
+                  color: 'var(--text-primary)',
+                  borderColor: 'var(--border-color)'
+                }}
+                placeholder="Введите полное имя"
+              />
             </div>
 
             {/* Email */}
@@ -211,12 +236,11 @@ const UserModal = ({
                     borderColor: 'var(--border-color)'
                   }}
                 >
-                  <option value="user">Пользователь</option>
-                  <option value="admin">Администратор</option>
-                  <option value="doctor">Врач</option>
-                  <option value="registrar">Регистратор</option>
-                  <option value="cashier">Кассир</option>
-                  <option value="lab">Лаборант</option>
+                  <option value="Patient">Пациент</option>
+                  <option value="Admin">Администратор</option>
+                  <option value="Doctor">Врач</option>
+                  <option value="Nurse">Медсестра</option>
+                  <option value="Receptionist">Регистратор</option>
                 </select>
               </div>
             </div>
@@ -226,20 +250,18 @@ const UserModal = ({
               <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
                 Статус
               </label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ 
-                  background: 'var(--bg-primary)', 
-                  color: 'var(--text-primary)',
-                  borderColor: 'var(--border-color)'
-                }}
-              >
-                <option value="active">Активен</option>
-                <option value="inactive">Неактивен</option>
-                <option value="blocked">Заблокирован</option>
-              </select>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={formData.is_active}
+                  onChange={(e) => handleChange('is_active', e.target.checked)}
+                  className="w-4 h-4 rounded border focus:ring-2 focus:ring-blue-500"
+                />
+                <label htmlFor="is_active" className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  Активный пользователь
+                </label>
+              </div>
             </div>
 
             {/* Пароль */}
@@ -346,3 +368,4 @@ const UserModal = ({
 };
 
 export default UserModal;
+

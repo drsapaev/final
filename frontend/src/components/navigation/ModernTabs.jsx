@@ -180,7 +180,9 @@ const ModernTabs = ({
         style={{
           background: isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
           backdropFilter: 'blur(20px)',
-          border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
+          borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
+          borderLeft: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
+          borderRight: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
           borderBottom: 'none',
           borderRadius: '12px 12px 0 0',
           padding: '8px 16px'
@@ -261,3 +263,4 @@ const ModernTabs = ({
 };
 
 export default ModernTabs;
+

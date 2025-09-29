@@ -1,7 +1,7 @@
 // Error Boundary для обработки ошибок React
 import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Button } from '../../design-system/components';
+import { Button } from '../ui/native';
 
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
@@ -191,3 +191,4 @@ export function useErrorHandler() {
 }
 
 export default ErrorBoundary;
+

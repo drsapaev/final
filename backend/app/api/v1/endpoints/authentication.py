@@ -68,24 +68,29 @@ async def login(
         
         if not result["success"]:
             print(f"DEBUG: Authentication failed, raising HTTPException")
+            print(f"DEBUG: Result details: {result}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=result["message"]
             )
         
         return LoginResponse(
-            access_token=result["tokens"]["access_token"],
-            refresh_token=result["tokens"]["refresh_token"],
-            token_type=result["tokens"]["token_type"],
-            expires_in=result["tokens"]["expires_in"],
+            access_token=(result.get("tokens") or {}).get("access_token"),
+            refresh_token=(result.get("tokens") or {}).get("refresh_token"),
+            token_type=(result.get("tokens") or {}).get("token_type", "bearer"),
+            expires_in=(result.get("tokens") or {}).get("expires_in", 0),
             user=result["user"],
             requires_2fa=result["requires_2fa"],
-            two_factor_method=result["two_factor_method"]
+            two_factor_method=result["two_factor_method"],
+            pending_2fa_token=result.get("pending_2fa_token")
         )
         
     except HTTPException:
         raise
     except Exception as e:
+        print(f"DEBUG: Exception in login endpoint: {e}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка входа: {str(e)}"
@@ -586,3 +591,248 @@ async def auth_health_check():
         "password_reset_expire_hours": 1,
         "email_verification_expire_hours": 24
     }
+
+
+# ===================== УПРАВЛЕНИЕ СЕССИЯМИ =====================
+
+@router.get("/sessions/current")
+async def get_current_session(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить текущую сессию пользователя"""
+    try:
+        auth_service = get_authentication_service()
+        ip_address, user_agent = get_client_info(request)
+        
+        session = auth_service.get_current_session(
+            db, current_user.id, ip_address, user_agent
+        )
+        
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Активная сессия не найдена"
+            )
+        
+        session_info = auth_service.get_session_info(db, session.id)
+        
+        return {
+            "success": True,
+            "message": "Текущая сессия получена",
+            "session": session_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting current session: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка получения текущей сессии"
+        )
+
+
+@router.get("/sessions")
+async def get_user_sessions(
+    active_only: bool = Query(True, description="Только активные сессии"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить все сессии пользователя"""
+    try:
+        auth_service = get_authentication_service()
+        sessions = auth_service.get_user_sessions(db, current_user.id, active_only)
+        
+        sessions_info = []
+        for session in sessions:
+            session_info = auth_service.get_session_info(db, session.id)
+            if session_info:
+                sessions_info.append(session_info)
+        
+        return {
+            "success": True,
+            "message": f"Найдено {len(sessions_info)} сессий",
+            "sessions": sessions_info,
+            "total": len(sessions_info)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user sessions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка получения сессий пользователя"
+        )
+
+
+@router.post("/sessions/{session_id}/revoke")
+async def revoke_session(
+    session_id: int,
+    reason: str = Query("manual", description="Причина отзыва сессии"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Отозвать сессию"""
+    try:
+        auth_service = get_authentication_service()
+        
+        # Проверяем, что сессия принадлежит текущему пользователю
+        from app.models.authentication import UserSession
+        session = db.query(UserSession).filter(UserSession.id == session_id).first()
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Сессия не найдена"
+            )
+        
+        if session.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к этой сессии"
+            )
+        
+        success = auth_service.revoke_session(db, session_id, reason)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Не удалось отозвать сессию"
+            )
+        
+        return {
+            "success": True,
+            "message": f"Сессия {session_id} отозвана",
+            "reason": reason
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking session {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка отзыва сессии"
+        )
+
+
+@router.post("/sessions/revoke-all")
+async def revoke_all_sessions(
+    request: Request,
+    except_current: bool = Query(True, description="Исключить текущую сессию"),
+    reason: str = Query("logout_all", description="Причина отзыва сессий"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Отозвать все сессии пользователя"""
+    try:
+        auth_service = get_authentication_service()
+        
+        current_session_id = None
+        if except_current:
+            ip_address, user_agent = get_client_info(request)
+            current_session = auth_service.get_current_session(
+                db, current_user.id, ip_address, user_agent
+            )
+            if current_session:
+                current_session_id = current_session.id
+        
+        revoked_count = auth_service.revoke_all_user_sessions(
+            db, current_user.id, current_session_id, reason
+        )
+        
+        return {
+            "success": True,
+            "message": f"Отозвано {revoked_count} сессий",
+            "revoked_count": revoked_count,
+            "reason": reason
+        }
+        
+    except Exception as e:
+        logger.error(f"Error revoking all sessions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка отзыва всех сессий"
+        )
+
+
+@router.post("/sessions/cleanup")
+async def cleanup_expired_sessions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Очистить истекшие сессии (только для администраторов)"""
+    try:
+        # Проверяем права администратора
+        if current_user.role not in ["Admin", "SuperAdmin"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Недостаточно прав для выполнения операции"
+            )
+        
+        auth_service = get_authentication_service()
+        cleaned_count = auth_service.cleanup_expired_sessions(db)
+        
+        return {
+            "success": True,
+            "message": f"Очищено {cleaned_count} истекших сессий",
+            "cleaned_count": cleaned_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cleaning up expired sessions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка очистки истекших сессий"
+        )
+
+
+@router.get("/sessions/{session_id}")
+async def get_session_info(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить информацию о сессии"""
+    try:
+        auth_service = get_authentication_service()
+        
+        # Проверяем, что сессия принадлежит текущему пользователю или пользователь - администратор
+        from app.models.authentication import UserSession
+        session = db.query(UserSession).filter(UserSession.id == session_id).first()
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Сессия не найдена"
+            )
+        
+        if session.user_id != current_user.id and current_user.role not in ["Admin", "SuperAdmin"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к этой сессии"
+            )
+        
+        session_info = auth_service.get_session_info(db, session_id)
+        
+        if not session_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Информация о сессии не найдена"
+            )
+        
+        return {
+            "success": True,
+            "message": "Информация о сессии получена",
+            "session": session_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting session info {session_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Ошибка получения информации о сессии"
+        )

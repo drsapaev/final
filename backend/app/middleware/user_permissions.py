@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.crud.user_management import user_role, user_permission, user_group
 from app.models.user import User
-from app.models.user_profile import UserRole, UserPermission, UserGroup
+from app.models.role_permission import UserGroup, UserPermissionOverride
 
 logger = logging.getLogger(__name__)
 

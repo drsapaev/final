@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Printer, Settings, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from './ui/native';
 
 const PrintSystem = () => {
   const [printerStatus, setPrinterStatus] = useState('disconnected');
@@ -325,4 +325,5 @@ const PrintSystem = () => {
 };
 
 export default PrintSystem;
+
 

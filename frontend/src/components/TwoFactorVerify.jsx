@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { Shield, Smartphone, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
-const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp' }) => {
+const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp', pendingToken }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -22,6 +22,11 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp' }) => {
         remember_device: rememberDevice
       };
 
+      // Добавляем pending_2fa_token если он есть
+      if (pendingToken) {
+        requestData.pending_2fa_token = pendingToken;
+      }
+
       if (method === 'totp' && totpCode) {
         requestData.totp_code = totpCode;
       } else if (method === 'backup' && backupCode) {
@@ -36,13 +41,13 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp' }) => {
 
       const response = await api.post('/2fa/verify', requestData);
       
-      if (response.success) {
+      if (response.data?.access_token || response.success) {
         setSuccess('Верификация успешна!');
         if (onSuccess) {
           onSuccess(response);
         }
       } else {
-        setError(response.message || 'Неверный код');
+        setError(response.data?.message || response.message || 'Неверный код');
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Ошибка верификации');
@@ -310,3 +315,4 @@ const TwoFactorVerify = ({ onSuccess, onCancel, method = 'totp' }) => {
 };
 
 export default TwoFactorVerify;
+

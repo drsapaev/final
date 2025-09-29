@@ -5,6 +5,7 @@ import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
 import { useTheme } from '../contexts/ThemeContext';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
+import ForgotPassword from '../components/auth/ForgotPassword';
 
 /**
  * Логин по OAuth2 Password (FastAPI):
@@ -15,11 +16,12 @@ export default function Login() {
   const roleOptions = ROLE_OPTIONS;
 
   const [selectedRoleKey, setSelectedRoleKey] = useState('admin');
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('admin@example.com');
   const [password, setPassword] = useState('admin123');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [language, setLanguage] = useState('RU');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Используем централизованную систему темизации
   const { 
@@ -290,6 +292,46 @@ export default function Login() {
     lineHeight: '1.5'
   };
 
+  // Если показываем форму восстановления пароля
+  if (showForgotPassword) {
+    return (
+      <div style={pageStyle}>
+        {/* Переключатели темы и языка */}
+        <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
+          <button 
+            onClick={() => toggleTheme()}
+            style={toggleButtonStyle}
+            title="Переключить тему"
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
+          <select 
+            value={language} 
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              ...toggleButtonStyle,
+              marginLeft: getSpacing('sm'),
+              background: theme === 'light' ? 'white' : getColor('gray', 800)
+            }}
+          >
+            <option value="RU">RU</option>
+            <option value="UZ">UZ</option>
+            <option value="EN">EN</option>
+          </select>
+        </div>
+
+        <ForgotPassword
+          language={language}
+          onBack={() => setShowForgotPassword(false)}
+          onSuccess={() => {
+            setShowForgotPassword(false);
+            setErr('');
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={pageStyle}>
       {/* Переключатели темы и языка */}
@@ -410,7 +452,7 @@ export default function Login() {
                 textDecoration: 'none',
                 fontSize: '14px'
               }}
-              onClick={(e) => { e.preventDefault(); /* TODO: implement */ }}
+              onClick={(e) => { e.preventDefault(); setShowForgotPassword(true); }}
             >
               {t.forgotPassword}
             </a>

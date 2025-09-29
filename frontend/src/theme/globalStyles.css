@@ -1,0 +1,453 @@
+/**
+ * Глобальные стили с использованием токенов дизайна
+ * Унифицированная система стилей для всего приложения
+ */
+
+/* Сброс стилей и базовые настройки */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-family-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  height: 100%;
+  background-color: var(--color-background-primary, #ffffff);
+  color: var(--color-text-primary, #111827);
+  font-size: var(--font-size-base, 16px);
+  line-height: var(--line-height-normal, 1.5);
+  transition: background-color var(--duration-normal, 300ms) ease, color var(--duration-normal, 300ms) ease;
+}
+
+#root {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Типографика */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--font-weight-semibold, 600);
+  line-height: var(--line-height-tight, 1.25);
+  margin-bottom: var(--spacing-4, 16px);
+  color: var(--color-text-primary, #111827);
+}
+
+h1 {
+  font-size: var(--font-size-3xl, 30px);
+}
+
+h2 {
+  font-size: var(--font-size-2xl, 24px);
+}
+
+h3 {
+  font-size: var(--font-size-xl, 20px);
+}
+
+h4 {
+  font-size: var(--font-size-lg, 18px);
+}
+
+h5 {
+  font-size: var(--font-size-base, 16px);
+}
+
+h6 {
+  font-size: var(--font-size-sm, 14px);
+}
+
+p {
+  margin-bottom: var(--spacing-4, 16px);
+  color: var(--color-text-secondary, #4b5563);
+}
+
+/* Ссылки */
+a {
+  color: var(--color-primary-500, #0ea5e9);
+  text-decoration: none;
+  transition: color var(--duration-fast, 150ms) ease;
+}
+
+a:hover {
+  color: var(--color-primary-600, #0284c7);
+  text-decoration: underline;
+}
+
+a:focus {
+  outline: 2px solid var(--color-border-focus, #0ea5e9);
+  outline-offset: 2px;
+}
+
+/* Кнопки */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Формы */
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--color-border-focus, #0ea5e9);
+  outline-offset: 2px;
+}
+
+/* Скроллбары */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background-secondary, #f9fafb);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-medium, #d1d5db);
+  border-radius: var(--radius-full, 9999px);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-dark, #9ca3af);
+}
+
+/* Утилитарные классы */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.not-sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Анимации */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Медицинские утилитарные классы */
+.medical-status-waiting {
+  color: var(--color-medical-warning, #f59e0b);
+}
+
+.medical-status-in-progress {
+  color: var(--color-medical-info, #3b82f6);
+}
+
+.medical-status-completed {
+  color: var(--color-medical-success, #10b981);
+}
+
+.medical-status-cancelled {
+  color: var(--color-gray-400, #9ca3af);
+}
+
+.medical-status-emergency {
+  color: var(--color-medical-danger, #ef4444);
+}
+
+/* Отделения */
+.department-cardiology {
+  color: var(--color-medical-cardiology, #dc2626);
+}
+
+.department-dermatology {
+  color: var(--color-medical-dermatology, #7c3aed);
+}
+
+.department-dentistry {
+  color: var(--color-medical-dentistry, #059669);
+}
+
+.department-laboratory {
+  color: var(--color-medical-laboratory, #0891b2);
+}
+
+.department-ecg {
+  color: var(--color-medical-ecg, #ea580c);
+}
+
+/* Адаптивные утилиты */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--spacing-4, 16px);
+  padding-right: var(--spacing-4, 16px);
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
+}
+
+/* Флекс утилиты */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-row {
+  flex-direction: row;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.items-start {
+  align-items: flex-start;
+}
+
+.items-end {
+  align-items: flex-end;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-start {
+  justify-content: flex-start;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.flex-1 {
+  flex: 1 1 0%;
+}
+
+.flex-auto {
+  flex: 1 1 auto;
+}
+
+.flex-none {
+  flex: none;
+}
+
+/* Грид утилиты */
+.grid {
+  display: grid;
+}
+
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.gap-1 {
+  gap: var(--spacing-1, 4px);
+}
+
+.gap-2 {
+  gap: var(--spacing-2, 8px);
+}
+
+.gap-3 {
+  gap: var(--spacing-3, 12px);
+}
+
+.gap-4 {
+  gap: var(--spacing-4, 16px);
+}
+
+.gap-6 {
+  gap: var(--spacing-6, 24px);
+}
+
+.gap-8 {
+  gap: var(--spacing-8, 32px);
+}
+
+/* Отступы */
+.p-0 { padding: 0; }
+.p-1 { padding: var(--spacing-1, 4px); }
+.p-2 { padding: var(--spacing-2, 8px); }
+.p-3 { padding: var(--spacing-3, 12px); }
+.p-4 { padding: var(--spacing-4, 16px); }
+.p-5 { padding: var(--spacing-5, 20px); }
+.p-6 { padding: var(--spacing-6, 24px); }
+.p-8 { padding: var(--spacing-8, 32px); }
+
+.m-0 { margin: 0; }
+.m-1 { margin: var(--spacing-1, 4px); }
+.m-2 { margin: var(--spacing-2, 8px); }
+.m-3 { margin: var(--spacing-3, 12px); }
+.m-4 { margin: var(--spacing-4, 16px); }
+.m-5 { margin: var(--spacing-5, 20px); }
+.m-6 { margin: var(--spacing-6, 24px); }
+.m-8 { margin: var(--spacing-8, 32px); }
+
+/* Размеры */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+
+/* Позиционирование */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+
+/* Тени */
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow { box-shadow: var(--shadow-base); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+
+/* Скругления */
+.rounded-none { border-radius: var(--radius-none, 0); }
+.rounded-sm { border-radius: var(--radius-sm, 2px); }
+.rounded { border-radius: var(--radius-base, 4px); }
+.rounded-md { border-radius: var(--radius-md, 6px); }
+.rounded-lg { border-radius: var(--radius-lg, 8px); }
+.rounded-xl { border-radius: var(--radius-xl, 12px); }
+.rounded-full { border-radius: var(--radius-full, 9999px); }
+
+/* Переходы */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: var(--duration-normal, 300ms);
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: var(--duration-fast, 150ms);
+}
+
+/* Темная тема */
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Печать */
+@media print {
+  * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  a,
+  a:visited {
+    text-decoration: underline;
+  }
+  
+  a[href]:after {
+    content: " (" attr(href) ")";
+  }
+  
+  abbr[title]:after {
+    content: " (" attr(title) ")";
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+

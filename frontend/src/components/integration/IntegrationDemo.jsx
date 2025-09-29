@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useAppData } from '../../contexts/AppDataContext';
@@ -291,3 +291,4 @@ const IntegrationDemo = () => {
 };
 
 export default IntegrationDemo;
+

@@ -19,7 +19,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const LicenseManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -753,3 +753,4 @@ const LicenseManagement = () => {
 };
 
 export default LicenseManagement;
+

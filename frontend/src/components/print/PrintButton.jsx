@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Printer, Download, FileText, Receipt, AlertCircle, CheckCircle, Loader } from 'lucide-react';
-import { Button } from '../../design-system/components';
+import { Button } from '../ui/native';
 
 /**
  * Компонент кнопки печати с поддержкой разных типов документов
@@ -148,3 +148,4 @@ const PrintButton = ({
 };
 
 export default PrintButton;
+

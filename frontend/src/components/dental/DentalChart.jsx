@@ -753,3 +753,4 @@ const TreatmentPlanModal = ({ treatmentPlan, onUpdate, onClose, teeth }) => {
 };
 
 export default DentalChart;
+

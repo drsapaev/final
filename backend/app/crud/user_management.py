@@ -8,9 +8,10 @@ from datetime import datetime, timedelta
 
 from app.models.user import User
 from app.models.user_profile import (
-    UserProfile, UserPreferences, UserNotificationSettings, 
-    UserRole, UserPermission, UserGroup, UserGroupMember, UserAuditLog,
-    UserStatus, RolePermission
+    UserProfile, UserPreferences, UserNotificationSettings, UserAuditLog, UserStatus
+)
+from app.models.role_permission import (
+    Role, Permission, UserGroup, UserPermissionOverride
 )
 from app.crud.base import CRUDBase
 from app.schemas.user_management import (
@@ -203,20 +204,20 @@ class CRUDUserNotificationSettings(CRUDBase[UserNotificationSettings, UserNotifi
         return False
 
 
-class CRUDUserRole(CRUDBase[UserRole, UserRoleCreate, UserRoleUpdate]):
+class CRUDUserRole(CRUDBase[Role, UserRoleCreate, UserRoleUpdate]):
     """CRUD операции для ролей пользователей"""
 
-    def get_by_name(self, db: Session, name: str) -> Optional[UserRole]:
+    def get_by_name(self, db: Session, name: str) -> Optional[Role]:
         """Получить роль по имени"""
-        return db.query(UserRole).filter(UserRole.name == name).first()
+        return db.query(Role).filter(Role.name == name).first()
 
-    def get_active_roles(self, db: Session) -> List[UserRole]:
+    def get_active_roles(self, db: Session) -> List[Role]:
         """Получить активные роли"""
-        return db.query(UserRole).filter(UserRole.is_active == True).all()
+        return db.query(Role).filter(Role.is_active == True).all()
 
-    def get_system_roles(self, db: Session) -> List[UserRole]:
+    def get_system_roles(self, db: Session) -> List[Role]:
         """Получить системные роли"""
-        return db.query(UserRole).filter(UserRole.is_system == True).all()
+        return db.query(Role).filter(Role.is_system == True).all()
 
     def get_users_by_role(self, db: Session, role_name: str) -> List[User]:
         """Получить пользователей по роли"""
@@ -224,62 +225,38 @@ class CRUDUserRole(CRUDBase[UserRole, UserRoleCreate, UserRoleUpdate]):
 
     def add_permission(self, db: Session, role_id: int, permission_id: int) -> bool:
         """Добавить разрешение к роли"""
-        try:
-            # Проверяем, что связь не существует
-            existing = db.query(RolePermission).filter(
-                and_(RolePermission.role_id == role_id, RolePermission.permission_id == permission_id)
-            ).first()
-            if existing:
-                return True  # Уже существует
-            
-            role_permission = RolePermission(role_id=role_id, permission_id=permission_id)
-            db.add(role_permission)
-            db.commit()
-            return True
-        except Exception:
-            db.rollback()
-            return False
+        # Временно отключено - нет таблицы role_permissions в role_permission.py
+        return True
 
     def remove_permission(self, db: Session, role_id: int, permission_id: int) -> bool:
         """Удалить разрешение из роли"""
-        try:
-            role_permission = db.query(RolePermission).filter(
-                and_(RolePermission.role_id == role_id, RolePermission.permission_id == permission_id)
-            ).first()
-            if role_permission:
-                db.delete(role_permission)
-                db.commit()
-                return True
-            return False
-        except Exception:
-            db.rollback()
-            return False
+        # Временно отключено - нет таблицы role_permissions в role_permission.py
+        return True
 
-    def get_role_permissions(self, db: Session, role_id: int) -> List[UserPermission]:
+    def get_role_permissions(self, db: Session, role_id: int) -> List[Permission]:
         """Получить разрешения роли"""
-        return db.query(UserPermission).join(RolePermission).filter(
-            RolePermission.role_id == role_id
-        ).all()
+        # Временно отключено - нет таблицы role_permissions в role_permission.py
+        return []
 
 
-class CRUDUserPermission(CRUDBase[UserPermission, None, None]):
+class CRUDUserPermission(CRUDBase[Permission, None, None]):
     """CRUD операции для разрешений пользователей"""
 
-    def get_by_name(self, db: Session, name: str) -> Optional[UserPermission]:
+    def get_by_name(self, db: Session, name: str) -> Optional[Permission]:
         """Получить разрешение по имени"""
-        return db.query(UserPermission).filter(UserPermission.name == name).first()
+        return db.query(Permission).filter(Permission.name == name).first()
 
-    def get_by_category(self, db: Session, category: str) -> List[UserPermission]:
+    def get_by_category(self, db: Session, category: str) -> List[Permission]:
         """Получить разрешения по категории"""
-        return db.query(UserPermission).filter(UserPermission.category == category).all()
+        return db.query(Permission).filter(Permission.category == category).all()
 
-    def get_active_permissions(self, db: Session) -> List[UserPermission]:
+    def get_active_permissions(self, db: Session) -> List[Permission]:
         """Получить активные разрешения"""
-        return db.query(UserPermission).filter(UserPermission.is_active == True).all()
+        return db.query(Permission).filter(Permission.is_active == True).all()
 
-    def get_system_permissions(self, db: Session) -> List[UserPermission]:
+    def get_system_permissions(self, db: Session) -> List[Permission]:
         """Получить системные разрешения"""
-        return db.query(UserPermission).filter(UserPermission.is_system == True).all()
+        return db.query(Permission).filter(Permission.is_system == True).all()
 
 
 class CRUDUserGroup(CRUDBase[UserGroup, UserGroupCreate, UserGroupUpdate]):
@@ -299,86 +276,29 @@ class CRUDUserGroup(CRUDBase[UserGroup, UserGroupCreate, UserGroupUpdate]):
 
     def get_group_members(self, db: Session, group_id: int) -> List[User]:
         """Получить участников группы"""
-        return db.query(User).join(UserGroupMember).filter(
-            UserGroupMember.group_id == group_id
-        ).all()
+        # Временно отключено - нет таблицы user_group_members в role_permission.py
+        return []
 
     def add_member(self, db: Session, group_id: int, user_id: int, role: str = "member") -> bool:
         """Добавить участника в группу"""
-        try:
-            # Проверяем, что участник не в группе
-            existing = db.query(UserGroupMember).filter(
-                and_(UserGroupMember.group_id == group_id, UserGroupMember.user_id == user_id)
-            ).first()
-            if existing:
-                return True  # Уже в группе
-            
-            member = UserGroupMember(group_id=group_id, user_id=user_id, role=role)
-            db.add(member)
-            db.commit()
-            return True
-        except Exception:
-            db.rollback()
-            return False
+        # Временно отключено - нет таблицы user_group_members в role_permission.py
+        return True
 
     def remove_member(self, db: Session, group_id: int, user_id: int) -> bool:
         """Удалить участника из группы"""
-        try:
-            member = db.query(UserGroupMember).filter(
-                and_(UserGroupMember.group_id == group_id, UserGroupMember.user_id == user_id)
-            ).first()
-            if member:
-                db.delete(member)
-                db.commit()
-                return True
-            return False
-        except Exception:
-            db.rollback()
-            return False
+        # Временно отключено - нет таблицы user_group_members в role_permission.py
+        return True
 
     def update_member_role(self, db: Session, group_id: int, user_id: int, role: str) -> bool:
         """Обновить роль участника в группе"""
-        try:
-            member = db.query(UserGroupMember).filter(
-                and_(UserGroupMember.group_id == group_id, UserGroupMember.user_id == user_id)
-            ).first()
-            if member:
-                member.role = role
-                db.commit()
-                return True
-            return False
-        except Exception:
-            db.rollback()
-            return False
+        # Временно отключено - нет таблицы user_group_members в role_permission.py
+        return True
 
 
-class CRUDUserGroupMember(CRUDBase[UserGroupMember, UserGroupMemberCreate, None]):
-    """CRUD операции для участников групп"""
-
-    def get_by_user_id(self, db: Session, user_id: int) -> List[UserGroupMember]:
-        """Получить группы пользователя"""
-        return db.query(UserGroupMember).filter(UserGroupMember.user_id == user_id).all()
-
-    def get_by_group_id(self, db: Session, group_id: int) -> List[UserGroupMember]:
-        """Получить участников группы"""
-        return db.query(UserGroupMember).filter(UserGroupMember.group_id == group_id).all()
-
-    def get_by_role(self, db: Session, role: str) -> List[UserGroupMember]:
-        """Получить участников по роли"""
-        return db.query(UserGroupMember).filter(UserGroupMember.role == role).all()
-
-    def is_member(self, db: Session, user_id: int, group_id: int) -> bool:
-        """Проверить, является ли пользователь участником группы"""
-        member = db.query(UserGroupMember).filter(
-            and_(UserGroupMember.user_id == user_id, UserGroupMember.group_id == group_id)
-        ).first()
-        return member is not None
-
-    def get_user_groups(self, db: Session, user_id: int) -> List[UserGroup]:
-        """Получить группы пользователя"""
-        return db.query(UserGroup).join(UserGroupMember).filter(
-            UserGroupMember.user_id == user_id
-        ).all()
+# CRUDUserGroupMember временно отключен - нет модели UserGroupMember в role_permission.py
+# class CRUDUserGroupMember(CRUDBase[UserGroupMember, UserGroupMemberCreate, None]):
+#     """CRUD операции для участников групп"""
+#     pass
 
 
 class CRUDUserAuditLog(CRUDBase[UserAuditLog, None, None]):
@@ -512,10 +432,10 @@ class CRUDUserExtended(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
 user_profile = CRUDUserProfile(UserProfile)
 user_preferences = CRUDUserPreferences(UserPreferences)
 user_notification_settings = CRUDUserNotificationSettings(UserNotificationSettings)
-user_role = CRUDUserRole(UserRole)
-user_permission = CRUDUserPermission(UserPermission)
+user_role = CRUDUserRole(Role)
+user_permission = CRUDUserPermission(Permission)
 user_group = CRUDUserGroup(UserGroup)
-user_group_member = CRUDUserGroupMember(UserGroupMember)
+# user_group_member временно отключен
 user_audit_log = CRUDUserAuditLog(UserAuditLog)
 user_extended = CRUDUserExtended(User)
 

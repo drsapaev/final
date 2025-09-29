@@ -69,6 +69,7 @@ class UserProfileUpdate(UserProfileBase):
 
 class UserProfileResponse(UserProfileBase):
     """Схема ответа профиля пользователя"""
+    model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     id: int
     user_id: int
     phone_verified: bool
@@ -136,6 +137,7 @@ class UserPreferencesUpdate(UserPreferencesBase):
 
 class UserPreferencesResponse(UserPreferencesBase):
     """Схема ответа настроек пользователя"""
+    model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     id: int
     user_id: int
     profile_id: int
@@ -197,6 +199,7 @@ class UserNotificationSettingsUpdate(UserNotificationSettingsBase):
 
 class UserNotificationSettingsResponse(UserNotificationSettingsBase):
     """Схема ответа настроек уведомлений"""
+    model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     id: int
     user_id: int
     profile_id: int
@@ -407,7 +410,7 @@ class UserUpdateRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """Схема ответа пользователя"""
-    model_config = ConfigDict(protected_namespaces=())
+    model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     
     id: int
     username: str

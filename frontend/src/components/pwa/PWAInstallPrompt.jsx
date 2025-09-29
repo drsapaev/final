@@ -191,3 +191,4 @@ const PWAInstallPrompt = ({ onClose }) => {
 };
 
 export default PWAInstallPrompt;
+

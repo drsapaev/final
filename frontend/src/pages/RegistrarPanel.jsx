@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PhoneInput from '../components/ui/PhoneInput';
-import { Toaster, toast } from 'react-hot-toast';
+import { ToastContainer, toast } from 'react-toastify';
 // import ServiceChecklist from '../components/ServiceChecklist';
 import IntegratedServiceSelector from '../components/registrar/IntegratedServiceSelector';
 import IntegratedDoctorSelector from '../components/registrar/IntegratedDoctorSelector';
@@ -700,15 +700,18 @@ const RegistrarPanel = () => {
       
       // Загружаем врачей, услуги и настройки очередей из админ панели
       try {
+      const token = localStorage.getItem('auth_token');
+      console.log('🔍 RegistrarPanel: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
+
       const [doctorsRes, servicesRes, queueRes] = await Promise.all([
           fetch(`${API_BASE}/api/v1/registrar/doctors`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+          headers: { 'Authorization': `Bearer ${token}` }
         }),
           fetch(`${API_BASE}/api/v1/registrar/services`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+          headers: { 'Authorization': `Bearer ${token}` }
         }),
           fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+          headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
@@ -906,6 +909,7 @@ const RegistrarPanel = () => {
       
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
+      console.log('🔍 loadAppointments: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
       if (!token) {
         console.warn('Токен аутентификации отсутствует, используем демо-данные');
         // Применяем локальные оверрайды к демо-данным
@@ -930,6 +934,7 @@ const RegistrarPanel = () => {
         return;
       }
       
+      console.log('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
       const response = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?limit=50`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1875,7 +1880,7 @@ const RegistrarPanel = () => {
 
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
-      <Toaster position="bottom-right" />
+      <ToastContainer position="bottom-right" />
       {/* Фиксированная верхняя часть убрана - используется глобальный хедер */}
 
       {/* Skip to content link for screen readers */}

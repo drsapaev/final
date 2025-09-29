@@ -257,3 +257,4 @@ function RealtimeQueueComponent() {
 }
 
 export { NewPatientComponent, RealtimeQueueComponent };
+

@@ -136,3 +136,4 @@ const AnimatedToast = ({
 };
 
 export default AnimatedToast;
+

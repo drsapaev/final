@@ -634,3 +634,4 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
 };
 
 export default ProcedureTemplates;
+

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 import { 
   Download, 
   FileText, 
@@ -317,3 +317,4 @@ const DataExporter = ({
 };
 
 export default DataExporter;
+

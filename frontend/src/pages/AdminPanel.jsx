@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+// AdminPanel.jsx - Force cache refresh - Updated: 2025-01-26
+import React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -7,7 +9,8 @@ import {
   BarChart3, 
   Settings, 
   Shield, 
-  FileText, 
+  FileText,
+  Mic, 
   CreditCard,
   TrendingUp,
   AlertTriangle,
@@ -25,8 +28,15 @@ import {
   Plus,
   RefreshCw,
   Package,
+  Percent,
   Brain,
   MessageSquare,
+  Heart,
+  Pill,
+  ClipboardCheck,
+  Bot,
+  Bell,
+  Phone,
   Monitor,
   Key,
   DollarSign,
@@ -35,11 +45,13 @@ import {
   TrendingDown,
   XCircle,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Printer,
+  Server,
+  Database,
+  Stethoscope
 } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '../design-system/components';
-import { useBreakpoint, useTouchDevice } from '../design-system/hooks';
-import { useFade, useSlide, useScale } from '../design-system/hooks/useAnimation';
+import { Card, Badge, Button, Skeleton, useBreakpoint, useTouchDevice, useFade, useSlide, useScale } from '../components/ui/native';
 import { useTheme } from '../contexts/ThemeContext';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
@@ -85,6 +97,33 @@ import AllFreeApproval from '../components/admin/AllFreeApproval';
 import BenefitSettings from '../components/admin/BenefitSettings';
 import WizardSettings from '../components/admin/WizardSettings';
 import PaymentProviderSettings from '../components/admin/PaymentProviderSettings';
+import QueueLimitsManager from '../components/admin/QueueLimitsManager';
+import MedicalImageAnalyzer from '../components/ai/MedicalImageAnalyzer';
+import TreatmentRecommendations from '../components/ai/TreatmentRecommendations';
+import DrugInteractionChecker from '../components/ai/DrugInteractionChecker';
+import RiskAssessment from '../components/ai/RiskAssessment';
+import VoiceToText from '../components/ai/VoiceToText';
+import SmartScheduling from '../components/ai/SmartScheduling';
+import QualityControl from '../components/ai/QualityControl';
+import AnalyticsInsights from '../components/ai/AnalyticsInsights';
+import TelegramBotManager from '../components/admin/TelegramBotManager';
+import FCMManager from '../components/admin/FCMManager';
+import PhoneVerificationManager from '../components/admin/PhoneVerificationManager';
+import UserDataTransferManager from '../components/admin/UserDataTransferManager';
+import GroupPermissionsManager from '../components/admin/GroupPermissionsManager';
+import UserExportManager from '../components/admin/UserExportManager';
+import RegistrarNotificationManager from '../components/admin/RegistrarNotificationManager';
+import WaitTimeAnalytics from '../components/analytics/WaitTimeAnalytics';
+import AIAnalytics from '../components/analytics/AIAnalytics'; 
+import GraphQLExplorer from '../components/admin/GraphQLExplorer'; 
+import WebhookManager from '../components/admin/WebhookManager';
+import ReportsManager from '../components/admin/ReportsManager';
+import SystemManagement from '../components/admin/SystemManagement';
+import CloudPrintingManager from '../components/admin/CloudPrintingManager';
+import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
+import DynamicPricingManager from '../components/admin/DynamicPricingManager';
+import BillingManager from '../components/admin/BillingManager';
+import DiscountBenefitsManager from '../components/admin/DiscountBenefitsManager';
 import { useAdminHotkeys } from '../hooks/useHotkeys';
 import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
@@ -169,6 +208,8 @@ const AdminPanel = () => {
     setFilterRole,
     filterStatus,
     setFilterStatus,
+    pagination,
+    changePage,
     createUser,
     updateUser,
     deleteUser
@@ -651,24 +692,22 @@ const AdminPanel = () => {
 
   const getRoleLabel = (role) => {
     const roleMap = {
-      admin: 'Администратор',
-      doctor: 'Врач',
-      registrar: 'Регистратор',
-      cashier: 'Кассир',
-      lab: 'Лаборант',
-      user: 'Пользователь'
+      Admin: 'Администратор',
+      Doctor: 'Врач',
+      Nurse: 'Медсестра',
+      Receptionist: 'Регистратор',
+      Patient: 'Пациент'
     };
     return roleMap[role] || role;
   };
 
+  const getUserStatusLabel = (status) => {
+    return status ? 'Активен' : 'Неактивен';
+  };
 
-  const getStatusColor = (status) => {
-    const colorMap = {
-      active: 'var(--success-color)',
-      inactive: 'var(--warning-color)',
-      blocked: 'var(--danger-color)'
-    };
-    return colorMap[status] || 'var(--text-tertiary)';
+
+  const getStatusColor = (isActive) => {
+    return isActive ? 'var(--success-color)' : 'var(--warning-color)';
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для врачей с универсальным хуком
@@ -969,7 +1008,18 @@ const AdminPanel = () => {
       title: 'Обзор',
       items: [
         { to: '/admin', label: 'Дашборд', icon: BarChart3 },
-        { to: '/admin/analytics', label: 'Аналитика', icon: TrendingUp }
+        { to: '/admin/analytics', label: 'Аналитика', icon: TrendingUp },
+        { to: '/admin/wait-time-analytics', label: 'Время ожидания', icon: Clock },
+        { to: '/admin/ai-analytics', label: 'AI Аналитика', icon: Brain },
+        { to: '/admin/webhooks', label: 'Webhook\'и', icon: Globe },
+        { to: '/admin/reports', label: 'Отчеты', icon: FileText },
+        { to: '/admin/system', label: 'Система', icon: Server },
+        { to: '/admin/cloud-printing', label: 'Облачная печать', icon: Printer },
+              { to: '/admin/medical-equipment', label: 'Медицинское оборудование', icon: Stethoscope },
+              { to: '/admin/dynamic-pricing', label: 'Динамическое ценообразование', icon: Package },
+              { to: '/admin/billing', label: 'Биллинг и счета', icon: Receipt },
+              { to: '/admin/discount-benefits', label: 'Скидки и льготы', icon: Percent },
+              { to: '/admin/graphql-explorer', label: 'GraphQL API', icon: Database }
       ]
     },
     {
@@ -992,7 +1042,23 @@ const AdminPanel = () => {
         { to: '/admin/clinic-management', label: 'Управление клиникой', icon: Building2 },
         { to: '/admin/clinic-settings', label: 'Настройки клиники', icon: Settings },
         { to: '/admin/queue-settings', label: 'Настройки очередей', icon: Clock },
+        { to: '/admin/queue-limits', label: 'Лимиты очередей', icon: Shield },
+        { to: '/admin/ai-imaging', label: 'AI Анализ изображений', icon: Brain },
+        { to: '/admin/treatment-recommendations', label: 'AI Рекомендации лечения', icon: Heart },
+        { to: '/admin/drug-interactions', label: 'AI Проверка взаимодействий', icon: Pill },
+        { to: '/admin/risk-assessment', label: 'AI Оценка рисков', icon: Shield },
+        { to: '/admin/voice-to-text', label: 'AI Голосовой ввод', icon: Mic },
+        { to: '/admin/smart-scheduling', label: 'AI Умное планирование', icon: Calendar },
+        { to: '/admin/quality-control', label: 'AI Контроль качества', icon: ClipboardCheck },
+        { to: '/admin/analytics-insights', label: 'AI Аналитические инсайты', icon: TrendingUp },
         { to: '/admin/ai-settings', label: 'AI настройки', icon: Brain },
+        { to: '/admin/telegram-bot', label: 'Telegram бот', icon: Bot },
+        { to: '/admin/fcm-notifications', label: 'FCM Push уведомления', icon: Bell },
+        { to: '/admin/phone-verification', label: 'Верификация телефонов', icon: Phone },
+                { to: '/admin/user-data-transfer', label: 'Передача данных пользователей', icon: Users },
+                { to: '/admin/group-permissions', label: 'Разрешения групп', icon: Shield },
+                { to: '/admin/user-export', label: 'Экспорт пользователей', icon: Download },
+                { to: '/admin/registrar-notifications', label: 'Уведомления регистратуры', icon: Bell },
         { to: '/admin/telegram-settings', label: 'Telegram', icon: MessageSquare },
         { to: '/admin/display-settings', label: 'Управление табло', icon: Monitor },
         { to: '/admin/activation', label: 'Система активации', icon: Key },
@@ -1209,12 +1275,11 @@ const AdminPanel = () => {
             style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
           >
             <option value="">Все роли</option>
-            <option value="admin">Администратор</option>
-            <option value="doctor">Врач</option>
-            <option value="registrar">Регистратор</option>
-            <option value="cashier">Кассир</option>
-            <option value="lab">Лаборант</option>
-            <option value="user">Пользователь</option>
+            <option value="Admin">Администратор</option>
+            <option value="Doctor">Врач</option>
+            <option value="Nurse">Медсестра</option>
+            <option value="Receptionist">Регистратор</option>
+            <option value="Patient">Пациент</option>
           </select>
           <select
             value={filterStatus}
@@ -1223,9 +1288,8 @@ const AdminPanel = () => {
             style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
           >
             <option value="">Все статусы</option>
-            <option value="active">Активен</option>
-            <option value="inactive">Неактивен</option>
-            <option value="blocked">Заблокирован</option>
+            <option value="true">Активен</option>
+            <option value="false">Неактивен</option>
           </select>
         </div>
 
@@ -1278,31 +1342,33 @@ const AdminPanel = () => {
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
                           <span className="text-white text-sm font-medium">
-                            {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            {(user.profile?.full_name || user.full_name || user.username || 'U').split(' ').map(n => n[0]).join('').toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{user.name}</p>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {user.profile?.full_name || user.full_name || user.username}
+                          </p>
                           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{user.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-4">
                       <Badge 
-                        variant={user.role === 'admin' ? 'error' : user.role === 'doctor' ? 'success' : 'info'}
+                        variant={user.role === 'Admin' ? 'error' : user.role === 'Doctor' ? 'success' : 'info'}
                       >
                         {getRoleLabel(user.role)}
                       </Badge>
                     </td>
                     <td className="py-3 px-4">
                       <Badge 
-                        variant={user.status === 'active' ? 'success' : user.status === 'inactive' ? 'warning' : 'error'}
+                        variant={user.is_active ? 'success' : 'warning'}
                       >
-                        {getStatusLabel(user.status)}
+                        {getUserStatusLabel(user.is_active)}
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {user.lastLogin}
+                      {user.profile?.last_login ? new Date(user.profile.last_login).toLocaleString('ru-RU') : 'Никогда'}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center space-x-2">
@@ -1330,6 +1396,68 @@ const AdminPanel = () => {
             </table>
           )}
         </div>
+
+        {/* Пагинация */}
+        {pagination.total_pages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Показано {((pagination.page - 1) * pagination.per_page) + 1}-{Math.min(pagination.page * pagination.per_page, pagination.total)} из {pagination.total} пользователей
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => changePage(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className="px-3 py-1"
+              >
+                Назад
+              </Button>
+              
+              {/* Номера страниц */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.total_pages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.total_pages - 2) {
+                    pageNum = pagination.total_pages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => changePage(pageNum)}
+                      className={`px-3 py-1 rounded ${
+                        pageNum === pagination.page
+                          ? 'bg-blue-500 text-white'
+                          : 'hover:bg-gray-100'
+                      }`}
+                      style={{
+                        background: pageNum === pagination.page ? 'var(--accent-color)' : 'transparent',
+                        color: pageNum === pagination.page ? 'white' : 'var(--text-primary)'
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                onClick={() => changePage(pagination.page + 1)}
+                disabled={pagination.page >= pagination.total_pages}
+                className="px-3 py-1"
+              >
+                Далее
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пользователя с универсальным хуком */}
@@ -1526,6 +1654,58 @@ const AdminPanel = () => {
         return <ClinicSettings />;
       case 'queue-settings':
         return <QueueSettings />;
+      case 'queue-limits':
+        return <QueueLimitsManager />;
+      case 'ai-imaging':
+        return <MedicalImageAnalyzer />;
+      case 'treatment-recommendations':
+        return <TreatmentRecommendations />;
+      case 'drug-interactions':
+        return <DrugInteractionChecker />;
+      case 'risk-assessment':
+        return <RiskAssessment />;
+      case 'voice-to-text':
+        return <VoiceToText />;
+        case 'smart-scheduling':
+          return <SmartScheduling />;
+        case 'quality-control':
+          return <QualityControl />;
+      case 'analytics-insights':
+        return <AnalyticsInsights />;
+      case 'telegram-bot':
+        return <TelegramBotManager />;
+      case 'fcm-notifications':
+        return <FCMManager />;
+      case 'phone-verification':
+        return <PhoneVerificationManager />;
+      case 'user-data-transfer':
+        return <UserDataTransferManager />;
+      case 'group-permissions':
+        return <GroupPermissionsManager />;
+      case 'user-export':
+        return <UserExportManager />;
+      case 'registrar-notifications':
+        return <RegistrarNotificationManager />;
+      case 'wait-time-analytics':
+        return <WaitTimeAnalytics />;
+      case 'ai-analytics':
+        return <AIAnalytics />;
+      case 'webhooks':
+        return <WebhookManager />;
+      case 'system':
+        return <SystemManagement />;
+      case 'cloud-printing':
+        return <CloudPrintingManager />;
+        case 'medical-equipment':
+          return <MedicalEquipmentManager />;
+        case 'dynamic-pricing':
+          return <DynamicPricingManager />;
+        case 'billing':
+          return <BillingManager />;
+        case 'discount-benefits':
+          return <DiscountBenefitsManager />;
+        case 'graphql-explorer':
+          return <GraphQLExplorer />;
       case 'services':
         return <ServiceCatalog />;
       case 'ai-settings':

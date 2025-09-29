@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, ChevronLeft, Search, Plus } from 'lucide-react';
-import { Button } from '../../design-system/components';
+import { Button } from '../ui/native';
 
 /**
  * Компонент для оптимизации админ панели на мобильных устройствах
@@ -248,3 +248,4 @@ export const useScreenSize = () => {
 };
 
 export default { MobileNavigation, ResponsiveTable, MobileQuickActions, useScreenSize };
+

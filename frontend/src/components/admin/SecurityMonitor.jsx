@@ -20,7 +20,7 @@ import {
   TrendingUp,
   TrendingDown
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const SecurityMonitor = ({ 
   data = {},
@@ -682,3 +682,4 @@ const SecurityMonitor = ({
 };
 
 export default SecurityMonitor;
+

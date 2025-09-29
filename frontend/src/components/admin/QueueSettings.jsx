@@ -15,7 +15,7 @@ import {
   QrCode,
   Play
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const QueueSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -427,3 +427,4 @@ const QueueSettings = () => {
 };
 
 export default QueueSettings;
+

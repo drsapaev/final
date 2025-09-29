@@ -304,3 +304,4 @@ export function UserInfo({ profile = null, showRoles = true, showPermissions = f
     </div>
   );
 }
+

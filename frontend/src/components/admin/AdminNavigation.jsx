@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Button } from '../../design-system/components';
-import { useFade, useSlide } from '../../design-system/hooks/useAnimation';
+import { Button, useFade, useSlide } from '../ui/native';
 
 const AdminNavigation = ({ sections = [] }) => {
   const location = useLocation();
@@ -85,3 +84,4 @@ const AdminNavigation = ({ sections = [] }) => {
 };
 
 export default AdminNavigation;
+

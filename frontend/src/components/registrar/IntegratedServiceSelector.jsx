@@ -12,7 +12,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
-import { Card, Badge } from '../../design-system/components';
+import { Card, Badge } from '../ui/native';
 
 /**
  * Интегрированный селектор услуг для регистратуры
@@ -465,3 +465,4 @@ const IntegratedServiceSelector = ({
 };
 
 export default IntegratedServiceSelector;
+

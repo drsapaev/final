@@ -14,7 +14,7 @@ import {
   Database,
   Save
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 import BranchManagement from './BranchManagement';
 import EquipmentManagement from './EquipmentManagement';
 import LicenseManagement from './LicenseManagement';
@@ -384,3 +384,4 @@ const ClinicManagement = () => {
 };
 
 export default ClinicManagement;
+

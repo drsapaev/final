@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+from app.models.role_permission import user_roles_table, user_groups_table
 
 
 class User(Base):
@@ -45,9 +46,29 @@ class User(Base):
     # Связь с пациентом
     patient: Mapped[Optional["Patient"]] = relationship("Patient", back_populates="user", uselist=False, cascade="all, delete-orphan")
     
-    # Роли и группы
-    # user_role: Mapped[Optional["UserRole"]] = relationship("UserRole", back_populates="users")  # Временно отключено - нет внешнего ключа
-    # groups: Mapped[List["UserGroup"]] = relationship("UserGroup", secondary="user_group_members", back_populates="users")  # Временно отключено
+    # Роли и группы (через единые M2M таблицы)
+    roles: Mapped[List["Role"]] = relationship(
+        "Role",
+        secondary=user_roles_table,
+        primaryjoin=lambda: User.id == user_roles_table.c.user_id,
+        secondaryjoin=lambda: __import__('app').models.role_permission.Role.id == user_roles_table.c.role_id,
+        viewonly=False
+    )
+    groups: Mapped[List["UserGroup"]] = relationship(
+        "UserGroup",
+        secondary=user_groups_table,
+        primaryjoin=lambda: User.id == user_groups_table.c.user_id,
+        secondaryjoin=lambda: __import__('app').models.role_permission.UserGroup.id == user_groups_table.c.group_id,
+        viewonly=False
+    )
+    
+    # Переопределения разрешений
+    permission_overrides: Mapped[List["UserPermissionOverride"]] = relationship(
+        "UserPermissionOverride", 
+        foreign_keys="UserPermissionOverride.user_id",
+        back_populates="user", 
+        cascade="all, delete-orphan"
+    )
     # group_memberships: Mapped[List["UserGroupMember"]] = relationship("UserGroupMember", back_populates="user", cascade="all, delete-orphan")  # Временно отключено
     
     # Аудит

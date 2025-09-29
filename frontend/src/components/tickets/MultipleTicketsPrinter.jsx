@@ -198,3 +198,4 @@ const MultipleTicketsPrinter = ({ tickets, onClose, onAllPrinted }) => {
 };
 
 export default MultipleTicketsPrinter;
+

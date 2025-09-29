@@ -847,3 +847,4 @@ const PatientCard = ({
 };
 
 export default PatientCard;
+

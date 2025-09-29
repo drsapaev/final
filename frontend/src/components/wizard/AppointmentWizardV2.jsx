@@ -16,7 +16,7 @@ import {
   List,
   ChevronDown
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import ModernDialog from '../dialogs/ModernDialog';
 // Импорты PaymentClick и PaymentPayMe убраны
 import './AppointmentWizardV2.css';
@@ -1330,3 +1330,4 @@ const getDoctorCategoryCode = (specialty) => {
 
 
 export default AppointmentWizardV2;
+

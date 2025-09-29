@@ -1,13 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Button, 
-  Card, 
-  Badge, 
-  Skeleton, 
-  AnimatedTransition,
-  useBreakpoint,
-  useTouchDevice
-} from '../design-system';
 import { useTheme } from '../contexts/ThemeContext';
 import auth from '../stores/auth.js';
 import AIAssistant from '../components/ai/AIAssistant';

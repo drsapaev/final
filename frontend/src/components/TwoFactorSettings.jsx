@@ -563,3 +563,4 @@ const TwoFactorSettings = () => {
 };
 
 export default TwoFactorSettings;
+

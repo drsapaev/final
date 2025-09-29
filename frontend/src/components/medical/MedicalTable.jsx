@@ -274,3 +274,4 @@ const MedicalTable = ({
 };
 
 export default MedicalTable;
+

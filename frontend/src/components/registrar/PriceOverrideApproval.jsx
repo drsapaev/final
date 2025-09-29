@@ -12,7 +12,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
 
@@ -373,3 +373,4 @@ const PriceOverrideApproval = () => {
 };
 
 export default PriceOverrideApproval;
+
