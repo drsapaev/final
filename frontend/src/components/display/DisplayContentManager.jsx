@@ -13,7 +13,7 @@ import {
   Volume2,
   Monitor
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 /**
  * Управление контентом для табло
@@ -391,4 +391,5 @@ const DisplayContentManager = ({
 };
 
 export default DisplayContentManager;
+
 

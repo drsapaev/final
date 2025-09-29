@@ -13,7 +13,7 @@ import {
   Hash,
   Activity
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 /**
  * Панель очереди для врача - показывает пациентов из регистратуры
@@ -520,3 +520,4 @@ const DoctorQueuePanel = ({
 };
 
 export default DoctorQueuePanel;
+

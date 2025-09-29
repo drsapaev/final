@@ -20,7 +20,7 @@ import {
   Clock,
   TrendingUp
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const AISettings = () => {
   const [loading, setLoading] = useState(true);
@@ -716,3 +716,4 @@ const SystemSettingsForm = ({ settings, onSave }) => {
 };
 
 export default AISettings;
+

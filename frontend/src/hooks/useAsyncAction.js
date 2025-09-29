@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { toast } from 'react-hot-toast';
+import React, { useState, useCallback } from 'react';
+import { toast } from 'react-toastify';
 
 /**
  * Универсальный хук для async действий с обработкой ошибок

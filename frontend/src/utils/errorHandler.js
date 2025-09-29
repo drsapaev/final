@@ -2,7 +2,7 @@
  * Централизованная система обработки ошибок
  */
 
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 /**
  * Типы ошибок
@@ -39,7 +39,7 @@ export function getErrorType(error) {
   }
 
   const status = error.response.status;
-
+  
   switch (status) {
     case HTTP_STATUS.UNAUTHORIZED:
       return ERROR_TYPES.AUTHENTICATION;

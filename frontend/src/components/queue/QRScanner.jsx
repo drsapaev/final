@@ -292,3 +292,4 @@ const QRScanner = ({ open, onClose, onScan }) => {
 };
 
 export default QRScanner;
+

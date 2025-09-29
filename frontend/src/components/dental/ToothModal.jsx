@@ -406,3 +406,4 @@ const ToothModal = ({
 };
 
 export default ToothModal;
+

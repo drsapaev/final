@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api, apiRequest } from '../api/client';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 /**
  * Хук для выполнения API запросов с состоянием загрузки
@@ -239,7 +239,12 @@ export function useWebSocket(url, options = {}) {
   const connect = useCallback(() => {
     if (socket) return;
 
-    const ws = new WebSocket(url);
+    // Добавляем токен аутентификации к URL
+    const token = localStorage.getItem('access_token');
+    const separator = url.includes('?') ? '&' : '?';
+    const authenticatedUrl = token ? `${url}${separator}token=${encodeURIComponent(token)}` : url;
+
+    const ws = new WebSocket(authenticatedUrl);
     
     ws.onopen = () => {
       setConnected(true);

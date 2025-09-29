@@ -16,7 +16,7 @@ import {
   Edit,
   Ban
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const SecuritySettings = ({ 
   settings = {},
@@ -753,3 +753,4 @@ const SecuritySettings = ({
 };
 
 export default SecuritySettings;
+

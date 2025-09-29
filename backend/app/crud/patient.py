@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import CRUDBase
 from app.models.patient import Patient
+from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientUpdate
 
 
@@ -104,3 +105,26 @@ patient = CRUDPatient(Patient)
 def get_patient_by_user_id(db: Session, user_id: int) -> Optional[Patient]:
     """Получить пациента по ID пользователя"""
     return db.query(Patient).filter(Patient.user_id == user_id).first()
+
+
+def create_patient_from_user(db: Session, user: User) -> Patient:
+    """Создать профиль пациента из данных пользователя"""
+    # Парсим ФИО пользователя
+    full_name_parts = user.full_name.split() if user.full_name else ["", "", ""]
+    
+    patient_data = {
+        "user_id": user.id,
+        "first_name": full_name_parts[1] if len(full_name_parts) > 1 else "",
+        "last_name": full_name_parts[0] if len(full_name_parts) > 0 else "",
+        "middle_name": full_name_parts[2] if len(full_name_parts) > 2 else "",
+        "phone": user.phone,
+        "email": user.email,
+        "created_at": datetime.utcnow()
+    }
+    
+    patient = Patient(**patient_data)
+    db.add(patient)
+    db.commit()
+    db.refresh(patient)
+    
+    return patient

@@ -9,7 +9,7 @@ import {
   CheckCircle,
   RefreshCw
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 /**
  * Диалог печати с выбором принтера и предварительным просмотром
@@ -330,3 +330,4 @@ const PrintDialog = ({
 };
 
 export default PrintDialog;
+

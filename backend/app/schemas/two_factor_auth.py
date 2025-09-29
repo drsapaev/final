@@ -192,6 +192,8 @@ class TwoFactorVerifyRequest(BaseModel):
     recovery_token: Optional[str] = Field(None, min_length=32, max_length=64)
     device_fingerprint: Optional[str] = None
     remember_device: bool = False
+    # Для блокирующего флоу входа (нет access токена до подтверждения)
+    pending_2fa_token: Optional[str] = None
 
 
 class TwoFactorDisableRequest(BaseModel):
@@ -248,6 +250,11 @@ class TwoFactorVerifyResponse(BaseModel):
     session_token: Optional[str] = None
     device_trusted: bool = False
     backup_codes_remaining: Optional[int] = None
+    # Для завершения логина, если сервер обменял pending_2fa_token на токены
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = None
+    expires_in: Optional[int] = None
 
 
 class TwoFactorRecoveryResponse(BaseModel):

@@ -1,11 +1,26 @@
-// Экспорт компонентов из дизайн-системы
-export { Button, Card, Badge, Skeleton, AnimatedTransition } from '../../design-system/components';
-export { useBreakpoint, useTouchDevice, useTheme } from '../../design-system/hooks';
+/**
+ * UI компоненты - переход на нативные компоненты
+ * Все основные компоненты теперь в ui/native/
+ */
 
-// Экспорт существующих компонентов
-export { default as ResponsiveTable } from '../ResponsiveTable';
-export { default as ResponsiveNavigation } from '../layout/ResponsiveNavigation';
-export { default as ResponsiveModal } from '../ResponsiveModal';
-export { default as ResponsiveForm } from '../forms/ResponsiveForm';
-export { default as AnimatedToast } from '../AnimatedToast';
+// Экспортируем все нативные компоненты
+export * from './native';
+
+// Специализированные компоненты, которые остаются в ui/
+export { default as PhoneInput } from './PhoneInput';
+
+// Компоненты из других папок
 export { default as AnimatedLoader } from '../AnimatedLoader';
+export { default as AnimatedToast } from '../AnimatedToast';
+
+// Для обратной совместимости - алиасы на нативные компоненты
+export { 
+  Button as UIButton,
+  Card as UICard,
+  Badge as UIBadge,
+  Input as UIInput,
+  Select as UISelect,
+  Label as UILabel,
+  Textarea as UITextarea,
+  Skeleton as UISkeleton
+} from './native';

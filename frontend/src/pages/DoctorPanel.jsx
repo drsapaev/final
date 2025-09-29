@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
-import { 
-  Button, 
-  Card, 
-  Badge, 
-  Skeleton, 
-  AnimatedTransition,
-  useBreakpoint,
-  useTouchDevice
-} from '../design-system';
 import { useTheme } from '../contexts/ThemeContext';
 import AIAssistant from '../components/ai/AIAssistant';
 import { 
@@ -40,8 +31,15 @@ import {
 } from 'lucide-react';
 import '../styles/animations.css';
 
+// UI компоненты
+import Button from '../components/ui/native/Button';
+import Card from '../components/ui/native/Card';
+import Badge from '../components/ui/native/Badge';
+import AnimatedTransition from '../components/ui/native/AnimatedTransition';
+
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal';
+import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 
 const DoctorPanel = () => {

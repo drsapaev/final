@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle, Heart } from 'lucide-react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 
 const PatientModal = ({ 
   isOpen, 
@@ -676,3 +676,4 @@ const PatientModal = ({
 };
 
 export default PatientModal;
+

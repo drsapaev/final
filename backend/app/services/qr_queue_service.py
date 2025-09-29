@@ -576,11 +576,26 @@ class QRQueueService:
         # Проверяем время начала (по умолчанию 07:00)
         start_time = getattr(daily_queue, 'online_start_time', '07:00')
         if current_time < start_time:
+            # Вычисляем время до открытия
+            start_hour, start_minute = map(int, start_time.split(':'))
+            start_datetime = now.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+            
+            # Если время уже прошло сегодня, значит открытие завтра
+            if start_datetime <= now:
+                start_datetime = start_datetime.replace(day=start_datetime.day + 1)
+            
+            time_until_open = start_datetime - now
+            minutes_until_open = int(time_until_open.total_seconds() / 60)
+            
             return {
                 "allowed": False,
                 "message": f"Запись откроется в {start_time}",
                 "status": "before_start_time",
-                "start_time": start_time
+                "start_time": start_time,
+                "current_time": current_time,
+                "minutes_until_open": minutes_until_open,
+                "opens_at_datetime": start_datetime.isoformat(),
+                "countdown_text": f"Откроется через {minutes_until_open} мин"
             }
         
         # Проверяем время окончания (по умолчанию 09:00)

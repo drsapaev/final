@@ -379,3 +379,4 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
 };
 
 export default TeethChart;
+

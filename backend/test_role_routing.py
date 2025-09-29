@@ -7,7 +7,7 @@ import sys
 
 import requests
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "http://127.0.0.1:8003"
 
 
 def test_user_login_and_role(username, password, expected_role, expected_redirect=None):
@@ -15,11 +15,11 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
     print(f"Тестируем пользователя: {username}")
 
     # Логин
-    login_url = f"{BASE_URL}/api/v1/auth/login"
+    login_url = f"{BASE_URL}/api/v1/authentication/login"
     login_data = {"username": username, "password": password, "grant_type": "password"}
 
     try:
-        response = requests.post(login_url, data=login_data)
+        response = requests.post(login_url, json=login_data)
         if response.status_code != 200:
             print(f"ОШИБКА: Логин не удался: {response.status_code}")
             return False
@@ -31,7 +31,7 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
             return False
 
         # Получение профиля
-        profile_url = f"{BASE_URL}/api/v1/auth/me"
+        profile_url = f"{BASE_URL}/api/v1/authentication/profile"
         headers = {"Authorization": f"Bearer {token}"}
         profile_response = requests.get(profile_url, headers=headers)
 
@@ -106,7 +106,7 @@ def test_api_endpoints_access():
 
     # Получаем токен админа
     login_data = {"username": "admin", "password": "admin123", "grant_type": "password"}
-    response = requests.post(f"{BASE_URL}/api/v1/auth/login", data=login_data)
+    response = requests.post(f"{BASE_URL}/api/v1/authentication/login", json=login_data)
     if response.status_code != 200:
         print("ОШИБКА: Не удалось получить токен админа")
         return False

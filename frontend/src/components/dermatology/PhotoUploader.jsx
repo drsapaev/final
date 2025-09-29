@@ -652,3 +652,4 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
 };
 
 export default PhotoUploader;
+

@@ -1,0 +1,249 @@
+/* Исправления отображения после отката миграции */
+
+/* Базовые стили для html и body */
+html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #1e293b);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Исправления для root контейнера */
+#root {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Исправления для MUI Box компонентов */
+.MuiBox-root {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  width: 100% !important;
+}
+
+/* Исправления для MUI Chip - возвращаем нормальный размер */
+.MuiChip-root {
+  height: auto !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.4 !important;
+}
+
+.MuiChip-sizeSmall {
+  height: 24px !important;
+  font-size: 0.75rem !important;
+}
+
+.MuiChip-label {
+  padding: 0 8px !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+.MuiChip-labelSmall {
+  padding: 0 6px !important;
+  font-size: 0.75rem !important;
+}
+
+.MuiChip-icon {
+  width: 18px !important;
+  height: 18px !important;
+  margin-left: 4px !important;
+  margin-right: -6px !important;
+}
+
+.MuiChip-iconSmall {
+  width: 16px !important;
+  height: 16px !important;
+  margin-left: 4px !important;
+  margin-right: -4px !important;
+}
+
+/* Исправления для основных контейнеров */
+.css-axw7ok,
+.css-1uqhpru,
+.css-k008qs {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  width: 100% !important;
+  background-color: var(--bg-primary, #ffffff) !important;
+  color: var(--text-primary, #1e293b) !important;
+}
+
+/* Исправления для панелей */
+.panel-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #1e293b);
+}
+
+/* Исправления для карточек */
+.card-container {
+  background-color: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+/* Исправления для кнопок */
+.btn-primary {
+  background-color: var(--accent-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-color, #2563eb);
+  transform: translateY(-1px);
+}
+
+/* Исправления для текста */
+.text-primary {
+  color: var(--text-primary, #1e293b);
+}
+
+.text-secondary {
+  color: var(--text-secondary, #64748b);
+}
+
+/* Исправления для темной темы */
+[data-theme="dark"] {
+  background-color: var(--bg-primary, #0f172a);
+  color: var(--text-primary, #f8fafc);
+}
+
+[data-theme="dark"] .MuiBox-root,
+[data-theme="dark"] .css-axw7ok,
+[data-theme="dark"] .css-1uqhpru,
+[data-theme="dark"] .css-k008qs {
+  background-color: var(--bg-primary, #0f172a) !important;
+  color: var(--text-primary, #f8fafc) !important;
+}
+
+/* Исправления для скроллбара */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary, #f8fafc);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color, #e2e8f0);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary, #64748b);
+}
+
+/* Исправления для анимаций */
+* {
+  box-sizing: border-box;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Исправления CSS конфликтов после миграции */
+
+/* Предотвращение конфликтов border shorthand */
+.modern-tabs .tabs-container {
+  border-top: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-bottom: none !important;
+}
+
+.modern-tabs.dark .tabs-container {
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: none !important;
+}
+
+/* Исправления для форм и инпутов с конфликтами */
+.form-input-conflict-fix {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: #d1d5db !important;
+  border-radius: 4px !important;
+}
+
+/* Исправления для карточек и панелей с конфликтами */
+.card-border-conflict-fix {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: #e5e5e5 !important;
+  border-radius: 8px !important;
+}
+
+/* Исправления для таблиц с конфликтами */
+.table-border-conflict-fix {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: #eee !important;
+  border-radius: 12px !important;
+}
+
+/* Исправления для кнопок с конфликтами */
+.button-border-conflict-fix {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: #ddd !important;
+  border-radius: 8px !important;
+}
+
+/* Исправления для адаптивности */
+@media (max-width: 768px) {
+  .MuiBox-root,
+  .css-axw7ok,
+  .css-1uqhpru,
+  .css-k008qs {
+    padding: 8px !important;
+  }
+  
+  .panel-container {
+    padding: 8px !important;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100vw;
+  }
+}

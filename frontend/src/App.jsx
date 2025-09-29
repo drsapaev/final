@@ -3,8 +3,10 @@ import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt, ConnectionStatus } from './components/pwa';
 import { usePWA } from './hooks/usePWA.js';
+import { ThemeProvider } from './theme';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
+import './styles/global-fixes.css';
 
 // Временно переключаемся на новый хедер (старый оставляем для сравнения)
 import HeaderNew from './components/layout/HeaderNew.jsx';
@@ -33,6 +35,8 @@ import PatientPanel from './pages/PatientPanel.jsx';
 import DisplayBoardUnified from './pages/DisplayBoardUnified.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import MediLabDemo from './pages/MediLabDemo.jsx';
+import QueueReorderDemo from './components/QueueReorderDemo';
+import CSSTestPage from './pages/CSSTestPage';
 import PaymentSuccess from './pages/PaymentSuccess.jsx';
 import PaymentCancel from './pages/PaymentCancel.jsx';
 import PaymentTest from './pages/PaymentTest.jsx';
@@ -109,11 +113,13 @@ function AppContent() {
       <ConnectionStatus />
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/new-login" element={<LoginFormStyled />} />
+      <Route path="/login" element={<LoginFormStyled />} />
+      <Route path="/old-login" element={<Login />} />
       <Route path="/health" element={<Health />} />
       <Route path="/" element={<Landing />} />
-      <Route path="/medilab-demo" element={<MediLabDemo />} />
+          <Route path="/medilab-demo" element={<MediLabDemo />} />
+          <Route path="/queue-reorder-demo" element={<QueueReorderDemo />} />
+          <Route path="/css-test" element={<CSSTestPage />} />
       <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
       <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
       <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
@@ -181,6 +187,7 @@ function AppContent() {
           {/* Демо интеграции */}
           <Route path="integration-demo"   element={<IntegrationDemo />} />
           
+          
           <Route path="*"             element={<Navigate to="/" replace />} />
         </Route>
       </Route>
@@ -192,9 +199,11 @@ function AppContent() {
 // Основной компонент App
 export default function App() {
   return (
-    <AppProviders>
-      <AppContent />
-    </AppProviders>
+    <ThemeProvider>
+      <AppProviders>
+        <AppContent />
+      </AppProviders>
+    </ThemeProvider>
   );
 }
 

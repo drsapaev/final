@@ -15,7 +15,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 /**
  * Селектор услуг для панели врача
@@ -362,3 +362,4 @@ const DoctorServiceSelector = ({
 };
 
 export default DoctorServiceSelector;
+

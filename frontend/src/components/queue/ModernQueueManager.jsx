@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import ModernDialog from '../dialogs/ModernDialog';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import './ModernQueueManager.css';
 
 const ModernQueueManager = ({
@@ -121,6 +121,10 @@ const ModernQueueManager = ({
         total_entries: queueStatus.entries.length,
         waiting_entries: queueStatus.queue_length,
         current_number: queueStatus.current_number,
+        online_start_time: queueStatus.online_start_time || '07:00',
+        online_end_time: queueStatus.online_end_time || '09:00',
+        current_time: queueStatus.current_time,
+        online_available: queueStatus.online_available,
         entries: queueStatus.entries.map(entry => ({
           id: entry.number,
           number: entry.number,
@@ -483,15 +487,26 @@ const ModernQueueManager = ({
           <h3 style={{ color: getColor('textPrimary') }}>
             {t.currentQueue}
             {queueData && (
-              <span 
-                className={`queue-status ${queueData.is_open ? 'open' : 'closed'}`}
-                style={{ 
-                  backgroundColor: queueData.is_open ? getColor('success') : getColor('warning'),
-                  color: 'white'
-                }}
-              >
-                {queueData.is_open ? t.receptionOpen : 'Онлайн-запись'}
-              </span>
+              <div className="queue-status-container">
+                <span 
+                  className={`queue-status ${queueData.is_open ? 'open' : 'closed'}`}
+                  style={{ 
+                    backgroundColor: queueData.is_open ? getColor('success') : 
+                                   queueData.online_available ? getColor('primary') : getColor('warning'),
+                    color: 'white'
+                  }}
+                >
+                  {queueData.is_open ? t.receptionOpen : 
+                   queueData.online_available ? 'Онлайн-запись открыта' : 
+                   `Откроется в ${queueData.online_start_time}`}
+                </span>
+                {!queueData.is_open && (
+                  <div className="time-info" style={{ color: getColor('textSecondary'), fontSize: '12px', marginTop: '4px' }}>
+                    <Clock size={12} style={{ marginRight: '4px' }} />
+                    Сейчас: {queueData.current_time} | Запись: {queueData.online_start_time}-{queueData.online_end_time}
+                  </div>
+                )}
+              </div>
             )}
           </h3>
           
@@ -772,4 +787,5 @@ const ModernQueueManager = ({
 };
 
 export default ModernQueueManager;
+
 

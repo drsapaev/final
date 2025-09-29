@@ -704,3 +704,4 @@ const EchoForm = ({ visitId, patientId, onDataUpdate }) => {
 };
 
 export default EchoForm;
+

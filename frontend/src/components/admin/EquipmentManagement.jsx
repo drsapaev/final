@@ -17,7 +17,7 @@ import {
   MapPin,
   Building2
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const EquipmentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -673,3 +673,4 @@ const EquipmentManagement = () => {
 };
 
 export default EquipmentManagement;
+

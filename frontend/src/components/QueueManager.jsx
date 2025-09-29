@@ -1,22 +1,33 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Phone, UserCheck, Clock, Mic, MicOff, Printer, QrCode } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from './ui/native';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import AnimatedToast from './AnimatedToast';
+import { moveQueueEntry } from '../utils/queueApi';
 
-const QueueManager = ({ specialist = 'Терапевт', room = '101' }) => {
+const QueueManager = ({ specialist = 'Терапевт', room = '101', specialistId = null }) => {
   const [queue, setQueue] = useState([]);
   const [currentNumber, setCurrentNumber] = useState(1);
   const [isCallActive, setIsCallActive] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isOnlineOpen, setIsOnlineOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [queueId, setQueueId] = useState(null);
   const wsRef = useRef(null);
 
   useEffect(() => {
     // Подключение к WebSocket для синхронизации очереди
     const connectWebSocket = () => {
-      const wsUrl = `ws://localhost:8000/ws/queue/${specialist}`;
+      const token = localStorage.getItem('access_token');
+      const baseUrl = `ws://localhost:8000/api/v1/ws-auth/ws/queue/optional-auth`;
+      const params = new URLSearchParams({
+        department: specialist,
+        date: new Date().toISOString().split('T')[0]
+      });
+      if (token) {
+        params.append('token', token);
+      }
+      const wsUrl = `${baseUrl}?${params.toString()}`;
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
@@ -48,6 +59,39 @@ const QueueManager = ({ specialist = 'Терапевт', room = '101' }) => {
 
   const loadQueue = async () => {
     try {
+      // Получаем текущую очередь для специалиста
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      // Сначала пытаемся найти очередь по specialistId
+      if (specialistId) {
+        const statusResponse = await fetch(`/api/v1/queue/status/by-specialist?specialist_id=${specialistId}&day=${today}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+
+        if (statusResponse.ok) {
+          const queueData = await statusResponse.json();
+          setQueueId(queueData.queue_id);
+          
+          const formattedQueue = queueData.entries.map(entry => ({
+            id: entry.id,
+            number: entry.number,
+            patient_name: entry.patient_name,
+            phone: entry.phone,
+            type: entry.source === 'online' ? 'Онлайн' : 'Регистратура',
+            source: entry.source,
+            status: entry.status
+          }));
+          
+          setQueue(formattedQueue);
+          setCurrentNumber(formattedQueue.length + 1);
+          setIsOnlineOpen(queueData.is_active || false);
+          return;
+        }
+      }
+      
+      // Fallback: старый API
       const response = await fetch(`/api/v1/queue/${specialist}/today`);
       if (response.ok) {
         const data = await response.json();
@@ -212,13 +256,15 @@ const QueueManager = ({ specialist = 'Терапевт', room = '101' }) => {
     }
   };
 
-  const onDragEnd = (result) => {
+  const onDragEnd = async (result) => {
     const { source, destination } = result || {};
     if (!destination || destination.index === source.index) return;
 
     const updated = Array.from(queue);
     const [moved] = updated.splice(source.index, 1);
     updated.splice(destination.index, 0, moved);
+    
+    // Оптимистично обновляем UI
     setQueue(updated);
 
     setToast({
@@ -226,7 +272,43 @@ const QueueManager = ({ specialist = 'Терапевт', room = '101' }) => {
       type: 'success'
     });
 
-    // TODO: Persist reorder to backend when API is available
+    // Сохраняем изменения на backend
+    try {
+      const result = await moveQueueEntry(moved.id, destination.index + 1);
+      
+      // Обновляем очередь с данными от сервера для синхронизации
+      if (result.success && result.queue_info?.entries) {
+        const serverQueue = result.queue_info.entries.map(entry => ({
+          id: entry.id,
+          number: entry.number,
+          patient_name: entry.patient_name,
+          phone: entry.phone,
+          status: entry.status,
+          source: entry.source,
+          type: entry.source === 'online' ? 'Онлайн' : 'Регистратура'
+        }));
+        setQueue(serverQueue);
+      }
+
+      setToast({
+        message: `Порядок сохранен: №${moved?.number ?? ''} → позиция ${destination.index + 1}`,
+        type: 'success'
+      });
+
+    } catch (error) {
+      console.error('QueueManager: Error updating queue order:', error);
+      
+      // Откатываем изменения в UI при ошибке
+      const reverted = Array.from(updated);
+      const [revertMoved] = reverted.splice(destination.index, 1);
+      reverted.splice(source.index, 0, revertMoved);
+      setQueue(reverted);
+
+      setToast({
+        message: 'Ошибка сохранения порядка очереди. Изменения отменены.',
+        type: 'error'
+      });
+    }
   };
 
   return (
@@ -453,4 +535,5 @@ const PatientForm = ({ onAdd, nextNumber }) => {
 };
 
 export default QueueManager;
+
 

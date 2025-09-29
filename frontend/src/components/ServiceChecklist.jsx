@@ -71,3 +71,4 @@ const ServiceChecklist = ({ value = [], onChange, department }) => {
 };
 
 export default ServiceChecklist;
+

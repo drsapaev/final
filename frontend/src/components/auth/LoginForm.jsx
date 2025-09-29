@@ -354,3 +354,4 @@ const LoginForm = ({ onLogin, onRegister, onForgotPassword }) => {
 };
 
 export default LoginForm;
+

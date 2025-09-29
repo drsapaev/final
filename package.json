@@ -16,7 +16,11 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "check-auth": "cd backend && python test_role_routing.py",
+    "check-system": "cd backend && python check_system_integrity.py",
+    "remind-rules": "python scripts/remind_auth_rules.py",
+    "pre-commit": "npm run check-auth && npm run check-system"
   },
   "repository": {
     "type": "git",

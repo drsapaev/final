@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 import { 
   MessageSquare, 
   Settings, 
@@ -713,3 +713,4 @@ const TelegramManager = () => {
 };
 
 export default TelegramManager;
+

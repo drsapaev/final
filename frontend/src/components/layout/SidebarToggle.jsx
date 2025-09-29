@@ -46,3 +46,4 @@ const SidebarToggle = ({ isCollapsed, onToggle, className = '' }) => {
 };
 
 export default SidebarToggle;
+

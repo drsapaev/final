@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, Check, Printer } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 const PaymentDialog = ({ 
   isOpen, 
@@ -322,3 +322,4 @@ const PaymentDialog = ({
 };
 
 export default PaymentDialog;
+

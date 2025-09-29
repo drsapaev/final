@@ -5,14 +5,16 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
+from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, func, text
 
 from app.models.user import User
 from app.models.user_profile import (
-    UserProfile, UserPreferences, UserNotificationSettings, 
-    UserRole, UserPermission, UserGroup, UserGroupMember, UserAuditLog,
-    UserStatus
+    UserProfile, UserPreferences, UserNotificationSettings, UserAuditLog, UserStatus
+)
+from app.models.role_permission import (
+    UserGroup, UserPermissionOverride
 )
 from app.core.security import get_password_hash, verify_password
 from app.schemas.user_management import (
@@ -364,12 +366,21 @@ class UserManagementService:
                 }
                 
                 if user.profile:
+                    # Безопасно сериализуем Enum и другие поля
+                    status_value = None
+                    try:
+                        status_obj = getattr(user.profile, "status", None)
+                        if status_obj is not None:
+                            status_value = getattr(status_obj, "value", None) or str(status_obj)
+                    except Exception:
+                        status_value = None
+
                     user_data.update({
                         "full_name": user.profile.full_name,
                         "first_name": user.profile.first_name,
                         "last_name": user.profile.last_name,
                         "phone": user.profile.phone,
-                        "status": user.profile.status,
+                        "status": status_value,
                         "last_login": user.profile.last_login,
                         "last_activity": user.profile.last_activity
                     })
@@ -591,6 +602,240 @@ class UserManagementService:
             db.add(audit_log)
         except Exception as e:
             logger.error(f"Error logging user action: {e}")
+
+    # ===================== ЭКСПОРТ ПОЛЬЗОВАТЕЛЕЙ =====================
+
+    def export_users_background(self, users: List[User], export_data: UserExportRequest, 
+                               current_user_id: int, db: Session):
+        """
+        Фоновый экспорт пользователей в различных форматах
+        """
+        try:
+            import os
+            import csv
+            import json
+            from datetime import datetime
+            from pathlib import Path
+            
+            # Создаем директорию для экспорта если её нет
+            export_dir = Path("exports/users")
+            export_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Генерируем имя файла
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename_base = f"users_export_{timestamp}"
+            
+            # Подготавливаем данные для экспорта
+            export_users_data = []
+            
+            for user in users:
+                user_data = {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "role": user.role,
+                    "is_active": user.is_active,
+                    "created_at": user.created_at.isoformat() if user.created_at else None,
+                    "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                    "last_login": user.last_login.isoformat() if user.last_login else None
+                }
+                
+                # Добавляем профиль если запрошен
+                if export_data.include_profile and hasattr(user, 'profile') and user.profile:
+                    user_data.update({
+                        "full_name": user.profile.full_name,
+                        "first_name": user.profile.first_name,
+                        "last_name": user.profile.last_name,
+                        "phone": user.profile.phone,
+                        "birth_date": user.profile.birth_date.isoformat() if user.profile.birth_date else None,
+                        "gender": user.profile.gender,
+                        "address": user.profile.address,
+                        "emergency_contact": user.profile.emergency_contact
+                    })
+                
+                # Добавляем настройки если запрошены
+                if export_data.include_preferences and hasattr(user, 'preferences') and user.preferences:
+                    user_data.update({
+                        "language": user.preferences.language,
+                        "timezone": user.preferences.timezone,
+                        "theme": user.preferences.theme,
+                        "date_format": user.preferences.date_format,
+                        "time_format": user.preferences.time_format
+                    })
+                
+                # Фильтруем поля если указаны
+                if export_data.fields:
+                    user_data = {k: v for k, v in user_data.items() if k in export_data.fields}
+                
+                export_users_data.append(user_data)
+            
+            # Экспортируем в зависимости от формата
+            file_path = None
+            
+            if export_data.format == "csv":
+                file_path = export_dir / f"{filename_base}.csv"
+                self._export_to_csv(export_users_data, file_path)
+                
+            elif export_data.format == "excel":
+                file_path = export_dir / f"{filename_base}.xlsx"
+                self._export_to_excel(export_users_data, file_path)
+                
+            elif export_data.format == "json":
+                file_path = export_dir / f"{filename_base}.json"
+                self._export_to_json(export_users_data, file_path)
+                
+            elif export_data.format == "pdf":
+                file_path = export_dir / f"{filename_base}.pdf"
+                self._export_to_pdf(export_users_data, file_path)
+            
+            # Логируем экспорт
+            self._log_user_action(
+                db, current_user_id, "export_users", "user_export", None,
+                f"Экспорт {len(users)} пользователей в формате {export_data.format}",
+                metadata={
+                    "format": export_data.format,
+                    "record_count": len(users),
+                    "file_path": str(file_path) if file_path else None,
+                    "file_size": file_path.stat().st_size if file_path and file_path.exists() else 0
+                }
+            )
+            
+            logger.info(f"Экспорт пользователей завершен: {file_path}")
+            
+        except Exception as e:
+            logger.error(f"Ошибка экспорта пользователей: {e}")
+            # Логируем ошибку
+            self._log_user_action(
+                db, current_user_id, "export_users_error", "user_export", None,
+                f"Ошибка экспорта пользователей: {str(e)}"
+            )
+
+    def _export_to_csv(self, data: List[Dict], file_path: Path):
+        """Экспорт в CSV формат"""
+        if not data:
+            return
+        
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+
+    def _export_to_json(self, data: List[Dict], file_path: Path):
+        """Экспорт в JSON формат"""
+        with open(file_path, 'w', encoding='utf-8') as jsonfile:
+            json.dump({
+                "export_info": {
+                    "timestamp": datetime.now().isoformat(),
+                    "record_count": len(data),
+                    "format": "json"
+                },
+                "users": data
+            }, jsonfile, indent=2, ensure_ascii=False, default=str)
+
+    def _export_to_excel(self, data: List[Dict], file_path: Path):
+        """Экспорт в Excel формат"""
+        try:
+            import pandas as pd
+            
+            # Создаем DataFrame
+            df = pd.DataFrame(data)
+            
+            # Экспортируем в Excel
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Users', index=False)
+                
+                # Добавляем информационный лист
+                info_df = pd.DataFrame({
+                    'Параметр': ['Дата экспорта', 'Количество записей', 'Формат'],
+                    'Значение': [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), len(data), 'Excel']
+                })
+                info_df.to_excel(writer, sheet_name='Export Info', index=False)
+                
+        except ImportError:
+            # Если pandas не установлен, используем альтернативный метод
+            logger.warning("pandas не установлен, используем альтернативный метод для Excel")
+            self._export_to_csv(data, file_path.with_suffix('.csv'))
+
+    def _export_to_pdf(self, data: List[Dict], file_path: Path):
+        """Экспорт в PDF формат"""
+        try:
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib import colors
+            from reportlab.lib.units import inch
+            
+            # Создаем PDF документ
+            doc = SimpleDocTemplate(str(file_path), pagesize=A4)
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Заголовок
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                spaceAfter=30,
+                alignment=1  # Центрирование
+            )
+            title = Paragraph("Экспорт пользователей", title_style)
+            elements.append(title)
+            
+            # Информация об экспорте
+            info_style = styles['Normal']
+            info = Paragraph(f"Дата экспорта: {datetime.now().strftime('%d.%m.%Y %H:%M')}<br/>Количество записей: {len(data)}", info_style)
+            elements.append(info)
+            elements.append(Spacer(1, 20))
+            
+            # Подготавливаем данные для таблицы
+            if data:
+                # Заголовки
+                headers = list(data[0].keys())
+                table_data = [headers]
+                
+                # Данные (ограничиваем количество для PDF)
+                for row in data[:50]:  # Максимум 50 записей для PDF
+                    table_data.append([str(row.get(header, '')) for header in headers])
+                
+                # Создаем таблицу
+                table = Table(table_data)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                
+                elements.append(table)
+                
+                if len(data) > 50:
+                    note = Paragraph(f"<i>Примечание: Показаны первые 50 записей из {len(data)}</i>", styles['Normal'])
+                    elements.append(Spacer(1, 10))
+                    elements.append(note)
+            
+            # Генерируем PDF
+            doc.build(elements)
+            
+        except ImportError:
+            logger.warning("reportlab не установлен, используем альтернативный метод для PDF")
+            # Создаем простой текстовый файл вместо PDF
+            with open(file_path.with_suffix('.txt'), 'w', encoding='utf-8') as f:
+                f.write("Экспорт пользователей\n")
+                f.write("=" * 50 + "\n\n")
+                f.write(f"Дата экспорта: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n")
+                f.write(f"Количество записей: {len(data)}\n\n")
+                
+                for i, user in enumerate(data, 1):
+                    f.write(f"{i}. {user.get('username', 'N/A')} ({user.get('email', 'N/A')})\n")
+                    f.write(f"   Роль: {user.get('role', 'N/A')}\n")
+                    f.write(f"   Активен: {'Да' if user.get('is_active') else 'Нет'}\n")
+                    f.write(f"   Создан: {user.get('created_at', 'N/A')}\n\n")
 
 
 # Глобальный экземпляр сервиса

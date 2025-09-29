@@ -13,7 +13,7 @@ import {
   CheckCircle,
   Image
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const ClinicSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -391,3 +391,4 @@ const ClinicSettings = () => {
 };
 
 export default ClinicSettings;
+

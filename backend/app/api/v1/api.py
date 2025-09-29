@@ -30,11 +30,27 @@ from app.api.v1.endpoints import (
     dental,
     feature_flags,  # Фича-флаги
     qr_queue,  # QR очереди
+    queue_limits,  # Лимиты очередей
+    queue_cabinet_management,  # Управление кабинетами в очередях
+    user_data_transfer,  # Передача данных пользователей
+    group_permissions,  # Разрешения групп пользователей
+    registrar_notifications,  # Уведомления регистратуры
+    doctor_info,  # Информация о врачах и отделениях
+    wait_time_analytics,  # Аналитика времени ожидания
+    ai_analytics,  # Расширенная аналитика AI
+    reports,  # Система отчетов
+    system_management,  # Система бэкапов и мониторинга
+    cloud_printing,  # Облачная печать
+    medical_equipment,  # Медицинское оборудование
+    dynamic_pricing,  # Динамическое ценообразование
+    billing,  # Автоматическое выставление счетов
+    discount_benefits,  # Система скидок и льгот
     derma,
     docs,
     health as health_ep,
     lab_specialized,
     mobile_api,
+    mobile_api_extended,
     notifications,
     emr_templates,
     emr_ai,
@@ -47,9 +63,17 @@ from app.api.v1.endpoints import (
     analytics_visualization,
     two_factor_auth,
     two_factor_sms_email,
+    sms_providers,
     two_factor_devices,
     telegram_webhook,
+    telegram_webhook_enhanced,
     telegram_notifications,
+    telegram_bot_management,
+    fcm_notifications,
+    phone_verification,
+    password_reset,
+    queue_reorder,
+    websocket_auth,
     email_sms_enhanced,
     file_system,
     file_upload_simple,
@@ -78,6 +102,7 @@ from app.api.v1.endpoints import (
     services,
     specialized_panels,
     visits,
+    webhooks,
 )
 # Импортируем новый queue endpoint
 from app.api.v1.endpoints.queue import router as queue_router
@@ -104,6 +129,14 @@ api_router = APIRouter()
 
 # Auth (/login, /me и т.д.)
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+
+# Простая авторизация (временное решение)
+from app.api.v1.endpoints import simple_auth
+api_router.include_router(simple_auth.router, prefix="/auth", tags=["simple-auth"])
+
+# Минимальная авторизация (без зависимостей от моделей)
+from app.api.v1.endpoints import minimal_auth
+api_router.include_router(minimal_auth.router, prefix="/auth", tags=["minimal-auth"])
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")
@@ -126,6 +159,28 @@ api_router.include_router(migration_management_router, tags=["migration-manageme
 api_router.include_router(feature_flags.router, tags=["feature-flags"])
 # Эндпоинты QR очередей
 api_router.include_router(qr_queue.router, tags=["qr-queue"])
+# Эндпоинты лимитов очередей
+api_router.include_router(queue_limits.router, prefix="/admin", tags=["queue-limits"])
+# Эндпоинты управления кабинетами в очередях
+api_router.include_router(queue_cabinet_management.router, prefix="/admin", tags=["queue-cabinet-management"])
+# Эндпоинты передачи данных пользователей
+api_router.include_router(user_data_transfer.router, prefix="/admin/user-data", tags=["user-data-transfer"])
+# Эндпоинты разрешений групп пользователей
+api_router.include_router(group_permissions.router, prefix="/admin/permissions", tags=["group-permissions"])
+# Эндпоинты уведомлений регистратуры
+api_router.include_router(registrar_notifications.router, prefix="/registrar/notifications", tags=["registrar-notifications"])
+# Эндпоинты информации о врачах и отделениях
+api_router.include_router(doctor_info.router, prefix="/doctor-info", tags=["doctor-info"])
+# Эндпоинты аналитики времени ожидания
+api_router.include_router(wait_time_analytics.router, prefix="/analytics/wait-time", tags=["wait-time-analytics"])
+# Эндпоинты расширенной аналитики AI
+api_router.include_router(ai_analytics.router, prefix="/analytics/ai", tags=["ai-analytics"])
+# Эндпоинты системы отчетов
+api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+# Эндпоинты системы бэкапов и мониторинга
+api_router.include_router(system_management.router, prefix="/system", tags=["system-management"])
+# Эндпоинты системы webhook'ов
+api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
@@ -155,6 +210,7 @@ api_router.include_router(admin_telegram.router, prefix="/admin", tags=["admin"]
 api_router.include_router(admin_stats.router, tags=["admin"])
 api_router.include_router(admin_users.router)
 api_router.include_router(mobile_api.router, prefix="/mobile", tags=["mobile"])
+api_router.include_router(mobile_api_extended.router, prefix="/mobile", tags=["mobile-extended"])
 api_router.include_router(emr_templates.router, prefix="/emr", tags=["emr-templates"])
 api_router.include_router(emr_ai.router, prefix="/emr/ai", tags=["emr-ai"])
 api_router.include_router(emr_ai_enhanced.router, prefix="/emr/ai-enhanced", tags=["emr-ai-enhanced"])
@@ -167,8 +223,16 @@ api_router.include_router(analytics_visualization.router, prefix="/analytics/vis
 api_router.include_router(two_factor_auth.router, prefix="/2fa", tags=["two-factor-auth"])
 api_router.include_router(two_factor_sms_email.router, prefix="/2fa", tags=["two-factor-sms-email"])
 api_router.include_router(two_factor_devices.router, prefix="/2fa", tags=["two-factor-devices"])
+api_router.include_router(sms_providers.router, prefix="/sms", tags=["sms-providers"])
 api_router.include_router(telegram_webhook.router, prefix="/telegram", tags=["telegram-webhook"])
+api_router.include_router(telegram_webhook_enhanced.router, prefix="/telegram", tags=["telegram-webhook-enhanced"])
 api_router.include_router(telegram_notifications.router, prefix="/telegram", tags=["telegram-notifications"])
+api_router.include_router(telegram_bot_management.router, prefix="/telegram-bot", tags=["telegram-bot-management"])
+api_router.include_router(fcm_notifications.router, prefix="/fcm", tags=["fcm-notifications"])
+api_router.include_router(phone_verification.router, prefix="/phone-verification", tags=["phone-verification"])
+api_router.include_router(password_reset.router, prefix="/password-reset", tags=["password-reset"])
+api_router.include_router(queue_reorder.router, prefix="/queue", tags=["queue-reorder"])
+api_router.include_router(websocket_auth.router, prefix="/ws-auth", tags=["websocket-auth"])
 api_router.include_router(email_sms_enhanced.router, prefix="/email-sms", tags=["email-sms-enhanced"])
 api_router.include_router(file_system.router, prefix="/files", tags=["file-system"])
 api_router.include_router(file_upload_simple.router, prefix="/files", tags=["file-upload-simple"])
@@ -213,3 +277,18 @@ api_router.include_router(online_queue_legacy.router, prefix="/online-queue", ta
 # Автозакрытие очередей
 from app.api.v1.endpoints import queue_auto_close
 api_router.include_router(queue_auto_close.router, prefix="/admin/queue-auto-close", tags=["queue-auto-close"])
+
+# Облачная печать
+api_router.include_router(cloud_printing.router, prefix="/cloud-printing", tags=["cloud-printing"])
+
+# Медицинское оборудование
+api_router.include_router(medical_equipment.router, prefix="/medical-equipment", tags=["medical-equipment"])
+
+# Динамическое ценообразование
+api_router.include_router(dynamic_pricing.router, prefix="/dynamic-pricing", tags=["dynamic-pricing"])
+
+# Автоматическое выставление счетов
+api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
+
+# Система скидок и льгот
+api_router.include_router(discount_benefits.router, prefix="/discount-benefits", tags=["discount-benefits"])

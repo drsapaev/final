@@ -57,3 +57,4 @@ const MedicalCard = ({
 };
 
 export default MedicalCard;
+

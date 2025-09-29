@@ -20,6 +20,7 @@ class UserStatus(str, enum.Enum):
 class UserProfile(Base):
     """Расширенный профиль пользователя"""
     __tablename__ = "user_profiles"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
@@ -177,101 +178,9 @@ class UserNotificationSettings(Base):
     profile = relationship("UserProfile", back_populates="notifications")
 
 
-class UserRole(Base):
-    """Роли пользователей"""
-    __tablename__ = "user_roles"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), unique=True, nullable=False)
-    display_name = Column(String(100), nullable=False)
-    description = Column(Text, nullable=True)
-    
-    # Разрешения
-    permissions = Column(JSON, nullable=True)  # Список разрешений
-    
-    # Системная информация
-    is_system = Column(Boolean, default=False)  # Системная роль
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Связи
-    # users = relationship("User", back_populates="user_role")  # Временно отключено - нет внешнего ключа
-
-
-class UserPermission(Base):
-    """Разрешения пользователей"""
-    __tablename__ = "user_permissions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False)
-    display_name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-    category = Column(String(50), nullable=True)  # auth, patients, appointments, etc.
-    
-    # Системная информация
-    is_system = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Связи
-    # roles = relationship("UserRole", secondary="role_permissions", back_populates="permissions")  # Временно отключено - нет соответствующей связи в UserRole
-
-
-class RolePermission(Base):
-    """Связь ролей и разрешений"""
-    __tablename__ = "role_permissions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    role_id = Column(Integer, ForeignKey("user_roles.id"), nullable=False)
-    permission_id = Column(Integer, ForeignKey("user_permissions.id"), nullable=False)
-    
-    # Метаданные
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Связи
-    # role = relationship("UserRole", back_populates="role_permissions")  # Временно отключено
-    # permission = relationship("UserPermission", back_populates="role_permissions")  # Временно отключено
-
-
-class UserGroup(Base):
-    """Группы пользователей"""
-    __tablename__ = "user_groups"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, nullable=False)
-    display_name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-    
-    # Настройки группы
-    is_active = Column(Boolean, default=True)
-    is_system = Column(Boolean, default=False)
-    
-    # Метаданные
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Связи
-    # users = relationship("User", secondary="user_group_members", back_populates="groups")  # Временно отключено
-
-
-class UserGroupMember(Base):
-    """Участники групп пользователей"""
-    __tablename__ = "user_group_members"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    group_id = Column(Integer, ForeignKey("user_groups.id"), nullable=False)
-    
-    # Роль в группе
-    role = Column(String(20), default="member")  # member, admin, moderator
-    
-    # Метаданные
-    joined_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Связи
-    # user = relationship("User", back_populates="group_memberships")  # Временно отключено
-    # group = relationship("UserGroup", back_populates="members")  # Временно отключено
+# КРИТИЧЕСКИ ВАЖНО: Модели ролей УДАЛЕНЫ отсюда!
+# Все модели ролей теперь ТОЛЬКО в app/models/role_permission.py
+# Это предотвращает дублирование и конфликты таблиц
 
 
 class UserAuditLog(Base):

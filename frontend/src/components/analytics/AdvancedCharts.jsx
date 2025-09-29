@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Chart, registerables } from 'chart.js';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 import { 
   Download, 
   RefreshCw, 
@@ -316,3 +316,4 @@ const AdvancedCharts = ({
 };
 
 export default AdvancedCharts;
+

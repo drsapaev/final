@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, UserCheck, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, Button, Badge } from '../design-system/components';
+import { Card, Button, Badge } from './ui/native';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../constants/appointmentStatus';
 
 const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect }) => {
@@ -256,3 +256,4 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
 };
 
 export default QueueIntegration;
+

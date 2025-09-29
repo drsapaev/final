@@ -420,3 +420,4 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
 };
 
 export default PhotoComparison;
+

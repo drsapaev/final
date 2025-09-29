@@ -586,3 +586,4 @@ const EMRInterface = () => {
 };
 
 export default EMRInterface;
+

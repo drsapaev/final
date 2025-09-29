@@ -3,9 +3,10 @@ import { useLocation } from 'react-router-dom';
 import Icon from '../components/Icon';
 import { Plus, Search, Filter, Calendar, Stethoscope, Edit, Trash2 } from 'lucide-react';
 
-// Новые унифицированные компоненты
+// Компоненты
 import UnifiedLayout from '../components/layout/UnifiedLayout';
-import { MedicalCard, PatientCard, MetricCard, MedicalTable } from '../components/medical';
+import { PatientCard, MetricCard, MedicalTable } from '../components/medical';
+import MedicalCard from '../components/medical/MedicalCard';
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/full-width.css';
 import '../styles/cursor-effects.css';

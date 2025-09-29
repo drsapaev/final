@@ -189,9 +189,15 @@ def join_online_queue(
             "cabinet": queue_token.specialist.cabinet
         }
     
-    # Проверяем лимит мест
+    # Проверяем лимит мест (приоритет: индивидуальный лимит врача -> настройки специальности -> по умолчанию)
     current_count = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
-    max_slots = queue_settings.get("max_per_day", {}).get(queue_token.specialist.specialty, 15)
+    
+    # Сначала проверяем индивидуальный лимит врача на этот день
+    if daily_queue.max_online_entries is not None:
+        max_slots = daily_queue.max_online_entries
+    else:
+        # Иначе используем настройки специальности
+        max_slots = queue_settings.get("max_per_day", {}).get(queue_token.specialist.specialty, 15)
     
     if current_count >= max_slots:
         return {
@@ -373,10 +379,13 @@ def check_queue_availability(
     # Проверяем лимит мест
     if daily_queue:
         current_count = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
-        max_slots = queue_settings.get("max_per_day", {}).get(
-            db.query(Doctor).filter(Doctor.id == specialist_id).first().specialty, 
-            15
-        )
+        
+        # Приоритет: индивидуальный лимит врача -> настройки специальности -> по умолчанию
+        if daily_queue.max_online_entries is not None:
+            max_slots = daily_queue.max_online_entries
+        else:
+            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+            max_slots = queue_settings.get("max_per_day", {}).get(doctor.specialty, 15)
         
         if current_count >= max_slots:
             return {
@@ -440,10 +449,13 @@ def get_or_create_daily_queue(
     db: Session,
     day: date,
     specialist_id: int,
-    queue_tag: Optional[str] = None
+    queue_tag: Optional[str] = None,
+    cabinet_number: Optional[str] = None,
+    cabinet_floor: Optional[int] = None,
+    cabinet_building: Optional[str] = None
 ) -> DailyQueue:
     """
-    Получить или создать дневную очередь с поддержкой queue_tag
+    Получить или создать дневную очередь с поддержкой queue_tag и информации о кабинете
     Теперь очереди уникальны по (day, specialist_id, queue_tag)
     """
     # Ищем очередь с учетом queue_tag
@@ -460,15 +472,40 @@ def get_or_create_daily_queue(
     daily_queue = db.query(DailyQueue).filter(and_(*query_filters)).first()
     
     if not daily_queue:
+        # Если информация о кабинете не передана, получаем из таблицы doctors
+        if not cabinet_number:
+            doctor = db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
+            if doctor and doctor.cabinet:
+                cabinet_number = doctor.cabinet
+        
         daily_queue = DailyQueue(
             day=day,
             specialist_id=specialist_id,
             queue_tag=queue_tag,
+            cabinet_number=cabinet_number,
+            cabinet_floor=cabinet_floor,
+            cabinet_building=cabinet_building,
             active=True
         )
         db.add(daily_queue)
         db.commit()
         db.refresh(daily_queue)
+    else:
+        # Обновляем информацию о кабинете, если она была передана
+        updated = False
+        if cabinet_number and daily_queue.cabinet_number != cabinet_number:
+            daily_queue.cabinet_number = cabinet_number
+            updated = True
+        if cabinet_floor is not None and daily_queue.cabinet_floor != cabinet_floor:
+            daily_queue.cabinet_floor = cabinet_floor
+            updated = True
+        if cabinet_building and daily_queue.cabinet_building != cabinet_building:
+            daily_queue.cabinet_building = cabinet_building
+            updated = True
+        
+        if updated:
+            db.commit()
+            db.refresh(daily_queue)
     
     return daily_queue
 

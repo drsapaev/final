@@ -421,3 +421,4 @@ const LabReportGenerator = ({
 };
 
 export default LabReportGenerator;
+

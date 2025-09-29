@@ -11,7 +11,7 @@ import {
   Plus,
   RefreshCw
 } from 'lucide-react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 
 const EmptyState = ({ 
   type = 'default',
@@ -99,3 +99,4 @@ const EmptyState = ({
 };
 
 export default EmptyState;
+

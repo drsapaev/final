@@ -20,7 +20,8 @@ except Exception:
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# Поддерживаем верификацию старых хэшей bcrypt, новые хешируем argon2
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

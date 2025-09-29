@@ -457,3 +457,4 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
 };
 
 export default SkinAnalysis;
+

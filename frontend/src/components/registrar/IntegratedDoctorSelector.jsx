@@ -11,7 +11,7 @@ import {
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
-import { Card, Badge } from '../../design-system/components';
+import { Card, Badge } from '../ui/native';
 
 /**
  * Интегрированный селектор врачей для регистратуры
@@ -259,3 +259,4 @@ const IntegratedDoctorSelector = ({
 };
 
 export default IntegratedDoctorSelector;
+

@@ -77,9 +77,14 @@ except Exception as e:  # pragma: no cover
 # Основные API-роутеры проекта
 # -----------------------------------------------------------------------------
 from app.api.v1.api import api_router as v1_router  # noqa: E402
+from app.graphql import graphql_router  # noqa: E402
 
 app.include_router(v1_router, prefix=API_V1_STR)
 log.info("Included api.v1.api router at %s", API_V1_STR)
+
+# GraphQL API
+app.include_router(graphql_router, prefix="/api")
+log.info("Included GraphQL router at /api/graphql")
 
 # -----------------------------------------------------------------------------
 # DEV fallback для аутентификации — регистрируем ТОЛЬКО если импорты auth упали

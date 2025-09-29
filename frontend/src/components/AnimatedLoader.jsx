@@ -195,3 +195,4 @@ AnimatedLoader.TableSkeleton = AnimatedTableSkeleton;
 AnimatedLoader.CardSkeleton = AnimatedCardSkeleton;
 
 export default AnimatedLoader;
+

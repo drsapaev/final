@@ -307,3 +307,4 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
 };
 
 export default TreatmentPlanner;
+

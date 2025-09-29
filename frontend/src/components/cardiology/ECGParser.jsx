@@ -294,3 +294,4 @@ export default {
   analyzeECGParameters,
   exportECGParameters,
 };
+

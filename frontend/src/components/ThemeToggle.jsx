@@ -56,3 +56,4 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
 };
 
 export default ThemeToggle;
+

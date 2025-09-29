@@ -1,4 +1,4 @@
-﻿// src/stores/auth.js
+// src/stores/auth.js
 // Lightweight auth store used across the frontend.
 // - Keeps token/profile in localStorage
 // - Notifies subscribers on changes

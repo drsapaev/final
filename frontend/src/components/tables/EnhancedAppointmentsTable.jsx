@@ -1680,3 +1680,4 @@ const EnhancedAppointmentsTable = ({
 };
 
 export default EnhancedAppointmentsTable;
+

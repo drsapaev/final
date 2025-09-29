@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 /**
  * Индикатор офлайн/онлайн статуса для мобильных устройств
@@ -207,3 +207,4 @@ const OfflineIndicator = () => {
 };
 
 export default OfflineIndicator;
+

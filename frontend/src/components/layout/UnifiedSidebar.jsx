@@ -449,3 +449,4 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
 };
 
 export default UnifiedSidebar;
+

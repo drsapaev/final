@@ -15,9 +15,9 @@ import {
   Package,
   Bell
 } from 'lucide-react';
-import { Card, Badge, Button } from '../../design-system/components';
+import { Card, Badge, Button } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
 
@@ -480,3 +480,4 @@ const AllFreeApproval = () => {
 };
 
 export default AllFreeApproval;
+

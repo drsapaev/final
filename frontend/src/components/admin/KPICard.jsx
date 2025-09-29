@@ -1,6 +1,5 @@
 import React from 'react';
-import { Card } from '../../design-system/components';
-import { useFade, useScale } from '../../design-system/hooks/useAnimation';
+import { Card, useFade, useScale } from '../ui/native';
 
 const KPICard = ({ 
   title, 
@@ -114,3 +113,4 @@ const KPICard = ({
 };
 
 export default KPICard;
+

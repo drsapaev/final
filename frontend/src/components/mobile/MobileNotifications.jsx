@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, BellOff, Settings, Check, X } from 'lucide-react';
-import { Button, Card, Badge } from '../../design-system/components';
+import { Button, Card, Badge } from '../ui/native';
 
 /**
  * Компонент для управления мобильными уведомлениями
@@ -284,3 +284,4 @@ const MobileNotifications = () => {
 };
 
 export default MobileNotifications;
+

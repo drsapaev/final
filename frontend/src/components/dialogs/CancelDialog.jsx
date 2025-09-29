@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 
 const CancelDialog = ({ 
   isOpen, 
@@ -296,3 +296,4 @@ const CancelDialog = ({
 };
 
 export default CancelDialog;
+

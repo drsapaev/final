@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import ModernDialog from '../dialogs/ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-toastify';
 import './AppointmentWizard.css';
 
 const AppointmentWizard = ({ 
@@ -880,3 +880,4 @@ const PaymentStep = ({
 );
 
 export default AppointmentWizard;
+

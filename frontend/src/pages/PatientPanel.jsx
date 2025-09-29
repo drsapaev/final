@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User, Calendar, Heart, FileText, Search } from 'lucide-react';
-import { Card, Button, Badge, Skeleton } from '../design-system/components';
-import { useBreakpoint } from '../design-system/hooks';
+import { Card, Button, Badge, Skeleton } from '../components/ui/native';
+import { useBreakpoint } from '../components/ui/native';
 import { useTheme } from '../contexts/ThemeContext';
 
 const PatientPanel = () => {

@@ -13,7 +13,7 @@ import {
   Eye,
   Printer
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const ReportGenerator = ({ 
   onGenerateReport,
@@ -415,3 +415,4 @@ const ReportGenerator = ({
 };
 
 export default ReportGenerator;
+

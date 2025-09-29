@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, Clock, User, Stethoscope, AlertCircle, Phone, Mail } from 'lucide-react';
-import { Card, Button } from '../../design-system/components';
+import { Card, Button } from '../ui/native';
 
 const AppointmentModal = ({ 
   isOpen, 
@@ -542,3 +542,4 @@ const AppointmentModal = ({
 };
 
 export default AppointmentModal;
+

@@ -131,12 +131,12 @@ export function getRouteForProfile(profile) {
  * Конфигурация ролей для UI
  */
 export const ROLE_OPTIONS = [
-  { key: 'admin', label: 'Администратор', username: 'admin', route: '/admin' },
-  { key: 'registrar', label: 'Регистратура', username: 'registrar', route: '/registrar-panel' },
-  { key: 'lab', label: 'Лаборатория', username: 'lab', route: '/lab-panel' },
-  { key: 'doctor', label: 'Врач', username: 'doctor', route: '/doctor-panel' },
-  { key: 'cashier', label: 'Касса', username: 'cashier', route: '/cashier-panel' },
-  { key: 'cardio', label: 'Кардиолог', username: 'cardio', route: '/cardiologist' },
-  { key: 'derma', label: 'Дерматолог', username: 'derma', route: '/dermatologist' },
-  { key: 'dentist', label: 'Стоматолог', username: 'dentist', route: '/dentist' },
+  { key: 'admin', label: 'Администратор', username: 'admin@example.com', route: '/admin' },
+  { key: 'registrar', label: 'Регистратура', username: 'registrar@example.com', route: '/registrar-panel' },
+  { key: 'lab', label: 'Лаборатория', username: 'lab@example.com', route: '/lab-panel' },
+  { key: 'doctor', label: 'Врач', username: 'doctor@example.com', route: '/doctor-panel' },
+  { key: 'cashier', label: 'Касса', username: 'cashier@example.com', route: '/cashier-panel' },
+  { key: 'cardio', label: 'Кардиолог', username: 'cardio@example.com', route: '/cardiologist' },
+  { key: 'derma', label: 'Дерматолог', username: 'derma@example.com', route: '/dermatologist' },
+  { key: 'dentist', label: 'Стоматолог', username: 'dentist@example.com', route: '/dentist' },
 ];

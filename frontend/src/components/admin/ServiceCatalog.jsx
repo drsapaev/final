@@ -18,7 +18,7 @@ import {
   Stethoscope,
   TestTube
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../design-system/components';
+import { Card, Button, Badge } from '../ui/native';
 
 const ServiceCatalog = () => {
   const [loading, setLoading] = useState(true);
@@ -737,3 +737,4 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
 };
 
 export default ServiceCatalog;
+

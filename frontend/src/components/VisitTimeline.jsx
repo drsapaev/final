@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle, Clock, AlertCircle, CreditCard, User, FileText, Pill } from 'lucide-react';
-import { Card, Badge } from '../design-system/components';
+import { Card, Badge } from './ui/native';
 import { 
   APPOINTMENT_STATUS, 
   STATUS_LABELS, 
@@ -186,3 +186,4 @@ const VisitTimeline = ({ appointment, emr, prescription }) => {
 };
 
 export default VisitTimeline;
+
