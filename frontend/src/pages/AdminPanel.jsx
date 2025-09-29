@@ -51,7 +51,8 @@ import {
   Database,
   Stethoscope
 } from 'lucide-react';
-import { Card, Badge, Button, Skeleton, useBreakpoint, useTouchDevice, useFade, useSlide, useScale } from '../components/ui/native';
+import { Card, Badge, Button, Skeleton, useFade, useSlide, useScale } from '../components/ui/native';
+import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
