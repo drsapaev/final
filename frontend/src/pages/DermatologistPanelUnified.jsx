@@ -22,7 +22,7 @@ import {
   DollarSign,
   Clock
 } from 'lucide-react';
-import { Button } from '../components/ui/native';
+import { Button, Card } from '../components/ui/native';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
