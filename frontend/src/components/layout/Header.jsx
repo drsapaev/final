@@ -443,7 +443,7 @@ export default function Header() {
                     />
                     <input
                       type="search"
-                      placeholder="Поиск по истории..."
+                      placeholder="Поиск по ФИО, телефону, услугам или ID записи..."
                       className="interactive-element focus-ring"
                       style={{
                         height: '40px',

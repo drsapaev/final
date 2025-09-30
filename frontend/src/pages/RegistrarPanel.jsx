@@ -76,6 +76,11 @@ const RegistrarPanel = () => {
   const [searchParams] = useSearchParams();
   const todayStr = new Date().toISOString().split('T')[0];
   
+  // Параметры поиска и фильтрации
+  const searchDate = searchParams.get('date');
+  const searchQuery = (searchParams.get('q') || '').toLowerCase();
+  const statusFilter = searchParams.get('status');
+  
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
   const [printInProgress, setPrintInProgress] = useState(false);
@@ -83,6 +88,9 @@ const RegistrarPanel = () => {
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
   
   const [contextMenu, setContextMenu] = useState({ open: false, row: null, position: { x: 0, y: 0 } });
+  
+  // Состояния для пагинации
+  const [paginationInfo, setPaginationInfo] = useState({ total: 0, hasMore: false, loadingMore: false });
   // Демо-данные вынесены в константу
   const DEMO_APPOINTMENTS = [
     {
@@ -101,7 +109,21 @@ const RegistrarPanel = () => {
       department: 'cardiology',
       doctor_specialty: 'cardiology',
       date: todayStr,
-      appointment_date: todayStr
+      appointment_date: todayStr,
+      // Добавляем номера очередей для демонстрации
+      queue_numbers: [
+        {
+          queue_tag: 'cardiology_common',
+          queue_name: 'Кардиолог',
+          number: 1,
+          status: 'waiting',
+          source: 'online',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: 'telegram_123456'
     },
     {
       id: 2,
@@ -116,10 +138,24 @@ const RegistrarPanel = () => {
       cost: 30000,
       status: 'queued',
       isEmpty: false,
-      department: 'ecg',
+      department: 'cardiology',
       doctor_specialty: 'cardiology',
       date: todayStr,
-      appointment_date: todayStr
+      appointment_date: todayStr,
+      // Добавляем номера очередей
+      queue_numbers: [
+        {
+          queue_tag: 'cardiology_common',
+          queue_name: 'Кардиолог',
+          number: 2,
+          status: 'waiting',
+          source: 'confirmation',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: 'registrar_1'
     },
     {
       id: 3,
@@ -137,7 +173,20 @@ const RegistrarPanel = () => {
       department: 'dermatology',
       doctor_specialty: 'dermatology',
       date: todayStr,
-      appointment_date: todayStr
+      appointment_date: todayStr,
+      queue_numbers: [
+        {
+          queue_tag: 'dermatology',
+          queue_name: 'Дерматолог',
+          number: 1,
+          status: 'waiting',
+          source: 'online',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: 'telegram_789012'
     },
     {
       id: 4,
@@ -150,12 +199,25 @@ const RegistrarPanel = () => {
       payment_type: 'cash',
       payment_status: 'pending',
       cost: 60000,
-      status: 'plan',
+      status: 'queued',
       isEmpty: false,
       department: 'stomatology',
       doctor_specialty: 'stomatology',
       date: todayStr,
-      appointment_date: todayStr
+      appointment_date: todayStr,
+      queue_numbers: [
+        {
+          queue_tag: 'stomatology',
+          queue_name: 'Стоматолог',
+          number: 1,
+          status: 'waiting',
+          source: 'desk',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'none',
+      confirmed_at: null,
+      confirmed_by: null
     },
     {
       id: 5,
@@ -173,7 +235,20 @@ const RegistrarPanel = () => {
       department: 'laboratory',
       doctor_specialty: 'laboratory',
       date: todayStr,
-      appointment_date: todayStr
+      appointment_date: todayStr,
+      queue_numbers: [
+        {
+          queue_tag: 'lab',
+          queue_name: 'Лаборатория',
+          number: 1,
+          status: 'waiting',
+          source: 'online',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: 'telegram_345678'
     },
     {
       id: 6,
@@ -191,7 +266,20 @@ const RegistrarPanel = () => {
       department: 'procedures',
       doctor_specialty: 'procedures',
       date: todayStr,
-      appointment_date: todayStr
+      appointment_date: todayStr,
+      queue_numbers: [
+        {
+          queue_tag: 'procedures',
+          queue_name: 'Процедуры',
+          number: 1,
+          status: 'waiting',
+          source: 'desk',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'none',
+      confirmed_at: null,
+      confirmed_by: null
     }
   ];
 
@@ -935,7 +1023,9 @@ const RegistrarPanel = () => {
       }
       
       console.log('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
-      const response = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?limit=50`, {
+
+      // Используем новый эндпоинт для получения очередей на сегодня
+      const response = await fetch(`${API_BASE}/api/v1/registrar/queues/today${activeTab ? `?department=${activeTab}` : ''}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -944,7 +1034,148 @@ const RegistrarPanel = () => {
       
       if (response.ok) {
         const data = await response.json();
-        const appointmentsData = Array.isArray(data) ? data : (data.items || data.appointments || []);
+
+        // Новый формат: данные сгруппированы по специальностям
+        let appointmentsData = [];
+
+        if (data && typeof data === 'object') {
+          console.log('📊 Получены данные от сервера:', data);
+
+          // Обрабатываем формат от эндпоинта registrar_integration.py
+          if (data.queues && Array.isArray(data.queues)) {
+            console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+
+            // Если задана конкретная специальность, фильтруем очереди
+            if (activeTab) {
+              console.log('📊 Фильтр по специальности:', activeTab);
+
+              // Находим очередь для указанной специальности
+              const targetQueue = data.queues.find(queue => {
+                const match = queue.specialty === activeTab ||
+                  (activeTab === 'cardio' && queue.specialty === 'cardiology') ||
+                  (activeTab === 'derma' && queue.specialty === 'dermatology') ||
+                  (activeTab === 'dental' && queue.specialty === 'stomatology') ||
+                  (activeTab === 'lab' && queue.specialty === 'laboratory');
+
+                console.log(`📊 Проверка очереди ${queue.specialty}: ${match ? 'подходит' : 'не подходит'}`);
+                return match;
+              });
+
+              console.log('📊 Найденная очередь:', targetQueue);
+
+              if (targetQueue && targetQueue.entries) {
+                console.log(`📊 Очередь ${targetQueue.specialty} имеет ${targetQueue.entries.length} записей`);
+
+                appointmentsData = targetQueue.entries.map((entry, index) => {
+                  const appointment = {
+                    id: entry.id,
+                    patient_id: null, // Неизвестен из данных очереди
+                    patient_fio: entry.patient_name,
+                    patient_phone: entry.phone,
+                    doctor_id: null,
+                    department: targetQueue.specialty,
+                    appointment_date: data.date,
+                    appointment_time: null,
+                    status: entry.status,
+                    services: [],
+                    service_codes: [],
+                    source: entry.source,
+                    queue_numbers: [{
+                      queue_tag: targetQueue.specialty,
+                      queue_name: targetQueue.specialist_name,
+                      number: entry.number,
+                      status: entry.status,
+                      source: entry.source,
+                      created_at: entry.created_at
+                    }],
+                    confirmation_status: 'none',
+                    confirmed_at: null,
+                    confirmed_by: null
+                  };
+
+                  console.log(`📊 Запись ${index + 1}:`, appointment);
+                  return appointment;
+                });
+              } else {
+                appointmentsData = [];
+                console.log('📊 Очередь не найдена или пуста');
+              }
+            } else {
+              console.log('📊 Объединяем все очереди');
+
+              // Берем все очереди и объединяем записи
+              appointmentsData = [];
+              for (const queue of data.queues) {
+                console.log(`📊 Обрабатываем очередь ${queue.specialty} с ${queue.entries?.length || 0} записями`);
+
+                if (queue.entries && Array.isArray(queue.entries)) {
+                  const queueAppointments = queue.entries.map((entry, index) => {
+                    const appointment = {
+                      id: entry.id,
+                      patient_id: null,
+                      patient_fio: entry.patient_name,
+                      patient_phone: entry.phone,
+                      doctor_id: queue.specialist_id,
+                      department: queue.specialty,
+                      appointment_date: data.date,
+                      appointment_time: null,
+                      status: entry.status,
+                      services: [],
+                      service_codes: [],
+                      source: entry.source,
+                      queue_numbers: [{
+                        queue_tag: queue.specialty,
+                        queue_name: queue.specialist_name,
+                        number: entry.number,
+                        status: entry.status,
+                        source: entry.source,
+                        created_at: entry.created_at
+                      }],
+                      confirmation_status: 'none',
+                      confirmed_at: null,
+                      confirmed_by: null
+                    };
+
+                    console.log(`📊 Запись ${index + 1} из очереди ${queue.specialty}:`, appointment);
+                    return appointment;
+                  });
+                  appointmentsData.push(...queueAppointments);
+                }
+              }
+            }
+          } else {
+            // Обрабатываем старый формат для совместимости
+            if (activeTab && data[activeTab]) {
+              appointmentsData = Array.isArray(data[activeTab]) ? data[activeTab] : [];
+            } else {
+              // Берем все специальности и объединяем
+              for (const dept in data) {
+                const deptData = data[dept];
+                if (Array.isArray(deptData)) {
+                  appointmentsData.push(...deptData);
+                }
+              }
+            }
+          }
+
+          setPaginationInfo({
+            total: appointmentsData.length,
+            hasMore: false,
+            loadingMore: false
+          });
+
+          console.log(`📊 Загружено ${appointmentsData.length} записей для специальности: ${activeTab || 'все'}`);
+
+          // Если данных нет, показываем демо-режим (это нормально для новой системы)
+          if (appointmentsData.length === 0) {
+            console.log('📋 Нет записей на сегодня, показываем демо-режим');
+            // Для отладки показываем демо-данные сразу, без ошибки
+            throw new Error('Нет данных от сервера');
+          }
+        } else {
+          console.warn('⚠️ Получены некорректные данные от сервера:', data);
+          throw new Error('Некорректные данные от сервера');
+        }
         
         if (appointmentsData.length > 0) {
           // Обогащаем данные записей информацией о пациентах
@@ -1099,6 +1330,151 @@ const RegistrarPanel = () => {
     loadIntegratedData();
     setIsInitialLoad(false);
   }, [loadAppointments, loadIntegratedData]);
+
+  // Перезагружаем данные при изменении фильтров
+  useEffect(() => {
+    if (initialLoadRef.current) {
+      console.log('🔄 Фильтры изменились, перезагружаем данные...');
+      loadAppointments({ silent: true });
+    }
+  }, [searchDate, searchQuery, statusFilter, loadAppointments]);
+
+  // Функция для загрузки дополнительных записей
+  const loadMoreAppointments = useCallback(async () => {
+    if (paginationInfo.loadingMore || !paginationInfo.hasMore) return;
+    
+    setPaginationInfo(prev => ({ ...prev, loadingMore: true }));
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      
+      // Используем новый эндпоинт для получения очередей на сегодня
+      const response = await fetch(`${API_BASE}/api/v1/registrar/queues/today${activeTab ? `?department=${activeTab}` : ''}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+
+        // Новый формат: данные сгруппированы по специальностям
+        let newAppointments = [];
+
+        if (data && typeof data === 'object') {
+          console.log('📊 Получены данные от сервера (дополнительно):', data);
+
+          // Обрабатываем формат от эндпоинта registrar_integration.py
+          if (data.queues && Array.isArray(data.queues)) {
+            // Если задана конкретная специальность, фильтруем очереди
+            if (activeTab) {
+              // Находим очередь для указанной специальности
+              const targetQueue = data.queues.find(queue =>
+                queue.specialty === activeTab ||
+                (activeTab === 'cardio' && queue.specialty === 'cardiology') ||
+                (activeTab === 'derma' && queue.specialty === 'dermatology') ||
+                (activeTab === 'dental' && queue.specialty === 'stomatology') ||
+                (activeTab === 'lab' && queue.specialty === 'laboratory')
+              );
+
+              if (targetQueue && targetQueue.entries) {
+                newAppointments = targetQueue.entries.map(entry => ({
+                  id: entry.id,
+                  patient_id: null,
+                  patient_fio: entry.patient_name,
+                  patient_phone: entry.phone,
+                  doctor_id: null,
+                  department: targetQueue.specialty,
+                  appointment_date: data.date,
+                  appointment_time: null,
+                  status: entry.status,
+                  services: [],
+                  service_codes: [],
+                  source: entry.source,
+                  queue_numbers: [{
+                    queue_tag: targetQueue.specialty,
+                    queue_name: targetQueue.specialist_name,
+                    number: entry.number,
+                    status: entry.status,
+                    source: entry.source,
+                    created_at: entry.created_at
+                  }],
+                  confirmation_status: 'none',
+                  confirmed_at: null,
+                  confirmed_by: null
+                }));
+              } else {
+                newAppointments = [];
+              }
+            } else {
+              // Берем все очереди и объединяем записи
+              for (const queue of data.queues) {
+                if (queue.entries && Array.isArray(queue.entries)) {
+                  const queueAppointments = queue.entries.map(entry => ({
+                    id: entry.id,
+                    patient_id: null,
+                    patient_fio: entry.patient_name,
+                    patient_phone: entry.phone,
+                    doctor_id: queue.specialist_id,
+                    department: queue.specialty,
+                    appointment_date: data.date,
+                    appointment_time: null,
+                    status: entry.status,
+                    services: [],
+                    service_codes: [],
+                    source: entry.source,
+                    queue_numbers: [{
+                      queue_tag: queue.specialty,
+                      queue_name: queue.specialist_name,
+                      number: entry.number,
+                      status: entry.status,
+                      source: entry.source,
+                      created_at: entry.created_at
+                    }],
+                    confirmation_status: 'none',
+                    confirmed_at: null,
+                    confirmed_by: null
+                  }));
+                  newAppointments.push(...queueAppointments);
+                }
+              }
+            }
+          } else {
+            // Обрабатываем старый формат для совместимости
+            if (activeTab && data[activeTab]) {
+              newAppointments = Array.isArray(data[activeTab]) ? data[activeTab] : [];
+            } else {
+              // Берем все специальности и объединяем
+              for (const dept in data) {
+                const deptData = data[dept];
+                if (Array.isArray(deptData)) {
+                  newAppointments.push(...deptData);
+                }
+              }
+            }
+          }
+        }
+
+        if (newAppointments.length > 0) {
+          const enriched = await enrichAppointmentsWithPatientData(newAppointments);
+          setAppointments(prev => [...prev, ...enriched]);
+          setPaginationInfo({
+            total: appointments.length + newAppointments.length,
+            hasMore: false, // Пока не поддерживаем пагинацию в новом формате
+            loadingMore: false
+          });
+        } else {
+          console.warn('⚠️ Нет дополнительных данных от сервера');
+          setPaginationInfo(prev => ({ ...prev, loadingMore: false }));
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки дополнительных записей:', error);
+      setPaginationInfo(prev => ({ ...prev, loadingMore: false }));
+    }
+  }, [paginationInfo, appointments.length, activeTab, API_BASE]);
 
   // Обработчик события из хедера для открытия мастера записи
   useEffect(() => {
@@ -1658,9 +2034,6 @@ const RegistrarPanel = () => {
 
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
-  const searchDate = searchParams.get('date');
-  const searchQuery = (searchParams.get('q') || '').toLowerCase();
-  const statusFilter = searchParams.get('status');
 
   const filteredAppointments = useMemo(() => {
     // console.log('Filtering appointments:', {
@@ -1676,16 +2049,26 @@ const RegistrarPanel = () => {
       if (activeTab && !isInDepartment(appointment, activeTab)) {
         return false;
       }
-      // Фильтр по дате: если не задана, показываем все даты
-      if (searchDate && appointment.date !== searchDate) return false;
-      // Фильтр по статусу
+      // Фильтр по статусу (если задан)
       if (statusFilter && appointment.status !== statusFilter) return false;
-      // Поиск по ФИО/телефону/услугам
+      // Поиск по ФИО/телефону/услугам/ID записи (если задан)
       if (searchQuery) {
         const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
-        const inPhone = (appointment.patient_phone || '').toLowerCase().includes(searchQuery);
+
+        // Поиск по ID записи
+        const inId = String(appointment.id).includes(searchQuery);
+
+        // Улучшенный поиск по телефону - ищем и в исходном, и в отформатированном виде
+        const originalPhone = (appointment.patient_phone || '').toLowerCase();
+        const phoneDigits = originalPhone.replace(/\D/g, ''); // Только цифры
+        const searchDigits = searchQuery.replace(/\D/g, ''); // Только цифры из поиска
+
+        const inPhone = originalPhone.includes(searchQuery) ||
+                       phoneDigits.includes(searchDigits) ||
+                       (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+
         const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
-        if (!inFio && !inPhone && !inServices) return false;
+        if (!inFio && !inPhone && !inServices && !inId) return false;
       }
     return true;
   });
@@ -1748,7 +2131,10 @@ const RegistrarPanel = () => {
           textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
         }}>
           <span>✅</span>
-          <span>Данные загружены с сервера ({count} записей)</span>
+          <span>Данные загружены с сервера</span>
+          <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
+            {count} из {paginationInfo.total} записей
+          </span>
         </div>
       );
     }
@@ -2303,7 +2689,7 @@ const RegistrarPanel = () => {
             <DataSourceIndicator count={appointments.length} />
 
             <EnhancedAppointmentsTable
-              data={appointments.slice(0, 5)}
+              data={filteredAppointments}
               loading={appointmentsLoading}
               theme={theme}
               language={language}
@@ -2605,6 +2991,56 @@ const RegistrarPanel = () => {
                     }
                   }}
                 />
+              )}
+              
+              {/* Кнопка загрузки дополнительных записей */}
+              {paginationInfo.hasMore && (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  padding: '16px',
+                  borderTop: `1px solid ${theme === 'light' ? '#e5e7eb' : '#374151'}`
+                }}>
+                  <button
+                    onClick={loadMoreAppointments}
+                    disabled={paginationInfo.loadingMore}
+                    style={{
+                      padding: '12px 24px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: paginationInfo.loadingMore 
+                        ? '#9ca3af' 
+                        : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: paginationInfo.loadingMore ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                    }}
+                  >
+                    {paginationInfo.loadingMore ? (
+                      <>
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '2px solid rgba(255,255,255,0.3)',
+                          borderTop: '2px solid white',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }} />
+                        Загрузка...
+                      </>
+                    ) : (
+                      <>
+                        📥 Загрузить еще
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
               
               {/* Старая таблица и legacy-конфигурация удалены - используется EnhancedAppointmentsTable */}
