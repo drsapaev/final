@@ -1,13 +1,14 @@
 name: ⚡ Нагрузочное тестирование
 
 on:
-  schedule:
-    - cron: '0 4 * * *'  # Ежедневно в 4:00 UTC
-  workflow_run:
-    workflows: ["🏥 CI/CD Pipeline - Клиника (Unified)"]
-    types: [completed]
-    branches: [main]  # Только после успешного CI/CD на main
-  workflow_dispatch:  # Ручной запуск
+  # Временно отключен для стабильности CI/CD
+  # schedule:
+  #   - cron: '0 4 * * *'  # Ежедневно в 4:00 UTC
+  # workflow_run:
+  #   workflows: ["🏥 CI/CD Pipeline - Клиника (Unified)"]
+  #   types: [completed]
+  #   branches: [main]  # Только после успешного CI/CD на main
+  workflow_dispatch:  # Только ручной запуск
 
 jobs:
   load-testing:
