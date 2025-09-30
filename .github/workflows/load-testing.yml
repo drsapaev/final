@@ -1,15 +1,17 @@
 name: ⚡ Нагрузочное тестирование
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
-  schedule:
-    - cron: '0 4 * * *'
-  workflow_run:
-    workflows: ["🏥 CI/CD Pipeline - Клиника (Unified)"]
-    types: [completed]
+  # Временно отключен для отладки
+  # push:
+  #   branches: [ main, develop ]
+  # pull_request:
+  #   branches: [ main, develop ]
+  # schedule:
+  #   - cron: '0 4 * * *'
+  # workflow_run:
+  #   workflows: ["🏥 CI/CD Pipeline - Клиника (Unified)"]
+  #   types: [completed]
+  workflow_dispatch:  # Только ручной запуск
 
 jobs:
   load-testing:
