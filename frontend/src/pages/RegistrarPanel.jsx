@@ -1069,16 +1069,21 @@ const RegistrarPanel = () => {
                 appointmentsData = targetQueue.entries.map((entry, index) => {
                   const appointment = {
                     id: entry.id,
-                    patient_id: null, // Неизвестен из данных очереди
+                    patient_id: entry.patient_id,
                     patient_fio: entry.patient_name,
+                    patient_birth_year: entry.patient_birth_year,
                     patient_phone: entry.phone,
-                    doctor_id: null,
+                    address: entry.address,
+                    doctor_id: targetQueue.specialist_id,
                     department: targetQueue.specialty,
                     appointment_date: data.date,
-                    appointment_time: null,
+                    appointment_time: entry.visit_time,
                     status: entry.status,
-                    services: [],
-                    service_codes: [],
+                    services: entry.services || [],
+                    service_codes: entry.service_codes || [],
+                    cost: entry.cost || 0,
+                    payment_status: entry.payment_status || 'pending',
+                    discount_mode: entry.discount_mode,
                     source: entry.source,
                     queue_numbers: [{
                       queue_tag: targetQueue.specialty,
@@ -1112,16 +1117,21 @@ const RegistrarPanel = () => {
                   const queueAppointments = queue.entries.map((entry, index) => {
                     const appointment = {
                       id: entry.id,
-                      patient_id: null,
+                      patient_id: entry.patient_id,
                       patient_fio: entry.patient_name,
+                      patient_birth_year: entry.patient_birth_year,
                       patient_phone: entry.phone,
+                      address: entry.address,
                       doctor_id: queue.specialist_id,
                       department: queue.specialty,
                       appointment_date: data.date,
-                      appointment_time: null,
+                      appointment_time: entry.visit_time,
                       status: entry.status,
-                      services: [],
-                      service_codes: [],
+                      services: entry.services || [],
+                      service_codes: entry.service_codes || [],
+                      cost: entry.cost || 0,
+                      payment_status: entry.payment_status || 'pending',
+                      discount_mode: entry.discount_mode,
                       source: entry.source,
                       queue_numbers: [{
                         queue_tag: queue.specialty,
@@ -1555,10 +1565,16 @@ const RegistrarPanel = () => {
       // Проверяем, не оплачена ли уже запись
       const paymentStatus = (appointment.payment_status || '').toLowerCase();
       const status = (appointment.status || '').toLowerCase();
-      console.log('Текущий статус оплаты:', paymentStatus, 'Статус записи:', status);
+      const discountMode = (appointment.discount_mode || '').toLowerCase();
       
-      if (paymentStatus === 'paid' || status === 'paid' || status === 'queued') {
-        toast('Запись уже оплачена', { icon: 'ℹ️' });
+      console.log('Текущий статус оплаты:', paymentStatus, 'Статус записи:', status, 'Discount mode:', discountMode);
+      
+      // Проверяем статус оплаты и discount_mode
+      if (paymentStatus === 'paid' || 
+          status === 'paid' || 
+          status === 'queued' ||
+          discountMode === 'paid') {
+        toast.info('Запись уже оплачена');
         return appointment;
       }
       
