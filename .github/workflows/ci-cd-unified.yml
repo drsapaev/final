@@ -147,7 +147,7 @@ jobs:
     - name: 🧪 Запуск тестов
       run: |
         cd backend
-        pytest tests/ -v --cov=app --cov-report=xml --cov-report=html --dead-fixtures || echo "⚠️ Backend тесты не прошли"
+        pytest tests/ --dead-fixtures || echo "⚠️ Backend тесты не прошли"
     
     - name: 📊 Загрузка отчета покрытия
       uses: actions/upload-artifact@v4
