@@ -434,55 +434,233 @@ def get_today_queues(
     """
     Получить все очереди на сегодня для регистратуры
     Из detail.md стр. 363: GET /api/queue/today?specialist_id
+    
+    ОБНОВЛЕНО: Теперь получаем данные из Visit вместо DailyQueue
     """
     try:
+        from app.models.visit import Visit
+        from app.models.appointment import Appointment
+        from app.models.patient import Patient
+        from app.models.clinic import Doctor
+        
         today = date.today()
         
-        # Получаем все дневные очереди
-        daily_queues = db.query(crud_queue.DailyQueue).filter(
-            crud_queue.DailyQueue.day == today
+        # Получаем все визиты на сегодня (новая система)
+        visits = db.query(Visit).filter(
+            Visit.visit_date == today
         ).all()
         
-        result = []
-        for queue in daily_queues:
-            # Получаем записи очереди
-            entries = db.query(crud_queue.QueueEntry).filter(
-                crud_queue.QueueEntry.queue_id == queue.id
-            ).order_by(crud_queue.QueueEntry.number).all()
+        # Получаем все appointments на сегодня (старая система)
+        appointments = db.query(Appointment).filter(
+            Appointment.appointment_date == today
+        ).all()
+        
+        # Группируем записи по специальности
+        queues_by_specialty = {}
+        
+        # Обрабатываем Visit (новая система)
+        for visit in visits:
+            specialty = visit.department or "general"
             
-            # Получаем врача
-            doctor = queue.specialist
+            if specialty not in queues_by_specialty:
+                queues_by_specialty[specialty] = {
+                    "entries": [],
+                    "doctor": None,
+                    "doctor_id": visit.doctor_id
+                }
+            
+            queues_by_specialty[specialty]["entries"].append({
+                "type": "visit",
+                "data": visit,
+                "created_at": visit.confirmed_at or visit.created_at
+            })
+            
+            # Сохраняем первого врача из этой специальности
+            if not queues_by_specialty[specialty]["doctor"] and visit.doctor:
+                queues_by_specialty[specialty]["doctor"] = visit.doctor
+        
+        # Обрабатываем Appointment (старая система)
+        for appointment in appointments:
+            # Определяем специальность из appointment
+            specialty = getattr(appointment, 'department', None) or "general"
+            
+            if specialty not in queues_by_specialty:
+                queues_by_specialty[specialty] = {
+                    "entries": [],
+                    "doctor": None,
+                    "doctor_id": getattr(appointment, 'doctor_id', None)
+                }
+            
+            queues_by_specialty[specialty]["entries"].append({
+                "type": "appointment",
+                "data": appointment,
+                "created_at": appointment.created_at
+            })
+            
+            # Сохраняем врача
+            if not queues_by_specialty[specialty]["doctor"] and hasattr(appointment, 'doctor') and appointment.doctor:
+                queues_by_specialty[specialty]["doctor"] = appointment.doctor
+        
+        # Формируем результат
+        result = []
+        queue_number = 1
+        
+        for specialty, data in queues_by_specialty.items():
+            doctor = data["doctor"]
+            entries_list = data["entries"]
+            
+            # Сортируем записи по времени создания/подтверждения
+            entries_list.sort(key=lambda e: e["created_at"])
+            
+            entries = []
+            for idx, entry_wrapper in enumerate(entries_list, 1):
+                entry_type = entry_wrapper["type"]
+                entry_data = entry_wrapper["data"]
+                
+                # Инициализируем общие переменные
+                patient_id = None
+                patient_name = "Неизвестный пациент"
+                phone = "Не указан"
+                patient_birth_year = None
+                address = None
+                services = []
+                service_codes = []
+                total_cost = 0
+                source = "desk"
+                entry_status = "waiting"
+                visit_time = None
+                discount_mode = "none"
+                record_id = None
+                
+                if entry_type == "visit":
+                    # Обработка Visit
+                    visit = entry_data
+                    record_id = visit.id
+                    patient_id = visit.patient_id
+                    visit_time = visit.visit_time
+                    discount_mode = visit.discount_mode
+                    
+                    # Загружаем пациента
+                    patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                    if patient:
+                        patient_name = f"{patient.last_name} {patient.first_name}"
+                        if patient.middle_name:
+                            patient_name += f" {patient.middle_name}"
+                        phone = patient.phone or "Не указан"
+                        if patient.birth_date:
+                            patient_birth_year = patient.birth_date.year
+                        address = patient.address
+                    
+                    # Загружаем услуги визита
+                    from app.models.visit import VisitService
+                    visit_services = db.query(VisitService).filter(
+                        VisitService.visit_id == visit.id
+                    ).all()
+                    
+                    for vs in visit_services:
+                        if vs.name:
+                            services.append(vs.name)
+                        if vs.code:
+                            service_codes.append(vs.code)
+                        if vs.price:
+                            total_cost += float(vs.price) * (vs.qty or 1)
+                    
+                    # Определяем источник записи
+                    if visit.confirmed_by:
+                        if "telegram" in visit.confirmed_by.lower():
+                            source = "online"
+                        elif "registrar" in visit.confirmed_by.lower():
+                            source = "confirmation"
+                    
+                    # Определяем статус
+                    status_mapping = {
+                        "confirmed": "waiting",
+                        "pending_confirmation": "waiting",
+                        "in_progress": "called",
+                        "completed": "served",
+                        "cancelled": "no_show"
+                    }
+                    entry_status = status_mapping.get(visit.status, "waiting")
+                
+                elif entry_type == "appointment":
+                    # Обработка Appointment
+                    appointment = entry_data
+                    record_id = appointment.id
+                    patient_id = appointment.patient_id
+                    visit_time = str(appointment.appointment_time) if hasattr(appointment, 'appointment_time') else None
+                    
+                    # Загружаем пациента
+                    patient = db.query(Patient).filter(Patient.id == appointment.patient_id).first()
+                    if patient:
+                        patient_name = f"{patient.last_name} {patient.first_name}"
+                        if patient.middle_name:
+                            patient_name += f" {patient.middle_name}"
+                        phone = patient.phone or "Не указан"
+                        if patient.birth_date:
+                            patient_birth_year = patient.birth_date.year
+                        address = patient.address
+                    
+                    # Загружаем услуги из appointment
+                    # TODO: Определить как хранятся услуги в Appointment
+                    if hasattr(appointment, 'services'):
+                        # Если есть поле services
+                        services = appointment.services if isinstance(appointment.services, list) else []
+                    
+                    # Примерная стоимость
+                    if hasattr(appointment, 'total_price'):
+                        total_cost = float(appointment.total_price)
+                    
+                    # Определяем статус
+                    status_mapping = {
+                        "scheduled": "waiting",
+                        "confirmed": "waiting",
+                        "in_progress": "called",
+                        "completed": "served",
+                        "cancelled": "no_show"
+                    }
+                    entry_status = status_mapping.get(appointment.status, "waiting")
+                    
+                    source = "desk"  # Appointment обычно создается регистратором
+                
+                entries.append({
+                    "id": record_id,
+                    "number": idx,
+                    "patient_id": patient_id,
+                    "patient_name": patient_name,
+                    "patient_birth_year": patient_birth_year,
+                    "phone": phone,
+                    "address": address,
+                    "services": services,
+                    "service_codes": service_codes,
+                    "cost": total_cost,
+                    "payment_status": "paid" if discount_mode == "paid" else "pending",
+                    "source": source,
+                    "status": entry_status,
+                    "created_at": entry_wrapper["created_at"].isoformat() if entry_wrapper["created_at"] else None,
+                    "called_at": None,
+                    "visit_time": visit_time,
+                    "discount_mode": discount_mode
+                })
             
             queue_data = {
-                "queue_id": queue.id,
-                "specialist_id": queue.specialist_id,
-                "specialist_name": doctor.user.full_name if doctor.user else f"Врач #{doctor.id}",
-                "specialty": doctor.specialty,
-                "cabinet": doctor.cabinet,
-                "opened_at": queue.opened_at,
-                "entries": [
-                    {
-                        "id": entry.id,
-                        "number": entry.number,
-                        "patient_name": entry.patient_name or (entry.patient.first_name + " " + entry.patient.last_name if entry.patient else "Пациент"),
-                        "phone": entry.phone,
-                        "source": entry.source,
-                        "status": entry.status,
-                        "created_at": entry.created_at,
-                        "called_at": entry.called_at
-                    }
-                    for entry in entries
-                ],
+                "queue_id": queue_number,
+                "specialist_id": data["doctor_id"],
+                "specialist_name": doctor.user.full_name if doctor and doctor.user else f"Врач",
+                "specialty": specialty,
+                "cabinet": doctor.cabinet if doctor else "N/A",
+                "opened_at": datetime.now().isoformat(),
+                "entries": entries,
                 "stats": {
                     "total": len(entries),
-                    "waiting": len([e for e in entries if e.status == "waiting"]),
-                    "called": len([e for e in entries if e.status == "called"]),
-                    "served": len([e for e in entries if e.status == "served"]),
-                    "online_entries": len([e for e in entries if e.source == "online"])
+                    "waiting": len([e for e in entries if e["status"] == "waiting"]),
+                    "called": len([e for e in entries if e["status"] == "called"]),
+                    "served": len([e for e in entries if e["status"] == "served"]),
+                    "online_entries": len([e for e in entries if e["source"] == "online"])
                 }
             }
             
             result.append(queue_data)
+            queue_number += 1
         
         return {
             "queues": result,
@@ -491,6 +669,8 @@ def get_today_queues(
         }
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения очередей: {str(e)}"

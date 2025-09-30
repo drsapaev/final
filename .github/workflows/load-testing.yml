@@ -15,7 +15,7 @@ jobs:
     name: ⚡ Нагрузочное тестирование
     runs-on: ubuntu-latest
     continue-on-error: true  # Весь job не блокирует workflow
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     
     steps:
     - uses: actions/checkout@v4
