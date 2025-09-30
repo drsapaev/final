@@ -28,9 +28,16 @@ jobs:
       run: |
         cd backend
         echo "📦 Устанавливаем инструменты нагрузочного тестирования..."
+        python -m pip install --upgrade pip
         pip install --no-cache-dir httpx websockets
         pip install --no-cache-dir -r requirements.txt
         echo "✅ Инструменты установлены"
+        
+        # Проверяем установленные пакеты
+        echo "📋 Проверяем критические пакеты..."
+        python -c "import fastapi; print(f'FastAPI: {fastapi.__version__}')"
+        python -c "import sqlalchemy; print(f'SQLAlchemy: {sqlalchemy.__version__}')"
+        python -c "import httpx; print(f'httpx: {httpx.__version__}')"
         
     - name: 🗄️ Проверка базы данных
       run: |
@@ -38,6 +45,18 @@ jobs:
         export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
+        
+        echo "🗄️ Проверяем состояние базы данных..."
+        echo "📊 DATABASE_URL: $DATABASE_URL"
+        echo "📁 Текущая директория: $(pwd)"
+        echo "📁 Содержимое директории:"
+        ls -la
+        
+        # Проверяем наличие основного файла приложения
+        if [ ! -f "app/main.py" ]; then
+          echo "❌ Файл app/main.py не найден!"
+          exit 1
+        fi
         
         echo "🗄️ Проверяем существующую базу clinic.db..."
         if [ -f "clinic.db" ]; then
@@ -47,14 +66,33 @@ jobs:
             echo "⚠️ База данных clinic.db не найдена, создаем..."
             python -c "
             import sys
+            import os
+            import traceback
             sys.path.insert(0, '.')
+            
+            print('🔧 Начинаем создание базы данных...')
+            
             try:
                 from app.db.base import Base
                 from app.db.session import engine
+                print('✅ Импорт базовых компонентов БД успешен')
+                
+                # Импортируем модели для создания таблиц
+                try:
+                    import app.models
+                    print('✅ Импорт всех моделей успешен')
+                except ImportError as e:
+                    print(f'⚠️ Ошибка импорта моделей: {e}')
+                    from app.models.user import User
+                    print('✅ Импорт базовой модели User успешен')
+                
                 Base.metadata.create_all(bind=engine)
                 print('✅ База данных создана')
+                
             except Exception as e:
-                print('❌ Ошибка создания базы:', e)
+                print(f'❌ Ошибка создания базы: {e}')
+                print('📋 Детали ошибки:')
+                traceback.print_exc()
                 sys.exit(1)
             "
         fi
@@ -67,13 +105,22 @@ jobs:
         export WS_DEV_ALLOW="1"
         
         echo "🚀 Запускаем сервер для нагрузочного тестирования..."
+        
+        # Проверяем наличие основного файла приложения
+        if [ ! -f "app/main.py" ]; then
+          echo "❌ Файл app/main.py не найден!"
+          exit 1
+        fi
+        
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         server_pid=$!
         echo $server_pid > server.pid
+        echo "📊 PID сервера: $server_pid"
         
         # Ждем запуска сервера с проверкой
         echo "⏳ Ожидаем запуск сервера..."
         for i in {1..30}; do
+            echo "🔄 Попытка $i/30..."
             if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
                 echo "✅ Сервер запущен успешно"
                 break
@@ -82,6 +129,8 @@ jobs:
                 echo "❌ Не удалось дождаться запуска сервера"
                 echo "📄 Логи сервера:"
                 cat server.log || echo "Логи недоступны"
+                echo "📊 Проверяем процессы:"
+                ps aux | grep uvicorn || echo "Процессы uvicorn не найдены"
                 kill $server_pid 2>/dev/null || true
                 exit 1
             fi
@@ -97,10 +146,17 @@ jobs:
         
         echo "⚡ Запускаем нагрузочное тестирование API..."
         
+        # Проверяем, что сервер запущен
+        if ! curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
+            echo "❌ Сервер не отвечает на health check!"
+            exit 1
+        fi
+        
         cat > load_test_api.py << 'EOF'
         import asyncio
         import httpx
         import time
+        import sys
         
         async def test_endpoint(client, endpoint):
             try:
@@ -119,40 +175,50 @@ jobs:
             print(f"🚀 Тестируем {len(endpoints)} эндпоинтов")
             print(f"📊 Количество запросов: 100")
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                start_time = time.time()
-                
-                tasks = []
-                for _ in range(100):
-                    for endpoint in endpoints:
-                        task = test_endpoint(client, endpoint)
-                        tasks.append(task)
-                
-                results = await asyncio.gather(*tasks)
-                
-                end_time = time.time()
-                total_time = end_time - start_time
-                
-                successful_requests = sum(1 for status, _ in results if status == 200)
-                
-                print(f"\n📊 РЕЗУЛЬТАТЫ:")
-                print(f"⏱️  Общее время: {total_time:.2f} секунд")
-                print(f"✅ Успешных запросов: {successful_requests}")
-                print(f"📈 Успешность: {(successful_requests/len(results)*100):.1f}%")
-                
-                if successful_requests >= len(results) * 0.8:
-                    print(f"\n🎉 ТЕСТ ПРОЙДЕН: Хорошая производительность!")
-                    return True
-                else:
-                    print(f"\n❌ ТЕСТ НЕ ПРОЙДЕН: Успешность {successful_requests/len(results)*100:.1f}% < 80%")
-                    return False
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    start_time = time.time()
+                    
+                    tasks = []
+                    for _ in range(100):
+                        for endpoint in endpoints:
+                            task = test_endpoint(client, endpoint)
+                            tasks.append(task)
+                    
+                    results = await asyncio.gather(*tasks)
+                    
+                    end_time = time.time()
+                    total_time = end_time - start_time
+                    
+                    successful_requests = sum(1 for status, _ in results if status == 200)
+                    
+                    print(f"\n📊 РЕЗУЛЬТАТЫ:")
+                    print(f"⏱️  Общее время: {total_time:.2f} секунд")
+                    print(f"✅ Успешных запросов: {successful_requests}")
+                    print(f"📈 Успешность: {(successful_requests/len(results)*100):.1f}%")
+                    
+                    if successful_requests >= len(results) * 0.8:
+                        print(f"\n🎉 ТЕСТ ПРОЙДЕН: Хорошая производительность!")
+                        return True
+                    else:
+                        print(f"\n❌ ТЕСТ НЕ ПРОЙДЕН: Успешность {successful_requests/len(results)*100:.1f}% < 80%")
+                        return False
+                        
+            except Exception as e:
+                print(f"❌ Критическая ошибка при нагрузочном тестировании: {e}")
+                return False
         
         if __name__ == "__main__":
             result = asyncio.run(load_test())
-            exit(0 if result else 1)
+            sys.exit(0 if result else 1)
         EOF
         
-        python load_test_api.py
+        python load_test_api.py || {
+            echo "❌ Нагрузочное тестирование завершилось с ошибкой"
+            echo "📋 Попытка диагностики..."
+            curl -v "http://127.0.0.1:8000/api/v1/health" || echo "Health check недоступен"
+            exit 1
+        }
         
     - name: 📊 Создание отчёта
       run: |
