@@ -1402,22 +1402,58 @@ def get_visits(
 
 # ===================== ПРОСТОЙ ЭНДПОИНТ ДЛЯ ОБЪЕДИНЕНИЯ ДАННЫХ =====================
 
+
+
 @router.get("/registrar/all-appointments")
 def get_all_appointments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
-    limit: int = Query(50, ge=1, le=100)
+    limit: int = Query(200, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    search: Optional[str] = Query(None, description="Поиск по ФИО, телефону или услугам")
 ):
     """Простое объединение appointments + visits для фронтенда"""
     try:
         from app.models.appointment import Appointment
         from app.models.visit import Visit
         from app.models.patient import Patient
+        from sqlalchemy import or_, func
         
         result = []
         
-        # 1. Получаем старые appointments
-        appointments = db.query(Appointment).order_by(Appointment.created_at.desc()).limit(limit//2).all()
+        # 1. Получаем старые appointments с фильтрацией
+        appointments_query = db.query(Appointment)
+        
+        # Применяем фильтры по дате
+        if date_from:
+            appointments_query = appointments_query.filter(Appointment.appointment_date >= date_from)
+        if date_to:
+            appointments_query = appointments_query.filter(Appointment.appointment_date <= date_to)
+        
+        # Применяем поиск
+        if search:
+            # Для поиска по телефону извлекаем только цифры
+            search_digits = ''.join(filter(str.isdigit, search))
+            
+            if search_digits:
+                # Поиск по ФИО, телефону и ID записи (включая только цифры)
+                appointments_query = appointments_query.join(Patient, Appointment.patient_id == Patient.id).filter(
+                    or_(
+                        Patient.full_name.ilike(f"%{search}%"),
+                        Patient.phone.ilike(f"%{search}%"),
+                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(f"%{search_digits}%"),
+                        Appointment.id.cast(String).ilike(f"%{search_digits}%")
+                    )
+                )
+            else:
+                # Если нет цифр, ищем только по ФИО
+                appointments_query = appointments_query.join(Patient, Appointment.patient_id == Patient.id).filter(
+                    Patient.full_name.ilike(f"%{search}%")
+                )
+        
+        appointments = appointments_query.order_by(Appointment.created_at.desc()).limit(limit//2).all()
         for apt in appointments:
             # Получаем имя пациента
             patient_fio = None
@@ -1468,8 +1504,37 @@ def get_all_appointments(
                 'confirmed_by': None
             })
         
-        # 2. Получаем новые visits
-        visits = db.query(Visit).order_by(Visit.created_at.desc()).limit(limit//2).all()
+        # 2. Получаем новые visits с фильтрацией
+        visits_query = db.query(Visit)
+        
+        # Применяем фильтры по дате
+        if date_from:
+            visits_query = visits_query.filter(Visit.visit_date >= date_from)
+        if date_to:
+            visits_query = visits_query.filter(Visit.visit_date <= date_to)
+        
+        # Применяем поиск
+        if search:
+            # Для поиска по телефону извлекаем только цифры
+            search_digits = ''.join(filter(str.isdigit, search))
+            
+            if search_digits:
+                # Поиск по ФИО, телефону и ID записи (включая только цифры)
+                visits_query = visits_query.join(Patient, Visit.patient_id == Patient.id).filter(
+                    or_(
+                        Patient.full_name.ilike(f"%{search}%"),
+                        Patient.phone.ilike(f"%{search}%"),
+                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(f"%{search_digits}%"),
+                        Visit.id.cast(String).ilike(f"%{search_digits}%")
+                    )
+                )
+            else:
+                # Если нет цифр, ищем только по ФИО
+                visits_query = visits_query.join(Patient, Visit.patient_id == Patient.id).filter(
+                    Patient.full_name.ilike(f"%{search}%")
+                )
+        
+        visits = visits_query.order_by(Visit.created_at.desc()).limit(limit//2).all()
         for visit in visits:
             # Получаем имя пациента
             patient_fio = None
@@ -1573,7 +1638,16 @@ def get_all_appointments(
         # Сортируем по дате создания
         result.sort(key=lambda x: x['created_at'], reverse=True)
         
-        return result[:limit]
+        # Применяем пагинацию
+        paginated_result = result[offset:offset + limit]
+        
+        return {
+            "data": paginated_result,
+            "total": len(result),
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + limit < len(result)
+        }
         
     except Exception as e:
         raise HTTPException(

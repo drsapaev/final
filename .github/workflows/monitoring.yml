@@ -20,9 +20,16 @@ jobs:
       run: |
         cd backend
         echo "📦 Устанавливаем Python зависимости..."
+        python -m pip install --upgrade pip
         pip install --no-cache-dir -r requirements.txt
         pip install --no-cache-dir httpx
         echo "✅ Зависимости установлены"
+        
+        # Проверяем установленные пакеты
+        echo "📋 Проверяем критические пакеты..."
+        python -c "import fastapi; print(f'FastAPI: {fastapi.__version__}')"
+        python -c "import sqlalchemy; print(f'SQLAlchemy: {sqlalchemy.__version__}')"
+        python -c "import alembic; print(f'Alembic: {alembic.__version__}')"
         
     - name: 🗄️ Проверка базы данных
       run: |
@@ -30,9 +37,34 @@ jobs:
         export DATABASE_URL="sqlite:///./clinic.db"
         
         echo "🗄️ Проверяем состояние базы данных..."
+        echo "📊 DATABASE_URL: $DATABASE_URL"
+        echo "📁 Текущая директория: $(pwd)"
+        echo "📁 Содержимое директории:"
+        ls -la
         
-        # Запускаем скрипт проверки базы данных
-        python check_db_workflow.py
+        # Проверяем наличие скрипта
+        if [ ! -f "check_db_workflow.py" ]; then
+          echo "❌ Скрипт check_db_workflow.py не найден!"
+          exit 1
+        fi
+        
+        echo "✅ Скрипт найден, запускаем проверку..."
+        
+        # Запускаем скрипт проверки базы данных с подробным выводом
+        python check_db_workflow.py || {
+          echo "❌ Скрипт проверки БД завершился с ошибкой"
+          echo "📋 Попытка диагностики..."
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          try:
+              from app.db.session import engine
+              print('✅ Импорт engine успешен')
+          except Exception as e:
+              print(f'❌ Ошибка импорта engine: {e}')
+          "
+          exit 1
+        }
         
     - name: 🔌 Проверка API эндпоинтов
       run: |
@@ -43,15 +75,23 @@ jobs:
         
         echo "🔌 Проверяем API эндпоинты..."
         
+        # Проверяем наличие основного файла приложения
+        if [ ! -f "app/main.py" ]; then
+          echo "❌ Файл app/main.py не найден!"
+          exit 1
+        fi
+        
         # Запускаем сервер в фоне
         echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         server_pid=$!
         echo $server_pid > server.pid
+        echo "📊 PID сервера: $server_pid"
         
         # Ждем запуска сервера с проверкой
         echo "⏳ Ожидаем запуск сервера..."
         for i in {1..30}; do
+            echo "🔄 Попытка $i/30..."
             if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
                 echo "✅ Сервер запущен успешно"
                 break
@@ -60,6 +100,8 @@ jobs:
                 echo "❌ Не удалось дождаться запуска сервера"
                 echo "📄 Логи сервера:"
                 cat server.log || echo "Логи недоступны"
+                echo "📊 Проверяем процессы:"
+                ps aux | grep uvicorn || echo "Процессы uvicorn не найдены"
                 kill $server_pid 2>/dev/null || true
                 exit 1
             fi
@@ -74,16 +116,24 @@ jobs:
             "/api/v1/appointments/stats?department=general&date=2024-01-01"
         )
         
+        echo "🔍 Проверяем ${#endpoints[@]} эндпоинтов..."
+        failed_endpoints=0
+        
         for endpoint in "${endpoints[@]}"; do
+            echo "🔄 Проверяем ${endpoint}..."
             response=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://127.0.0.1:8000${endpoint}" 2>/dev/null)
             if [ "$response" = "200" ]; then
                 echo "✅ ${endpoint}: HTTP ${response}"
             elif [ -n "$response" ]; then
                 echo "⚠️ ${endpoint}: HTTP ${response}"
+                failed_endpoints=$((failed_endpoints + 1))
             else
                 echo "❌ ${endpoint}: недоступен или timeout"
+                failed_endpoints=$((failed_endpoints + 1))
             fi
         done
+        
+        echo "📊 Результат проверки эндпоинтов: $(( ${#endpoints[@]} - failed_endpoints ))/${#endpoints[@]} успешно"
         
         # Останавливаем сервер
         echo "🛑 Останавливаем сервер..."
@@ -96,6 +146,12 @@ jobs:
             kill -9 $server_pid 2>/dev/null || true
             rm server.pid
             echo "✅ Сервер остановлен"
+        fi
+        
+        # Если слишком много эндпоинтов недоступно, считаем это ошибкой
+        if [ $failed_endpoints -gt 2 ]; then
+            echo "❌ Слишком много эндпоинтов недоступно: $failed_endpoints"
+            exit 1
         fi
         
         # Cleanup - убиваем все возможные uvicorn процессы на этом порту

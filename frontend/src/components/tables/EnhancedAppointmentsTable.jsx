@@ -611,106 +611,135 @@ const EnhancedAppointmentsTable = ({
 
   // Функция для отображения номеров очередей
   const renderQueueNumbers = useCallback((row) => {
-    // Если есть номера очередей из нового API
-    if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          {row.queue_numbers.map((queue, index) => {
-            // Определяем цвета и иконки для статусов
-            const statusConfig = {
-              waiting: { 
-                bg: colors.warning, 
-                icon: '⏳', 
-                text: 'Ожидает',
-                pulse: true 
-              },
-              called: { 
-                bg: colors.accent, 
-                icon: '📢', 
-                text: 'Вызван',
-                pulse: true 
-              },
-              served: { 
-                bg: colors.success, 
-                icon: '✅', 
-                text: 'Обслужен',
-                pulse: false 
-              },
-              no_show: { 
-                bg: colors.error, 
-                icon: '❌', 
-                text: 'Не явился',
-                pulse: false 
-              }
-            };
-            
-            const config = statusConfig[queue.status] || statusConfig.waiting;
-            
-            return (
-              <div 
-                key={index} 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '4px',
-                  padding: '2px',
-                  borderRadius: '6px',
-                  backgroundColor: config.bg + '10',
-                  border: `1px solid ${config.bg}30`
-                }}
-                title={`${queue.queue_name}: №${queue.number} (${config.text})`}
-              >
-                <span style={{
-                  padding: '3px 6px',
-                  backgroundColor: config.bg,
-                  color: 'white',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  minWidth: '24px',
-                  textAlign: 'center',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  animation: config.pulse ? 'pulse 2s infinite' : 'none'
-                }}>
-                  {queue.number}
-                </span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <span style={{
-                    fontSize: '10px',
-                    color: config.bg,
-                    fontWeight: '600',
-                    maxWidth: '70px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {queue.queue_name}
-                  </span>
-                  <span style={{
-                    fontSize: '9px',
-                    color: colors.textSecondary,
+    // Получаем текущую дату
+    const today = new Date().toISOString().split('T')[0];
+
+    // Если запись на текущий день - показываем номер в очереди
+    if (row.date === today || row.appointment_date === today) {
+      // Если есть номера очередей из нового API
+      if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            {row.queue_numbers.map((queue, index) => {
+              // Определяем цвета и иконки для статусов
+              const statusConfig = {
+                waiting: {
+                  bg: colors.warning,
+                  icon: '⏳',
+                  text: 'Ожидает',
+                  pulse: true
+                },
+                called: {
+                  bg: colors.accent,
+                  icon: '📢',
+                  text: 'Вызван',
+                  pulse: true
+                },
+                served: {
+                  bg: colors.success,
+                  icon: '✅',
+                  text: 'Обслужен',
+                  pulse: false
+                },
+                no_show: {
+                  bg: colors.error,
+                  icon: '❌',
+                  text: 'Не явился',
+                  pulse: false
+                }
+              };
+
+              const config = statusConfig[queue.status] || statusConfig.waiting;
+
+              return (
+                <div
+                  key={index}
+                  style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '2px'
+                    gap: '4px',
+                    padding: '2px',
+                    borderRadius: '6px',
+                    backgroundColor: config.bg + '10',
+                    border: `1px solid ${config.bg}30`
+                  }}
+                  title={`${queue.queue_name}: №${queue.number} (${config.text})`}
+                >
+                  <span style={{
+                    padding: '3px 6px',
+                    backgroundColor: config.bg,
+                    color: 'white',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    minWidth: '24px',
+                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    animation: config.pulse ? 'pulse 2s infinite' : 'none'
                   }}>
-                    <span>{config.icon}</span>
-                    <span>{config.text}</span>
+                    {queue.number}
                   </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{
+                      fontSize: '10px',
+                      color: config.bg,
+                      fontWeight: '600',
+                      maxWidth: '70px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {queue.queue_name}
+                    </span>
+                    <span style={{
+                      fontSize: '9px',
+                      color: colors.textSecondary,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '2px'
+                    }}>
+                      <span>{config.icon}</span>
+                      <span>{config.text}</span>
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      // Если нет номеров очередей, но запись на сегодня - показываем порядковый номер
+      // Для этого нужно найти позицию записи среди всех записей на сегодня
+      const todayAppointments = data.filter(item =>
+        item.date === today || item.appointment_date === today
+      );
+      const todayIndex = todayAppointments.findIndex(item => item.id === row.id) + 1;
+
+      return (
+        <span style={{
+          padding: '3px 6px',
+          backgroundColor: colors.accent,
+          color: 'white',
+          borderRadius: '4px',
+          fontSize: '11px',
+          fontWeight: '700',
+          minWidth: '24px',
+          textAlign: 'center',
+          display: 'inline-block'
+        }}>
+          #{todayIndex}
+        </span>
       );
     }
-    
-    // Fallback для старых записей - показываем порядковый номер
+
+    // Для записей не на сегодня показываем дефолтный номер
     const fallbackIndex = data.findIndex(item => item.id === row.id) + 1;
     return (
-      <span style={{ 
-        color: colors.textSecondary, 
+      <span style={{
+        color: colors.textSecondary,
         fontSize: '12px',
         padding: '2px 6px',
         backgroundColor: colors.textSecondary + '10',
