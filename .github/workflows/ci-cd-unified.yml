@@ -293,7 +293,6 @@ jobs:
         sleep 10
     
     - name: 🧪 Интеграционные тесты
-      if: false  # Временно отключено для отладки
       continue-on-error: true
       run: |
         cd backend
@@ -381,7 +380,6 @@ jobs:
         pip install sphinx sphinx-rtd-theme
     
     - name: 📚 Генерация API документации
-      if: false  # Временно отключено для отладки
       continue-on-error: true
       run: |
         cd backend
@@ -476,7 +474,7 @@ jobs:
     name: 🚀 Deploy Staging
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [docker, security]  # Убрали зависимость от integration
+    needs: [docker, security, docs, integration]
     if: github.ref == 'refs/heads/develop'
     
     steps:
@@ -495,7 +493,7 @@ jobs:
     name: 🌟 Deploy Production
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [docker, security]  # Убрали зависимость от docs и integration
+    needs: [docker, security, docs, integration]
     if: github.ref == 'refs/heads/main'
     
     steps:
