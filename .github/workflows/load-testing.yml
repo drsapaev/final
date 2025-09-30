@@ -206,15 +206,15 @@ jobs:
         echo '            successful_requests = sum(1 for status, _ in results if status == 200)' >> load_test_api.py
         echo '            ' >> load_test_api.py
         echo '            print(f"\n📊 РЕЗУЛЬТАТЫ:")' >> load_test_api.py
-        echo '            print(f"⏱️  Общее время: {total_time:.2f} секунд")' >> load_test_api.py
+        echo '            print(f"⏱️  Общее время: {int(total_time)} секунд")' >> load_test_api.py
         echo '            print(f"✅ Успешных запросов: {successful_requests}")' >> load_test_api.py
-        echo '            print(f"📈 Успешность: {(successful_requests/len(results)*100):.1f}%")' >> load_test_api.py
+        echo '            print(f"📈 Успешность: {int(successful_requests/len(results)*100)}%")' >> load_test_api.py
         echo '            ' >> load_test_api.py
         echo '            if successful_requests >= len(results) * 0.8:' >> load_test_api.py
         echo '                print(f"\n🎉 ТЕСТ ПРОЙДЕН: Хорошая производительность!")' >> load_test_api.py
         echo '                return True' >> load_test_api.py
         echo '            else:' >> load_test_api.py
-        echo '                print(f"\n❌ ТЕСТ НЕ ПРОЙДЕН: Успешность {successful_requests/len(results)*100:.1f}% < 80%")' >> load_test_api.py
+        echo '                print(f"\n❌ ТЕСТ НЕ ПРОЙДЕН: Успешность {int(successful_requests/len(results)*100)}% < 80%")' >> load_test_api.py
         echo '                return False' >> load_test_api.py
         echo '                ' >> load_test_api.py
         echo '    except Exception as e:' >> load_test_api.py
