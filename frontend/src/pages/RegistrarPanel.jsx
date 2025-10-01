@@ -1085,6 +1085,8 @@ const RegistrarPanel = () => {
                     payment_status: entry.payment_status || 'pending',
                     discount_mode: entry.discount_mode,
                     source: entry.source,
+                    record_type: entry.record_type,  // Добавляем тип записи
+                    created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at на верхний уровень
                     queue_numbers: [{
                       queue_tag: targetQueue.specialty,
                       queue_name: targetQueue.specialist_name,
@@ -1133,6 +1135,8 @@ const RegistrarPanel = () => {
                       payment_status: entry.payment_status || 'pending',
                       discount_mode: entry.discount_mode,
                       source: entry.source,
+                      record_type: entry.record_type,  // Добавляем тип записи
+                      created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at на верхний уровень
                       queue_numbers: [{
                         queue_tag: queue.specialty,
                         queue_name: queue.specialist_name,
@@ -1176,11 +1180,14 @@ const RegistrarPanel = () => {
 
           console.log(`📊 Загружено ${appointmentsData.length} записей для специальности: ${activeTab || 'все'}`);
 
-          // Если данных нет, показываем демо-режим (это нормально для новой системы)
+          // ✅ ИСПРАВЛЕНО: Пустая очередь - это нормально, не переключаемся в демо-режим
           if (appointmentsData.length === 0) {
-            console.log('📋 Нет записей на сегодня, показываем демо-режим');
-            // Для отладки показываем демо-данные сразу, без ошибки
-            throw new Error('Нет данных от сервера');
+            console.log('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
+            // Устанавливаем пустой массив, не выбрасываем ошибку
+            setAppointments([]);
+            setDataSource('api'); // ✅ Указываем, что данные получены от API
+            setAppointmentsLoading(false);
+            return; // ✅ Выходим из функции, не загружаем демо-данные
           }
         } else {
           console.warn('⚠️ Получены некорректные данные от сервера:', data);
@@ -1403,6 +1410,7 @@ const RegistrarPanel = () => {
                   services: [],
                   service_codes: [],
                   source: entry.source,
+                  created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
                   queue_numbers: [{
                     queue_tag: targetQueue.specialty,
                     queue_name: targetQueue.specialist_name,
@@ -1435,6 +1443,7 @@ const RegistrarPanel = () => {
                     services: [],
                     service_codes: [],
                     source: entry.source,
+                    created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
                     queue_numbers: [{
                       queue_tag: queue.specialty,
                       queue_name: queue.specialist_name,
@@ -1579,17 +1588,17 @@ const RegistrarPanel = () => {
       }
       
       // Определяем источник записи и правильный ID
-      const isFromVisits = appointment.id >= 20000;
-      const realId = isFromVisits ? appointment.id - 20000 : appointment.id;
-      const source = appointment.source || (isFromVisits ? 'visits' : 'appointments');
+      // Используем record_type, если есть, иначе определяем по ID
+      const recordType = appointment.record_type || (appointment.id >= 20000 ? 'visit' : 'appointment');
+      const realId = appointment.id;
       
-      console.log('Попытка оплатить запись:', appointment.id, 'Реальный ID:', realId, 'Источник:', source);
+      console.log('Попытка оплатить запись:', appointment.id, 'Тип записи:', recordType);
       
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
       
-      // Используем правильный API в зависимости от источника
+      // Используем правильный API в зависимости от типа записи
       let url;
-      if (source === 'visits') {
+      if (recordType === 'visit') {
         // Для записей из visits используем API visits
         url = `${API_BASE}/api/v1/registrar/visits/${realId}/mark-paid`;
       } else {
@@ -2690,20 +2699,76 @@ const RegistrarPanel = () => {
               </AnimatedTransition>
 
               {/* Недавние записи */}
-              {appointments.length > 0 && (
-                <div>
-                  <h3 style={{ fontSize: '20px', marginBottom: '16px', color: accentColor }}>
-                    📋 Недавние записи
-                  </h3>
-                  <div style={{ 
-                    background: cardBg,
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: '8px',
-                    padding: '16px'
-                  }}>
-            {/* Индикатор источника данных */}
-            <DataSourceIndicator count={appointments.length} />
+              <div>
+                <h3 style={{ fontSize: '20px', marginBottom: '16px', color: accentColor }}>
+                  📋 Недавние записи
+                </h3>
+                <div style={{ 
+                  background: cardBg,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: '8px',
+                  padding: '16px'
+                }}>
+          {/* Индикатор источника данных */}
+          {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
 
+            {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
+            {(() => {
+              console.log('🎯 Empty state render check:', {
+                appointmentsLoading,
+                dataSource,
+                filteredLength: filteredAppointments.length,
+                appointmentsLength: appointments.length,
+                shouldShow: !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0
+              });
+              return !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
+            })() && (
+              <div style={{
+                padding: '60px 20px',
+                textAlign: 'center',
+                background: colors.cardBg,
+                borderRadius: '12px',
+                border: `1px solid ${colors.border}`
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '16px',
+                  opacity: 0.3
+                }}>
+                  📋
+                </div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  color: colors.textPrimary,
+                  marginBottom: '8px'
+                }}>
+                  Очередь пуста
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  color: colors.textSecondary,
+                  marginBottom: '24px'
+                }}>
+                  {activeTab 
+                    ? `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}`
+                    : 'Сегодня пока нет записей'}
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={() => setShowWizard(true)}
+                  style={{
+                    padding: '12px 24px',
+                    fontSize: '14px'
+                  }}
+                >
+                  ➕ Создать первую запись
+                </Button>
+              </div>
+            )}
+
+            {/* Таблица отображается только если есть данные */}
+            {(appointmentsLoading || filteredAppointments.length > 0) && (
             <EnhancedAppointmentsTable
               data={filteredAppointments}
               loading={appointmentsLoading}
@@ -2712,6 +2777,7 @@ const RegistrarPanel = () => {
               selectedRows={appointmentsSelected}
               outerBorder={true}
               services={services}
+              showCheckboxes={false}  // ✅ Отключаем чекбоксы для регистратуры
               onRowSelect={(id, checked) => {
                 const newSelected = new Set(appointmentsSelected);
                 if (checked) {
@@ -2782,9 +2848,9 @@ const RegistrarPanel = () => {
                 }
               }}
             />
+            )}
                   </div>
                 </div>
-              )}
             </Card.Content>
           </Card>
           </AnimatedTransition>
@@ -2924,6 +2990,50 @@ const RegistrarPanel = () => {
               {/* Таблица записей */}
               {appointmentsLoading ? (
                 <AnimatedLoader.TableSkeleton rows={8} columns={10} />
+              ) : filteredAppointments.length === 0 && dataSource === 'api' ? (
+                <div style={{
+                  padding: '60px 20px',
+                  textAlign: 'center',
+                  background: cardBg,
+                  borderRadius: '12px',
+                  border: `1px solid ${borderColor}`
+                }}>
+                  <div style={{
+                    fontSize: '48px',
+                    marginBottom: '16px',
+                    opacity: 0.3
+                  }}>
+                    📋
+                  </div>
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '600',
+                    color: textColor,
+                    marginBottom: '8px'
+                  }}>
+                    Очередь пуста
+                  </h3>
+                  <p style={{
+                    fontSize: '14px',
+                    color: textColor,
+                    opacity: 0.7,
+                    marginBottom: '24px'
+                  }}>
+                    {activeTab 
+                      ? `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}`
+                      : 'Сегодня пока нет записей'}
+                  </p>
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowWizard(true)}
+                    style={{
+                      padding: '12px 24px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    ➕ Создать первую запись
+                  </Button>
+                </div>
               ) : filteredAppointments.length === 0 ? (
                 <div style={{ padding: 24, textAlign: 'center', opacity: 0.7 }}>
                   {t('empty_table')}
@@ -2937,6 +3047,7 @@ const RegistrarPanel = () => {
                   selectedRows={appointmentsSelected}
                   outerBorder={false}
                   services={services}
+                  showCheckboxes={false}  // ✅ Отключаем чекбоксы для регистратуры
                   onRowSelect={(id, checked) => {
                     const newSelected = new Set(appointmentsSelected);
                     if (checked) {

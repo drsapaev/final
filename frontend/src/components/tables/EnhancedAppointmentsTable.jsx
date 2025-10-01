@@ -9,6 +9,7 @@ import {
   Clock, 
   User, 
   Phone, 
+  Home,  // ✅ Добавлена иконка дома
   CreditCard,
   FileText,
   MoreHorizontal,
@@ -31,7 +32,8 @@ const EnhancedAppointmentsTable = ({
   selectedRows: externalSelectedRows,
   onRowSelect,
   services = {},
-  outerBorder = true
+  outerBorder = true,
+  showCheckboxes = true  // ✅ Новый проп для отключения чекбоксов
 }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterConfig, setFilterConfig] = useState({
@@ -125,6 +127,13 @@ const EnhancedAppointmentsTable = ({
       if (sortConfig.key === 'cost') {
         aVal = a.cost || a.payment_amount || 0;
         bVal = b.cost || b.payment_amount || 0;
+      }
+      
+      // ✅ Специальная обработка для номера очереди
+      if (sortConfig.key === 'queue_number') {
+        // Извлекаем первый номер очереди из массива queue_numbers
+        aVal = (a.queue_numbers && a.queue_numbers.length > 0) ? a.queue_numbers[0].number : 999999;
+        bVal = (b.queue_numbers && b.queue_numbers.length > 0) ? b.queue_numbers[0].number : 999999;
       }
       
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -846,7 +855,7 @@ const EnhancedAppointmentsTable = ({
           </button>
 
           {/* Информация о выбранных */}
-          {selectedRows.size > 0 && (
+          {showCheckboxes && selectedRows.size > 0 && (
             <div style={{
               padding: '8px 12px',
               backgroundColor: colors.accent + '20',
@@ -872,31 +881,43 @@ const EnhancedAppointmentsTable = ({
           <thead>
             <tr style={{ backgroundColor: colors.bgSecondary }}>
               {/* Чекбокс для выбора всех */}
-              <th style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: `1px solid ${colors.border}`,
-                width: '40px'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  style={{ cursor: 'pointer' }}
-                />
-              </th>
+              {showCheckboxes && (
+                <th style={{
+                  padding: '12px 8px',
+                  textAlign: 'left',
+                  borderBottom: `1px solid ${colors.border}`,
+                  width: '40px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.size === paginatedData.length && paginatedData.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
+              )}
 
               {/* Номер */}
-              <th style={{
-                padding: '12px 8px',
-                textAlign: 'center',
-                borderBottom: `1px solid ${colors.border}`,
-                color: colors.text,
-                fontWeight: '600',
-                fontSize: '14px',
-                width: '60px'
-              }}>
-                {t.number}
+              <th 
+                onClick={() => handleSort('queue_number')}
+                style={{
+                  padding: '12px 8px',
+                  textAlign: 'center',
+                  borderBottom: `1px solid ${colors.border}`,
+                  color: colors.text,
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  width: '60px',
+                  cursor: 'pointer',  // ✅ Указатель при наведении
+                  userSelect: 'none'  // ✅ Запрет выделения текста
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                  {t.number}
+                  {sortConfig.key === 'queue_number' && (
+                    sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                  )}
+                </div>
               </th>
 
               {/* Пациент */}
@@ -1151,17 +1172,19 @@ const EnhancedAppointmentsTable = ({
                   onClick={() => onRowClick?.(row)}
                 >
                   {/* Чекбокс */}
-                  <td style={{ padding: '12px 8px' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedRows.has(row.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleRowSelect(row.id, e.target.checked);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
+                  {showCheckboxes && (
+                    <td style={{ padding: '12px 8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(row.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleRowSelect(row.id, e.target.checked);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
+                  )}
 
                   {/* Номер */}
                   <td style={{
@@ -1251,7 +1274,29 @@ const EnhancedAppointmentsTable = ({
                   className="hide-on-mobile"
                   title={row.address}
                   >
-                    {row.address || '—'}
+                    {row.address ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <Home size={18} style={{ 
+                          color: colors.accent, 
+                          fontWeight: 'bold', 
+                          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
+                          flexShrink: 0  // ✅ Иконка не сжимается
+                        }} />
+                        <span style={{ 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical'
+                        }}>
+                          {row.address}
+                        </span>
+                      </div>
+                    ) : '—'}
                   </td>
 
                   {/* Тип обращения */}

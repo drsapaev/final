@@ -438,7 +438,8 @@ def create_cart_appointments(
         total_invoice_amount = Decimal('0')
         
         # Создаём визиты
-        for visit_req in cart_data.visits:
+        from time import sleep
+        for idx, visit_req in enumerate(cart_data.visits):
             # Проверяем право на повторный визит
             if cart_data.discount_mode == "repeat" and visit_req.doctor_id:
                 service_ids = [s.service_id for s in visit_req.services]
@@ -456,20 +457,17 @@ def create_cart_appointments(
                 cart_data.patient_id, visit_req.doctor_id
             )
             
-            # Проверяем фича-флаг для режима подтверждения
-            confirmation_required = is_feature_enabled(db, "confirmation_before_queue", default=True)
+            # ✅ ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
+            # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
+            # Записи от регистратора сразу попадают в очередь
+            visit_status = "confirmed"
+            confirmed_at = datetime.utcnow()
+            confirmed_by = f"registrar_{current_user.id}"
             
-            # Определяем статус визита в зависимости от фича-флага
-            if confirmation_required and cart_data.discount_mode != "all_free":
-                # Новый режим: требуется подтверждение пациентом
-                visit_status = "pending_confirmation"
-                confirmed_at = None
-                confirmed_by = None
-            else:
-                # Старый режим: сразу подтвержден регистратором
-                visit_status = "confirmed"
-                confirmed_at = datetime.utcnow()
-                confirmed_by = f"registrar_{current_user.id}"
+            # ✅ ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
+            # Это гарантирует, что визиты одного пациента будут иметь разные временные метки
+            if idx > 0:
+                sleep(0.001)  # 1 миллисекунда задержки между визитами
             
             # Создаём визит
             visit = Visit(

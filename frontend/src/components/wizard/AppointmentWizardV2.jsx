@@ -421,7 +421,14 @@ const AppointmentWizardV2 = ({
       service_price: service.price,
       quantity: 1,
       doctor_id: service.requires_doctor ? null : undefined,
-      visit_date: new Date().toISOString().split('T')[0], // Сегодня по умолчанию
+      visit_date: (() => {
+        // ✅ Используем локальную дату, а не UTC
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })(),
       visit_time: null
     };
     
@@ -648,7 +655,7 @@ const AppointmentWizardV2 = ({
             last_name: lastName,
             first_name: firstName,
             middle_name: middleName,
-            birth_date: wizardData.patient.birth_date,
+            birth_date: wizardData.patient.birth_date || null,  // ✅ Отправляем null вместо пустой строки
             phone: wizardData.patient.phone,
             address: wizardData.patient.address
           })
@@ -687,6 +694,8 @@ const AppointmentWizardV2 = ({
       
       // Создаём корзину визитов
       console.log('📤 Отправляем данные корзины:', cartData);
+      console.log('📅 Дата из браузера (new Date()):', new Date().toISOString());
+      console.log('📅 Дата для визита:', cartData.visits ? Object.values(cartData.visits)[0]?.visit_date : 'N/A');
       const cartResponse = await fetch(`${API_BASE}/registrar/cart`, {
         method: 'POST',
         headers: { 
@@ -722,7 +731,12 @@ const AppointmentWizardV2 = ({
     const visits = {};
     
     wizardData.cart.items.forEach(item => {
-      const key = `${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
+      // Определяем отделение для услуги
+      const department = getDepartmentByService(item.service_id);
+      
+      // ✅ ИСПРАВЛЕНО: Группируем по department + doctor_id + visit_date + visit_time
+      // Это создаёт отдельные визиты для каждого отделения
+      const key = `${department}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
       
       if (!visits[key]) {
         visits[key] = {
@@ -730,7 +744,7 @@ const AppointmentWizardV2 = ({
           services: [],
           visit_date: item.visit_date,
           visit_time: item.visit_time || null,
-          department: getDepartmentByService(item.service_id),
+          department: department,
           notes: null
         };
       }
