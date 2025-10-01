@@ -509,7 +509,8 @@ def get_today_queues(
             doctor = data["doctor"]
             entries_list = data["entries"]
             
-            # Сортируем записи по времени создания/подтверждения
+            # Сортируем записи по времени создания/подтверждения (от раннего к позднему)
+            # Это формирует правильную очередь: кто раньше пришёл, тот раньше в очереди
             entries_list.sort(key=lambda e: e["created_at"])
             
             entries = []
@@ -601,24 +602,32 @@ def get_today_queues(
                         address = patient.address
                     
                     # Загружаем услуги из appointment
-                    # TODO: Определить как хранятся услуги в Appointment
-                    if hasattr(appointment, 'services'):
-                        # Если есть поле services
+                    if hasattr(appointment, 'services') and appointment.services:
                         services = appointment.services if isinstance(appointment.services, list) else []
                     
-                    # Примерная стоимость
-                    if hasattr(appointment, 'total_price'):
-                        total_cost = float(appointment.total_price)
+                    # Стоимость
+                    if hasattr(appointment, 'payment_amount') and appointment.payment_amount:
+                        total_cost = float(appointment.payment_amount)
                     
-                    # Определяем статус
+                    # Определяем статус записи
                     status_mapping = {
                         "scheduled": "waiting",
+                        "pending": "waiting",
                         "confirmed": "waiting",
+                        "paid": "waiting",  # Оплачено, но еще в очереди
                         "in_progress": "called",
+                        "in_visit": "called",
                         "completed": "served",
                         "cancelled": "no_show"
                     }
                     entry_status = status_mapping.get(appointment.status, "waiting")
+                    
+                    # Определяем статус оплаты по статусу записи
+                    # В Appointment статус "paid" означает, что запись оплачена
+                    if appointment.status == "paid":
+                        discount_mode = "paid"
+                    else:
+                        discount_mode = appointment.visit_type if hasattr(appointment, 'visit_type') else "none"
                     
                     source = "desk"  # Appointment обычно создается регистратором
                 
@@ -636,10 +645,11 @@ def get_today_queues(
                     "payment_status": "paid" if discount_mode == "paid" else "pending",
                     "source": source,
                     "status": entry_status,
-                    "created_at": entry_wrapper["created_at"].isoformat() if entry_wrapper["created_at"] else None,
+                    "created_at": entry_wrapper["created_at"].isoformat() + "Z" if entry_wrapper["created_at"] else None,  # ✅ Добавляем 'Z' для UTC
                     "called_at": None,
                     "visit_time": visit_time,
-                    "discount_mode": discount_mode
+                    "discount_mode": discount_mode,
+                    "record_type": entry_type  # Добавляем тип записи: 'visit' или 'appointment'
                 })
             
             queue_data = {
