@@ -1,58 +1,44 @@
 #!/usr/bin/env python3
 """
-Проверка пользователей в базе данных
+Проверка пользователей в системе
 """
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
-from app.db.session import SessionLocal
-from app.models.user import User
-from sqlalchemy import text
+import sqlite3
 
 def check_users():
-    """Проверить пользователей в БД"""
-    db = SessionLocal()
+    """Проверяем пользователей в системе"""
+    conn = sqlite3.connect('backend/clinic.db')
+    cursor = conn.cursor()
+    
+    print("👥 ПРОВЕРКА ПОЛЬЗОВАТЕЛЕЙ В СИСТЕМЕ")
+    print("=" * 50)
+    
+    # Проверяем таблицу пользователей
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%user%'")
+    user_tables = cursor.fetchall()
+    print(f"📋 Таблицы пользователей: {[t[0] for t in user_tables]}")
+    
+    # Проверяем таблицу users
     try:
-        # Проверяем, есть ли таблица users
-        result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users';"))
-        table_exists = result.fetchone()
-        
-        if not table_exists:
-            print("❌ Таблица 'users' не существует!")
-            return
-            
-        print("✅ Таблица 'users' существует")
-        
-        # Получаем всех пользователей
-        users = db.query(User).all()
-        print(f"📊 Всего пользователей в БД: {len(users)}")
-        
-        if users:
-            print("\n👥 Список пользователей:")
-            for user in users:
-                print(f"  - ID: {user.id}, Email: {user.email}, Role: {user.role}, Active: {user.is_active}")
-                
-            # Ищем admin пользователя
-            admin = db.query(User).filter(User.email == "admin@example.com").first()
-            if admin:
-                print(f"\n✅ Пользователь admin найден:")
-                print(f"  - ID: {admin.id}")
-                print(f"  - Email: {admin.email}")
-                print(f"  - Role: {admin.role}")
-                print(f"  - Active: {admin.is_active}")
-                print(f"  - Password hash: {admin.password_hash[:20]}...")
-            else:
-                print("\n❌ Пользователь admin@example.com не найден!")
-        else:
-            print("❌ Пользователи не найдены в БД!")
-            
+        cursor.execute("SELECT id, email, username, role FROM users LIMIT 10")
+        users = cursor.fetchall()
+        print(f"\n👤 ПОЛЬЗОВАТЕЛИ ({len(users)} найдено):")
+        for user in users:
+            print(f"  ID: {user[0]}, Email: {user[1]}, Username: {user[2]}, Role: {user[3]}")
     except Exception as e:
-        print(f"❌ Ошибка при проверке пользователей: {e}")
-    finally:
-        db.close()
+        print(f"❌ Ошибка при чтении пользователей: {e}")
+    
+    # Проверяем таблицу staff
+    try:
+        cursor.execute("SELECT id, email, username, role FROM staff LIMIT 10")
+        staff = cursor.fetchall()
+        print(f"\n👨‍⚕️ СТАФФ ({len(staff)} найдено):")
+        for person in staff:
+            print(f"  ID: {person[0]}, Email: {person[1]}, Username: {person[2]}, Role: {person[3]}")
+    except Exception as e:
+        print(f"❌ Ошибка при чтении стаффа: {e}")
+    
+    conn.close()
 
 if __name__ == "__main__":
-    print("🔍 Проверка пользователей в базе данных...")
     check_users()
-

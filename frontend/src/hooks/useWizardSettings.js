@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const useWizardSettings = () => {
   const [settings, setSettings] = useState({
-    use_new_wizard: false,
+    use_new_wizard: true,  // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
     loading: true,
     error: null
   });
@@ -19,7 +19,7 @@ const useWizardSettings = () => {
       if (!token) {
         console.warn('No auth token found, using default wizard settings');
         setSettings({
-          use_new_wizard: false, // По умолчанию используем старый мастер
+          use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
           loading: false,
           error: null
         });
@@ -38,7 +38,7 @@ const useWizardSettings = () => {
         if (response.status === 401) {
           console.warn('Unauthorized access to wizard settings, using default');
           setSettings({
-            use_new_wizard: false, // По умолчанию используем старый мастер
+            use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
             loading: false,
             error: null
           });
@@ -50,14 +50,14 @@ const useWizardSettings = () => {
       const data = await response.json();
       
       setSettings({
-        use_new_wizard: data.use_new_wizard || false,
+        use_new_wizard: data.use_new_wizard !== undefined ? data.use_new_wizard : true, // 🎯 Дефолт - НОВЫЙ мастер
         loading: false,
         error: null
       });
     } catch (error) {
       console.error('Error fetching wizard settings:', error);
       setSettings({
-        use_new_wizard: false, // По умолчанию используем старый мастер
+        use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
         loading: false,
         error: null // Не показываем ошибку пользователю, просто используем дефолт
       });

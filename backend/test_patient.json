@@ -1,7 +1,8 @@
 {
-  "first_name": "Тест",
+  "first_name": "Тестовый",
   "last_name": "Пациент",
-  "phone": "+998901234567",
+  "middle_name": "Иванович", 
+  "phone": "+998901555777",
   "birth_date": "1990-01-01",
-  "gender": "M"
+  "address": "Тестовый адрес, 123"
 }

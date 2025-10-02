@@ -591,24 +591,24 @@ const AppointmentWizardV2 = ({
   
   const handleComplete = async () => {
     if (!validateStep(currentStep)) return;
-    
+
     // Проверяем токен авторизации
     const token = localStorage.getItem('auth_token');
     if (!token) {
       toast.error('Требуется авторизация. Пожалуйста, войдите в систему заново.');
       return;
     }
-    
+
     // Проверяем валидность токена
     try {
       const testResponse = await fetch(`${API_BASE}/patients/`, {
         method: 'GET',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' 
+          'Content-Type': 'application/json'
         }
       });
-      
+
       if (testResponse.status === 401) {
         toast.error('Сессия истекла. Пожалуйста, войдите в систему заново.');
         return;
@@ -618,9 +618,9 @@ const AppointmentWizardV2 = ({
       toast.error('Ошибка проверки авторизации. Пожалуйста, войдите в систему заново.');
       return;
     }
-    
+
     setIsProcessing(true);
-    
+
     try {
       // Подготавливаем данные для отправки
       const cartData = {
@@ -693,9 +693,6 @@ const AppointmentWizardV2 = ({
       }
       
       // Создаём корзину визитов
-      console.log('📤 Отправляем данные корзины:', cartData);
-      console.log('📅 Дата из браузера (new Date()):', new Date().toISOString());
-      console.log('📅 Дата для визита:', cartData.visits ? Object.values(cartData.visits)[0]?.visit_date : 'N/A');
       const cartResponse = await fetch(`${API_BASE}/registrar/cart`, {
         method: 'POST',
         headers: { 
@@ -707,16 +704,31 @@ const AppointmentWizardV2 = ({
       
       if (cartResponse.ok) {
         const result = await cartResponse.json();
-        
+
+        console.log('✅ Запись создана успешно на backend:', result);
+
         // Всегда завершаем после создания корзины (без онлайн оплаты в UI)
         localStorage.removeItem(DRAFT_KEY);
         toast.success('Запись создана успешно!');
         onComplete?.(result);
         onClose();
       } else {
-        const errorText = await cartResponse.text();
-        console.error('❌ Ошибка создания корзины:', cartResponse.status, errorText);
-        throw new Error(`Ошибка создания корзины: ${cartResponse.status} ${errorText}`);
+        // Получаем детальную информацию об ошибке
+        let errorMessage = `Ошибка создания записи (${cartResponse.status})`;
+
+        try {
+          const errorData = await cartResponse.json();
+          console.error('❌ Детали ошибки создания корзины:', errorData);
+          errorMessage = errorData.detail || errorMessage;
+        } catch (parseError) {
+          const errorText = await cartResponse.text();
+          console.error('❌ Текст ошибки создания корзины:', errorText);
+          errorMessage = errorText || errorMessage;
+        }
+
+        console.error('❌ Ошибка создания корзины:', cartResponse.status, errorMessage);
+        toast.error(`Ошибка создания записи: ${errorMessage}`);
+        return; // ❌ НЕ закрываем мастер при ошибке создания
       }
     } catch (error) {
       console.error('Ошибка завершения мастера:', error);
@@ -734,9 +746,15 @@ const AppointmentWizardV2 = ({
       // Определяем отделение для услуги
       const department = getDepartmentByService(item.service_id);
       
-      // ✅ ИСПРАВЛЕНО: Группируем по department + doctor_id + visit_date + visit_time
-      // Это создаёт отдельные визиты для каждого отделения
-      const key = `${department}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
+      // ✅ ИСПРАВЛЕНО: Объединяем все процедуры в один визит
+      // Все процедуры (P, C, D_PROC) должны быть в одном визите с department = 'procedures'
+      let finalDepartment = department;
+      if (department === 'procedures') {
+        finalDepartment = 'procedures'; // Все процедуры в одном отделе
+      }
+      
+      // Группируем по finalDepartment + doctor_id + visit_date + visit_time
+      const key = `${finalDepartment}_${item.doctor_id || 'no_doctor'}_${item.visit_date}_${item.visit_time || 'no_time'}`;
       
       if (!visits[key]) {
         visits[key] = {
@@ -744,7 +762,7 @@ const AppointmentWizardV2 = ({
           services: [],
           visit_date: item.visit_date,
           visit_time: item.visit_time || null,
-          department: department,
+          department: finalDepartment,
           notes: null
         };
       }
@@ -768,10 +786,12 @@ const AppointmentWizardV2 = ({
     // ✅ ИСПРАВЛЕННЫЙ МАППИНГ - соответствует вкладкам RegistrarPanel
     const mapping = {
       'K': 'cardiology',    // Кардиология → вкладка cardio
-      'D': 'dermatology',   // Дерматология → вкладка derma  
+      'D': 'dermatology',   // Дерматология → вкладка derma (только консультации)
       'S': 'dentistry',     // Стоматология → вкладка dental
       'L': 'laboratory',    // Лаборатория → вкладка lab
-      'C': 'procedures',    // Косметология → вкладка procedures (нет отдельной вкладки)
+      'P': 'procedures',    // Физиотерапия → вкладка procedures
+      'C': 'procedures',    // Косметология → вкладка procedures
+      'D_PROC': 'procedures', // Дерматологические процедуры → вкладка procedures
       'O': 'procedures'     // Прочие процедуры → вкладка procedures
     };
     

@@ -80,8 +80,8 @@ def get_registrar_services(
                     service_data["group"] = "dermatology"
                     grouped_services["dermatology"].append(service_data)
                 elif category_code == 'C':
-                    service_data["group"] = "cosmetology"
-                    grouped_services["cosmetology"].append(service_data)
+                    service_data["group"] = "procedures"
+                    grouped_services["procedures"].append(service_data)
                 elif category_code == 'K':
                     service_data["group"] = "cardiology"
                     grouped_services["cardiology"].append(service_data)
@@ -105,8 +105,8 @@ def get_registrar_services(
                     service_data["group"] = "dermatology"
                     grouped_services["dermatology"].append(service_data)
                 elif any(word in name_lower for word in ["косметолог", "пилинг", "чистка", "ботокс"]):
-                    service_data["group"] = "cosmetology"
-                    grouped_services["cosmetology"].append(service_data)
+                    service_data["group"] = "procedures"
+                    grouped_services["procedures"].append(service_data)
                 elif any(word in name_lower for word in ["кардиолог", "экг", "эхокг", "холтер"]):
                     service_data["group"] = "cardiology"
                     grouped_services["cardiology"].append(service_data)

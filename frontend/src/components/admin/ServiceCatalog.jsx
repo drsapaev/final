@@ -35,16 +35,18 @@ const ServiceCatalog = () => {
   // Иконки специальностей
   const specialtyIcons = {
     cardiology: Heart,
-    dermatology: Stethoscope, 
+    dermatology: Stethoscope,
     stomatology: Scissors,
-    laboratory: TestTube
+    laboratory: TestTube,
+    physiotherapy: Package // Можно заменить на более подходящую иконку
   };
 
   const specialtyColors = {
     cardiology: 'text-red-600',
     dermatology: 'text-orange-600',
-    stomatology: 'text-blue-600', 
-    laboratory: 'text-green-600'
+    stomatology: 'text-blue-600',
+    laboratory: 'text-green-600',
+    physiotherapy: 'text-purple-600'
   };
 
   useEffect(() => {
@@ -259,6 +261,7 @@ const ServiceCatalog = () => {
               <option value="dermatology">Дерматология</option>
               <option value="stomatology">Стоматология</option>
               <option value="laboratory">Лаборатория</option>
+              <option value="physiotherapy">Физиотерапия</option>
             </select>
           </div>
 
@@ -622,6 +625,7 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
                 <option value="C">C - Косметология</option>
                 <option value="L">L - Лабораторные анализы</option>
                 <option value="S">S - Стоматология</option>
+                <option value="P">P - Физиотерапия</option>
                 <option value="O">O - Другие услуги</option>
               </select>
             </div>
@@ -655,6 +659,7 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
                 <option value="dermatology">Дерматология</option>
                 <option value="cosmetology">Косметология</option>
                 <option value="lab">Лаборатория</option>
+                <option value="physiotherapy">Физиотерапия</option>
               </select>
             </div>
 
@@ -702,8 +707,9 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
 
           <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg mt-4">
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              <strong>Подсказка:</strong> Только ЭхоКГ (кардиолог) и Рентгенография зуб (стоматолог) требуют врача. 
+              <strong>Подсказка:</strong> Только ЭхоКГ (кардиолог), Рентгенография зуб (стоматолог) и сложные дерматологические процедуры требуют врача.
               Консультации участвуют в расчёте льгот и повторных визитов.
+              Физиотерапевтические процедуры могут выполняться медицинским персоналом среднего звена.
             </p>
           </div>
         </div>
