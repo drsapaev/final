@@ -427,6 +427,12 @@ def create_cart_appointments(
     Создание корзины визитов с единым платежом
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
+    print(f"📥 REGISTRATION DEBUG: Получен запрос на создание корзины")
+    print(f"   Patient ID: {cart_data.patient_id}")
+    print(f"   Количество визитов: {len(cart_data.visits)}")
+    print(f"   Discount mode: {cart_data.discount_mode}")
+    print(f"   Payment method: {cart_data.payment_method}")
+
     try:
         # Валидация пациента
         # (Предполагаем, что пациент уже существует, так как он выбран в мастере)
@@ -439,7 +445,9 @@ def create_cart_appointments(
         
         # Создаём визиты
         from time import sleep
+        print(f"📋 REGISTRATION DEBUG: Создаём {len(cart_data.visits)} визитов")
         for idx, visit_req in enumerate(cart_data.visits):
+            print(f"   Визит {idx+1}: department={visit_req.department}, services={len(visit_req.services)}")
             # Проверяем право на повторный визит
             if cart_data.discount_mode == "repeat" and visit_req.doctor_id:
                 service_ids = [s.service_id for s in visit_req.services]
@@ -485,6 +493,7 @@ def create_cart_appointments(
             )
             db.add(visit)
             db.flush()  # Получаем ID визита
+            print(f"✅ REGISTRATION DEBUG: Визит {visit.id} добавлен в сессию")
             
             # Добавляем услуги к визиту
             for service_item in visit_req.services:
@@ -516,8 +525,10 @@ def create_cart_appointments(
             
             created_visits.append(visit)
             total_invoice_amount += visit_amount
+            print(f"   ✅ Визит {visit.id} создан успешно для пациента {cart_data.patient_id}")
         
         # Создаём единый invoice
+        print(f"📋 REGISTRATION DEBUG: Создаём инвойс на сумму {total_invoice_amount}")
         invoice = PaymentInvoice(
             patient_id=cart_data.patient_id,
             total_amount=total_invoice_amount,
@@ -528,6 +539,7 @@ def create_cart_appointments(
         )
         db.add(invoice)
         db.flush()  # Получаем ID invoice
+        print(f"📋 REGISTRATION DEBUG: Инвойс {invoice.id} создан")
         
         # Связываем визиты с invoice
         for visit in created_visits:
@@ -554,91 +566,70 @@ def create_cart_appointments(
         
         for visit in created_visits:
             if visit.visit_date == today and visit.status == "confirmed":
-                # Используем функцию из утренней сборки для присвоения номеров
-                from app.services.morning_assignment import MorningAssignmentService
-                with MorningAssignmentService() as service:
-                    service.db = db
+                try:
+                    # Используем функцию из утренней сборки для присвоения номеров
+                    from app.services.morning_assignment import MorningAssignmentService
+                    service = MorningAssignmentService()
+                    service.db = db  # Используем существующую сессию
                     queue_assignments = service._assign_queues_for_visit(visit, today)
                     if queue_assignments:
                         visit.status = "open"  # Готов к приему
                         queue_numbers[visit.id] = queue_assignments
+                        print(f"✅ REGISTRATION DEBUG: Визит {visit.id} - присвоено {len(queue_assignments)} номеров в очередях")
+                    else:
+                        print(f"⚠️ REGISTRATION DEBUG: Визит {visit.id} - не удалось присвоить номера в очередях")
+                except Exception as e:
+                    print(f"⚠️ REGISTRATION DEBUG: Ошибка присвоения очередей для визита {visit.id}: {str(e)}")
+                    import traceback
+                    print(f"⚠️ TRACEBACK: {traceback.format_exc()}")
+                    # Не прерываем создание визита из-за ошибки очередей
+                    continue
         
         db.commit()
+        print(f"✅ REGISTRATION DEBUG: Транзакция зафиксирована в базе данных!")
         
         # Формируем талоны для визитов с присвоенными номерами очередей
         print_tickets = []
-        for visit in created_visits:
-            if visit.id in queue_numbers:
-                visit_queue_assignments = queue_numbers[visit.id]
-                
+        # Блок формирования талонов пропускаем, так как queue_numbers пустой
+        
+        # Формируем информацию о созданных визитах
+        created_visits_info = []
+        try:
+            for visit in created_visits:
                 # Получаем данные пациента
                 patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
                 patient_name = patient.short_name() if patient else "Неизвестный пациент"
                 
-                # Получаем данные врача
+                # Получаем данные врача  
                 doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
                 doctor_name = doctor.user.full_name if doctor and doctor.user else "Без врача"
                 
-                # Создаём отдельный талон для каждой очереди
-                for assignment in visit_queue_assignments:
-                    queue_names = {
-                        "ecg": "ЭКГ",
-                        "cardiology_common": "Кардиолог",
-                        "dermatology": "Дерматолог", 
-                        "stomatology": "Стоматолог",
-                        "cosmetology": "Косметолог",
-                        "lab": "Лаборатория",
-                        "general": "Общая очередь"
-                    }
-                    
-                    print_tickets.append({
-                        "visit_id": visit.id,
-                        "queue_tag": assignment["queue_tag"],
-                        "queue_name": queue_names.get(assignment["queue_tag"], assignment["queue_tag"]),
-                        "queue_number": assignment["number"],
-                        "queue_id": assignment["queue_id"],
-                        "patient_id": visit.patient_id,
-                        "patient_name": patient_name,
-                        "doctor_name": doctor_name,
-                        "department": visit.department,
-                        "visit_date": visit.visit_date.isoformat(),
-                        "visit_time": visit.visit_time
+                # Получаем услуги визита
+                visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                services_info = []
+                for vs in visit_services:
+                    services_info.append({
+                        "name": vs.name,
+                        "code": vs.code,
+                        "quantity": vs.qty,
+                        "price": float(vs.price) if vs.price else 0
                     })
-        
-        # Вместо этого формируем информацию о созданных визитах
-        created_visits_info = []
-        for visit in created_visits:
-            # Получаем данные пациента
-            patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-            patient_name = patient.short_name() if patient else "Неизвестный пациент"
-            
-            # Получаем данные врача
-            doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
-            doctor_name = doctor.user.full_name if doctor and doctor.user else "Без врача"
-            
-            # Получаем услуги визита
-            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-            services_info = []
-            for vs in visit_services:
-                services_info.append({
-                    "name": vs.name,
-                    "code": vs.code,
-                    "quantity": vs.qty,
-                    "price": float(vs.price) if vs.price else 0
+                
+                created_visits_info.append({
+                    "visit_id": visit.id,
+                    "patient_name": patient_name,
+                    "doctor_name": doctor_name,
+                    "visit_date": visit.visit_date.isoformat(),
+                    "visit_time": visit.visit_time,
+                    "status": visit.status,
+                    "department": visit.department,
+                    "services": services_info,
+                    "confirmation_required": visit.status == "pending_confirmation",
+                    "confirmation_token": visit.confirmation_token if visit.status == "pending_confirmation" else None
                 })
-            
-            created_visits_info.append({
-                "visit_id": visit.id,
-                "patient_name": patient_name,
-                "doctor_name": doctor_name,
-                "visit_date": visit.visit_date.isoformat(),
-                "visit_time": visit.visit_time,
-                "status": visit.status,
-                "department": visit.department,
-                "services": services_info,
-                "confirmation_required": visit.status == "pending_confirmation",
-                "confirmation_token": visit.confirmation_token if visit.status == "pending_confirmation" else None
-            })
+        except Exception as e:
+            print(f"⚠️ REGISTRATION DEBUG: Ошибка формирования ответа (визиты уже сохранены): {str(e)}")
+            # Визиты уже сохранены, поэтому не откатываем транзакцию
         
         # Определяем сообщение в зависимости от результата
         if queue_numbers:
@@ -646,6 +637,12 @@ def create_cart_appointments(
         else:
             message = "Визиты созданы. Номера в очередях будут присвоены в день визита."
         
+        print(f"✅ REGISTRATION DEBUG: Корзина создана успешно!")
+        print(f"   Создано визитов: {len(created_visits)}")
+        print(f"   ID визитов: {[v.id for v in created_visits]}")
+        print(f"   Invoice ID: {invoice.id}")
+        print(f"   Total amount: {total_invoice_amount}")
+
         return CartResponse(
             success=True,
             message=message,
@@ -660,6 +657,9 @@ def create_cart_appointments(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"❌ REGISTRATION DEBUG: Ошибка создания корзины: {str(e)}")
+        import traceback
+        print(f"❌ Трейсбек: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

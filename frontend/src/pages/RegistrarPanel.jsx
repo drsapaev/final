@@ -50,10 +50,9 @@ import CancelDialog from '../components/dialogs/CancelDialog';
 import PrintDialog from '../components/dialogs/PrintDialog';
 
 // Современный мастер
-import AppointmentWizard from '../components/wizard/AppointmentWizard';
+// ✅ Используется только новый мастер (V2)
 import AppointmentWizardV2 from '../components/wizard/AppointmentWizardV2';
 import PaymentManager from '../components/payment/PaymentManager';
-import useWizardSettings from '../hooks/useWizardSettings';
 
 // Современные фильтры
 import ModernFilters from '../components/filters/ModernFilters';
@@ -290,13 +289,10 @@ const RegistrarPanel = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [showAddressColumn, setShowAddressColumn] = useState(true);
-  // Состояния встроенного мастера удалены - используется AppointmentWizard компонент
-  const [showWizard, setShowWizard] = useState(false); // Для современного AppointmentWizard
+  // ✅ Используется только новый мастер (V2)
+  const [showWizard, setShowWizard] = useState(false);
   const [showPaymentManager, setShowPaymentManager] = useState(false); // Для модуля оплаты
   const [isProcessing, setIsProcessing] = useState(false); // Состояние обработки
-  
-  // Настройки мастера регистрации (A/B тест)
-  const { useNewWizard, loading: wizardSettingsLoading } = useWizardSettings();
   const [patientSuggestions, setPatientSuggestions] = useState([]);
   const [showPatientSuggestions, setShowPatientSuggestions] = useState(false);
   const [patientErrors, setPatientErrors] = useState({});
@@ -791,111 +787,108 @@ const RegistrarPanel = () => {
       const token = localStorage.getItem('auth_token');
       console.log('🔍 RegistrarPanel: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
 
-      const [doctorsRes, servicesRes, queueRes] = await Promise.all([
-          fetch(`${API_BASE}/api/v1/registrar/doctors`, {
+      // Загружаем данные последовательно, чтобы избежать проблем с Promise.all
+      let doctorsRes, servicesRes, queueRes;
+
+      try {
+        console.log('🔍 Загружаем врачей с токеном:', token ? `${token.substring(0, 30)}...` : 'null');
+        doctorsRes = await fetch(`${API_BASE}/api/v1/registrar/doctors`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        }),
-          fetch(`${API_BASE}/api/v1/registrar/services`, {
+        });
+        console.log('📊 Ответ врачей:', doctorsRes.status, doctorsRes.statusText);
+      } catch (error) {
+        console.error('❌ Ошибка загрузки врачей:', error.message);
+        doctorsRes = { ok: false };
+      }
+
+      try {
+        console.log('🔍 Загружаем услуги...');
+        servicesRes = await fetch(`${API_BASE}/api/v1/registrar/services`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        }),
-          fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
+        });
+        console.log('📊 Ответ услуг:', servicesRes.status, servicesRes.statusText);
+      } catch (error) {
+        console.error('❌ Ошибка загрузки услуг:', error.message);
+        servicesRes = { ok: false };
+      }
+
+      try {
+        console.log('🔍 Загружаем настройки очереди...');
+        queueRes = await fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
           headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+        });
+        console.log('📊 Ответ настроек очереди:', queueRes.status, queueRes.statusText);
+      } catch (error) {
+        console.error('❌ Ошибка загрузки настроек очереди:', error.message);
+        queueRes = { ok: false };
+      }
+
+      console.log('🔄 Обрабатываем ответы API...');
+
+      // Проверяем, что все ответы успешны
+      const allSuccess = doctorsRes.ok && servicesRes.ok && queueRes.ok;
+      console.log('📊 Статус ответов:', {
+        doctors: doctorsRes.ok ? 'OK' : 'ERROR',
+        services: servicesRes.ok ? 'OK' : 'ERROR',
+        queueSettings: queueRes.ok ? 'OK' : 'ERROR',
+        allSuccess
+      });
+
+      if (!allSuccess) {
+        console.warn('⚠️ Некоторые API недоступны, но продолжаем работу');
+      }
 
       if (doctorsRes.ok) {
-        const doctorsData = await doctorsRes.json();
-        const apiDoctors = doctorsData.doctors || [];
-        // Если API пустой — оставляем уже установленные фолбэк-данные без лишних перерисовок
-        if (apiDoctors.length > 0) {
-          setDoctors(apiDoctors);
+        try {
+          const doctorsData = await doctorsRes.json();
+          const apiDoctors = doctorsData.doctors || [];
+          console.log('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
+          // Если API вернул данные — используем их
+          if (apiDoctors.length > 0) {
+            setDoctors(apiDoctors);
+            console.log('✅ Врачи обновлены из API');
+          }
+        } catch (error) {
+          console.warn('Ошибка обработки данных врачей:', error.message);
         }
       } else {
-        // Fallback данные для врачей
-        setDoctors([
-          { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
-          { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
-          { id: 3, specialty: 'stomatology', user: { full_name: 'Доктор Стоматолог' }, cabinet: '103', price_default: 60000 }
-        ]);
+        console.warn('❌ API врачей недоступен, используем демо-данные');
       }
 
       if (servicesRes.ok) {
-        const servicesData = await servicesRes.json();
-        const apiServices = servicesData.services_by_group || {};
-        // Если API пустой — оставляем уже установленные фолбэк-данные без лишних перерисовок
-        if (Object.keys(apiServices).length > 0) {
-          setServices(apiServices);
-        } else {
-          setServices({
-            laboratory: [
-              { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
-              { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
-              { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-              { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }
-            ],
-            dermatology: [
-              { id: 5, name: 'Консультация дерматолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
-              { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
-              { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
-              { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }
-            ],
-            cosmetology: [
-              { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
-              { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
-              { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
-              { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }
-            ]
-          });
+        try {
+          const servicesData = await servicesRes.json();
+          const apiServices = servicesData.services_by_group || {};
+          console.log('✅ Данные услуг получены:', Object.keys(apiServices));
+          // Если API вернул данные — используем их
+          if (Object.keys(apiServices).length > 0) {
+            setServices(apiServices);
+            console.log('✅ Услуги обновлены из API');
+          }
+        } catch (error) {
+          console.warn('Ошибка обработки данных услуг:', error.message);
         }
       } else {
-        setServices({
-          laboratory: [
-            { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
-            { id: 2, name: 'Биохимический анализ крови', price: 25000, specialty: 'laboratory', group: 'laboratory' },
-            { id: 3, name: 'Анализ мочи', price: 10000, specialty: 'laboratory', group: 'laboratory' },
-            { id: 4, name: 'Анализ кала', price: 12000, specialty: 'laboratory', group: 'laboratory' }
-          ],
-          cardiology: [
-            { id: 13, name: 'Консультация кардиолога', price: 50000, specialty: 'cardiology', group: 'cardiology' },
-            { id: 14, name: 'ЭКГ', price: 20000, specialty: 'cardiology', group: 'cardiology' },
-            { id: 15, name: 'ЭхоКГ', price: 35000, specialty: 'cardiology', group: 'cardiology' },
-            { id: 16, name: 'ЭКГ с консультацией кардиолога', price: 70000, specialty: 'cardiology', group: 'cardiology' },
-            { id: 17, name: 'ЭхоКГ с консультацией кардиолога', price: 85000, specialty: 'cardiology', group: 'cardiology' }
-          ],
-          dermatology: [
-            { id: 5, name: 'Консультация дерматолога-косметолога', price: 40000, specialty: 'dermatology', group: 'dermatology' },
-            { id: 6, name: 'Дерматоскопия', price: 30000, specialty: 'dermatology', group: 'dermatology' },
-            { id: 7, name: 'УЗИ кожи', price: 20000, specialty: 'dermatology', group: 'dermatology' },
-            { id: 8, name: 'Лечение акне', price: 60000, specialty: 'dermatology', group: 'dermatology' }
-          ],
-          stomatology: [
-            { id: 18, name: 'Консультация стоматолога', price: 30000, specialty: 'stomatology', group: 'stomatology' },
-            { id: 19, name: 'Лечение кариеса', price: 80000, specialty: 'stomatology', group: 'stomatology' },
-            { id: 20, name: 'Удаление зуба', price: 50000, specialty: 'stomatology', group: 'stomatology' },
-            { id: 21, name: 'Чистка зубов', price: 40000, specialty: 'stomatology', group: 'stomatology' }
-          ],
-          cosmetology: [
-            { id: 9, name: 'Чистка лица', price: 35000, specialty: 'cosmetology', group: 'cosmetology' },
-            { id: 10, name: 'Пилинг лица', price: 40000, specialty: 'cosmetology', group: 'cosmetology' },
-            { id: 11, name: 'Массаж лица', price: 25000, specialty: 'cosmetology', group: 'cosmetology' },
-            { id: 12, name: 'Мезотерапия', price: 120000, specialty: 'cosmetology', group: 'cosmetology' }
-          ],
-          procedures: [
-            { id: 22, name: 'Физиотерапия', price: 25000, specialty: 'procedures', group: 'procedures' },
-            { id: 23, name: 'Массаж', price: 30000, specialty: 'procedures', group: 'procedures' },
-            { id: 24, name: 'Ингаляция', price: 15000, specialty: 'procedures', group: 'procedures' }
-          ]
-        });
+        console.warn('❌ API услуг недоступен, используем демо-данные');
       }
 
       if (queueRes.ok) {
-        const queueData = await queueRes.json();
-        setQueueSettings(queueData);
+        try {
+          const queueData = await queueRes.json();
+          setQueueSettings(queueData);
+          console.log('✅ Настройки очереди обновлены из API');
+        } catch (error) {
+          console.warn('Ошибка обработки данных настроек очереди:', error.message);
         }
-      } catch (fetchError) {
-        // Backend недоступен - используем демо-данные (уже установлены выше)
-        console.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+      } else {
+        console.warn('❌ API настроек очереди недоступен, используем демо-данные');
       }
+
+      console.log('🎯 Загрузка интегрированных данных завершена');
+    } catch (fetchError) {
+      // Backend недоступен - используем демо-данные (уже установлены выше)
+      console.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+    }
 
     } catch (error) {
       console.error('Ошибка загрузки интегрированных данных:', error);
@@ -1180,6 +1173,11 @@ const RegistrarPanel = () => {
 
           console.log(`📊 Загружено ${appointmentsData.length} записей для специальности: ${activeTab || 'все'}`);
 
+          // Отладка: показываем ID всех загруженных записей
+          if (appointmentsData.length > 0) {
+            console.log('📋 ID всех загруженных записей:', appointmentsData.map(a => a.id));
+          }
+
           // ✅ ИСПРАВЛЕНО: Пустая очередь - это нормально, не переключаемся в демо-режим
           if (appointmentsData.length === 0) {
             console.log('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
@@ -1300,7 +1298,8 @@ const RegistrarPanel = () => {
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
-      console.warn('Backend недоступен для загрузки записей, используем демо-режим:', error.message);
+      console.error('❌ Backend недоступен для загрузки записей, используем демо-режим:', error.message);
+      console.error('❌ Детали ошибки:', error);
         startTransition(() => {
           if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
           setAppointments(prev => {
@@ -1943,50 +1942,98 @@ const RegistrarPanel = () => {
   const isInDepartment = useCallback((appointment, departmentKey) => {
     const dept = (appointment.department?.toLowerCase() || '');
     const specialty = (appointment.doctor_specialty?.toLowerCase() || '');
-    const appointmentServiceCodes = appointment.service_codes || []; // Используем коды услуг
+    // Получаем коды услуг из service_codes
+    const appointmentServiceCodes = appointment.service_codes || [];
     
-    // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий
+    // Получаем услуги (могут быть ID или названия)
+    const appointmentServices = appointment.services || [];
+    
+    // Преобразуем услуги в коды услуг
+    const serviceCodesFromServices = appointmentServices.map(service => {
+      if (services && typeof services === 'object') {
+        // Ищем услугу по ID или названию во всех группах
+        for (const groupName in services) {
+          const groupServices = services[groupName];
+          if (Array.isArray(groupServices)) {
+            // Сначала пробуем найти по ID (если service - число)
+            if (typeof service === 'number' || (typeof service === 'string' && !isNaN(service))) {
+              const serviceId = parseInt(service);
+              const serviceByID = groupServices.find(s => s.id === serviceId);
+              if (serviceByID && serviceByID.service_code) {
+                return serviceByID.service_code;
+              }
+            }
+            
+            // Затем пробуем найти по названию
+            const serviceByName = groupServices.find(s => s.name === service);
+            if (serviceByName && serviceByName.service_code) {
+              return serviceByName.service_code;
+            }
+          }
+        }
+      }
+      return null;
+    }).filter(code => code !== null);
+    
+    // Объединяем коды из service_codes и преобразованные из services
+    const allServiceCodes = [...appointmentServiceCodes, ...serviceCodesFromServices];
+    
+    // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
     const departmentCategoryMapping = {
-      'cardio': ['K'],           // Кардиология (консультации кардиолога)
-      'echokg': ['ECG'],         // ЭКГ - отдельная категория
-      'derma': ['D'],            // Дерматология
-      'dental': ['S'],           // Стоматология
-      'lab': ['L'],              // Лаборатория
-      'procedures': ['C', 'O']   // Процедуры включают косметологию (C) и прочие процедуры (O)
+      'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
+      'echokg': ['ECG'],         // ЭКГ - отдельная категория (только ЭКГ)
+      'derma': ['D'],            // Дерматология: консультация дерматолога-косметолога
+      'dental': ['S'],           // Стоматология: консультация стоматолога, рентгенография зубов
+      'lab': ['L'],              // Лаборатория: все лабораторные услуги
+      'procedures': ['P', 'C', 'D_PROC']  // Процедуры: физиотерапия (P), косметология (C), дерматологические процедуры (D_PROC)
     };
     
     // Получаем коды категорий для данного отдела
     const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
     
-    // Маппинг кодов услуг к категориям (поддерживает разные форматы)
+    // Маппинг кодов услуг к категориям (обновлен согласно новым требованиям)
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
-      
-      // ЭКГ - отдельная категория
-      if (serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
-      
-      // ЭхоКГ - тоже кардиология, но отдельно от ЭКГ
-      if (serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO')) return 'K';
-      
-      // Новый формат кодов (K11, D01, S05, L12, etc.)
-      if (serviceCode.match(/^K\d+$/)) return 'K';  // K11, K12 -> Кардиология
-      if (serviceCode.match(/^D\d+$/)) return 'D';  // D01, D02 -> Дерматология  
-      if (serviceCode.match(/^S\d+$/)) return 'S';  // S01, S02 -> Стоматология
-      if (serviceCode.match(/^L\d+$/)) return 'L';  // L01, L02 -> Лаборатория
-      if (serviceCode.match(/^C\d+$/)) return 'C';  // C01, C02 -> Косметология
-      if (serviceCode.match(/^O\d+$/)) return 'O';  // O01, O02 -> Прочие процедуры
-      
-      // Старый формат кодов (префиксы)
-      if (serviceCode.startsWith('CONS_CARD')) return 'K';
-      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'D';
-      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'S';
-      if (serviceCode.startsWith('LAB_')) return 'L';
-      if (serviceCode.startsWith('COSM_')) return 'C';
-      if (serviceCode.startsWith('PROC_')) return 'O';
-      
+
+      // ЭКГ - отдельная категория (только ЭКГ)
+      if (serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
+
+      // ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
+      if (serviceCode === 'K11' || serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO') || serviceCode.includes('ЭхоКГ')) return 'ECHO';
+
+      // Физиотерапия (дерматологическая) - коды P01-P05
+      if (serviceCode.match(/^P\d+$/)) return 'P';
+
+      // Дерматологические процедуры - коды D_PROC01-D_PROC04
+      if (serviceCode.match(/^D_PROC\d+$/)) return 'D_PROC';
+
+      // Косметологические процедуры - коды C01-C12
+      if (serviceCode.match(/^C\d+$/)) return 'C';
+
+      // Кардиология - коды K01, K11
+      if (serviceCode.match(/^K\d+$/)) return 'K';
+
+      // Стоматология - коды S01, S10
+      if (serviceCode.match(/^S\d+$/)) return 'S';
+
+      // Лаборатория - коды L01-L65
+      if (serviceCode.match(/^L\d+$/)) return 'L';
+
+      // Дерматология - только консультации (D01)
+      if (serviceCode === 'D01') return 'D';
+
+      // Старый формат кодов (префиксы) - обновленный
+      if (serviceCode.startsWith('CONS_CARD')) return 'K';  // Консультации кардиолога
+      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'D';  // Дерматология-косметология
+      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'S';  // Стоматология
+      if (serviceCode.startsWith('LAB_')) return 'L';  // Лаборатория
+      if (serviceCode.startsWith('COSM_')) return 'C';  // Косметология
+      if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
+      if (serviceCode.startsWith('DERM_PROC_') || serviceCode.startsWith('DERM_')) return 'D_PROC';  // Дерматологические процедуры
+
       // Дополнительные паттерны для кардиологии
-      if (serviceCode.startsWith('CARD_')) return 'K';
-      
+      if (serviceCode.startsWith('CARD_') && !serviceCode.includes('ECG')) return 'K';
+
       return null;
     };
     
@@ -2007,14 +2054,12 @@ const RegistrarPanel = () => {
                               (departmentKey === 'lab' && (specialty.includes('lab') || specialty.includes('laboratory')));
     
     // ✅ НОВАЯ ЛОГИКА: проверяем по кодам услуг
-    const matchesByServices = appointmentServiceCodes.some(serviceCode => {
+    const matchesByServices = allServiceCodes.some(serviceCode => {
       const serviceCategory = getServiceCategoryByCode(serviceCode);
       return targetCategoryCodes.includes(serviceCategory);
     });
     
     const result = matchesByDepartment || matchesBySpecialty || matchesByServices;
-    
-    // Отладка убрана - система работает корректно
     
     // ✅ Возвращаем результат универсальной проверки
     return result;
@@ -2061,14 +2106,6 @@ const RegistrarPanel = () => {
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
 
   const filteredAppointments = useMemo(() => {
-    // console.log('Filtering appointments:', {
-    //   total: appointments.length,
-    //   activeTab,
-    //   searchDate,
-    //   statusFilter,
-    //   searchQuery
-    // });
-    
     const filtered = appointments.filter(appointment => {
       // Фильтр по вкладке (отдел)
       if (activeTab && !isInDepartment(appointment, activeTab)) {
@@ -2098,7 +2135,6 @@ const RegistrarPanel = () => {
     return true;
   });
 
-    // console.log('Filtered appointments result:', filtered.length);
     return filtered;
   }, [appointments, activeTab, searchDate, statusFilter, searchQuery, isInDepartment]);
 
@@ -2453,19 +2489,6 @@ const RegistrarPanel = () => {
                       }}
                     >
                       ➕ {t('new_appointment')}
-                      {!wizardSettingsLoading && (
-                        <span style={{
-                          marginLeft: '8px',
-                          fontSize: '10px',
-                          opacity: 0.8,
-                          background: useNewWizard ? '#10b981' : '#f59e0b',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          fontWeight: '500'
-                        }}>
-                          {useNewWizard ? 'V2' : 'V1'}
-                        </span>
-                      )}
                     </button>
                   </AnimatedTransition>
 
@@ -2699,17 +2722,17 @@ const RegistrarPanel = () => {
               </AnimatedTransition>
 
               {/* Недавние записи */}
-              <div>
-                <h3 style={{ fontSize: '20px', marginBottom: '16px', color: accentColor }}>
-                  📋 Недавние записи
-                </h3>
-                <div style={{ 
-                  background: cardBg,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: '8px',
-                  padding: '16px'
-                }}>
-          {/* Индикатор источника данных */}
+                <div>
+                  <h3 style={{ fontSize: '20px', marginBottom: '16px', color: accentColor }}>
+                    📋 Недавние записи
+                  </h3>
+                  <div style={{ 
+                    background: cardBg,
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '8px',
+                    padding: '16px'
+                  }}>
+            {/* Индикатор источника данных */}
           {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
 
             {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
@@ -3231,10 +3254,8 @@ const RegistrarPanel = () => {
         }}
       />
 
-      {/* A/B тест: условный рендеринг мастера */}
-      {!wizardSettingsLoading && (
-        useNewWizard ? (
-          <AppointmentWizardV2
+      {/* ✅ Используется только новый мастер (V2) */}
+      <AppointmentWizardV2
             isOpen={showWizard}
             onClose={() => {
               console.log('AppointmentWizardV2 closing');
@@ -3263,264 +3284,6 @@ const RegistrarPanel = () => {
               }
             }}
           />
-        ) : (
-          <AppointmentWizard
-            isOpen={showWizard}
-            onClose={() => {
-              console.log('AppointmentWizard closing');
-              setShowWizard(false);
-            }}
-            doctors={doctors}
-            services={services}
-            onComplete={async (wizardData) => {
-          console.log('Creating appointment with data:', wizardData);
-          console.log('wizardData.patient:', wizardData.patient);
-          console.log('wizardData.appointment:', wizardData.appointment);
-          console.log('wizardData.payment:', wizardData.payment);
-          
-          try {
-            // Создание пациента (если нужно)
-            let patientId = selectedPatientId;
-            if (!patientId) {
-              try {
-                const patientResponse = await fetch(`${API_BASE}/api/v1/patients/`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                  },
-                  body: JSON.stringify({
-                    last_name: wizardData.patient.fio.split(' ')[0] || '',
-                    first_name: wizardData.patient.fio.split(' ')[1] || '',
-                    middle_name: wizardData.patient.fio.split(' ').slice(2).join(' ') || null,
-                    birth_date: wizardData.patient.birth_date,
-                    phone: wizardData.patient.phone,
-                    address: wizardData.patient.address || '',
-                    doc_number: wizardData.patient.doc_number || null
-                  })
-                });
-              
-              if (patientResponse.ok) {
-                const patient = await patientResponse.json();
-                patientId = patient.id;
-                console.log('Created new patient with ID:', patientId);
-              } else {
-                const errorData = await patientResponse.json().catch(() => ({}));
-                console.log('Patient creation error:', errorData);
-                
-                // Если пациент уже существует, пытаемся найти его
-                if (errorData.detail && errorData.detail.includes('уже существует')) {
-                  try {
-                    const searchResponse = await fetch(`${API_BASE}/api/v1/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
-                      headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-                    });
-                    if (searchResponse.ok) {
-                      const searchData = await searchResponse.json();
-                      if (searchData.length > 0) {
-                        patientId = searchData[0].id;
-                        console.log('Found existing patient with ID:', patientId);
-                      }
-                    }
-                  } catch (findError) {
-                    console.warn('Error finding existing patient:', findError);
-                  }
-                }
-                
-                if (!patientId) {
-                  const details = Array.isArray(errorData.detail) 
-                    ? errorData.detail.map(err => `${err.loc?.join('.')}: ${err.msg}`).join(', ')
-                    : errorData.detail || 'Неверные данные пациента';
-                  throw new Error('Ошибка создания пациента: ' + details);
-                }
-              }
-            } catch (fetchError) {
-              // Обработка CORS и других ошибок сети
-              if (fetchError.message.includes('401') || fetchError.message.includes('Unauthorized')) {
-                console.warn('Токен недействителен, требуется повторный вход');
-                localStorage.removeItem('auth_token');
-                toast.error('Сессия истекла. Перенаправляем на страницу входа...');
-                setTimeout(() => {
-                  window.location.href = '/login';
-                }, 2000);
-                return;
-              }
-              
-              console.warn('Backend недоступен, используем демо-режим:', fetchError.message);
-              
-              // В демо-режиме создаем виртуального пациента
-              patientId = Math.floor(Math.random() * 1000) + 1000;
-              console.log('Created demo patient with ID:', patientId);
-              
-              toast.success('Запись создана в демо-режиме (backend недоступен)');
-            }
-            }
-            
-            // Создание записи
-            try {
-              // Подготовим корректный payload и подробный лог
-              const _doctorId = wizardData.appointment?.doctor_id ? parseInt(wizardData.appointment.doctor_id) : (selectedDoctor?.id || null);
-              const _visitType = wizardData.appointment?.visit_type === 'Платный' ? 'paid'
-                : wizardData.appointment?.visit_type === 'Повторный' ? 'repeat'
-                : wizardData.appointment?.visit_type === 'Льготный' ? 'free' : 'paid';
-              const paymentMethod = wizardData.payment?.method || wizardData.payment?.type || 'Наличные';
-              const _paymentType = (paymentMethod === 'Карта' ? 'card' : paymentMethod === 'Онлайн' ? 'online' : 'cash');
-              // ✅ ИСПРАВЛЕННАЯ ЛОГИКА МАППИНГА УСЛУГ
-              const _services = Array.isArray(wizardData.appointment?.services)
-                ? wizardData.appointment.services
-                    .map(s => {
-                      // Всегда возвращаем ID услуги как строку
-                      if (typeof s === 'number') return String(s);
-                      if (typeof s === 'string' && /^\d+$/.test(s)) return s; // Уже ID как строка
-                      if (typeof s === 'object' && (s?.id || s?.service_id)) {
-                        return String(s.id || s.service_id);
-                      }
-                      // ❌ НЕ используем s?.code || s?.name - это может быть группа!
-                      return null; // Неизвестный формат услуги
-                    })
-                    .filter(s => s && s !== 'null' && s !== 'undefined')
-                : [];
-
-              const payload = {
-                patient_id: patientId,
-                doctor_id: _doctorId || null,
-                appointment_date: wizardData.appointment.date,
-                appointment_time: wizardData.appointment.time || (() => {
-                  // Генерируем случайное время от 09:00 до 17:00
-                  const hour = 9 + Math.floor(Math.random() * 8);
-                  const minute = Math.floor(Math.random() * 4) * 15; // 00, 15, 30, 45
-                  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                })(),
-                department: wizardData.appointment.department || selectedDoctor?.specialty || (() => {
-                  // Определяем отделение по выбранным услугам (по структуре демо-режима)
-                  const labServices = ['1', '2', '3', '4', '38', '39', '40', '41', '42', '43']; // Лаборатория: демо ID 1,2,3,4 + API ID 38-43
-                  const dermaServices = ['5', '6', '7', '8']; // Дерматология: демо ID 5,6,7,8
-                  const cosmetoServices = ['9', '10', '11', '12', '20', '21', '25', '26', '27']; // Косметология: демо ID 9,10,11,12 + API ID 20,21,25-27
-                  const cardioServices = ['13', '14', '15', '16', '17', '28', '29', '30', '46']; // Кардиология: демо ID 13,14,15,16,17 + API ID 28-30,46
-                  const dentistryServices = ['18', '19', '37']; // Стоматология: демо ID 18,19 + API ID 37
-                  const procedureServices = ['22', '23', '24']; // Процедуры: демо ID 22,23,24
-                  
-                  if (_services.some(s => cardioServices.includes(s))) return 'cardiology';
-                  if (_services.some(s => dermaServices.includes(s))) return 'dermatology';
-                  if (_services.some(s => cosmetoServices.includes(s))) return 'cosmetology';
-                  if (_services.some(s => dentistryServices.includes(s))) return 'dentistry';
-                  if (_services.some(s => labServices.includes(s))) return 'laboratory';
-                  if (_services.some(s => procedureServices.includes(s))) return 'procedures';
-                  return 'procedures'; // По умолчанию для прочих услуг
-                })(),
-                notes: wizardData.appointment.notes || '',
-                status: 'scheduled',
-                visit_type: _visitType,
-                payment_type: _paymentType,
-                services: _services,
-                payment_amount: wizardData.payment?.amount || 0,
-                payment_currency: 'UZS'
-              };
-              console.log('Raw services from wizard:', wizardData.appointment?.services);
-              console.log('Processed services:', _services);
-              console.log('Appointment payload:', payload);
-
-              const appointmentResponse = await fetch(`${API_BASE}/api/v1/appointments/`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-                },
-                body: JSON.stringify(payload)
-              });
-              
-              if (appointmentResponse.ok) {
-                const appointment = await appointmentResponse.json();
-                
-                // Обновляем локальный список и перезагружаем данные
-                setAppointments(prev => [appointment, ...prev]);
-                
-                // Принудительно обновляем данные из API
-                setTimeout(() => {
-                  loadAppointments();
-                }, 500);
-                
-                // Закрываем мастер
-                setShowWizard(false);
-                setSelectedPatientId(null);
-                
-                toast.success('Запись успешно создана!');
-                
-                // Предлагаем печать талона с данными пациента
-                setTimeout(() => {
-                        setPrintDialog({ 
-                          open: true, 
-                          type: 'ticket', 
-                    data: {
-                      ...appointment,
-                      patient_fio: wizardData.patient.fio,
-                      patient_phone: wizardData.patient.phone,
-                      patient_birth_year: wizardData.patient.birth_date ? new Date(wizardData.patient.birth_date).getFullYear() : null,
-                      address: wizardData.patient.address || 'Не указан',
-                      services: _services
-                    }
-                  });
-                }, 500);
-                
-                    } else {
-                let errDetail = '';
-                try {
-                  const err = await appointmentResponse.json();
-                  errDetail = JSON.stringify(err);
-                } catch(e) {
-                  // Игнорируем ошибки парсинга JSON
-                }
-                console.error('Create appointment failed:', appointmentResponse.status, errDetail);
-                throw new Error('Ошибка создания записи');
-              }
-            } catch (fetchError) {
-              // Обработка CORS и других ошибок сети для создания записи
-              if (fetchError.message.includes('401') || fetchError.message.includes('Unauthorized')) {
-                console.warn('Токен недействителен при создании записи');
-                localStorage.removeItem('auth_token');
-                toast.error('Сессия истекла. Перенаправляем на страницу входа...');
-                setTimeout(() => {
-                  window.location.href = '/login';
-                }, 2000);
-                return;
-              }
-              
-              console.warn('Backend недоступен для создания записи, используем демо-режим:', fetchError.message);
-              
-          // Создаем демо-запись
-          const demoAppointment = {
-            id: Math.floor(Math.random() * 1000) + 2000,
-            patient_id: patientId,
-            doctor_id: wizardData.appointment.doctor_id || null,
-            appointment_date: wizardData.appointment.date,
-            appointment_time: wizardData.appointment.time || '09:00',
-            notes: wizardData.appointment.notes || '',
-            status: 'scheduled',
-            payment_amount: wizardData.payment.amount || 0,
-            payment_currency: 'UZS',
-            // Дополнительные поля для отображения
-            patient_fio: wizardData.patient.fio,
-            patient_phone: wizardData.patient.phone,
-            created_at: new Date().toISOString()
-          };
-              
-              // Обновляем локальный список
-              setAppointments(prev => [demoAppointment, ...prev]);
-              
-              // Закрываем мастер
-              setShowWizard(false);
-              setSelectedPatientId(null);
-              
-              toast.success('Запись создана в демо-режиме (backend недоступен)');
-            }
-            
-          } catch (error) {
-            console.error('Error in wizard completion:', error);
-            throw error; // Пробрасываем ошибку в мастер
-          }
-        }}
-          />
-        )
-      )}
 
       {/* Старые диалоги удалены - используются современные компоненты CancelDialog, PaymentDialog, PrintDialog */}
       {/* Встроенное модальное окно оплаты удалено - используется PaymentDialog компонент */}

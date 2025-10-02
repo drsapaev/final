@@ -210,20 +210,118 @@ const EnhancedAppointmentsTable = ({
     }
   }, [paginatedData, onRowSelect]);
 
-  // Рендер статуса (компактный)
+  // ✅ Улучшенный рендер статуса (полный контекстный)
   const renderStatus = useCallback((status) => {
     const statusConfig = {
-      scheduled: { color: colors.accent, bg: `${colors.accent}20`, icon: Calendar, short: 'План' },
-      confirmed: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Подтв' },
-      queued: { color: colors.warning, bg: `${colors.warning}20`, icon: Clock, short: 'Очер' },
-      in_cabinet: { color: colors.accent, bg: `${colors.accent}20`, icon: User, short: 'Каб' },
-      done: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Готов' },
-      cancelled: { color: colors.error, bg: `${colors.error}20`, icon: XCircle, short: 'Отмен' },
-      no_show: { color: colors.textSecondary, bg: `${colors.textSecondary}20`, icon: AlertCircle, short: 'Неявка' },
-      paid_pending: { color: colors.warning, bg: `${colors.warning}20`, icon: CreditCard, short: 'Ожид' },
-      payment_paid: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Оплач' },
-      paid: { color: colors.success, bg: `${colors.success}20`, icon: CheckCircle, short: 'Оплач' },
-      plan: { color: colors.accent, bg: `${colors.accent}20`, icon: Calendar, short: 'План' }
+      // Статусы записи
+      scheduled: { 
+        color: colors.accent, 
+        bg: `${colors.accent}20`, 
+        icon: Calendar, 
+        text: 'Запланирован',
+        emoji: '📅'
+      },
+      confirmed: { 
+        color: colors.success, 
+        bg: `${colors.success}20`, 
+        icon: CheckCircle, 
+        text: 'Подтверждён',
+        emoji: '✅'
+      },
+      
+      // Статусы очереди
+      waiting: {
+        color: colors.warning,
+        bg: `${colors.warning}20`,
+        icon: Clock,
+        text: 'В очереди',
+        emoji: '⏳'
+      },
+      queued: { 
+        color: colors.warning, 
+        bg: `${colors.warning}20`, 
+        icon: Clock, 
+        text: 'В очереди',
+        emoji: '⏳'
+      },
+      called: {
+        color: colors.accent,
+        bg: `${colors.accent}20`,
+        icon: User,
+        text: 'Вызван',
+        emoji: '📢'
+      },
+      in_cabinet: { 
+        color: colors.accent, 
+        bg: `${colors.accent}20`, 
+        icon: User, 
+        text: 'В кабинете',
+        emoji: '👤'
+      },
+      
+      // Завершённые статусы
+      served: {
+        color: colors.success,
+        bg: `${colors.success}20`,
+        icon: CheckCircle,
+        text: 'Обслужен',
+        emoji: '✅'
+      },
+      done: { 
+        color: colors.success, 
+        bg: `${colors.success}20`, 
+        icon: CheckCircle, 
+        text: 'Обслужен',
+        emoji: '✅'
+      },
+      
+      // Статусы оплаты
+      paid_pending: { 
+        color: colors.warning, 
+        bg: `${colors.warning}20`, 
+        icon: CreditCard, 
+        text: 'Ожидает оплаты',
+        emoji: '⏳'
+      },
+      payment_paid: { 
+        color: colors.success, 
+        bg: `${colors.success}20`, 
+        icon: CheckCircle, 
+        text: 'Оплачен',
+        emoji: '✅'
+      },
+      paid: { 
+        color: colors.success, 
+        bg: `${colors.success}20`, 
+        icon: CheckCircle, 
+        text: 'Оплачен',
+        emoji: '✅'
+      },
+      
+      // Отрицательные статусы
+      cancelled: { 
+        color: colors.error, 
+        bg: `${colors.error}20`, 
+        icon: XCircle, 
+        text: 'Отменён',
+        emoji: '❌'
+      },
+      no_show: { 
+        color: colors.textSecondary, 
+        bg: `${colors.textSecondary}20`, 
+        icon: AlertCircle, 
+        text: 'Не явился',
+        emoji: '👻'
+      },
+      
+      // Старые статусы (для совместимости)
+      plan: { 
+        color: colors.accent, 
+        bg: `${colors.accent}20`, 
+        icon: Calendar, 
+        text: 'Запланирован',
+        emoji: '📅'
+      }
     };
 
     const config = statusConfig[status] || statusConfig.scheduled;
@@ -232,24 +330,25 @@ const EnhancedAppointmentsTable = ({
     return (
       <div 
         className="status-badge"
-        title={t[status] || status} // Полное название в подсказке
+        title={config.text}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '2px',
-          padding: '2px 6px',
-          borderRadius: '4px',
+          gap: '4px',
+          padding: '4px 8px',
+          borderRadius: '6px',
           backgroundColor: config.bg,
           color: config.color,
-          fontSize: '10px',
+          fontSize: '12px',
           fontWeight: '500',
-          cursor: 'help'
+          cursor: 'help',
+          border: `1px solid ${config.color}30`
         }}>
-        <Icon size={10} />
-        {config.short}
+        <span style={{ fontSize: '14px' }}>{config.emoji}</span>
+        <span>{config.text}</span>
       </div>
     );
-  }, [colors, t]);
+  }, [colors]);
 
   // ✅ УНИВЕРСАЛЬНЫЙ МАППИНГ УСЛУГ (работает с любыми данными из админ панели)
   const createServiceMapping = useCallback(() => {
@@ -446,32 +545,37 @@ const EnhancedAppointmentsTable = ({
     const color = paymentColors[paymentType] || colors.textSecondary;
     const statusColor = statusColors[paymentStatus] || colors.textSecondary;
 
+    // ✅ Упрощённый вид: вид оплаты + иконка статуса
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '6px',
+        justifyContent: 'center'
+      }}>
         <span style={{
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          padding: '2px 6px',
+          padding: '3px 8px',
           borderRadius: '6px',
-          fontSize: '11px',
+          fontSize: '12px',
           fontWeight: '500',
           backgroundColor: `${color}15`,
           color: color,
           border: `1px solid ${color}30`
         }}>
           <span>{icon}</span>
-          {typeText}
+          <span>{typeText}</span>
         </span>
         {paymentStatus && (
           <span style={{
-            fontSize: '10px',
-            color: statusColor,
-            fontWeight: '500'
+            fontSize: '16px',
+            lineHeight: 1
           }}>
-            {paymentStatus === 'paid' ? '✅ Оплачено' : 
-             paymentStatus === 'pending' ? '⏳ Ожидает' : 
-             paymentStatus === 'failed' ? '❌ Ошибка' : paymentStatus}
+            {paymentStatus === 'paid' ? '✅' : 
+             paymentStatus === 'pending' ? '⏳' : 
+             paymentStatus === 'failed' ? '❌' : ''}
           </span>
         )}
       </div>
@@ -660,60 +764,26 @@ const EnhancedAppointmentsTable = ({
 
               const config = statusConfig[queue.status] || statusConfig.waiting;
 
+              // ✅ Показываем только номер очереди (без названия и статуса)
               return (
-                <div
+                <span 
                   key={index}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px',
-                    borderRadius: '6px',
-                    backgroundColor: config.bg + '10',
-                    border: `1px solid ${config.bg}30`
-                  }}
-                  title={`${queue.queue_name}: №${queue.number} (${config.text})`}
-                >
-                  <span style={{
-                    padding: '3px 6px',
+                    padding: '4px 8px',
                     backgroundColor: config.bg,
                     color: 'white',
-                    borderRadius: '4px',
-                    fontSize: '11px',
+                    borderRadius: '6px',
+                    fontSize: '14px',
                     fontWeight: '700',
-                    minWidth: '24px',
+                    minWidth: '32px',
                     textAlign: 'center',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    animation: config.pulse ? 'pulse 2s infinite' : 'none'
-                  }}>
-                    {queue.number}
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                    <span style={{
-                      fontSize: '10px',
-                      color: config.bg,
-                      fontWeight: '600',
-                      maxWidth: '70px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {queue.queue_name}
-                    </span>
-                    <span style={{
-                      fontSize: '9px',
-                      color: colors.textSecondary,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '2px'
-                    }}>
-                      <span>{config.icon}</span>
-                      <span>{config.text}</span>
-                    </span>
-                  </div>
-                </div>
+                    display: 'inline-block',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                  title={`${queue.queue_name}: №${queue.number}`}
+                >
+                  {queue.number}
+                </span>
               );
             })}
           </div>
@@ -729,17 +799,18 @@ const EnhancedAppointmentsTable = ({
 
       return (
         <span style={{
-          padding: '3px 6px',
+          padding: '4px 8px',
           backgroundColor: colors.accent,
           color: 'white',
-          borderRadius: '4px',
-          fontSize: '11px',
+          borderRadius: '6px',
+          fontSize: '14px',
           fontWeight: '700',
-          minWidth: '24px',
+          minWidth: '32px',
           textAlign: 'center',
-          display: 'inline-block'
+          display: 'inline-block',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
         }}>
-          #{todayIndex}
+          {todayIndex}
         </span>
       );
     }

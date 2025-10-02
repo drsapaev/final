@@ -194,26 +194,29 @@ class MorningAssignmentService:
         doctor_id = visit.doctor_id
         
         # Для очередей без конкретного врача используем ресурс-врачей
-        if queue_tag == "ecg" and not doctor_id:
-            ecg_resource = self.db.query(User).filter(
-                User.username == "ecg_resource",
+        if not doctor_id:
+            # Маппинг queue_tag → resource_username
+            resource_mapping = {
+                "ecg": "ecg_resource",
+                "lab": "lab_resource",
+                "stomatology": "stomatology_resource",
+                "general": "general_resource",
+                "cardiology_common": "general_resource",  # Используем общий ресурс
+                "dermatology": "general_resource",  # Используем общий ресурс
+            }
+            
+            resource_username = resource_mapping.get(queue_tag, "general_resource")  # Fallback на general_resource
+            
+            resource_user = self.db.query(User).filter(
+                User.username == resource_username,
                 User.is_active == True
             ).first()
-            if ecg_resource:
-                doctor_id = ecg_resource.id
+            
+            if resource_user:
+                doctor_id = resource_user.id
+                logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (ID: {doctor_id})")
             else:
-                logger.warning(f"ЭКГ ресурс-врач не найден для queue_tag={queue_tag}")
-                return None
-                
-        elif queue_tag == "lab" and not doctor_id:
-            lab_resource = self.db.query(User).filter(
-                User.username == "lab_resource",
-                User.is_active == True
-            ).first()
-            if lab_resource:
-                doctor_id = lab_resource.id
-            else:
-                logger.warning(f"Лаборатория ресурс-врач не найден для queue_tag={queue_tag}")
+                logger.warning(f"Ресурс-врач {resource_username} не найден для queue_tag={queue_tag}")
                 return None
         
         if not doctor_id:

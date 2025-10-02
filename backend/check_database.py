@@ -1,58 +1,32 @@
 #!/usr/bin/env python3
-"""
-Скрипт для проверки базы данных
-"""
+import sqlite3
 
-import os
-import sys
-from pathlib import Path
+conn = sqlite3.connect('backend/clinic.db')
+cursor = conn.cursor()
 
-# Добавляем путь к проекту
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+print("🔍 Проверяем визит ID 76:")
+cursor.execute('SELECT id, patient_id, department, visit_date, status, created_at FROM visits WHERE id = 76')
+visit = cursor.fetchone()
+if visit:
+    print(f'✅ Визит ID 76 найден в базе!')
+    print(f'   Patient: {visit[1]}, Dept: {visit[2]}, Date: {visit[3]}, Status: {visit[4]}, Created: {visit[5]}')
+else:
+    print('❌ Визит ID 76 НЕ найден в базе!')
 
-from sqlalchemy import create_engine, text
-from app.core.config import settings
+print('\n📋 Последние 3 визита:')
+cursor.execute('SELECT id, patient_id, department, visit_date, status FROM visits ORDER BY id DESC LIMIT 3')
+for v in cursor.fetchall():
+    print(f'   ID: {v[0]}, Patient: {v[1]}, Dept: {v[2]}, Date: {v[3]}, Status: {v[4]}')
 
-# Создаем движок базы данных
-engine = create_engine(settings.DATABASE_URL, echo=False)
+print('\n🎯 Записи в очередях на сегодня:')
+cursor.execute("""
+SELECT oqe.id, oqe.patient_id, oqe.number, oqe.status, oqe.source, dq.queue_tag 
+FROM online_queue_entries oqe 
+JOIN daily_queues dq ON oqe.queue_id = dq.id 
+WHERE dq.day = '2025-10-01' 
+ORDER BY oqe.id DESC LIMIT 5
+""")
+for q in cursor.fetchall():
+    print(f'   Entry ID: {q[0]}, Patient: {q[1]}, Number: {q[2]}, Status: {q[3]}, Source: {q[4]}, Tag: {q[5]}')
 
-print("🔍 Проверка базы данных...")
-print(f"📁 DATABASE_URL: {settings.DATABASE_URL}")
-
-try:
-    with engine.connect() as conn:
-        # Проверяем, существует ли таблица users
-        result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
-        tables = result.fetchall()
-        
-        if tables:
-            print("✅ Таблица 'users' существует")
-            
-            # Проверяем количество пользователей
-            result = conn.execute(text("SELECT COUNT(*) FROM users"))
-            count = result.fetchone()[0]
-            print(f"👥 Количество пользователей: {count}")
-            
-            # Показываем пользователей
-            result = conn.execute(text("SELECT username, email, role, is_active FROM users LIMIT 5"))
-            users = result.fetchall()
-            print("📋 Пользователи:")
-            for user in users:
-                print(f"  - {user[0]} ({user[1]}) - {user[2]} - {'активен' if user[3] else 'неактивен'}")
-                
-        else:
-            print("❌ Таблица 'users' не существует")
-            
-        # Показываем все таблицы
-        result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
-        all_tables = result.fetchall()
-        print(f"\n📊 Всего таблиц в базе: {len(all_tables)}")
-        print("📋 Список таблиц:")
-        for table in all_tables:
-            print(f"  - {table[0]}")
-            
-except Exception as e:
-    print(f"❌ Ошибка при проверке базы данных: {e}")
-
-print("\n🎉 Проверка завершена!")
+conn.close()
