@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
-// Хук для проверки медиа-запросов
+/**
+ * Хук для проверки медиа-запросов
+ * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлена SSR защита
+ */
 export const useMediaQuery = (query) => {
+  // SSR protection
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  
   const [matches, setMatches] = useState(false);
 
   useEffect(() => {

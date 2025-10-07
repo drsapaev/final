@@ -13,23 +13,18 @@ export default function Landing() {
     theme, 
     isDark, 
     isLight, 
-    toggleTheme, 
-    getColor, 
-    getSpacing, 
-    getFontSize,
-    getShadow,
-    designTokens 
+    toggleTheme
   } = useTheme();
 
-  const textColor = isDark ? getColor('secondary', 200) : getColor('secondary', 700);
-  const bgColor = isDark ? getColor('secondary', 900) : getColor('secondary', 50);
+  const textColor = isDark ? 'var(--color-text-secondary)' : 'var(--color-text-primary)';
+  const bgColor = isDark ? 'var(--color-background-primary)' : 'var(--color-background-secondary)';
 
   const pageStyle = {
     minHeight: '100vh',
     background: isLight 
-      ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
-      : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
-    padding: getSpacing('lg'),
+      ? 'linear-gradient(135deg, var(--color-background-secondary) 0%, var(--color-background-tertiary) 100%)'
+      : 'linear-gradient(135deg, var(--color-background-primary) 0%, var(--color-background-secondary) 100%)',
+    padding: '1.5rem',
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
     color: textColor,
     display: 'flex',
@@ -40,14 +35,14 @@ export default function Landing() {
 
   const cardStyle = {
     background: isLight 
-      ? 'rgba(255, 255, 255, 0.9)' 
+      ? 'rgba(255, 255, 255, 0.95)' 
       : 'rgba(30, 41, 59, 0.9)',
-    border: `1px solid ${isLight ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+    border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
     borderRadius: '20px',
-    padding: getSpacing('2xl'),
-    marginBottom: getSpacing('lg'),
+    padding: '2rem',
+    marginBottom: '1.5rem',
     boxShadow: isLight 
-      ? getShadow('xl')
+      ? 'var(--shadow-xl)'
       : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
     backdropFilter: 'blur(10px)',
     maxWidth: '600px',
@@ -55,8 +50,8 @@ export default function Landing() {
   };
 
   const buttonStyle = {
-    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+    padding: '0.5rem 1.5rem',
+    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '12px',
@@ -65,21 +60,21 @@ export default function Landing() {
     fontWeight: '600',
     transition: 'all 0.3s ease',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    marginRight: getSpacing('sm'),
-    marginBottom: getSpacing('sm')
+    marginRight: '0.5rem',
+    marginBottom: '0.5rem'
   };
 
   const buttonSecondaryStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${getColor('secondary', 500)} 0%, ${getColor('secondary', 600)} 100%)`,
+    background: 'linear-gradient(135deg, var(--color-text-secondary) 0%, var(--color-text-tertiary) 100%)',
     boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
   };
 
   const headerStyle = {
     fontSize: '48px',
     fontWeight: '800',
-          marginBottom: getSpacing('md'),
-    background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 400)} 100%)`,
+    marginBottom: '1rem',
+    background: 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-400) 100%)',
     backgroundClip: 'text',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
@@ -89,25 +84,25 @@ export default function Landing() {
   const subtitleStyle = {
     fontSize: '18px',
     opacity: 0.8,
-          marginBottom: getSpacing('xl'),
+    marginBottom: '2rem',
     textAlign: 'center',
     lineHeight: '1.6'
   };
 
   const contactCardStyle = {
     ...cardStyle,
-    padding: getSpacing('lg'),
-          marginBottom: getSpacing('sm')
+    padding: '1.5rem',
+    marginBottom: '0.5rem'
   };
 
   const toggleButtonStyle = {
-    padding: getSpacing('xs'),
-    background: 'transparent',
-    border: `1px solid ${isLight ? getColor('secondary', 300) : getColor('secondary', 600)}`,
+    padding: '0.25rem',
+    background: isLight ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
+    border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.2)' : 'var(--color-border-light)'}`,
     borderRadius: '8px',
     cursor: 'pointer',
     color: textColor,
-    marginLeft: getSpacing('sm')
+    marginLeft: '0.5rem'
   };
 
   const translations = {
@@ -117,10 +112,10 @@ export default function Landing() {
       login: 'Войти',
       activate: 'Активировать аккаунт',
       contacts: 'Контакты',
-      address: 'Адрес: г. Ташкент, ул. Примерная 1',
-      phone: 'Телефон: +998 (90) 000-00-00',
-      schedule: 'График: Пн–Сб 9:00–18:00',
-      telegram: 'Telegram: @clinic',
+      address: 'Адрес: г. Турткул, ул. Беруний',
+      phone: 'Телефон: +998 (95) 104-34-34',
+      schedule: 'График: Пн–Сб 9:00–17:00',
+      telegram: 'Telegram: @doktor_cosmed_clinic',
       footer: 'v1.0.0 · Политика конфиденциальности · Условия использования'
     },
     UZ: {
@@ -129,10 +124,10 @@ export default function Landing() {
       login: 'Kirish',
       activate: 'Akkauntni faollashtirish',
       contacts: 'Kontaktlar',
-      address: 'Manzil: Toshkent sh., Namunaviy k., 1-uy',
-      phone: 'Telefon: +998 (90) 000-00-00',
-      schedule: 'Ish vaqti: Du–Sha 9:00–18:00',
-      telegram: 'Telegram: @clinic',
+      address: 'Manzil: Tortkul sh., Beruniy k.',
+      phone: 'Telefon: +998 (95) 104-34-34',
+      schedule: 'Ish vaqti: Du–Sha 9:00–17:00',
+      telegram: 'Telegram: @doktor_cosmed_clinic',
       footer: 'v1.0.0 · Maxfiylik siyosati · Foydalanish shartlari'
     },
     EN: {
@@ -141,10 +136,10 @@ export default function Landing() {
       login: 'Login',
       activate: 'Activate Account',
       contacts: 'Contacts',
-      address: 'Address: Tashkent, Example St. 1',
-      phone: 'Phone: +998 (90) 000-00-00',
-      schedule: 'Schedule: Mon–Sat 9:00–18:00',
-      telegram: 'Telegram: @clinic',
+      address: 'Address: Tortkul, Beruniy St.',
+      phone: 'Phone: +998 (95) 104-34-34',
+      schedule: 'Schedule: Mon–Sat 9:00–17:00',
+      telegram: 'Telegram: @doktor_cosmed_clinic',
       footer: 'v1.0.0 · Privacy Policy · Terms of Use'
     }
   };
@@ -154,7 +149,7 @@ export default function Landing() {
   return (
     <div style={pageStyle}>
       {/* Переключатели темы и языка */}
-              <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
+              <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', alignItems: 'center' }}>
         <button 
           onClick={toggleTheme}
           style={toggleButtonStyle}
@@ -167,8 +162,9 @@ export default function Landing() {
           onChange={(e) => setLanguage(e.target.value)}
           style={{
             ...toggleButtonStyle,
-            marginLeft: getSpacing('sm'),
-            background: isLight ? 'white' : getColor('secondary', 800)
+            marginLeft: '0.5rem',
+            background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'var(--color-background-secondary)',
+            color: isLight ? 'var(--color-text-primary)' : 'var(--color-text-primary)'
           }}
         >
           <option value="RU">RU</option>
@@ -182,7 +178,7 @@ export default function Landing() {
         <div style={headerStyle}>{t.title}</div>
         <div style={subtitleStyle}>{t.subtitle}</div>
         
-        <div style={{ display: 'flex', gap: getSpacing('sm'), flexWrap: 'wrap', justifyContent: 'center', marginBottom: getSpacing('lg') }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.5rem' }}>
           <button 
             onClick={() => navigate('/login')} 
             style={buttonStyle}
@@ -204,10 +200,10 @@ export default function Landing() {
 
       {/* Карточка контактов */}
       <div style={contactCardStyle}>
-        <div style={{ fontWeight: '700', marginBottom: getSpacing('sm'), fontSize: '18px', color: getColor('primary', 600) }}>
+        <div style={{ fontWeight: '700', marginBottom: '0.5rem', fontSize: '18px', color: 'var(--color-primary-600)' }}>
           {t.contacts}
         </div>
-        <div style={{ lineHeight: '1.6' }}>
+        <div style={{ lineHeight: '1.6', color: isLight ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
           <div style={{ marginBottom: '4px' }}>{t.address}</div>
           <div style={{ marginBottom: '4px' }}>{t.phone}</div>
           <div style={{ marginBottom: '4px' }}>{t.schedule}</div>
@@ -220,7 +216,7 @@ export default function Landing() {
         opacity: 0.6, 
         fontSize: '14px', 
         textAlign: 'center',
-        marginTop: getSpacing('lg') 
+        marginTop: '1.5rem' 
       }}>
         {t.footer}
       </div>

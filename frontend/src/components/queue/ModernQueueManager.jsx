@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Activity
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useTheme } from '../../contexts/ThemeContext';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
@@ -32,6 +33,8 @@ const ModernQueueManager = ({
   language = 'ru',
   theme = 'light',
   doctors = [],
+  onDoctorChange,
+  onDateChange,
   ...props
 }) => {
   const { getColor } = useTheme();
@@ -40,6 +43,11 @@ const ModernQueueManager = ({
   const [statistics, setStatistics] = useState(null);
   const [qrData, setQrData] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  // Локальные значения если пропсы не переданы
+  const [internalDoctor, setInternalDoctor] = useState('');
+  const [internalDate, setInternalDate] = useState(new Date().toISOString().split('T')[0]);
+  const effectiveDoctor = selectedDoctor || internalDoctor;
+  const effectiveDate = selectedDate || internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
   const [showStatsDialog, setShowStatsDialog] = useState(false);
   
@@ -78,7 +86,7 @@ const ModernQueueManager = ({
 
   // Автообновление
   useEffect(() => {
-    if (autoRefresh && selectedDoctor) {
+    if (autoRefresh && effectiveDoctor) {
       refreshIntervalRef.current = setInterval(() => {
         loadQueue();
         loadStatistics();
@@ -95,17 +103,17 @@ const ModernQueueManager = ({
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [autoRefresh, selectedDoctor]);
+  }, [autoRefresh, effectiveDoctor]);
 
   // Загрузка данных очереди
   const loadQueue = async () => {
-    if (!selectedDoctor) return;
+    if (!effectiveDoctor) return;
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/queue/status/${selectedDoctor}?target_date=${selectedDate}`, {
+      const response = await fetch(`/api/v1/queue/status/${effectiveDoctor}?target_date=${effectiveDate}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -116,7 +124,7 @@ const ModernQueueManager = ({
       const queueStatus = await response.json();
       
       const queueData = {
-        id: selectedDoctor,
+        id: effectiveDoctor,
         is_open: queueStatus.active,
         total_entries: queueStatus.entries.length,
         waiting_entries: queueStatus.queue_length,
@@ -147,7 +155,7 @@ const ModernQueueManager = ({
 
   // Загрузка статистики
   const loadStatistics = async () => {
-    if (!selectedDoctor) return;
+    if (!effectiveDoctor) return;
     
     try {
       // Мок данных для демонстрации
@@ -169,7 +177,7 @@ const ModernQueueManager = ({
 
   // Генерация QR кода
   const generateQR = async () => {
-    if (!selectedDoctor || !selectedDate) {
+    if (!effectiveDoctor || !effectiveDate) {
       toast.error('Выберите врача и дату');
       return;
     }
@@ -177,18 +185,18 @@ const ModernQueueManager = ({
     setLoading(true);
     try {
       // Определяем отделение на основе врача
-      const doctor = doctors.find(d => d.id == selectedDoctor);
-      const department = doctor?.department || 'general';
+      const doctor = doctors.find(d => String(d.id) === String(effectiveDoctor));
       
+      // Используем админский эндпоинт (доступен Admin/Doctor/Registrar)
       const response = await fetch('/api/v1/admin/qr-tokens/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
-          specialist_id: parseInt(selectedDoctor),
-          department: department,
+          specialist_id: parseInt(effectiveDoctor),
+          department: doctor?.department || 'general',
           expires_hours: 24
         })
       });
@@ -203,10 +211,11 @@ const ModernQueueManager = ({
       const qrData = {
         token: qrTokenData.token,
         specialist_name: doctor?.full_name || doctor?.name || 'Врач',
-        department: qrTokenData.department,
+        day: effectiveDate,
         expires_at: qrTokenData.expires_at,
-        qr_code_base64: qrTokenData.qr_code_base64,
-        url: qrTokenData.qr_url
+        qr_url: qrTokenData.qr_url,
+        online_start_time: '07:00',
+        online_end_time: '09:00'
       };
       
       setQrData(qrData);
@@ -222,7 +231,7 @@ const ModernQueueManager = ({
 
   // Открытие приема
   const openReception = async () => {
-    if (!selectedDoctor) {
+    if (!effectiveDoctor) {
       toast.error('Выберите врача');
       return;
     }
@@ -255,10 +264,10 @@ const ModernQueueManager = ({
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/queue/${selectedDoctor}/call-next`, {
+      const response = await fetch(`/api/v1/queue/${effectiveDoctor}/call-next`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -316,15 +325,36 @@ const ModernQueueManager = ({
 
   // Скачивание QR кода
   const downloadQR = () => {
-    if (!qrData || !qrData.qr_code_base64) return;
+    if (!qrData || !qrData.qr_url) {
+      toast.error('QR данные недоступны');
+      return;
+    }
     
-    // Создаем ссылку для скачивания изображения
+    // Создаем текстовый файл с информацией о QR коде
+    const qrInfo = `
+QR код для онлайн-очереди
+
+Специалист: ${qrData.specialist_name}
+Дата приёма: ${new Date(qrData.day).toLocaleDateString('ru-RU')}
+Окно онлайн-записи: ${qrData.online_start_time} - ${qrData.online_end_time}
+
+Ссылка для записи:
+${window.location.origin}${qrData.qr_url}
+
+Токен: ${qrData.token}
+
+⏰ QR код действует с ${qrData.online_start_time} до момента открытия приёма в регистратуре
+📅 Токен истекает: ${new Date(qrData.expires_at).toLocaleString('ru-RU')}
+    `.trim();
+    
+    const blob = new Blob([qrInfo], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
-    link.download = `qr-queue-${selectedDate}-${qrData.specialist_name.replace(/\s+/g, '_')}.png`;
-    link.href = qrData.qr_code_base64;
+    link.download = `qr-queue-${selectedDate}-${qrData.specialist_name.replace(/\s+/g, '_')}.txt`;
+    link.href = URL.createObjectURL(blob);
     link.click();
+    URL.revokeObjectURL(link.href);
     
-    toast.success('QR код скачан');
+    toast.success('Информация о QR коде скачана');
   };
 
   return (
@@ -419,11 +449,58 @@ const ModernQueueManager = ({
           <h3 style={{ color: getColor('textPrimary') }}>Управление очередью</h3>
           
           <div className="controls-grid">
+            {/* Выбор даты */}
+            <div className="control-field">
+              <label style={{ color: getColor('textSecondary'), fontSize: '12px' }}>Дата</label>
+              <input
+                type="date"
+                value={effectiveDate}
+                onChange={(e) => {
+                  setInternalDate(e.target.value);
+                  onDateChange && onDateChange(e.target.value);
+                }}
+                style={{
+                  backgroundColor: getColor('cardBg'),
+                  color: getColor('textPrimary'),
+                  border: '1px solid ' + getColor('border'),
+                  borderRadius: '6px',
+                  padding: '8px 10px'
+                }}
+              />
+            </div>
+
+            {/* Выбор врача */}
+            <div className="control-field">
+              <label style={{ color: getColor('textSecondary'), fontSize: '12px' }}>Специалист</label>
+              <select
+                value={effectiveDoctor}
+                onChange={(e) => {
+                  setInternalDoctor(e.target.value);
+                  onDoctorChange && onDoctorChange(e.target.value);
+                }}
+                style={{
+                  backgroundColor: getColor('cardBg'),
+                  color: getColor('textPrimary'),
+                  border: '1px solid ' + getColor('border'),
+                  borderRadius: '6px',
+                  padding: '8px 10px',
+                  minWidth: '14rem'
+                }}
+              >
+                <option value="">Выберите врача</option>
+                {doctors.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.full_name || d.name || d.username || `ID ${d.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <button
               type="button"
               className="control-btn control-btn--primary"
               onClick={generateQR}
-              disabled={!selectedDoctor || loading}
+              disabled={!effectiveDoctor || loading}
               style={{
                 backgroundColor: getColor('primary'),
                 color: 'white'
@@ -664,43 +741,83 @@ const ModernQueueManager = ({
       >
         {qrData && (
           <div className="qr-dialog-content">
-            <div className="qr-info">
-              <p><strong>Специалист:</strong> {qrData.specialist_name}</p>
-              <p><strong>Дата:</strong> {new Date(qrData.day).toLocaleDateString('ru-RU')}</p>
-              <p><strong>Действует до:</strong> {formatTime(qrData.expires_at)}</p>
+            <div className="qr-info" style={{ marginBottom: '16px' }}>
+              <p style={{ marginBottom: '8px' }}>
+                <strong>Специалист:</strong> {qrData.specialist_name}
+              </p>
+              <p style={{ marginBottom: '8px' }}>
+                <strong>Дата приёма:</strong> {new Date(qrData.day).toLocaleDateString('ru-RU')}
+              </p>
+              <p style={{ marginBottom: '8px' }}>
+                <strong>Окно онлайн-записи:</strong> {qrData.online_start_time} - {qrData.online_end_time}
+              </p>
+              <p style={{ marginBottom: '8px', fontSize: '0.875rem', color: getColor('textSecondary') }}>
+                ⏰ QR код действует с {qrData.online_start_time} до момента открытия приёма в регистратуре
+              </p>
+              <p style={{ fontSize: '0.875rem', color: getColor('textSecondary') }}>
+                📅 Токен истекает: {new Date(qrData.expires_at).toLocaleDateString('ru-RU')} в {formatTime(qrData.expires_at)}
+              </p>
             </div>
             
-            <div className="qr-code-container">
-              {qrData.qr_code_base64 ? (
-                <img 
-                  src={qrData.qr_code_base64} 
-                  alt="QR Code" 
-                  style={{ 
-                    width: '200px', 
-                    height: '200px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px'
-                  }} 
-                />
+            <div className="qr-code-container" style={{ 
+              textAlign: 'center', 
+              padding: '20px',
+              backgroundColor: getColor('cardBg'),
+              borderRadius: '8px',
+              marginBottom: '16px'
+            }}>
+              {qrData.qr_url ? (
+                <div>
+                  <div style={{
+                    display: 'inline-block',
+                    padding: '16px',
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    border: '2px solid ' + getColor('border')
+                  }}>
+                    <QRCodeSVG
+                      value={`${window.location.origin}${qrData.qr_url}`}
+                      size={200}
+                      level="M"
+                      includeMargin={true}
+                    />
+                  </div>
+                  <p style={{ 
+                    marginTop: '12px', 
+                    fontSize: '0.75rem', 
+                    color: getColor('textSecondary'),
+                    wordBreak: 'break-all'
+                  }}>
+                    {window.location.origin}{qrData.qr_url}
+                  </p>
+                </div>
               ) : (
                 <div className="qr-placeholder">
                   <QrCode size={200} style={{ color: getColor('textSecondary') }} />
-                  <p style={{ color: getColor('textSecondary') }}>
-                    QR код будет здесь
+                  <p style={{ color: getColor('textSecondary'), marginTop: '8px' }}>
+                    QR код загружается...
                   </p>
                 </div>
               )}
             </div>
             
-            <div className="qr-actions">
+            <div className="qr-actions" style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
                 className="qr-action-btn"
                 onClick={downloadQR}
                 style={{
+                  flex: 1,
+                  padding: '10px 16px',
                   backgroundColor: getColor('cardBg'),
                   color: getColor('textPrimary'),
-                  borderColor: getColor('border')
+                  border: '1px solid ' + getColor('border'),
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
                 <Download size={16} />
@@ -711,8 +828,17 @@ const ModernQueueManager = ({
                 className="qr-action-btn"
                 onClick={() => window.print()}
                 style={{
+                  flex: 1,
+                  padding: '10px 16px',
                   backgroundColor: getColor('primary'),
-                  color: 'white'
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
                 <Printer size={16} />

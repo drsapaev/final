@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button, useFade, useSlide } from '../ui/native';
+import { colors } from '../../theme/tokens';
 
 const AdminNavigation = ({ sections = [] }) => {
   const location = useLocation();
@@ -56,13 +57,17 @@ const AdminNavigation = ({ sections = [] }) => {
                         : 'hover:shadow-sm hover:transform hover:scale-102'
                     }`}
                     style={{
-                      background: active 
-                        ? '#3b82f6'
-                        : 'rgba(59, 130, 246, 0.1)',
+                      background: active
+                        ? colors.primary[500]  // ✅ Основной синий из токенов
+                        : colors.semantic.surface.selected,  // ✅ Полупрозрачный фон
                       borderWidth: '1px',
                       borderStyle: 'solid',
-                      borderColor: active ? '#3b82f6' : 'rgba(59, 130, 246, 0.3)',
-                      color: active ? 'white' : '#60a5fa',
+                      borderColor: active
+                        ? colors.primary[500]  // ✅ Основной синий из токенов
+                        : colors.semantic.border.medium,  // ✅ Средняя граница из токенов
+                      color: active
+                        ? colors.semantic.text.inverse  // ✅ Белый текст для активных
+                        : colors.primary[400],  // ✅ Светлый синий для неактивных
                       padding: '8px 16px',
                       borderRadius: '6px',
                       fontWeight: '500',

@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { colors, typography, spacing } from '../theme';
+import { colors as designColors } from '../../theme/tokens';
 
 const Input = ({
   type = 'text',
@@ -24,56 +25,56 @@ const Input = ({
   style = {},
   ...props
 }) => {
-  // Размеры
+  // Размеры (обновлены для touch-friendly интерфейса)
   const sizes = {
     small: {
-      height: '32px',
-      padding: `${spacing.spacing[1]} ${spacing.spacing[3]}`,
-      fontSize: typography.fontSizes.sm,
+      height: '44px',  // Минимум 44px для мобильных устройств
+      padding: `${spacing.spacing[2]} ${spacing.spacing[3]}`, // Увеличен padding
+      fontSize: typography.fontSizes.base, // Увеличен размер шрифта для читаемости
     },
     medium: {
-      height: '40px',
-      padding: `${spacing.spacing[2]} ${spacing.spacing[4]}`,
+      height: '48px',  // Оптимальный размер для мобильных и десктоп
+      padding: `${spacing.spacing[3]} ${spacing.spacing[4]}`, // Увеличен padding
       fontSize: typography.fontSizes.base,
     },
     large: {
-      height: '48px',
-      padding: `${spacing.spacing[3]} ${spacing.spacing[5]}`,
+      height: '56px',  // Большой размер для важных полей
+      padding: `${spacing.spacing[4]} ${spacing.spacing[5]}`,
       fontSize: typography.fontSizes.lg,
     },
   };
 
-  // Варианты стилей
+  // Варианты стилей (обновлены на новую цветовую систему)
   const variants = {
     outlined: {
-      border: `1px solid ${error ? colors.brand.error[500] : colors.neutral.gray[300]}`,
+      border: `1px solid ${error ? designColors.status.danger : designColors.border.medium}`,
       borderRadius: '6px',
-      backgroundColor: colors.neutral.white,
+      backgroundColor: designColors.semantic.background.primary,
       '&:focus': {
-        borderColor: error ? colors.brand.error[500] : colors.brand.primary[500],
-        boxShadow: `0 0 0 2px ${error ? colors.brand.error[100] : colors.brand.primary[100]}`,
+        borderColor: error ? designColors.status.danger : designColors.border.focus,
+        boxShadow: `0 0 0 2px ${error ? designColors.status.danger : designColors.primary[100]}`,
       },
       '&:hover': {
-        borderColor: error ? colors.brand.error[400] : colors.neutral.gray[400],
+        borderColor: error ? designColors.status.danger : designColors.border.dark,
       },
     },
     filled: {
       border: 'none',
       borderRadius: '6px',
-      backgroundColor: colors.neutral.gray[100],
-      borderBottom: `2px solid ${error ? colors.brand.error[500] : colors.neutral.gray[300]}`,
+      backgroundColor: designColors.gray[100],
+      borderBottom: `2px solid ${error ? designColors.status.danger : designColors.border.medium}`,
       '&:focus': {
-        backgroundColor: colors.neutral.gray[50],
-        borderBottomColor: error ? colors.brand.error[500] : colors.brand.primary[500],
+        backgroundColor: designColors.gray[50],
+        borderBottomColor: error ? designColors.status.danger : designColors.primary[500],
       },
     },
     standard: {
       border: 'none',
-      borderBottom: `1px solid ${error ? colors.brand.error[500] : colors.neutral.gray[300]}`,
+      borderBottom: `1px solid ${error ? designColors.status.danger : designColors.border.medium}`,
       borderRadius: '0',
       backgroundColor: 'transparent',
       '&:focus': {
-        borderBottomColor: error ? colors.brand.error[500] : colors.brand.primary[500],
+        borderBottomColor: error ? designColors.status.danger : designColors.primary[500],
         borderBottomWidth: '2px',
       },
     },
@@ -89,14 +90,14 @@ const Input = ({
     fontFamily: typography.fontFamilies.primary,
     fontWeight: typography.fontWeights.normal,
     lineHeight: typography.lineHeights.input,
-    color: colors.neutral.gray[900],
+    color: designColors.semantic.text.primary,
     outline: 'none',
     transition: 'all 200ms ease-in-out',
     
     // Состояния
     ...(disabled && {
-      backgroundColor: colors.neutral.gray[100],
-      color: colors.neutral.gray[500],
+      backgroundColor: designColors.gray[100],
+      color: designColors.gray[500],
       cursor: 'not-allowed',
     }),
     
@@ -113,13 +114,13 @@ const Input = ({
   const labelStyles = {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: error ? colors.brand.error[700] : colors.neutral.gray[700],
+    color: error ? designColors.status.danger : designColors.semantic.text.primary,
     marginBottom: spacing.spacing[1],
   };
 
   const errorStyles = {
     fontSize: typography.fontSizes.xs,
-    color: colors.brand.error[600],
+    color: designColors.status.danger,
     marginTop: spacing.spacing[1],
   };
 
@@ -134,7 +135,7 @@ const Input = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: colors.neutral.gray[500],
+    color: designColors.semantic.text.secondary,
     pointerEvents: 'none',
   };
 
@@ -153,7 +154,7 @@ const Input = ({
       {label && (
         <label style={labelStyles}>
           {label}
-          {required && <span style={{ color: colors.brand.error[500] }}> *</span>}
+          {required && <span style={{ color: designColors.status.danger }}> *</span>}
         </label>
       )}
       

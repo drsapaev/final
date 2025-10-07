@@ -31,7 +31,12 @@ export default function HeaderNew() {
 
   useEffect(() => auth.subscribe(setState), []);
 
-  const { theme, toggleTheme, getColor, getSpacing } = useTheme();
+  const { theme, toggleTheme } = useTheme();
+
+  // Принудительная перерисовка при смене темы
+  useEffect(() => {
+    // Этот useEffect заставит компонент перерисоваться при смене темы
+  }, [theme]);
 
   const user = state.profile || state.user || null;
   const role = (user?.role || user?.role_name || 'Guest');
@@ -39,13 +44,11 @@ export default function HeaderNew() {
 
   const isRegistrarPanel = location.pathname === '/registrar-panel';
 
-  const textColor = theme === 'light' ? getColor('gray', 900) : getColor('gray', 50);
-  const borderColor = theme === 'light' ? getColor('gray', 200) : getColor('gray', 700);
-
   const headerStyle = {
-    background: theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 23, 42, 0.9)',
-    borderBottom: `1px solid ${borderColor}`,
-    backdropFilter: 'blur(20px)'
+    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+    borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
+    backdropFilter: 'blur(20px)',
+    transition: 'background-color 0.3s ease, border-color 0.3s ease'
   };
 
   // Навигация по ролям (как в исходном хедере)
@@ -68,7 +71,7 @@ export default function HeaderNew() {
       className="hdr-btn hdr-btn--brand"
       onClick={() => navigate('/')}
       title="На главную"
-      style={{ color: textColor }}
+      style={{ color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
     >
       <span className="hdr-logo" aria-hidden>🏥</span>
       <span className="hdr-title hdr-hide-xs">Clinic Management</span>

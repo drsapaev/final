@@ -23,7 +23,6 @@ const ModernTabs = ({
 }) => {
   const [indicatorStyle, setIndicatorStyle] = useState({});
   const tabsRef = useRef(null);
-  const isDark = theme === 'dark';
 
   // Переводы
   const t = {
@@ -88,16 +87,16 @@ const ModernTabs = ({
   ];
 
   // Используем ту же систему цветов, что и таблица
-  const { getColor } = useTheme();
+  const { isDark } = useTheme();
   
   const colors = {
-    bg: isDark ? getColor('secondary', 900) : '#ffffff',
-    bgSecondary: isDark ? getColor('secondary', 800) : getColor('secondary', 50),
-    border: isDark ? getColor('secondary', 700) : getColor('secondary', 200),
-    text: isDark ? getColor('secondary', 50) : getColor('secondary', 900),
-    textSecondary: isDark ? getColor('secondary', 300) : getColor('secondary', 600),
-    hover: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-    active: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+    bg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.98)',
+    bgSecondary: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.98)',
+    border: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.3)',
+    text: isDark ? '#f8fafc' : '#0f172a',
+    textSecondary: isDark ? '#cbd5e1' : '#64748b',
+    hover: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.1)',
+    active: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.15)'
   };
 
   // Обновление позиции индикатора
@@ -178,14 +177,15 @@ const ModernTabs = ({
       <div 
         className="tabs-container"
         style={{
-          background: isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+          background: colors.bg,
           backdropFilter: 'blur(20px)',
-          borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
-          borderLeft: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
-          borderRight: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)'}`,
-          borderBottom: 'none',
+          borderTop: `1px solid ${colors.border}`,
+          borderLeft: `1px solid ${colors.border}`,
+          borderRight: `1px solid ${colors.border}`,
+          borderBottom: `1px solid ${colors.border}`,
           borderRadius: '12px 12px 0 0',
-          padding: '8px 16px'
+          padding: '8px 16px',
+          boxShadow: 'none'
         }}
       >
         {/* Кнопка "Все отделения" */}
@@ -232,7 +232,8 @@ const ModernTabs = ({
                 className={`tab-button department ${isActive ? 'active' : ''}`}
                 onClick={() => onTabChange(isActive ? null : tab.key)}
                 style={{
-                  color: isActive ? '#ffffff' : colors.text,
+                  color: isActive ? (isDark ? '#ffffff' : '#0f172a') : colors.text,
+                  backgroundColor: isActive ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)') : 'transparent',
                   '--tab-color': tab.color,
                   '--tab-gradient': tab.gradient
                 }}

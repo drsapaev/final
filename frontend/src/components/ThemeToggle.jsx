@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../theme/tokens';
 
 const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
   const { theme, isDark, toggleTheme, getColor, getSpacing } = useTheme();
@@ -19,11 +20,11 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
     justifyContent: 'center',
     padding,
     borderRadius: '50%',
-    border: `1px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
-    background: isDark 
-      ? 'rgba(255, 255, 255, 0.1)' 
-      : 'rgba(255, 255, 255, 0.8)',
-    color: isDark ? '#f8fafc' : '#1e293b',
+    border: `1px solid ${isDark ? colors.border.medium : colors.border.light}`,
+    background: isDark
+      ? colors.semantic.surface.card
+      : colors.semantic.surface.card,
+    color: isDark ? colors.semantic.text.primary : colors.semantic.text.primary,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     backdropFilter: 'blur(10px)',
@@ -32,12 +33,12 @@ const ThemeToggle = ({ size = 'md', className = '', style = {} }) => {
 
   const hoverStyle = {
     transform: 'scale(1.05)',
-    background: isDark 
-      ? 'rgba(255, 255, 255, 0.2)' 
-      : 'rgba(255, 255, 255, 0.9)',
+    background: isDark
+      ? colors.semantic.surface.hover
+      : colors.semantic.surface.hover,
     boxShadow: isDark
-      ? '0 4px 20px rgba(0, 0, 0, 0.3)'
-      : '0 4px 20px rgba(0, 0, 0, 0.1)'
+      ? `0 4px 20px ${colors.semantic.surface.overlay}`
+      : `0 4px 20px ${colors.semantic.surface.overlay}`
   };
 
   return (

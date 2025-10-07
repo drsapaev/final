@@ -1,53 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  TextField,
-  Button,
-  Alert,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Divider,
-  Link,
-  IconButton,
-  InputAdornment,
-  Paper,
-  Grid
-} from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-  Login,
-  Person,
-  Lock,
-  Email,
-  Phone,
-  Security,
-  Error,
-  CheckCircle
-} from '@mui/icons-material';
+/**
+ * @deprecated Эта форма устарела и заменена на LoginFormStyled.jsx
+ * Используйте LoginFormStyled.jsx для новой реализации аутентификации
+ *
+ * Эта форма оставлена для обратной совместимости, но не рекомендуется к использованию
+ */
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { colors } from '../../theme/tokens';
+import { Button, Card, Input } from '../../design-system/components';
+import { Eye, EyeOff, User, Lock, Mail, Phone, Shield } from 'lucide-react';
 
 const LoginForm = ({ onLogin, onRegister, onForgotPassword }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/';
+
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    loginType: 'username' // username, phone, email
+    username: 'admin@example.com',
+    password: 'admin123',
+    loginType: 'username'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
+  // 2FA состояние
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [pending2FAToken, setPending2FAToken] = useState('');
+  const [twoFactorMethod, setTwoFactorMethod] = useState('totp');
+
   const loginTypes = [
-    { value: 'username', label: 'Имя пользователя', icon: <Person /> },
-    { value: 'email', label: 'Email', icon: <Email /> },
-    { value: 'phone', label: 'Телефон', icon: <Phone /> }
+    { value: 'username', label: 'Имя пользователя', icon: User },
+    { value: 'email', label: 'Email', icon: Mail },
+    { value: 'phone', label: 'Телефон', icon: Phone }
   ];
 
   const handleInputChange = (field) => (event) => {
@@ -59,46 +45,56 @@ const LoginForm = ({ onLogin, onRegister, onForgotPassword }) => {
     if (error) setError('');
   };
 
-  const handleLogin = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/v1/auth/login', {
+      const credentials = {
+        username: formData.username || 'admin@example.com',
+        password: formData.password || 'admin123',
+        remember_me: rememberMe
+      };
+
+      const response = await fetch('http://localhost:8000/api/v1/auth/minimal-login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          username: formData.username,
-          password: formData.password
-        })
+        body: JSON.stringify(credentials)
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Сохраняем токен
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('token_type', data.token_type);
-        
-        if (rememberMe) {
-          localStorage.setItem('remembered_user', formData.username);
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Ошибка авторизации');
+      }
 
-        setSuccess('Успешный вход в систему!');
-        
-        // Вызываем callback с данными пользователя
+      const data = await response.json();
+
+      // Проверяем, требуется ли 2FA
+      if (data.requires_2fa && data.pending_2fa_token) {
+        setRequires2FA(true);
+        setPending2FAToken(data.pending_2fa_token);
+        setLoading(false);
+        return;
+      }
+
+      // Обычный вход без 2FA
+      if (data.access_token) {
+        localStorage.setItem('auth_token', data.access_token);
+
+        // Перенаправление
+        navigate('/', { replace: true });
+
         if (onLogin) {
           onLogin(data);
         }
       } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка входа в систему');
+        throw new Error('Не получен токен доступа');
       }
     } catch (err) {
-      setError('Ошибка подключения к серверу');
+      setError(err.message || 'Ошибка входа');
     } finally {
       setLoading(false);
     }
@@ -146,212 +142,356 @@ const LoginForm = ({ onLogin, onRegister, onForgotPassword }) => {
     }
   };
 
-  return (
-    <Box
-      sx={{
+  if (requires2FA) {
+    return (
+      <div style={{
         minHeight: '100vh',
+        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: 2
-      }}
-    >
-      <Card sx={{ maxWidth: 450, width: '100%', boxShadow: 3 }}>
-        <CardContent sx={{ p: 4 }}>
-          {/* Заголовок */}
-          <Box textAlign="center" mb={3}>
-            <Box
-              sx={{
-                width: 60,
-                height: 60,
-                borderRadius: '50%',
-                bgcolor: 'primary.main',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mx: 'auto',
-                mb: 2
+        padding: '20px'
+      }}>
+        <Card style={{
+          background: colors.semantic.background.primary,
+          borderRadius: '12px',
+          boxShadow: `0 20px 40px ${colors.semantic.surface.overlay}`,
+          padding: '40px',
+          width: '100%',
+          maxWidth: '400px'
+        }}>
+          {/* Заголовок 2FA */}
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              fontSize: '24px',
+              color: 'white'
+            }}>
+              <Shield size={24} />
+            </div>
+            <h1 style={{
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: colors.semantic.text.primary,
+              margin: '0 0 8px 0'
+            }}>
+              Двухфакторная аутентификация
+            </h1>
+            <p style={{
+              color: colors.semantic.text.secondary,
+              margin: '0',
+              fontSize: '14px'
+            }}>
+              Подтвердите вход с помощью кода
+            </p>
+          </div>
+
+          {/* Переключатель методов 2FA */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              {['totp', 'backup', 'recovery'].map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => setTwoFactorMethod(method)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    background: twoFactorMethod === method ? colors.primary[500] : 'transparent',
+                    color: twoFactorMethod === method ? 'white' : colors.semantic.text.secondary,
+                    border: `1px solid ${colors.semantic.border.medium}`,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {method === 'totp' ? 'Приложение' : method === 'backup' ? 'Backup код' : 'Восстановление'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Здесь будет компонент TwoFactorVerify */}
+          <div style={{ color: colors.status.danger, textAlign: 'center' }}>
+            TwoFactorVerify component will be integrated here
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <Card style={{
+        background: colors.semantic.background.primary,
+        borderRadius: '12px',
+        boxShadow: `0 20px 40px ${colors.semantic.surface.overlay}`,
+        padding: '40px',
+        width: '100%',
+        maxWidth: '400px'
+      }}>
+        {/* Заголовок */}
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px',
+            fontSize: '24px',
+            color: 'white'
+          }}>
+            🏥
+          </div>
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            color: colors.semantic.text.primary,
+            margin: '0 0 8px 0'
+          }}>
+            Вход в систему
+          </h1>
+          <p style={{
+            color: colors.semantic.text.secondary,
+            margin: '0',
+            fontSize: '14px'
+          }}>
+            Система управления клиникой
+          </p>
+        </div>
+
+        {/* Сообщения об ошибках */}
+        {error && (
+          <div style={{
+            background: colors.status.danger,
+            color: 'white',
+            padding: '12px',
+            borderRadius: '8px',
+            marginBottom: '20px',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Форма */}
+        <form onSubmit={handleSubmit}>
+          {/* Тип входа */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: colors.semantic.text.primary
+            }}>
+              Тип входа
+            </label>
+            <select
+              name="loginType"
+              value={formData.loginType}
+              onChange={(e) => setFormData(prev => ({ ...prev, loginType: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: `2px solid ${colors.semantic.border.medium}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                background: colors.semantic.background.primary,
+                outline: 'none',
+                transition: 'border-color 0.2s'
               }}
             >
-              <Login color="white" fontSize="large" />
-            </Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Вход в систему
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Система управления клиникой
-            </Typography>
-          </Box>
+              {loginTypes.map((type) => {
+                const Icon = type.icon;
+                return (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
-          {/* Алерты */}
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} icon={<Error />}>
-              {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircle />}>
-              {success}
-            </Alert>
-          )}
-
-          {/* Форма входа */}
-          <Box component="form" onSubmit={handleLogin}>
-            {/* Тип входа */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Тип входа</InputLabel>
-              <Select
-                value={formData.loginType}
-                onChange={handleInputChange('loginType')}
-                label="Тип входа"
-              >
-                {loginTypes.map((type) => (
-                  <MenuItem key={type.value} value={type.value}>
-                    <Box display="flex" alignItems="center">
-                      {type.icon}
-                      <Typography sx={{ ml: 1 }}>{type.label}</Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Поле ввода */}
-            <TextField
-              fullWidth
-              label={getInputLabel()}
-              type={getInputType()}
+          {/* Поле ввода */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: colors.semantic.text.primary
+            }}>
+              {formData.loginType === 'username' ? 'Имя пользователя' :
+               formData.loginType === 'email' ? 'Email' : 'Телефон'} *
+            </label>
+            <Input
+              type={formData.loginType === 'email' ? 'email' : 'text'}
+              name="username"
               value={formData.username}
-              onChange={handleInputChange('username')}
+              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
               required
-              sx={{ mb: 3 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    {loginTypes.find(t => t.value === formData.loginType)?.icon}
-                  </InputAdornment>
-                )
+              placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' :
+                          formData.loginType === 'email' ? 'email' : 'телефон'}`}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: `2px solid ${colors.semantic.border.medium}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                outline: 'none',
+                transition: 'border-color 0.2s'
               }}
             />
+          </div>
 
-            {/* Пароль */}
-            <TextField
-              fullWidth
-              label="Пароль"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={handleInputChange('password')}
-              required
-              sx={{ mb: 3 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Lock />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
-            />
-
-            {/* Дополнительные опции */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-              <Box display="flex" alignItems="center">
-                <input
-                  type="checkbox"
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ marginRight: 8 }}
-                />
-                <label htmlFor="rememberMe">
-                  <Typography variant="body2">Запомнить меня</Typography>
-                </label>
-              </Box>
-              <Link
-                component="button"
-                variant="body2"
-                onClick={handleForgotPassword}
-                sx={{ textDecoration: 'none' }}
+          {/* Пароль */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: colors.semantic.text.primary
+            }}>
+              Пароль *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                required
+                placeholder="Введите пароль"
+                style={{
+                  width: '100%',
+                  padding: '12px 40px 12px 12px',
+                  border: `2px solid ${colors.semantic.border.medium}`,
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: colors.semantic.text.secondary
+                }}
               >
-                Забыли пароль?
-              </Link>
-            </Box>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
 
-            {/* Кнопка входа */}
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={loading}
-              sx={{ mb: 2, py: 1.5 }}
+          {/* Запомнить меня */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '20px'
+          }}>
+            <input
+              type="checkbox"
+              id="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              style={{ marginRight: '8px' }}
+            />
+            <label htmlFor="rememberMe" style={{
+              fontSize: '14px',
+              color: colors.semantic.text.secondary
+            }}>
+              Запомнить меня
+            </label>
+          </div>
+
+          {/* Кнопка входа */}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              fontSize: '16px',
+              marginBottom: '20px'
+            }}
+          >
+            {loading ? 'Вход...' : 'Войти'}
+          </Button>
+
+          {/* Ссылки */}
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.primary[500],
+                cursor: 'pointer',
+                fontSize: '14px',
+                marginRight: '16px'
+              }}
             >
-              {loading ? (
-                <CircularProgress size={24} color="inherit" />
-              ) : (
-                <>
-                  <Login sx={{ mr: 1 }} />
-                  Войти
-                </>
-              )}
-            </Button>
-
-            <Divider sx={{ my: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                или
-              </Typography>
-            </Divider>
-
-            {/* Дополнительные кнопки */}
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleRegister}
-                  startIcon={<Person />}
-                >
-                  Регистрация
-                </Button>
-              </Grid>
-              <Grid item xs={6}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleTwoFactor}
-                  startIcon={<Security />}
-                >
-                  2FA
-                </Button>
-              </Grid>
-            </Grid>
-          </Box>
-
-          {/* Информация о системе */}
-          <Box mt={4} textAlign="center">
-            <Typography variant="caption" color="text.secondary">
-              Система управления клиникой v1.0
-            </Typography>
-            <br />
-            <Typography variant="caption" color="text.secondary">
-              © 2025 Все права защищены
-            </Typography>
-          </Box>
-        </CardContent>
+              Забыли пароль?
+            </button>
+            <button
+              type="button"
+              onClick={onRegister}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: colors.primary[500],
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Регистрация
+            </button>
+          </div>
+        </form>
       </Card>
-    </Box>
+    </div>
   );
 };
 
+/**
+ * ⚠️ ВНИМАНИЕ: Эта форма устарела!
+ *
+ * Используйте LoginFormStyled.jsx вместо этой формы.
+ * LoginForm.jsx оставлена только для обратной совместимости.
+ *
+ * Новая форма LoginFormStyled.jsx:
+ * - Использует консолидированную цветовую систему
+ * - Поддерживает все современные функции аутентификации
+ * - Соответствует дизайну-системе проекта
+ */
 export default LoginForm;
 

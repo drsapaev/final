@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
-import { Button, AnimatedTransition } from '../components/ui/native';
+import { Button, AnimatedTransition, Badge, Card } from '../components/ui/native';
 import auth from '../stores/auth.js';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
@@ -16,6 +16,7 @@ import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import { 
   User, 
   Calendar, 
@@ -46,6 +47,7 @@ import {
   Shield,
   Camera,
   BarChart3,
+  RefreshCw,
   TrendingUp,
   Users,
   DollarSign,
@@ -87,6 +89,11 @@ const DentistPanelUnified = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  
+  // Состояния для таблицы записей
+  const [appointmentsTableData, setAppointmentsTableData] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -195,6 +202,107 @@ const DentistPanelUnified = () => {
     loadData();
   }, []);
 
+  // Загрузка записей стоматолога
+  const loadDentistryAppointments = async () => {
+    setAppointmentsLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('Нет токена аутентификации');
+        setAppointmentsLoading(false);
+        return;
+      }
+      
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=dental', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Обрабатываем данные из API
+        let appointmentsData = [];
+        if (data && data.queues && Array.isArray(data.queues)) {
+          const dentalQueue = data.queues.find(queue => 
+            queue.specialty === 'dental' || queue.specialty === 'dentist' || queue.specialty === 'dentistry'
+          );
+          
+          if (dentalQueue && dentalQueue.entries) {
+            appointmentsData = dentalQueue.entries.map(entry => ({
+              id: entry.id,
+              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+              patient_phone: entry.patient?.phone || entry.phone || '',
+              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
+              address: entry.patient?.address || entry.address || '',
+              visit_type: entry.visit_type || 'Платный',
+              services: entry.services || [],
+              payment_type: entry.payment_status || 'Не оплачено',
+              doctor: entry.doctor_name || 'Стоматолог',
+              date: entry.appointment_date || new Date().toISOString().split('T')[0],
+              time: entry.appointment_time || '09:00',
+              status: entry.status || 'Ожидает',
+              cost: entry.total_cost || 0,
+              payment: entry.payment_status || 'Не оплачено'
+            }));
+          }
+        }
+        
+        setAppointmentsTableData(appointmentsData);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки записей стоматолога:', error);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  // Загружаем записи при переключении на вкладку
+  useEffect(() => {
+    if (activeTab === 'appointments') {
+      loadDentistryAppointments();
+    }
+  }, [activeTab]);
+
+  // Обработчики для таблицы записей
+  const handleAppointmentRowClick = (row) => {
+    console.log('Клик по записи:', row);
+    // Можно открыть детали записи или переключиться на прием
+    if (row.patient_fio) {
+      // Создаем объект пациента для переключения на прием
+      const patientData = {
+        id: row.id,
+        patient_name: row.patient_fio,
+        phone: row.patient_phone,
+        number: row.id,
+        source: 'appointments'
+      };
+      setSelectedPatient(patientData);
+      setActiveTab('examinations');
+    }
+  };
+
+  const handleAppointmentActionClick = (action, row, event) => {
+    console.log('Действие с записью:', action, row);
+    event.stopPropagation();
+    
+    switch (action) {
+      case 'view':
+        handleAppointmentRowClick(row);
+        break;
+      case 'edit':
+        // Логика редактирования записи
+        break;
+      case 'cancel':
+        // Логика отмены записи
+        break;
+      default:
+        break;
+    }
+  };
+
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
   
@@ -210,7 +318,7 @@ const DentistPanelUnified = () => {
 
   const loadPatients = async () => {
     try {
-      const response = await fetch('/api/v1/patients?department=Dental&limit=100', { headers: authHeader() });
+      const response = await fetch('http://localhost:8000/api/v1/patients?department=Dental&limit=100', { headers: authHeader() });
       if (response.ok) {
         const data = await response.json();
         setPatients(Array.isArray(data) ? data : []);
@@ -222,7 +330,7 @@ const DentistPanelUnified = () => {
 
   const loadAppointments = async () => {
     try {
-      const response = await fetch('/api/v1/appointments?department=Dental&limit=100', { headers: authHeader() });
+      const response = await fetch('http://localhost:8000/api/v1/appointments?department=Dental&limit=100', { headers: authHeader() });
       if (response.ok) {
         const data = await response.json();
         setAppointments(Array.isArray(data) ? data : []);
@@ -234,7 +342,7 @@ const DentistPanelUnified = () => {
 
   const loadDentalExaminations = async () => {
     try {
-      const res = await fetch('/api/v1/dental/examinations?limit=100', { headers: authHeader() });
+      const res = await fetch('http://localhost:8000/api/v1/dental/examinations?limit=100', { headers: authHeader() });
       if (res.ok) setDentalExaminations(await res.json());
     } catch {
       // Игнорируем ошибки загрузки обследований
@@ -243,7 +351,7 @@ const DentistPanelUnified = () => {
 
   const loadTreatmentPlans = async () => {
     try {
-      const res = await fetch('/api/v1/dental/treatments?limit=100', { headers: authHeader() });
+      const res = await fetch('http://localhost:8000/api/v1/dental/treatments?limit=100', { headers: authHeader() });
       if (res.ok) setTreatmentPlans(await res.json());
     } catch {
       // Игнорируем ошибки загрузки планов лечения
@@ -252,7 +360,7 @@ const DentistPanelUnified = () => {
 
   const loadProsthetics = async () => {
     try {
-      const res = await fetch('/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
+      const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
       if (res.ok) setProsthetics(await res.json());
     } catch {
       // Игнорируем ошибки загрузки протезирования
@@ -696,34 +804,48 @@ const DentistPanelUnified = () => {
   const renderAppointments = () => (
     <div className="space-y-6">
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Записи на прием</h3>
-        <div className="space-y-3">
-          {appointments.map(appointment => (
-            <div key={appointment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium">
-                    {appointment.patientName?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium">{appointment.patientName}</p>
-                  <p className="text-sm text-gray-600">
-                    {appointment.date} в {appointment.time}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={appointment.status === 'confirmed' ? 'success' : 'warning'}>
-                  {appointment.status}
-                </Badge>
-                <Button size="sm" variant="outline">
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium flex items-center">
+            <Calendar size={20} className="mr-2 text-green-600" />
+            Записи к стоматологу
+          </h3>
+          <div className="flex items-center gap-2">
+            <Badge variant="info">
+              Всего: {appointmentsTableData.length}
+            </Badge>
+            <Button 
+              variant="secondary" 
+              size="sm"
+              onClick={loadDentistryAppointments}
+              disabled={appointmentsLoading}
+            >
+              <RefreshCw size={16} className="mr-1" />
+              Обновить
+            </Button>
+          </div>
         </div>
+        
+        <EnhancedAppointmentsTable
+          data={appointmentsTableData}
+          loading={appointmentsLoading}
+          theme="light"
+          language="ru"
+          selectedRows={appointmentsSelected}
+          outerBorder={false}
+          services={{}}
+          showCheckboxes={false}
+          onRowSelect={(id, checked) => {
+            const newSelected = new Set(appointmentsSelected);
+            if (checked) {
+              newSelected.add(id);
+            } else {
+              newSelected.delete(id);
+            }
+            setAppointmentsSelected(newSelected);
+          }}
+          onRowClick={handleAppointmentRowClick}
+          onActionClick={handleAppointmentActionClick}
+        />
       </Card>
     </div>
   );
@@ -2024,7 +2146,7 @@ const DentistPanelUnified = () => {
           isOpen={scheduleNextModal.open}
           onClose={() => setScheduleNextModal({ open: false, patient: null })}
           patient={scheduleNextModal.patient}
-          theme={{ isDark, getColor, getSpacing: (size) => theme.spacing[size], getFontSize: (size) => theme.fontSize[size] }}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
           specialtyFilter="dentistry"
         />
       )}

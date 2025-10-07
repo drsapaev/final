@@ -57,10 +57,10 @@ const Card = React.forwardRef(({
 
 Card.displayName = 'Card';
 
-const CardHeader = React.forwardRef(({ 
-  children, 
-  className = '', 
-  ...props 
+const CardHeader = React.forwardRef(({
+  children,
+  className = '',
+  ...props
 }, ref) => (
   <div
     ref={ref}
@@ -73,10 +73,10 @@ const CardHeader = React.forwardRef(({
 
 CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef(({ 
-  children, 
-  className = '', 
-  ...props 
+const CardTitle = React.forwardRef(({
+  children,
+  className = '',
+  ...props
 }, ref) => (
   <h3
     ref={ref}
@@ -89,10 +89,10 @@ const CardTitle = React.forwardRef(({
 
 CardTitle.displayName = 'CardTitle';
 
-const CardDescription = React.forwardRef(({ 
-  children, 
-  className = '', 
-  ...props 
+const CardDescription = React.forwardRef(({
+  children,
+  className = '',
+  ...props
 }, ref) => (
   <p
     ref={ref}
@@ -105,10 +105,10 @@ const CardDescription = React.forwardRef(({
 
 CardDescription.displayName = 'CardDescription';
 
-const CardContent = React.forwardRef(({ 
-  children, 
-  className = '', 
-  ...props 
+const CardContent = React.forwardRef(({
+  children,
+  className = '',
+  ...props
 }, ref) => (
   <div
     ref={ref}
@@ -121,10 +121,10 @@ const CardContent = React.forwardRef(({
 
 CardContent.displayName = 'CardContent';
 
-const CardFooter = React.forwardRef(({ 
-  children, 
-  className = '', 
-  ...props 
+const CardFooter = React.forwardRef(({
+  children,
+  className = '',
+  ...props
 }, ref) => (
   <div
     ref={ref}
@@ -136,6 +136,13 @@ const CardFooter = React.forwardRef(({
 ));
 
 CardFooter.displayName = 'CardFooter';
+
+// Прикрепляем подкомпоненты к основному компоненту Card (после их объявления)
+Card.Header = CardHeader;
+Card.Title = CardTitle;
+Card.Description = CardDescription;
+Card.Content = CardContent;
+Card.Footer = CardFooter;
 
 export default Card;
 export { CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

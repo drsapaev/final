@@ -64,7 +64,6 @@ export function useModal() {
  * Контейнер для отображения модальных окон
  */
 function ModalContainer({ modals, onClose, theme }) {
-  const { getColor, getSpacing } = theme;
 
   const overlayStyle = {
     position: 'fixed',
@@ -77,7 +76,7 @@ function ModalContainer({ modals, onClose, theme }) {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: getSpacing('md')
+    padding: '1rem'
   };
 
   return (
@@ -99,7 +98,6 @@ function ModalContainer({ modals, onClose, theme }) {
  * Отдельное модальное окно
  */
 function ModalItem({ modal, onClose, theme }) {
-  const { getColor, getSpacing, getFontSize } = theme;
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -120,7 +118,7 @@ function ModalItem({ modal, onClose, theme }) {
   };
 
   const modalStyle = {
-    backgroundColor: getColor('background', 'primary'),
+    backgroundColor: 'var(--color-background-primary)',
     borderRadius: '12px',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
     maxWidth: getSize(modal.size),
@@ -135,8 +133,8 @@ function ModalItem({ modal, onClose, theme }) {
   };
 
   const headerStyle = {
-    padding: getSpacing('lg'),
-    borderBottom: `1px solid ${getColor('border', 'light')}`,
+    padding: '1.5rem',
+    borderBottom: '1px solid var(--color-border-medium)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
@@ -145,7 +143,7 @@ function ModalItem({ modal, onClose, theme }) {
   const titleStyle = {
     fontSize: getFontSize('xl'),
     fontWeight: '600',
-    color: getColor('text', 'primary'),
+    color: 'var(--color-text-primary)',
     margin: 0
   };
 
@@ -154,8 +152,8 @@ function ModalItem({ modal, onClose, theme }) {
     border: 'none',
     fontSize: getFontSize('xl'),
     cursor: 'pointer',
-    color: getColor('text', 'secondary'),
-    padding: getSpacing('xs'),
+    color: 'var(--color-text-secondary)',
+    padding: '0.5rem',
     borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
@@ -165,17 +163,17 @@ function ModalItem({ modal, onClose, theme }) {
   };
 
   const contentStyle = {
-    padding: getSpacing('lg'),
+    padding: '1.5rem',
     flex: 1,
     overflow: 'auto'
   };
 
   const footerStyle = {
-    padding: getSpacing('lg'),
-    borderTop: `1px solid ${getColor('border', 'light')}`,
+    padding: '1.5rem',
+    borderTop: '1px solid var(--color-border-medium)',
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: getSpacing('sm')
+    gap: '0.5rem'
   };
 
   const handleOverlayClick = (e) => {
@@ -209,7 +207,7 @@ function ModalItem({ modal, onClose, theme }) {
               style={closeButtonStyle}
               onClick={() => onClose(modal.id)}
               onMouseOver={(e) => {
-                e.target.style.backgroundColor = getColor('background', 'tertiary');
+                e.target.style.backgroundColor = 'var(--color-background-tertiary)';
               }}
               onMouseOut={(e) => {
                 e.target.style.backgroundColor = 'transparent';
@@ -248,7 +246,6 @@ export function Modal({
   ...props 
 }) {
   const theme = useTheme();
-  const { getColor, getSpacing, getFontSize } = theme;
 
   if (!isOpen) return null;
 
@@ -274,11 +271,11 @@ export function Modal({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: getSpacing('md')
+    padding: '1rem'
   };
 
   const modalStyle = {
-    backgroundColor: getColor('background', 'primary'),
+    backgroundColor: 'var(--color-background-primary)',
     borderRadius: '12px',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
     maxWidth: getSize(size),
@@ -291,8 +288,8 @@ export function Modal({
   };
 
   const headerStyle = {
-    padding: getSpacing('lg'),
-    borderBottom: `1px solid ${getColor('border', 'light')}`,
+    padding: '1.5rem',
+    borderBottom: '1px solid var(--color-border-medium)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'
@@ -301,7 +298,7 @@ export function Modal({
   const titleStyle = {
     fontSize: getFontSize('xl'),
     fontWeight: '600',
-    color: getColor('text', 'primary'),
+    color: 'var(--color-text-primary)',
     margin: 0
   };
 
@@ -310,8 +307,8 @@ export function Modal({
     border: 'none',
     fontSize: getFontSize('xl'),
     cursor: 'pointer',
-    color: getColor('text', 'secondary'),
-    padding: getSpacing('xs'),
+    color: 'var(--color-text-secondary)',
+    padding: '0.5rem',
     borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
@@ -321,17 +318,17 @@ export function Modal({
   };
 
   const contentStyle = {
-    padding: getSpacing('lg'),
+    padding: '1.5rem',
     flex: 1,
     overflow: 'auto'
   };
 
   const footerStyle = {
-    padding: getSpacing('lg'),
-    borderTop: `1px solid ${getColor('border', 'light')}`,
+    padding: '1.5rem',
+    borderTop: '1px solid var(--color-border-medium)',
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: getSpacing('sm')
+    gap: '0.5rem'
   };
 
   const handleOverlayClick = (e) => {
@@ -366,7 +363,7 @@ export function Modal({
                 style={closeButtonStyle}
                 onClick={onClose}
                 onMouseOver={(e) => {
-                  e.target.style.backgroundColor = getColor('background', 'tertiary');
+                  e.target.style.backgroundColor = 'var(--color-background-tertiary)';
                 }}
                 onMouseOut={(e) => {
                   e.target.style.backgroundColor = 'transparent';

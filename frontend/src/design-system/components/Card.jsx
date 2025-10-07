@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { createCardStyles } from './utils';
+import { colors } from '../../theme/tokens';
 
 const Card = forwardRef(({
   children,
@@ -41,7 +42,7 @@ const CardHeader = forwardRef(({
 }, ref) => {
   const headerStyles = {
     padding: '24px 24px 0 24px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+    borderBottom: `1px solid ${colors.border.medium}`,
     marginBottom: '16px',
     ...style
   };
@@ -93,7 +94,7 @@ const CardFooter = forwardRef(({
 }, ref) => {
   const footerStyles = {
     padding: '16px 24px 24px 24px',
-    borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+    borderTop: `1px solid ${colors.border.medium}`,
     marginTop: '16px',
     ...style
   };

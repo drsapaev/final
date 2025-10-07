@@ -1,31 +1,15 @@
 // Утилиты для компонентов дизайн-системы
-// Импортируем designTokens напрямую, чтобы избежать циркулярных зависимостей
+// Используем консолидированную цветовую систему из tokens.js
+import { colors as designColors } from '../../theme/tokens';
+
 const designTokens = {
   colors: {
-    primary: {
-      50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa',
-      500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a'
-    },
-    secondary: {
-      50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8',
-      500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a'
-    },
-    success: {
-      50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80',
-      500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d'
-    },
-    danger: {
-      50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171',
-      500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d'
-    },
-    warning: {
-      50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24',
-      500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f'
-    },
-    info: {
-      50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 400: '#38bdf8',
-      500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e'
-    }
+    primary: designColors.primary,
+    secondary: designColors.secondary,
+    success: { 500: designColors.status.success },
+    danger: { 500: designColors.status.danger },
+    warning: { 500: designColors.status.warning },
+    info: { 500: designColors.status.info }
   },
   typography: {
     fontSize: { xs: '12px', sm: '14px', base: '16px', lg: '18px', xl: '20px', '2xl': '24px', '3xl': '30px', '4xl': '36px', '5xl': '48px' },
@@ -45,7 +29,13 @@ const designTokens = {
 
 // Функции для работы с токенами
 const getColor = (color, shade) => {
-  return designTokens.colors[color]?.[shade] || '#000000';
+  // Обрабатываем новую структуру цветов
+  if (color === 'primary' || color === 'secondary') {
+    return designTokens.colors[color]?.[shade] || '#000000';
+  } else {
+    // Для статусных цветов берем напрямую из объекта
+    return designTokens.colors[color]?.[500] || '#000000';
+  }
 };
 
 const getSpacing = (size) => {
@@ -78,24 +68,24 @@ export const createButtonStyles = (variant, size, disabled = false) => {
     overflow: 'hidden'
   };
 
-  // Размеры
+  // Размеры (обновлены для touch-friendly интерфейса)
   const sizes = {
     sm: {
-      padding: '8px 16px',
+      padding: '10px 16px',  // Увеличен padding для лучшего касания
       fontSize: getFontSize('sm'),
-      height: '32px',
-      minWidth: '80px'
+      height: '44px',        // Минимум 44px для мобильных устройств
+      minWidth: '44px'       // Квадратная кнопка для лучшего касания
     },
     md: {
-      padding: '12px 24px',
+      padding: '12px 20px',  // Сбалансированный размер
       fontSize: getFontSize('base'),
-      height: '40px',
+      height: '44px',        // Минимум 44px для мобильных
       minWidth: '100px'
     },
     lg: {
-      padding: '16px 32px',
+      padding: '16px 24px',
       fontSize: getFontSize('lg'),
-      height: '48px',
+      height: '52px',        // Увеличена для лучшего касания
       minWidth: '120px'
     }
   };

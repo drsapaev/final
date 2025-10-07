@@ -72,16 +72,15 @@ export function useToast() {
  * Контейнер для отображения уведомлений
  */
 function ToastContainer({ toasts, onRemove, theme }) {
-  const { getColor, getSpacing, getFontSize } = theme;
 
   const containerStyle = {
     position: 'fixed',
-    top: getSpacing('md'),
-    right: getSpacing('md'),
+    top: '1rem',
+    right: '1rem',
     zIndex: 9999,
     display: 'flex',
     flexDirection: 'column',
-    gap: getSpacing('sm'),
+    gap: '0.5rem',
     maxWidth: '400px',
     width: '100%'
   };
@@ -104,7 +103,6 @@ function ToastContainer({ toasts, onRemove, theme }) {
  * Отдельное уведомление
  */
 function ToastItem({ toast, onRemove, theme }) {
-  const { getColor, getSpacing, getFontSize } = theme;
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -115,12 +113,12 @@ function ToastItem({ toast, onRemove, theme }) {
 
   const getToastStyles = (type) => {
     const baseStyle = {
-      padding: getSpacing('md'),
+      padding: '1rem',
       borderRadius: '8px',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
       display: 'flex',
       alignItems: 'flex-start',
-      gap: getSpacing('sm'),
+      gap: '0.5rem',
       transform: isVisible ? 'translateX(0)' : 'translateX(100%)',
       opacity: isVisible ? 1 : 0,
       transition: 'all 0.3s ease',
@@ -130,24 +128,24 @@ function ToastItem({ toast, onRemove, theme }) {
 
     const typeStyles = {
       success: {
-        backgroundColor: getColor('success', 'light'),
-        borderLeft: `4px solid ${getColor('success', 'main')}`,
-        color: getColor('success', 'dark')
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderLeft: '4px solid var(--color-success)',
+        color: 'var(--color-success)'
       },
       error: {
-        backgroundColor: getColor('error', 'light'),
-        borderLeft: `4px solid ${getColor('error', 'main')}`,
-        color: getColor('error', 'dark')
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderLeft: '4px solid var(--color-danger)',
+        color: 'var(--color-danger)'
       },
       warning: {
-        backgroundColor: getColor('warning', 'light'),
-        borderLeft: `4px solid ${getColor('warning', 'main')}`,
-        color: getColor('warning', 'dark')
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        borderLeft: '4px solid var(--color-warning)',
+        color: 'var(--color-warning)'
       },
       info: {
-        backgroundColor: getColor('info', 'light'),
-        borderLeft: `4px solid ${getColor('info', 'main')}`,
-        color: getColor('info', 'dark')
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        borderLeft: '4px solid var(--color-info)',
+        color: 'var(--color-info)'
       }
     };
 
@@ -179,11 +177,11 @@ function ToastItem({ toast, onRemove, theme }) {
 
   const titleStyle = {
     fontWeight: '600',
-    marginBottom: toast.message ? getSpacing('xs') : 0
+    marginBottom: toast.message ? '0.25rem' : 0
   };
 
   const messageStyle = {
-    color: getColor('text', 'secondary')
+    color: 'var(--color-text-secondary)'
   };
 
   const closeButtonStyle = {
@@ -194,7 +192,7 @@ function ToastItem({ toast, onRemove, theme }) {
     color: 'inherit',
     opacity: 0.7,
     padding: 0,
-    marginLeft: getSpacing('sm'),
+    marginLeft: '0.5rem',
     flexShrink: 0
   };
 
@@ -203,7 +201,10 @@ function ToastItem({ toast, onRemove, theme }) {
     bottom: 0,
     left: 0,
     height: '3px',
-    backgroundColor: getColor(toast.type, 'main'),
+    backgroundColor: toast.type === 'success' ? 'var(--color-success)' :
+                     toast.type === 'error' ? 'var(--color-danger)' :
+                     toast.type === 'warning' ? 'var(--color-warning)' :
+                     'var(--color-info)',
     width: '100%',
     transform: 'scaleX(1)',
     transformOrigin: 'left',

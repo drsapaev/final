@@ -27,7 +27,20 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
   const loadQueue = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/queue/${specialist}/today`, {
+      // Определяем правильный URL в зависимости от специалиста
+      let apiUrl = '';
+      if (specialist === 'Дерматолог') {
+        apiUrl = 'http://localhost:8000/api/v1/queue/Дерматолог/today';
+      } else if (specialist === 'Кардиолог') {
+        apiUrl = 'http://localhost:8000/api/v1/queue/Кардиолог/today';
+      } else if (specialist === 'Стоматолог') {
+        apiUrl = 'http://localhost:8000/api/v1/queue/Стоматолог/today';
+      } else {
+        // Для других специалистов используем относительный URL
+        apiUrl = `/api/v1/queue/${encodeURIComponent(specialist)}/today`;
+      }
+
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
@@ -46,7 +59,19 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
 
   const callPatient = async (patient) => {
     try {
-      const response = await fetch(`/api/v1/queue/${specialist}/call`, {
+      // Определяем правильный URL в зависимости от специалиста
+      let apiUrl = '';
+      if (specialist === 'Дерматолог') {
+        apiUrl = 'http://localhost:8000/api/v1/queue/Дерматолог/call';
+      } else if (specialist === 'Кардиолог') {
+        apiUrl = 'http://localhost:8000/api/v1/queue/Кардиолог/call';
+      } else if (specialist === 'Стоматолог') {
+        apiUrl = 'http://localhost:8000/api/v1/queue/Стоматолог/call';
+      } else {
+        apiUrl = `/api/v1/queue/${encodeURIComponent(specialist)}/call`;
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,7 +112,7 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
         total_cost: 0
       };
 
-      const response = await fetch('/api/v1/appointments', {
+      const response = await fetch('http://localhost:8000/api/v1/appointments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

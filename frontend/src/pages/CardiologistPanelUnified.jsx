@@ -26,6 +26,7 @@ import AIAssistant from '../components/ai/AIAssistant';
 import ECGViewer from '../components/cardiology/ECGViewer';
 import EchoForm from '../components/cardiology/EchoForm';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 
 /**
  * Унифицированная панель кардиолога
@@ -33,7 +34,7 @@ import ScheduleNextModal from '../components/common/ScheduleNextModal';
  */
 const CardiologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
-  const { theme, isDark, getColor } = useTheme();
+  const { theme, isDark, getColor, getSpacing, getFontSize } = useTheme();
   
   const [activeTab, setActiveTab] = useState('queue');
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -47,6 +48,11 @@ const CardiologistPanelUnified = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  
+  // Состояния для таблицы записей
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
 
   // Специализированные данные кардиолога
   const [ecgForm, setEcgForm] = useState({
@@ -84,6 +90,7 @@ const CardiologistPanelUnified = () => {
   // Вкладки панели
   const tabs = [
     { id: 'queue', label: 'Очередь', icon: Users, color: 'text-blue-600' },
+    { id: 'appointments', label: 'Записи', icon: Calendar, color: 'text-green-600' },
     { id: 'visit', label: 'Прием', icon: Heart, color: 'text-red-600' },
     { id: 'ecg', label: 'ЭКГ', icon: Activity, color: 'text-green-600' },
     { id: 'blood', label: 'Анализы', icon: TestTube, color: 'text-purple-600' },
@@ -97,6 +104,107 @@ const CardiologistPanelUnified = () => {
       loadPatientData();
     }
   }, [selectedPatient]);
+
+  // Загрузка записей кардиолога
+  const loadCardiologyAppointments = async () => {
+    setAppointmentsLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('Нет токена аутентификации');
+        setAppointmentsLoading(false);
+        return;
+      }
+      
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=cardio', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Обрабатываем данные из API
+        let appointmentsData = [];
+        if (data && data.queues && Array.isArray(data.queues)) {
+          const cardioQueue = data.queues.find(queue => 
+            queue.specialty === 'cardio' || queue.specialty === 'cardiology'
+          );
+          
+          if (cardioQueue && cardioQueue.entries) {
+            appointmentsData = cardioQueue.entries.map(entry => ({
+              id: entry.id,
+              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+              patient_phone: entry.patient?.phone || entry.phone || '',
+              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
+              address: entry.patient?.address || entry.address || '',
+              visit_type: entry.visit_type || 'Платный',
+              services: entry.services || [],
+              payment_type: entry.payment_status || 'Не оплачено',
+              doctor: entry.doctor_name || 'Кардиолог',
+              date: entry.appointment_date || new Date().toISOString().split('T')[0],
+              time: entry.appointment_time || '09:00',
+              status: entry.status || 'Ожидает',
+              cost: entry.total_cost || 0,
+              payment: entry.payment_status || 'Не оплачено'
+            }));
+          }
+        }
+        
+        setAppointments(appointmentsData);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки записей кардиолога:', error);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  // Загружаем записи при переключении на вкладку
+  useEffect(() => {
+    if (activeTab === 'appointments') {
+      loadCardiologyAppointments();
+    }
+  }, [activeTab]);
+
+  // Обработчики для таблицы записей
+  const handleAppointmentRowClick = (row) => {
+    console.log('Клик по записи:', row);
+    // Можно открыть детали записи или переключиться на прием
+    if (row.patient_fio) {
+      // Создаем объект пациента для переключения на прием
+      const patientData = {
+        id: row.id,
+        patient_name: row.patient_fio,
+        phone: row.patient_phone,
+        number: row.id,
+        source: 'appointments'
+      };
+      setSelectedPatient(patientData);
+      setActiveTab('visit');
+    }
+  };
+
+  const handleAppointmentActionClick = (action, row, event) => {
+    console.log('Действие с записью:', action, row);
+    event.stopPropagation();
+    
+    switch (action) {
+      case 'view':
+        handleAppointmentRowClick(row);
+        break;
+      case 'edit':
+        // Логика редактирования записи
+        break;
+      case 'cancel':
+        // Логика отмены записи
+        break;
+      default:
+        break;
+    }
+  };
 
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
@@ -394,6 +502,56 @@ const CardiologistPanelUnified = () => {
             specialty="cardiology"
             onPatientSelect={handlePatientSelect}
           />
+        )}
+
+        {/* Записи кардиолога */}
+        {activeTab === 'appointments' && (
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium flex items-center">
+                  <Calendar size={20} className="mr-2 text-green-600" />
+                  Записи к кардиологу
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="info">
+                    Всего: {appointments.length}
+                  </Badge>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={loadCardiologyAppointments}
+                    disabled={appointmentsLoading}
+                  >
+                    <RefreshCw size={16} className="mr-1" />
+                    Обновить
+                  </Button>
+                </div>
+              </div>
+              
+              <EnhancedAppointmentsTable
+                data={appointments}
+                loading={appointmentsLoading}
+                theme={isDark ? 'dark' : 'light'}
+                language="ru"
+                selectedRows={appointmentsSelected}
+                outerBorder={false}
+                services={{}}
+                showCheckboxes={false}
+                onRowSelect={(id, checked) => {
+                  const newSelected = new Set(appointmentsSelected);
+                  if (checked) {
+                    newSelected.add(id);
+                  } else {
+                    newSelected.delete(id);
+                  }
+                  setAppointmentsSelected(newSelected);
+                }}
+                onRowClick={handleAppointmentRowClick}
+                onActionClick={handleAppointmentActionClick}
+              />
+            </Card>
+          </div>
         )}
 
         {/* Прием пациента */}
@@ -779,7 +937,7 @@ const CardiologistPanelUnified = () => {
           isOpen={scheduleNextModal.open}
           onClose={() => setScheduleNextModal({ open: false, patient: null })}
           patient={scheduleNextModal.patient}
-          theme={{ isDark, getColor, getSpacing: (size) => theme.spacing[size], getFontSize: (size) => theme.fontSize[size] }}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
           specialtyFilter="cardiology"
         />
       )}

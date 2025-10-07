@@ -128,9 +128,7 @@ import DiscountBenefitsManager from '../components/admin/DiscountBenefitsManager
 import { useAdminHotkeys } from '../hooks/useHotkeys';
 import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
-import '../styles/admin.css';
-import '../styles/admin-dark-theme.css';
-import '../styles/dark-theme-visibility-fix.css';
+import '../styles/admin-styles.css';
 
 const AdminPanel = () => {
   const location = useLocation();
@@ -442,9 +440,18 @@ const AdminPanel = () => {
   ]);
   
   const { 
-    getSpacing, 
-    getFontSize 
+    designTokens,
+    isDark 
   } = useTheme();
+
+  // Вспомогательные функции для работы с токенами
+  const getSpacing = (size) => {
+    return designTokens.spacing[size] || '16px';
+  };
+
+  const getFontSize = (size) => {
+    return designTokens.typography.fontSize[size] || '16px';
+  };
   
   // Анимации (используются в компонентах)
   const [animationsStarted, setAnimationsStarted] = useState(false);
@@ -3162,9 +3169,9 @@ const AdminPanel = () => {
           <h1 style={{ 
             fontSize: getFontSize('3xl'),
             fontWeight: '700',
-            color: 'var(--text-primary)',
+            color: 'var(--color-text-primary)',
             marginBottom: getSpacing('xs'),
-            background: 'linear-gradient(135deg, var(--accent-color) 0%, #1d4ed8 100%)',
+            background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text'
@@ -3173,7 +3180,7 @@ const AdminPanel = () => {
           </h1>
           <p style={{ 
             fontSize: getFontSize('lg'),
-            color: 'var(--text-secondary)',
+            color: 'var(--color-text-secondary)',
             fontWeight: '400'
           }}>
             Управление системой клиники

@@ -3,36 +3,58 @@
  * Централизованная система цветов, размеров, типографики
  */
 
-// Цветовая палитра
+// Цветовая палитра (ОБЪЕДИНЕННАЯ ИЗ ВСЕХ СИСТЕМ)
 export const colors = {
-  // Основные цвета
+  // Основные брендовые цвета (выбраны лучшие из основной темы)
   primary: {
     50: '#f0f9ff',
     100: '#e0f2fe',
     200: '#bae6fd',
     300: '#7dd3fc',
     400: '#38bdf8',
-    500: '#0ea5e9', // Основной синий
+    500: '#0ea5e9', // ✅ Основной синий (из основной темы)
     600: '#0284c7',
     700: '#0369a1',
     800: '#075985',
     900: '#0c4a6e'
   },
-  
-  // Медицинские цвета
+
+  // Статусные цвета (оптимизированные для лучшего контраста)
+  status: {
+    success: '#10b981',    // ✅ Зеленый (из основной темы)
+    warning: '#f59e0b',    // ✅ Оранжевый (из основной темы)
+    danger: '#ef4444',     // ✅ Красный (из основной темы)
+    info: '#3b82f6',       // ✅ Синий (из основной темы)
+    pending: '#f59e0b',    // Оранжевый для ожидания
+    completed: '#10b981',  // Зеленый для завершения
+    cancelled: '#6b7280'   // Серый для отмены
+  },
+
+  // Медицинские цвета отделений (специфичные для каждой специализации)
   medical: {
-    success: '#10b981', // Зеленый для успеха
-    warning: '#f59e0b', // Оранжевый для предупреждений
-    danger: '#ef4444',  // Красный для опасности
-    info: '#3b82f6',    // Синий для информации
-    cardiology: '#dc2626', // Красный для кардиологии
-    dermatology: '#7c3aed', // Фиолетовый для дерматологии
-    dentistry: '#059669',   // Зеленый для стоматологии
-    laboratory: '#0891b2', // Голубой для лаборатории
-    ecg: '#ea580c'         // Оранжевый для ЭКГ
+    cardiology: '#dc2626',   // ✅ Красный для кардиологии (лучший контраст)
+    dermatology: '#7c3aed',  // Фиолетовый для дерматологии
+    dentistry: '#059669',    // Зеленый для стоматологии
+    laboratory: '#0891b2',   // Голубой для лаборатории
+    general: '#0ea5e9',      // Синий для общих врачей
+    ecg: '#ea580c'           // Оранжевый для ЭКГ
+  },
+
+  // Вторичные цвета (для акцентов и дополнительных элементов)
+  secondary: {
+    50: '#f8fafc',
+    100: '#f1f5f9',
+    200: '#e2e8f0',
+    300: '#cbd5e1',
+    400: '#94a3b8',
+    500: '#64748b',
+    600: '#475569',
+    700: '#334155',
+    800: '#1e293b',
+    900: '#0f172a'
   },
   
-  // Нейтральные цвета
+  // Нейтральные цвета (улучшенные)
   gray: {
     50: '#f9fafb',
     100: '#f3f4f6',
@@ -45,29 +67,37 @@ export const colors = {
     800: '#1f2937',
     900: '#111827'
   },
-  
-  // Семантические цвета
+
+  // Семантические цвета (для фона, текста и поверхностей)
   semantic: {
     background: {
-      primary: '#ffffff',
-      secondary: '#f9fafb',
-      tertiary: '#f3f4f6'
+      primary: '#ffffff',      // Основной фон
+      secondary: '#f8fafc',    // Вторичный фон
+      tertiary: '#f1f5f9',     // Третичный фон
+      elevated: '#ffffff',     // Приподнятые элементы
+      overlay: 'rgba(0, 0, 0, 0.5)', // Оверлеи
+      disabled: '#f3f4f6'      // Отключенные элементы
     },
     text: {
-      primary: '#111827',
-      secondary: '#4b5563',
-      tertiary: '#9ca3af',
-      inverse: '#ffffff'
+      primary: '#0f172a',      // Основной текст
+      secondary: '#374151',    // Вторичный текст
+      tertiary: '#6b7280',     // Третичный текст
+      inverse: '#ffffff',      // Инверсный текст
+      disabled: '#9ca3af'      // Отключенный текст
     },
     border: {
-      light: '#e5e7eb',
-      medium: '#d1d5db',
-      dark: '#9ca3af'
+      light: '#e5e7eb',        // Светлая граница
+      medium: '#d1d5db',       // Средняя граница
+      dark: '#9ca3af',         // Темная граница
+      focus: '#0ea5e9'         // Граница фокуса
     },
     surface: {
-      elevated: '#ffffff',
-      overlay: 'rgba(0, 0, 0, 0.5)',
-      disabled: '#f3f4f6'
+      card: '#ffffff',         // Карточки
+      input: '#ffffff',        // Поля ввода
+      button: '#ffffff',       // Кнопки
+      hover: '#f8fafc',        // Hover состояние
+      active: '#f1f5f9',       // Active состояние
+      selected: '#e0f2fe'      // Выбранное состояние
     }
   }
 };
@@ -194,34 +224,34 @@ export const zIndex = {
   tooltip: 1800
 };
 
-// Медицинские специфичные токены
+// Медицинские специфичные токены (используют новую структуру цветов)
 export const medical = {
   // Статусы пациентов
   patientStatus: {
-    waiting: colors.medical.warning,
-    inProgress: colors.medical.info,
-    completed: colors.medical.success,
-    cancelled: colors.gray[400],
-    emergency: colors.medical.danger
+    waiting: colors.status.pending,     // Ожидание
+    inProgress: colors.status.info,     // В процессе
+    completed: colors.status.completed, // Завершено
+    cancelled: colors.status.cancelled, // Отменено
+    emergency: colors.status.danger     // Экстренный случай
   },
-  
+
   // Приоритеты
   priority: {
-    low: colors.gray[400],
-    normal: colors.medical.info,
-    high: colors.medical.warning,
-    urgent: colors.medical.danger,
-    emergency: colors.medical.danger
+    low: colors.gray[400],              // Низкий
+    normal: colors.status.info,         // Нормальный
+    high: colors.status.warning,        // Высокий
+    urgent: colors.status.danger,       // Срочный
+    emergency: colors.status.danger     // Экстренный
   },
-  
-  // Отделения
+
+  // Отделения (специфичные цвета)
   departments: {
-    cardiology: colors.medical.cardiology,
-    dermatology: colors.medical.dermatology,
-    dentistry: colors.medical.dentistry,
-    laboratory: colors.medical.laboratory,
-    ecg: colors.medical.ecg,
-    general: colors.primary[500]
+    cardiology: colors.medical.cardiology,   // Кардиология - красный
+    dermatology: colors.medical.dermatology, // Дерматология - фиолетовый
+    dentistry: colors.medical.dentistry,     // Стоматология - зеленый
+    laboratory: colors.medical.laboratory,   // Лаборатория - голубой
+    ecg: colors.medical.ecg,                 // ЭКГ - оранжевый
+    general: colors.medical.general          // Общая практика - синий
   }
 };
 

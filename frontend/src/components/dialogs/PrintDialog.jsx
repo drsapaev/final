@@ -11,7 +11,7 @@ const PrintDialog = ({
   documentData,
   onPrint
 }) => {
-  const { theme, getColor } = useTheme();
+  const { theme } = useTheme();
   const [printers, setPrinters] = useState([]);
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -151,7 +151,7 @@ const PrintDialog = ({
           borderRadius: '8px'
         }}>
           <h4 style={{ 
-            color: getColor('textPrimary'),
+            color: 'var(--color-text-primary)',
             margin: '0 0 8px 0',
             fontSize: '16px',
             fontWeight: '600'
@@ -163,7 +163,7 @@ const PrintDialog = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {documentData.patient_fio && (
                 <p style={{ 
-                  color: getColor('textSecondary'),
+                  color: 'var(--color-text-secondary)',
                   margin: 0,
                   fontSize: '14px'
                 }}>
@@ -173,7 +173,7 @@ const PrintDialog = ({
               
               {documentData.services && (
                 <p style={{ 
-                  color: getColor('textSecondary'),
+                  color: 'var(--color-text-secondary)',
                   margin: 0,
                   fontSize: '14px'
                 }}>
@@ -185,7 +185,7 @@ const PrintDialog = ({
               
               {documentData.cost && (
                 <p style={{ 
-                  color: getColor('textSecondary'),
+                  color: 'var(--color-text-secondary)',
                   margin: 0,
                   fontSize: '14px'
                 }}>
@@ -203,7 +203,7 @@ const PrintDialog = ({
             fontSize: '14px',
             fontWeight: '500',
             marginBottom: '12px',
-            color: getColor('textPrimary')
+            color: 'var(--color-text-primary)'
           }}>
             Выберите принтер
           </label>
@@ -214,7 +214,7 @@ const PrintDialog = ({
               alignItems: 'center',
               justifyContent: 'center',
               padding: '40px',
-              color: getColor('textSecondary')
+              color: 'var(--color-text-secondary)'
             }}>
               <div className="loading-spinner" style={{ marginRight: '12px' }}></div>
               Загрузка принтеров...
@@ -306,21 +306,21 @@ const PrintDialog = ({
 
                   {/* Иконка принтера */}
                   <Printer size={20} style={{ 
-                    color: getColor('textSecondary'),
+                    color: 'var(--color-text-secondary)',
                     flexShrink: 0
                   }} />
 
                   {/* Информация о принтере */}
                   <div style={{ flex: 1 }}>
                     <div style={{
-                      color: getColor('textPrimary'),
+                      color: 'var(--color-text-primary)',
                       fontSize: '14px',
                       fontWeight: '500'
                     }}>
                       {printer.name}
                     </div>
                     <div style={{
-                      color: getColor('textSecondary'),
+                      color: 'var(--color-text-secondary)',
                       fontSize: '12px',
                       marginTop: '2px'
                     }}>
@@ -358,7 +358,7 @@ const PrintDialog = ({
             <div style={{
               textAlign: 'center',
               padding: '40px',
-              color: getColor('textSecondary')
+              color: 'var(--color-text-secondary)'
             }}>
               <Printer size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
               <p style={{ margin: 0 }}>Принтеры не найдены</p>
