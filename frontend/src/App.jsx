@@ -106,91 +106,96 @@ function AppShell() {
 
 // Внутренний компонент с PWA логикой
 function AppContent() {
-  const { shouldShowInstallPrompt } = usePWA();
+  // Безопасный вызов PWA хука с fallback
+  let shouldShowInstallPrompt = () => false;
+  
+  try {
+    const pwa = usePWA();
+    shouldShowInstallPrompt = pwa.shouldShowInstallPrompt;
+  } catch (error) {
+    console.warn('PWA hook failed in AppContent, using fallback:', error);
+  }
 
   return (
     <>
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Routes>
-      <Route path="/login" element={<LoginFormStyled />} />
-      <Route path="/old-login" element={<Login />} />
-      <Route path="/health" element={<Health />} />
-      <Route path="/" element={<Landing />} />
-          <Route path="/medilab-demo" element={<MediLabDemo />} />
-          <Route path="/queue-reorder-demo" element={<QueueReorderDemo />} />
-          <Route path="/css-test" element={<CSSTestPage />} />
-      <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
-      <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
-      <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
-      <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
-      <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
-      <Route path="/queue/join" element={<QueueJoin />} />
+        <Route path="/login" element={<LoginFormStyled />} />
+        <Route path="/old-login" element={<Login />} />
+        <Route path="/health" element={<Health />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/medilab-demo" element={<MediLabDemo />} />
+        <Route path="/queue-reorder-demo" element={<QueueReorderDemo />} />
+        <Route path="/css-test" element={<CSSTestPage />} />
+        <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
+        <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
+        <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
+        <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
+        <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
+        <Route path="/queue/join" element={<QueueJoin />} />
         <Route path="/queue/join/:token" element={<QueueJoin />} />
         <Route path="/pwa/queue" element={<QueueJoin />} />
-      <Route path="/payment/success" element={<PaymentSuccess />} />
-      <Route path="/payment/cancel" element={<PaymentCancel />} />
-      <Route path="/payment/test" element={<PaymentTest />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/cancel" element={<PaymentCancel />} />
+        <Route path="/payment/test" element={<PaymentTest />} />
+        <Route element={<RequireAuth />}>
+          <Route element={<AppShell />}>
+            <Route path="cashier-panel" element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
+            <Route path="admin" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/analytics" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/users" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/doctors" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/services" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/patients" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/appointments" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/all-free" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/benefit-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/wizard-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/payment-providers" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/ai-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/telegram-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/display-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/activation" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/finance" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+            <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
+            <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
+            <Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanelUnified /></RequireAuth>} />
+            <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanelUnified /></RequireAuth>} />
+            <Route path="dentist" element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanelUnified /></RequireAuth>} />
+            <Route path="lab-panel" element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
+            <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
+            <Route path="queue-board" element={<DisplayBoardUnified />} />
+            <Route path="display-board" element={<DisplayBoardUnified />} />
+            <Route path="display-board/:role" element={<DisplayBoardUnified />} />
+            <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
+            <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
+            <Route path="scheduler" element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
+            <Route path="appointments" element={<RequireAuth roles={['Admin','Registrar']}><Appointments /></RequireAuth>} />
+            <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
+            <Route path="visits/:id" element={<VisitDetails />} />
+            <Route path="search" element={<Search />} />
 
-          <Route path="cashier-panel" element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
-          <Route path="admin" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/analytics" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/users" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/doctors" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/services" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/patients" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/appointments" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/all-free" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/benefit-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/wizard-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/payment-providers" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/ai-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/telegram-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/display-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/activation" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/finance" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-          <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
-          <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
-          <Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanelUnified /></RequireAuth>} />
-          <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanelUnified /></RequireAuth>} />
-          <Route path="dentist"       element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanelUnified /></RequireAuth>} />
-          <Route path="lab-panel"     element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
-          <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
-          <Route path="queue-board"   element={<DisplayBoardUnified />} />
-          <Route path="display-board" element={<DisplayBoardUnified />} />
-          <Route path="display-board/:role" element={<DisplayBoardUnified />} />
-          <Route path="settings"      element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
-          <Route path="audit"         element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
-          <Route path="scheduler"     element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
-          <Route path="appointments"  element={<RequireAuth roles={['Admin','Registrar']}><Appointments /></RequireAuth>} />
-          <Route path="analytics"     element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
-          <Route path="visits/:id"    element={<VisitDetails />} />
-          <Route path="search"        element={<Search />} />
-          
-          
-          {/* Интегрированные скрытые компоненты */}
-          <Route path="advanced-users"     element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
-          <Route path="advanced-emr"       element={<RequireAuth roles={['Admin','Doctor','Nurse']}><EMRInterface /></RequireAuth>} />
-          <Route path="file-management"    element={<RequireAuth roles={['Admin','Doctor','Nurse']}><FileManager /></RequireAuth>} />
-          <Route path="notifications"     element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
-          <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
-          <Route path="security-settings" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><TwoFactorManager /></RequireAuth>} />
-          
-          {/* Демо интеграции */}
-          <Route path="integration-demo"   element={<IntegrationDemo />} />
-          
-          
-          <Route path="*"             element={<Navigate to="/" replace />} />
+            {/* Интегрированные скрытые компоненты */}
+            <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
+            <Route path="advanced-emr" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><EMRInterface /></RequireAuth>} />
+            <Route path="file-management" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><FileManager /></RequireAuth>} />
+            <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
+            <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
+            <Route path="security-settings" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><TwoFactorManager /></RequireAuth>} />
+
+            {/* Демо интеграции */}
+            <Route path="integration-demo" element={<IntegrationDemo />} />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
     </>
   );
 }

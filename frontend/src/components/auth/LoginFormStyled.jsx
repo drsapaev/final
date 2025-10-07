@@ -5,6 +5,7 @@ import { api, setToken } from '../../api/client';
 import { setProfile } from '../../stores/auth';
 import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
+import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 
 const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
@@ -157,7 +158,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -179,7 +180,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
             <div style={{
               width: '60px',
               height: '60px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
@@ -200,13 +201,13 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
             <h1 style={{
               fontSize: '24px',
               fontWeight: 'bold',
-              color: '#333',
+              color: colors.semantic.text.primary,
               margin: '0 0 8px 0'
             }}>
               Двухфакторная аутентификация
             </h1>
             <p style={{
-              color: '#666',
+              color: colors.semantic.text.secondary,
               margin: '0',
               fontSize: '14px'
             }}>
@@ -223,8 +224,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  background: twoFactorMethod === 'totp' ? '#667eea' : 'transparent',
-                  color: twoFactorMethod === 'totp' ? 'white' : '#666',
+                  background: twoFactorMethod === 'totp' ? colors.primary[500] : 'transparent',
+                  color: twoFactorMethod === 'totp' ? 'white' : colors.semantic.text.secondary,
                   border: '1px solid #e1e5e9',
                   borderRadius: '6px',
                   fontSize: '12px',
@@ -239,8 +240,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  background: twoFactorMethod === 'backup' ? '#667eea' : 'transparent',
-                  color: twoFactorMethod === 'backup' ? 'white' : '#666',
+                  background: twoFactorMethod === 'backup' ? colors.primary[500] : 'transparent',
+                  color: twoFactorMethod === 'backup' ? 'white' : colors.semantic.text.secondary,
                   border: '1px solid #e1e5e9',
                   borderRadius: '6px',
                   fontSize: '12px',
@@ -255,8 +256,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  background: twoFactorMethod === 'recovery' ? '#667eea' : 'transparent',
-                  color: twoFactorMethod === 'recovery' ? 'white' : '#666',
+                  background: twoFactorMethod === 'recovery' ? colors.primary[500] : 'transparent',
+                  color: twoFactorMethod === 'recovery' ? 'white' : colors.semantic.text.secondary,
                   border: '1px solid #e1e5e9',
                   borderRadius: '6px',
                   fontSize: '12px',
@@ -282,7 +283,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -305,7 +306,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           <div style={{
             width: '60px',
             height: '60px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
@@ -326,13 +327,13 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           <h1 style={{
             fontSize: '24px',
             fontWeight: 'bold',
-            color: '#333',
+            color: colors.semantic.text.primary,
             margin: '0 0 8px 0'
           }}>
             Вход в систему
           </h1>
           <p style={{
-            color: '#666',
+            color: colors.semantic.text.secondary,
             margin: '0',
             fontSize: '14px'
           }}>
@@ -349,7 +350,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               marginBottom: '8px',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#333'
+              color: colors.semantic.text.primary
             }}>
               Тип входа
             </label>
@@ -381,7 +382,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               marginBottom: '8px',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#333'
+              color: colors.semantic.text.primary
             }}>
               {formData.loginType === 'username' ? 'Имя пользователя' : 
                formData.loginType === 'email' ? 'Email' : 'Телефон'} *
@@ -414,7 +415,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               marginBottom: '8px',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#333'
+              color: colors.semantic.text.primary
             }}>
               Пароль *
             </label>
@@ -448,7 +449,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#666',
+                  color: colors.semantic.text.secondary,
                   fontSize: '18px'
                 }}
               >
@@ -469,7 +470,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               alignItems: 'center',
               cursor: 'pointer',
               fontSize: '14px',
-              color: '#333'
+              color: colors.semantic.text.primary
             }}>
               <input
                 type="checkbox"
@@ -485,7 +486,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#667eea',
+                color: colors.primary[500],
                 cursor: 'pointer',
                 fontSize: '14px',
                 textDecoration: 'underline'
@@ -517,7 +518,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
             style={{
               width: '100%',
               padding: '14px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
               color: 'white',
               border: 'none',
               borderRadius: '8px',
@@ -547,7 +548,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
             <span style={{
               background: 'white',
               padding: '0 20px',
-              color: '#666',
+              color: colors.semantic.text.secondary,
               fontSize: '14px',
               position: 'absolute',
               top: '-10px',

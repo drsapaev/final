@@ -429,13 +429,14 @@ def open_reception(
 @router.get("/registrar/queues/today")
 def get_today_queues(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab"))
 ):
     """
     Получить все очереди на сегодня для регистратуры
     Из detail.md стр. 363: GET /api/queue/today?specialist_id
     
     ОБНОВЛЕНО: Теперь получаем данные из Visit вместо DailyQueue
+    Доступ: Admin, Registrar, Doctor, Lab
     """
     try:
         from app.models.visit import Visit

@@ -60,11 +60,11 @@
   white-space: nowrap;
 }
 
-.hdr-btn--icon { width: 40px; justify-content: center; border: 1px solid var(--border-color, rgba(148,163,184,.3)); }
-.hdr-btn--ghost { border: 1px solid var(--border-color, rgba(148,163,184,.3)); }
+.hdr-btn--icon { width: 40px; justify-content: center; border: 1px solid rgba(148,163,184,.3); }
+.hdr-btn--ghost { border: 1px solid rgba(148,163,184,.3); }
 .hdr-btn--primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; }
 .hdr-btn--danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; border: none; }
-.hdr-btn--nav { border: 1px solid var(--border-color, rgba(148,163,184,.3)); }
+.hdr-btn--nav { border: 1px solid rgba(148,163,184,.3); }
 .hdr-btn--nav.is-active { background: rgba(59,130,246,.15); border-color: rgba(59,130,246,.4); color: #93c5fd; }
 .hdr-btn--brand { font-weight: 800; border: none; }
 
@@ -75,7 +75,7 @@
   height: 40px;
   padding: 8px 8px;
   border-radius: 8px;
-  border: 1px solid var(--border-color, rgba(148,163,184,.3));
+  border: 1px solid rgba(148,163,184,.3);
   background: transparent;
   color: inherit;
   flex: 0 0 auto;

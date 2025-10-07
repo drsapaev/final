@@ -22,13 +22,14 @@ import {
   DollarSign,
   Clock
 } from 'lucide-react';
-import { Button, Card } from '../components/ui/native';
+import { Button, Card, Badge } from '../components/ui/native';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorQueuePanel from '../components/doctor/DoctorQueuePanel';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
 import AIAssistant from '../components/ai/AIAssistant';
 import ServiceChecklist from '../components/ServiceChecklist';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import EMRSystem from '../components/medical/EMRSystem';
 import PhotoUploader from '../components/dermatology/PhotoUploader';
 import PhotoComparison from '../components/dermatology/PhotoComparison';
@@ -46,7 +47,7 @@ import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
  */
 const DermatologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
-  const { theme, isDark, getColor } = useTheme();
+  const { theme, isDark, getColor, getSpacing, getFontSize } = useTheme();
   
   const [activeTab, setActiveTab] = useState('queue');
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -60,6 +61,11 @@ const DermatologistPanelUnified = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  
+  // Состояния для таблицы записей
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
 
   // Специализированные данные дерматолога
   const [skinExamination, setSkinExamination] = useState({
@@ -124,6 +130,7 @@ const DermatologistPanelUnified = () => {
   // Вкладки панели
   const tabs = [
     { id: 'queue', label: 'Очередь', icon: Users, color: 'text-blue-600' },
+    { id: 'appointments', label: 'Записи', icon: Calendar, color: 'text-green-600' },
     { id: 'visit', label: 'Прием', icon: Stethoscope, color: 'text-orange-600' },
     { id: 'patients', label: 'Пациенты', icon: User, color: 'text-green-600' },
     { id: 'photos', label: 'Фото', icon: Camera, color: 'text-purple-600' },
@@ -146,6 +153,107 @@ const DermatologistPanelUnified = () => {
     }
   }, [selectedPatient]);
 
+  // Загрузка записей дерматолога
+  const loadDermatologyAppointments = async () => {
+    setAppointmentsLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('Нет токена аутентификации');
+        setAppointmentsLoading(false);
+        return;
+      }
+      
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=derma', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Обрабатываем данные из API
+        let appointmentsData = [];
+        if (data && data.queues && Array.isArray(data.queues)) {
+          const dermaQueue = data.queues.find(queue => 
+            queue.specialty === 'derma' || queue.specialty === 'dermatology'
+          );
+          
+          if (dermaQueue && dermaQueue.entries) {
+            appointmentsData = dermaQueue.entries.map(entry => ({
+              id: entry.id,
+              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+              patient_phone: entry.patient?.phone || entry.phone || '',
+              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
+              address: entry.patient?.address || entry.address || '',
+              visit_type: entry.visit_type || 'Платный',
+              services: entry.services || [],
+              payment_type: entry.payment_status || 'Не оплачено',
+              doctor: entry.doctor_name || 'Дерматолог',
+              date: entry.appointment_date || new Date().toISOString().split('T')[0],
+              time: entry.appointment_time || '09:00',
+              status: entry.status || 'Ожидает',
+              cost: entry.total_cost || 0,
+              payment: entry.payment_status || 'Не оплачено'
+            }));
+          }
+        }
+        
+        setAppointments(appointmentsData);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки записей дерматолога:', error);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  // Загружаем записи при переключении на вкладку
+  useEffect(() => {
+    if (activeTab === 'appointments') {
+      loadDermatologyAppointments();
+    }
+  }, [activeTab]);
+
+  // Обработчики для таблицы записей
+  const handleAppointmentRowClick = (row) => {
+    console.log('Клик по записи:', row);
+    // Можно открыть детали записи или переключиться на прием
+    if (row.patient_fio) {
+      // Создаем объект пациента для переключения на прием
+      const patientData = {
+        id: row.id,
+        patient_name: row.patient_fio,
+        phone: row.patient_phone,
+        number: row.id,
+        source: 'appointments'
+      };
+      setSelectedPatient(patientData);
+      setActiveTab('visit');
+    }
+  };
+
+  const handleAppointmentActionClick = (action, row, event) => {
+    console.log('Действие с записью:', action, row);
+    event.stopPropagation();
+    
+    switch (action) {
+      case 'view':
+        handleAppointmentRowClick(row);
+        break;
+      case 'edit':
+        // Логика редактирования записи
+        break;
+      case 'cancel':
+        // Логика отмены записи
+        break;
+      default:
+        break;
+    }
+  };
+
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
   
@@ -162,7 +270,7 @@ const DermatologistPanelUnified = () => {
   const loadPatients = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/patients?department=Derma&limit=100', {
+      const response = await fetch('http://localhost:8000/api/v1/patients?department=Derma&limit=100', {
         headers: authHeader(),
       });
       if (response.ok) {
@@ -178,7 +286,7 @@ const DermatologistPanelUnified = () => {
 
   const loadSkinExaminations = async () => {
     try {
-      const response = await fetch('/api/v1/derma/examinations?limit=100', {
+      const response = await fetch('http://localhost:8000/api/v1/derma/examinations?limit=100', {
         headers: authHeader(),
       });
       if (response.ok) {
@@ -192,7 +300,7 @@ const DermatologistPanelUnified = () => {
 
   const loadCosmeticProcedures = async () => {
     try {
-      const response = await fetch('/api/v1/derma/procedures?limit=100', {
+      const response = await fetch('http://localhost:8000/api/v1/derma/procedures?limit=100', {
         headers: authHeader(),
       });
       if (response.ok) {
@@ -401,7 +509,7 @@ const DermatologistPanelUnified = () => {
   const handleSkinExaminationSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/v1/dermatology/skin-examinations', {
+      const response = await fetch('http://localhost:8000/api/v1/dermatology/skin-examinations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -436,7 +544,7 @@ const DermatologistPanelUnified = () => {
   const handleCosmeticProcedureSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/v1/dermatology/cosmetic-procedures', {
+      const response = await fetch('http://localhost:8000/api/v1/dermatology/cosmetic-procedures', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -598,6 +706,56 @@ const DermatologistPanelUnified = () => {
                   setActiveTab('visit');
                 }}
                 onStartVisit={startVisit}
+              />
+            </Card>
+          </div>
+        )}
+
+        {/* Записи дерматолога */}
+        {activeTab === 'appointments' && (
+          <div className="space-y-6">
+            <Card className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium flex items-center">
+                  <Calendar size={20} className="mr-2 text-green-600" />
+                  Записи к дерматологу
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="info">
+                    Всего: {appointments.length}
+                  </Badge>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={loadDermatologyAppointments}
+                    disabled={appointmentsLoading}
+                  >
+                    <RefreshCw size={16} className="mr-1" />
+                    Обновить
+                  </Button>
+                </div>
+              </div>
+              
+              <EnhancedAppointmentsTable
+                data={appointments}
+                loading={appointmentsLoading}
+                theme={isDark ? 'dark' : 'light'}
+                language="ru"
+                selectedRows={appointmentsSelected}
+                outerBorder={false}
+                services={{}}
+                showCheckboxes={false}
+                onRowSelect={(id, checked) => {
+                  const newSelected = new Set(appointmentsSelected);
+                  if (checked) {
+                    newSelected.add(id);
+                  } else {
+                    newSelected.delete(id);
+                  }
+                  setAppointmentsSelected(newSelected);
+                }}
+                onRowClick={handleAppointmentRowClick}
+                onActionClick={handleAppointmentActionClick}
               />
             </Card>
           </div>
@@ -1477,7 +1635,7 @@ const DermatologistPanelUnified = () => {
           isOpen={scheduleNextModal.open}
           onClose={() => setScheduleNextModal({ open: false, patient: null })}
           patient={scheduleNextModal.patient}
-          theme={{ isDark, getColor, getSpacing: (size) => theme.spacing[size], getFontSize: (size) => theme.fontSize[size] }}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
           specialtyFilter="dermatology"
         />
       )}

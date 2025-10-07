@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { colors } from '../../theme/tokens';
 import './ModernButton.css';
 
 const ModernButton = ({
@@ -58,79 +59,79 @@ const ModernButton = ({
     onClick?.(event);
   };
 
-  // Получение цветов для варианта
+  // Получение цветов для варианта (используем новую структуру токенов)
   const getVariantColors = () => {
-    const colors = {
+    const colorMap = {
       primary: {
-        bg: getColor('primary'),
-        text: 'white',
-        hover: getColor('primaryDark'),
-        border: getColor('primary')
+        bg: colors.primary[500],        // Основной синий
+        text: colors.semantic.text.inverse, // Белый текст
+        hover: colors.primary[600],     // Темнее при hover
+        border: colors.primary[500]
       },
       secondary: {
-        bg: getColor('secondary'),
-        text: 'white',
-        hover: getColor('secondaryDark'),
-        border: getColor('secondary')
+        bg: colors.secondary[500],      // Серый
+        text: colors.semantic.text.inverse,
+        hover: colors.secondary[600],   // Темнее при hover
+        border: colors.secondary[500]
       },
       success: {
-        bg: getColor('success'),
-        text: 'white',
-        hover: getColor('successDark'),
-        border: getColor('success')
+        bg: colors.status.success,      // Зеленый успех
+        text: colors.semantic.text.inverse,
+        hover: colors.status.success,   // Тот же цвет при hover (для консистентности)
+        border: colors.status.success
       },
       warning: {
-        bg: getColor('warning'),
-        text: 'white',
-        hover: getColor('warningDark'),
-        border: getColor('warning')
+        bg: colors.status.warning,      // Оранжевый предупреждение
+        text: colors.semantic.text.primary, // Темный текст для контраста
+        hover: colors.status.warning,   // Тот же цвет при hover
+        border: colors.status.warning
       },
       danger: {
-        bg: getColor('danger'),
-        text: 'white',
-        hover: getColor('dangerDark'),
-        border: getColor('danger')
+        bg: colors.status.danger,       // Красный ошибка
+        text: colors.semantic.text.inverse,
+        hover: colors.status.danger,    // Тот же цвет при hover
+        border: colors.status.danger
       },
       info: {
-        bg: getColor('info'),
-        text: 'white',
-        hover: getColor('infoDark'),
-        border: getColor('info')
+        bg: colors.status.info,         // Синий информация
+        text: colors.semantic.text.inverse,
+        hover: colors.status.info,      // Тот же цвет при hover
+        border: colors.status.info
       },
       light: {
-        bg: getColor('gray100'),
-        text: getColor('textPrimary'),
-        hover: getColor('gray200'),
-        border: getColor('gray300')
+        bg: colors.semantic.background.secondary, // Светлый фон
+        text: colors.semantic.text.primary,      // Темный текст
+        hover: colors.semantic.surface.hover,    // Hover состояние
+        border: colors.semantic.border.light
       },
       dark: {
-        bg: getColor('gray800'),
-        text: 'white',
-        hover: getColor('gray900'),
-        border: getColor('gray800')
+        bg: colors.gray[800],           // Темный серый
+        text: colors.semantic.text.inverse,
+        hover: colors.gray[900],        // Еще темнее при hover
+        border: colors.gray[800]
       }
     };
 
-    return colors[variant] || colors.primary;
+    return colorMap[variant] || colorMap.primary;
   };
 
   const variantColors = getVariantColors();
 
-  // Стили кнопки
+  // Стили кнопки (используем токены цветов)
   const buttonStyles = {
-    backgroundColor: ghost 
-      ? 'transparent' 
-      : outlined 
-        ? 'transparent' 
-        : disabled 
-          ? getColor('gray300')
+    backgroundColor: ghost
+      ? 'transparent'
+      : outlined
+        ? 'transparent'
+        : disabled
+          ? colors.gray[300]  // Отключенное состояние
           : variantColors.bg,
     color: ghost
       ? variantColors.bg
       : outlined
         ? variantColors.bg
         : disabled
-          ? getColor('gray500')
+          ? colors.gray[500]  // Отключенный текст
           : variantColors.text,
     borderColor: outlined || ghost
       ? variantColors.border

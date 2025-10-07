@@ -109,11 +109,77 @@ const RegistrarPanel = () => {
       doctor_specialty: 'cardiology',
       date: todayStr,
       appointment_date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
       // Добавляем номера очередей для демонстрации
       queue_numbers: [
         {
           queue_tag: 'cardiology_common',
           queue_name: 'Кардиолог',
+          number: 1,
+          status: 'waiting',
+          source: 'online',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: 'telegram_123456'
+    },
+    // Добавляем записи для того же пациента в разных отделениях (для тестирования агрегации)
+    {
+      id: 2,
+      patient_fio: 'Иванов Иван Иванович', // Тот же пациент
+      patient_birth_year: 1985,
+      patient_phone: '+998 (90) 123-45-67',
+      address: 'ул. Навои, д. 15, кв. 23',
+      services: ['Консультация дерматолога', 'Дерматоскопия'], // Другие услуги
+      visit_type: 'paid',
+      payment_type: 'card',
+      payment_status: 'paid',
+      cost: 45000,
+      status: 'confirmed',
+      isEmpty: false,
+      department: 'dermatology', // Другое отделение
+      doctor_specialty: 'dermatology',
+      date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
+      appointment_date: todayStr,
+      queue_numbers: [
+        {
+          queue_tag: 'dermatology',
+          queue_name: 'Дерматолог',
+          number: 1,
+          status: 'waiting',
+          source: 'online',
+          created_at: new Date().toISOString()
+        }
+      ],
+      confirmation_status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: 'telegram_123456'
+    },
+    {
+      id: 3,
+      patient_fio: 'Иванов Иван Иванович', // Тот же пациент
+      patient_birth_year: 1985,
+      patient_phone: '+998 (90) 123-45-67',
+      address: 'ул. Навои, д. 15, кв. 23',
+      services: ['Консультация стоматолога'], // Третья услуга
+      visit_type: 'paid',
+      payment_type: 'cash',
+      payment_status: 'paid',
+      cost: 30000,
+      status: 'confirmed',
+      isEmpty: false,
+      department: 'stomatology', // Третье отделение
+      doctor_specialty: 'stomatology',
+      date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
+      appointment_date: todayStr,
+      queue_numbers: [
+        {
+          queue_tag: 'stomatology',
+          queue_name: 'Стоматолог',
           number: 1,
           status: 'waiting',
           source: 'online',
@@ -140,6 +206,7 @@ const RegistrarPanel = () => {
       department: 'cardiology',
       doctor_specialty: 'cardiology',
       date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
       appointment_date: todayStr,
       // Добавляем номера очередей
       queue_numbers: [
@@ -172,6 +239,7 @@ const RegistrarPanel = () => {
       department: 'dermatology',
       doctor_specialty: 'dermatology',
       date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
       appointment_date: todayStr,
       queue_numbers: [
         {
@@ -203,6 +271,7 @@ const RegistrarPanel = () => {
       department: 'stomatology',
       doctor_specialty: 'stomatology',
       date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
       appointment_date: todayStr,
       queue_numbers: [
         {
@@ -234,6 +303,7 @@ const RegistrarPanel = () => {
       department: 'laboratory',
       doctor_specialty: 'laboratory',
       date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
       appointment_date: todayStr,
       queue_numbers: [
         {
@@ -265,6 +335,7 @@ const RegistrarPanel = () => {
       department: 'procedures',
       doctor_specialty: 'procedures',
       date: todayStr,
+      record_type: 'appointment', // Добавляем тип записи для демо-данных
       appointment_date: todayStr,
       queue_numbers: [
         {
@@ -312,6 +383,60 @@ const RegistrarPanel = () => {
   // Отладка изменений appointments
   useEffect(() => {
     console.log('📋 appointments changed, count:', appointments.length);
+    if (appointments.length > 0) {
+      console.log('📋 Первая запись в состоянии:', appointments[0]);
+    }
+
+    // Тестируем агрегацию пациентов при изменении данных
+    if (appointments.length > 0) {
+      setTimeout(() => {
+        console.log('🧪 Тестирование агрегации пациентов:');
+        console.log('Исходные записи:', appointments.length);
+
+        // Простая функция агрегации для тестирования
+        const patientGroups = {};
+        appointments.forEach(appointment => {
+          const patientKey = appointment.patient_fio;
+          if (!patientGroups[patientKey]) {
+            patientGroups[patientKey] = {
+              patient_fio: appointment.patient_fio,
+              services: [],
+              departments: new Set(),
+              cost: 0 // Общая стоимость
+            };
+          }
+
+          // Суммируем стоимость
+          if (appointment.cost) {
+            patientGroups[patientKey].cost += appointment.cost;
+          }
+
+          if (appointment.services && Array.isArray(appointment.services)) {
+            appointment.services.forEach(service => {
+              if (!patientGroups[patientKey].services.includes(service)) {
+                patientGroups[patientKey].services.push(service);
+              }
+            });
+          }
+          if (appointment.department) {
+            patientGroups[patientKey].departments.add(appointment.department);
+          }
+        });
+
+        const aggregated = Object.values(patientGroups);
+        console.log('После агрегации:', aggregated.length);
+
+        // Находим первого пациента для тестирования
+        const firstPatient = aggregated[0];
+        if (firstPatient) {
+          console.log('Первый пациент после агрегации:', firstPatient.patient_fio);
+          console.log('Количество услуг:', firstPatient.services.length);
+          console.log('Услуги:', firstPatient.services);
+          console.log('Отделения:', Array.from(firstPatient.departments));
+          console.log('Общая стоимость:', firstPatient.cost);
+        }
+      }, 100);
+    }
   }, [appointments]);
 
   // Убираем дублирование - filteredAppointments уже определена ниже в коде
@@ -531,31 +656,27 @@ const RegistrarPanel = () => {
   const { 
     theme,
     isDark, 
-    isLight, 
-    getColor, 
-    getSpacing, 
-    getFontSize, 
-    designTokens 
+    isLight
   } = useTheme();
 
   // Адаптивные цвета из централизованной системы темизации
-  const cardBg = isDark ? getColor('secondary', 900) : getColor('secondary', 50);
-  const textColor = isDark ? getColor('secondary', 50) : getColor('secondary', 900);
-  const borderColor = isDark ? getColor('secondary', 700) : getColor('secondary', 200);
-  const accentColor = getColor('primary', 500);
-  const successColor = getColor('success', 500);
-  const warningColor = getColor('warning', 500);
-  const dangerColor = getColor('danger', 500);
+  const cardBg = isDark ? 'var(--color-background-primary)' : 'var(--color-background-secondary)';
+  const textColor = isDark ? 'var(--color-text-primary)' : 'var(--color-text-primary)';
+  const borderColor = isDark ? 'var(--color-border-medium)' : 'var(--color-border-light)';
+  const accentColor = 'var(--color-primary-500)';
+  const successColor = 'var(--color-success)';
+  const warningColor = 'var(--color-warning)';
+  const dangerColor = 'var(--color-danger)';
 
   // Используем централизованную типографику и отступы
-  // Убираем локальные spacing и typography - используем getSpacing и getColor напрямую
+  // Используем CSS переменные вместо getSpacing и getColor
 
   const pageStyle = {
     padding: '0',
     maxWidth: 'none',
     margin: '0',
     fontFamily: 'system-ui, -apple-system, sans-serif',
-    fontSize: isMobile ? getFontSize('sm') : isTablet ? getFontSize('base') : getFontSize('lg'),
+    fontSize: isMobile ? '14px' : isTablet ? '16px' : '18px',
     fontWeight: 400,
     lineHeight: 1.5,
     background: theme === 'light' 
@@ -567,11 +688,11 @@ const RegistrarPanel = () => {
 
   const cardStyle = {
     background: theme === 'light' 
-      ? 'rgba(255, 255, 255, 0.8)' 
+      ? 'rgba(255, 255, 255, 0.95)' 
       : 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(20px)',
     color: textColor,
-    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
+    border: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
     borderRadius: '20px',
     margin: '0 20px 20px 20px',
     boxShadow: theme === 'light' 
@@ -587,7 +708,7 @@ const RegistrarPanel = () => {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 700)} 50%, ${getColor('primary', 900)} 100%)`,
+    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 50%, var(--color-primary-700) 100%)',
     color: 'white',
     textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
     position: 'relative',
@@ -601,15 +722,15 @@ const RegistrarPanel = () => {
 
   // Контейнер таблицы, визуально "сливается" с вкладками
   const tableContainerStyle = {
-    background: theme === 'light' 
-      ? 'rgba(255, 255, 255, 0.8)' 
+    background: theme === 'light'
+      ? 'rgba(255, 255, 255, 0.98)'
       : 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(20px)',
     color: textColor,
-    borderLeft: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderRight: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderBottom: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderTop: 'none',
+    borderLeft: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
+    borderRight: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
+    borderBottom: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
+    borderTop: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)'}`,
     borderRadius: '0 0 20px 20px',
     margin: '0 20px 20px 20px',
     boxShadow: theme === 'light' 
@@ -625,14 +746,14 @@ const RegistrarPanel = () => {
   };
 
   const buttonStyle = {
-    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+    padding: '0.5rem 1.5rem',
+    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '12px',
     cursor: 'pointer',
-    marginRight: getSpacing('sm'),
-    fontSize: getFontSize('sm'),
+    marginRight: '0.5rem',
+    fontSize: '14px',
     fontWeight: '600',
     lineHeight: '1.25',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -643,14 +764,14 @@ const RegistrarPanel = () => {
   };
 
   const buttonSecondaryStyle = {
-    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    background: theme === 'light' ? 'white' : getColor('gray', 800),
+    padding: `${'0.5rem'} ${'1.5rem'}`,
+    background: theme === 'light' ? 'white' : 'var(--color-background-secondary)',
     color: textColor,
     border: `1px solid ${borderColor}`,
     borderRadius: '12px',
     cursor: 'pointer',
-    marginRight: getSpacing('sm'),
-    fontSize: getFontSize('sm'),
+    marginRight: '0.5rem',
+    fontSize: '14px',
     fontWeight: '600',
     lineHeight: '1.25',
     transition: 'all 0.2s ease',
@@ -660,19 +781,19 @@ const RegistrarPanel = () => {
 
   const buttonSuccessStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${getColor('success', 500)} 0%, ${getColor('success', 600)} 100%)`,
+    background: `linear-gradient(135deg, ${'var(--color-success)'} 0%, ${'var(--color-success)'} 100%)`,
     boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
   };
 
   const buttonDangerStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${getColor('danger', 500)} 0%, ${getColor('danger', 600)} 100%)`,
+    background: `linear-gradient(135deg, ${'var(--color-danger)'} 0%, ${'var(--color-danger)'} 100%)`,
     boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
   };
 
   const buttonWarningStyle = {
     ...buttonStyle,
-    background: `linear-gradient(135deg, ${getColor('warning', 500)} 0%, ${getColor('warning', 600)} 100%)`,
+    background: `linear-gradient(135deg, ${'var(--color-warning)'} 0%, ${'var(--color-warning)'} 100%)`,
     color: '#212529',
     boxShadow: '0 4px 14px 0 rgba(245, 158, 11, 0.3)'
   };
@@ -695,11 +816,11 @@ const RegistrarPanel = () => {
   };
 
   const tabStyle = {
-    padding: isMobile ? `${getSpacing('xs')} ${getSpacing('sm')}` : `${getSpacing('sm')} ${getSpacing('xl')}`,
+    padding: isMobile ? `${'0.25rem'} ${'0.5rem'}` : `${'0.5rem'} ${'2rem'}`,
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    fontSize: isMobile ? getFontSize('xs') : getFontSize('sm'),
+    fontSize: isMobile ? '12px' : '14px',
     fontWeight: '500',
     lineHeight: '1.25',
     color: textColor,
@@ -712,17 +833,17 @@ const RegistrarPanel = () => {
     whiteSpace: 'nowrap',
     display: 'flex',
     alignItems: 'center',
-    gap: isMobile ? '4px' : getSpacing('xs'),
+    gap: isMobile ? '4px' : '0.25rem',
     borderBottom: '3px solid transparent'
   };
 
   const activeTabStyle = {
     ...tabStyle,
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
+    background: `linear-gradient(135deg, ${'var(--color-primary-500)'} 0%, ${'var(--color-primary-600)'} 100%)`,
     color: 'white',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
     transform: 'translateY(-2px)',
-    borderBottom: `3px solid ${getColor('primary', 700)}`
+    borderBottom: `3px solid ${'var(--color-primary-700)'}`
   };
 
   // Базовый URL API
@@ -1048,7 +1169,8 @@ const RegistrarPanel = () => {
                   (activeTab === 'cardio' && queue.specialty === 'cardiology') ||
                   (activeTab === 'derma' && queue.specialty === 'dermatology') ||
                   (activeTab === 'dental' && queue.specialty === 'stomatology') ||
-                  (activeTab === 'lab' && queue.specialty === 'laboratory');
+                  (activeTab === 'lab' && queue.specialty === 'laboratory') ||
+                  (activeTab === 'procedures' && queue.specialty === 'procedures');
 
                 console.log(`📊 Проверка очереди ${queue.specialty}: ${match ? 'подходит' : 'не подходит'}`);
                 return match;
@@ -1060,6 +1182,15 @@ const RegistrarPanel = () => {
                 console.log(`📊 Очередь ${targetQueue.specialty} имеет ${targetQueue.entries.length} записей`);
 
                 appointmentsData = targetQueue.entries.map((entry, index) => {
+                  console.log(`📋 Загрузка записи ${entry.id} из API:`, {
+                    id: entry.id,
+                    record_type: entry.record_type,
+                    status: entry.status,
+                    payment_status: entry.payment_status
+                  });
+                  console.log(`📋 Все ключи entry из API:`, Object.keys(entry));
+                  console.log(`📋 Полный entry объект:`, JSON.stringify(entry, null, 2));
+
                   const appointment = {
                     id: entry.id,
                     patient_id: entry.patient_id,
@@ -1110,6 +1241,15 @@ const RegistrarPanel = () => {
 
                 if (queue.entries && Array.isArray(queue.entries)) {
                   const queueAppointments = queue.entries.map((entry, index) => {
+                    console.log(`📋 Загрузка записи ${entry.id} из очереди ${queue.specialty}:`, {
+                      id: entry.id,
+                      record_type: entry.record_type,
+                      status: entry.status,
+                      payment_status: entry.payment_status
+                    });
+                    console.log(`📋 Все ключи entry из очереди ${queue.specialty}:`, Object.keys(entry));
+                    console.log(`📋 Полный entry объект из очереди:`, JSON.stringify(entry, null, 2));
+
                     const appointment = {
                       id: entry.id,
                       patient_id: entry.patient_id,
@@ -1232,6 +1372,7 @@ const RegistrarPanel = () => {
             setDataSource(prev => (prev === 'api' ? prev : 'api'));
           });
           console.debug('✅ Загружены и обогащены данные из API:', enriched.length, 'записей');
+          console.log('💾 Первая запись после обогащения:', enriched[0]);
         } else {
           // API вернул пустой массив - показываем демо-данные с учетом оверрайдов
           let demo = DEMO_APPOINTMENTS;
@@ -1392,7 +1533,8 @@ const RegistrarPanel = () => {
                 (activeTab === 'cardio' && queue.specialty === 'cardiology') ||
                 (activeTab === 'derma' && queue.specialty === 'dermatology') ||
                 (activeTab === 'dental' && queue.specialty === 'stomatology') ||
-                (activeTab === 'lab' && queue.specialty === 'laboratory')
+                (activeTab === 'lab' && queue.specialty === 'laboratory') ||
+                (activeTab === 'procedures' && queue.specialty === 'procedures')
               );
 
               if (targetQueue && targetQueue.entries) {
@@ -1569,6 +1711,23 @@ const RegistrarPanel = () => {
     try {
       console.log('🔍 handlePayment вызван с данными:', appointment);
       console.log('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
+      console.log('🔍 appointment.record_type:', appointment.record_type);
+      console.log('🔍 Все ключи appointment:', Object.keys(appointment));
+      console.log('🔍 Полный объект appointment:', JSON.stringify(appointment, null, 2));
+
+      // Определяем, является ли это агрегированной записью
+      const isAggregated = appointment.departments && appointment.departments instanceof Set;
+      console.log('🔍 Это агрегированная запись:', isAggregated);
+
+      // Если это агрегированная запись, находим все оригинальные записи пациента
+      let recordsToUpdate = [appointment]; // По умолчанию только текущая запись
+      if (isAggregated) {
+        console.log('🔍 Ищем все записи пациента:', appointment.patient_fio);
+        // Находим все записи этого пациента в оригинальном массиве
+        const allPatientRecords = appointments.filter(apt => apt.patient_fio === appointment.patient_fio);
+        console.log('🔍 Найдено записей пациента:', allPatientRecords.length);
+        recordsToUpdate = allPatientRecords;
+      }
       
       // Проверяем, не оплачена ли уже запись
       const paymentStatus = (appointment.payment_status || '').toLowerCase();
@@ -1587,22 +1746,29 @@ const RegistrarPanel = () => {
       }
       
       // Определяем источник записи и правильный ID
-      // Используем record_type, если есть, иначе определяем по ID
+      // Используем record_type из API, если есть, иначе определяем по ID
       const recordType = appointment.record_type || (appointment.id >= 20000 ? 'visit' : 'appointment');
       const realId = appointment.id;
       
-      console.log('Попытка оплатить запись:', appointment.id, 'Тип записи:', recordType);
-      
+      console.log('Попытка оплатить записи:', recordsToUpdate.map(r => r.id), 'Тип записи:', recordType);
+
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-      
+
+      // Используем первую запись для создания платежа (она содержит правильный record_type и ID)
+      const paymentRecord = recordsToUpdate[0];
+      const paymentRecordType = paymentRecord.record_type || (paymentRecord.id >= 20000 ? 'visit' : 'appointment');
+      const paymentRecordId = paymentRecord.id;
+
+      console.log('🔍 Создаем платеж для записи:', paymentRecordId, 'типа:', paymentRecordType);
+
       // Используем правильный API в зависимости от типа записи
       let url;
-      if (recordType === 'visit') {
+      if (paymentRecordType === 'visit') {
         // Для записей из visits используем API visits
-        url = `${API_BASE}/api/v1/registrar/visits/${realId}/mark-paid`;
+        url = `${API_BASE}/api/v1/registrar/visits/${paymentRecordId}/mark-paid`;
       } else {
         // Для записей из appointments используем старый API
-        url = `${API_BASE}/api/v1/appointments/${realId}/mark-paid`;
+        url = `${API_BASE}/api/v1/appointments/${paymentRecordId}/mark-paid`;
       }
       
       console.log('🔍 Отправляем запрос на:', url);
@@ -1620,37 +1786,44 @@ const RegistrarPanel = () => {
       if (response.ok) {
         const updatedAppointment = await response.json();
         console.log('Успешный ответ:', updatedAppointment);
-        
-        // Обновляем список записей - устанавливаем статус 'queued' после оплаты
-        const appointmentWithQueuedStatus = {
-          ...updatedAppointment,
-          status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
-          payment_status: 'paid',
-          _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
-        };
-        
-        // Сохраняем локальный оверрайд в localStorage (на случай полного перезагрузки страницы)
-        try {
-          const overridesRaw = localStorage.getItem('appointments_local_overrides');
-          const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-          overrides[String(appointment.id)] = {
-            status: appointmentWithQueuedStatus.status,
-            payment_status: appointmentWithQueuedStatus.payment_status,
-            // TTL 10 минут
-            expiresAt: Date.now() + 10 * 60 * 1000
-          };
-          localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
-        } catch(_) {
-        // Игнорируем ошибки парсинга JSON
-      }
 
-        setAppointments(prev => prev.map(apt => (
-          apt.id === appointment.id ? appointmentWithQueuedStatus : apt
-        )));
-        toast.success('Запись оплачена и добавлена в очередь!');
+        console.log('✅ Оплата успешна, обновляем локальное состояние для всех записей пациента');
+        console.log('Обновляем записи:', recordsToUpdate.map(r => r.id));
+
+        // Обновляем статус всех записей пациента
+        recordsToUpdate.forEach(record => {
+          const recordWithQueuedStatus = {
+            ...record,
+            status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
+            payment_status: 'paid',
+            _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
+          };
+
+          // Сохраняем локальный оверрайд для каждой записи
+          try {
+            const overridesRaw = localStorage.getItem('appointments_local_overrides');
+            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+            overrides[String(record.id)] = {
+              status: recordWithQueuedStatus.status,
+              payment_status: recordWithQueuedStatus.payment_status,
+              // TTL 10 минут
+              expiresAt: Date.now() + 10 * 60 * 1000
+            };
+            localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
+          } catch(_) {
+          // Игнорируем ошибки парсинга JSON
+        }
+
+          // Обновляем состояние для каждой записи
+          setAppointments(prev => prev.map(apt => (
+            apt.id === record.id ? recordWithQueuedStatus : apt
+          )));
+        });
+
+        toast.success(`Оплачено ${recordsToUpdate.length} записей пациента и добавлены в очередь!`);
         // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
         setTimeout(() => loadAppointments({ silent: true }), 800);
-        return appointmentWithQueuedStatus;
+        return updatedAppointment;
       } else {
         const errorText = await response.text();
         console.error('Ошибка API:', response.status, errorText);
@@ -1982,10 +2155,10 @@ const RegistrarPanel = () => {
     const departmentCategoryMapping = {
       'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
       'echokg': ['ECG'],         // ЭКГ - отдельная категория (только ЭКГ)
-      'derma': ['D'],            // Дерматология: консультация дерматолога-косметолога
-      'dental': ['S'],           // Стоматология: консультация стоматолога, рентгенография зубов
+      'derma': ['D', 'DERM', 'DERM_PROC'],            // Дерматология: консультация и дерм. процедуры
+      'dental': ['S', 'DENT', 'STOM'],           // Стоматология: консультация, рентген
       'lab': ['L'],              // Лаборатория: все лабораторные услуги
-      'procedures': ['P', 'C', 'D_PROC']  // Процедуры: физиотерапия (P), косметология (C), дерматологические процедуры (D_PROC)
+      'procedures': ['P', 'C', 'D_PROC', 'PHYS', 'COSM']  // Процедуры: физио, косметология, дерм.процедуры
     };
     
     // Получаем коды категорий для данного отдела
@@ -2024,8 +2197,8 @@ const RegistrarPanel = () => {
 
       // Старый формат кодов (префиксы) - обновленный
       if (serviceCode.startsWith('CONS_CARD')) return 'K';  // Консультации кардиолога
-      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'D';  // Дерматология-косметология
-      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'S';  // Стоматология
+      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'DERM';  // Дерматология-косметология
+      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'DENT';  // Стоматология
       if (serviceCode.startsWith('LAB_')) return 'L';  // Лаборатория
       if (serviceCode.startsWith('COSM_')) return 'C';  // Косметология
       if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
@@ -2102,41 +2275,153 @@ const RegistrarPanel = () => {
     return departmentStats[departmentKey]?.hasPendingPayments || false;
   }, [departmentStats]);
 
+  // Функция агрегации пациентов для вкладки "Все отделения"
+  const aggregatePatientsForAllDepartments = useCallback((appointments) => {
+    const patientGroups = {};
+
+    appointments.forEach(appointment => {
+      // Используем patient_fio как уникальный идентификатор пациента
+      const patientKey = appointment.patient_fio;
+
+      if (!patientGroups[patientKey]) {
+        patientGroups[patientKey] = {
+          id: appointment.id,
+          patient_id: appointment.patient_id,
+          patient_fio: appointment.patient_fio,
+          patient_birth_year: appointment.patient_birth_year,
+          patient_phone: appointment.patient_phone,
+          address: appointment.address,
+          visit_type: appointment.visit_type,
+          payment_type: appointment.payment_type,
+          payment_status: appointment.payment_status,
+          cost: 0, // Будет суммироваться из всех записей
+          status: appointment.status,
+          date: appointment.date,
+          appointment_date: appointment.appointment_date,
+          created_at: appointment.created_at,
+          // Агрегируем услуги из разных отделений
+          services: [],
+          departments: new Set(),
+          doctors: new Set(),
+          // Используем первую попавшуюся запись для остальных полей
+          department: appointment.department,
+          doctor_specialty: appointment.doctor_specialty,
+          queue_numbers: appointment.queue_numbers || [],
+          confirmation_status: appointment.confirmation_status,
+          confirmed_at: appointment.confirmed_at,
+          confirmed_by: appointment.confirmed_by,
+          record_type: appointment.record_type // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
+        };
+      }
+
+      // Суммируем стоимость для ВСЕХ записей пациента (включая первую)
+      if (appointment.cost) {
+        patientGroups[patientKey].cost += appointment.cost;
+      }
+
+      // Добавляем услуги если их еще нет
+      if (appointment.services && Array.isArray(appointment.services)) {
+        appointment.services.forEach(service => {
+          if (!patientGroups[patientKey].services.includes(service)) {
+            patientGroups[patientKey].services.push(service);
+          }
+        });
+      }
+
+      // Добавляем информацию об отделении
+      if (appointment.department) {
+        patientGroups[patientKey].departments.add(appointment.department);
+      }
+
+      // Добавляем информацию о враче
+      if (appointment.doctor_specialty) {
+        patientGroups[patientKey].doctors.add(appointment.doctor_specialty);
+      }
+    });
+
+    // Преобразуем обратно в массив
+    return Object.values(patientGroups);
+  }, []);
+
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
 
   const filteredAppointments = useMemo(() => {
-    const filtered = appointments.filter(appointment => {
-      // Фильтр по вкладке (отдел)
-      if (activeTab && !isInDepartment(appointment, activeTab)) {
-        return false;
-      }
-      // Фильтр по статусу (если задан)
-      if (statusFilter && appointment.status !== statusFilter) return false;
-      // Поиск по ФИО/телефону/услугам/ID записи (если задан)
+    // Если выбрана конкретная вкладка (не "Все отделения"), используем обычную фильтрацию
+    if (activeTab) {
+      const filtered = appointments.filter(appointment => {
+        // Фильтр по вкладке (отдел)
+        if (!isInDepartment(appointment, activeTab)) {
+          return false;
+        }
+        // Фильтр по статусу (если задан)
+        if (statusFilter && appointment.status !== statusFilter) return false;
+        // Поиск по ФИО/телефону/услугам/ID записи (если задан)
+        if (searchQuery) {
+          const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
+
+          // Поиск по ID записи
+          const inId = String(appointment.id).includes(searchQuery);
+
+          // Улучшенный поиск по телефону - ищем и в исходном, и в отформатированном виде
+          const originalPhone = (appointment.patient_phone || '').toLowerCase();
+          const phoneDigits = originalPhone.replace(/\D/g, ''); // Только цифры
+          const searchDigits = searchQuery.replace(/\D/g, ''); // Только цифры из поиска
+
+          const inPhone = originalPhone.includes(searchQuery) ||
+                         phoneDigits.includes(searchDigits) ||
+                         (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+
+          const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
+          if (!inFio && !inPhone && !inServices && !inId) return false;
+        }
+        return true;
+      });
+
+      return filtered;
+    }
+
+    // Для вкладки "Все отделения" (activeTab === null) - агрегируем пациентов
+    if (!activeTab) {
+      // Сначала фильтруем по статусу и дате, если заданы
+      let filtered = appointments.filter(appointment => {
+        // Фильтр по статусу (если задан)
+        if (statusFilter && appointment.status !== statusFilter) return false;
+        return true;
+      });
+
+      // Затем агрегируем пациентов
+      const aggregatedPatients = aggregatePatientsForAllDepartments(filtered);
+
+      // Применяем поиск к агрегированным данным
       if (searchQuery) {
-        const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
+        return aggregatedPatients.filter(patient => {
+          const inFio = (patient.patient_fio || '').toLowerCase().includes(searchQuery);
 
-        // Поиск по ID записи
-        const inId = String(appointment.id).includes(searchQuery);
+          // Поиск по ID записи
+          const inId = String(patient.id).includes(searchQuery);
 
-        // Улучшенный поиск по телефону - ищем и в исходном, и в отформатированном виде
-        const originalPhone = (appointment.patient_phone || '').toLowerCase();
-        const phoneDigits = originalPhone.replace(/\D/g, ''); // Только цифры
-        const searchDigits = searchQuery.replace(/\D/g, ''); // Только цифры из поиска
+          // Улучшенный поиск по телефону
+          const originalPhone = (patient.patient_phone || '').toLowerCase();
+          const phoneDigits = originalPhone.replace(/\D/g, '');
+          const searchDigits = searchQuery.replace(/\D/g, '');
 
-        const inPhone = originalPhone.includes(searchQuery) ||
-                       phoneDigits.includes(searchDigits) ||
-                       (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+          const inPhone = originalPhone.includes(searchQuery) ||
+                         phoneDigits.includes(searchDigits) ||
+                         (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
 
-        const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
-        if (!inFio && !inPhone && !inServices && !inId) return false;
+          // Поиск по услугам (теперь ищем в агрегированном списке)
+          const inServices = Array.isArray(patient.services) && patient.services.some(s => String(s).toLowerCase().includes(searchQuery));
+
+          return inFio || inPhone || inServices || inId;
+        });
       }
-    return true;
-  });
 
-    return filtered;
-  }, [appointments, activeTab, searchDate, statusFilter, searchQuery, isInDepartment]);
+      return aggregatedPatients;
+    }
+
+    return appointments;
+  }, [appointments, activeTab, searchDate, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments]);
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   const DataSourceIndicator = memo(({ count }) => {
@@ -2339,7 +2624,7 @@ const RegistrarPanel = () => {
           top: '0',
           zIndex: 9999,
           padding: '8px 16px',
-          background: getColor('primary', 600),
+          background: 'var(--color-primary-600)',
           color: 'white',
           textDecoration: 'none',
           borderRadius: '0 0 4px 4px'
@@ -2357,7 +2642,7 @@ const RegistrarPanel = () => {
       {/* Современные вкладки */}
       {(!searchParams.get('view') || (searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue')) && (
         <div style={{
-          margin: `0 ${getSpacing('md')}`,
+          margin: `0 ${'1rem'}`,
           maxWidth: 'none',
           width: 'calc(100vw - 32px)'
         }}>
@@ -2379,7 +2664,7 @@ const RegistrarPanel = () => {
         {searchParams.get('view') === 'welcome' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card variant="default" style={{ 
-              margin: `0 ${getSpacing('md')} ${getSpacing('xl')} ${getSpacing('md')}`,
+              margin: `0 ${'1rem'} ${'2rem'} ${'1rem'}`,
               maxWidth: 'none',
               width: 'calc(100vw - 32px)'
             }}>
@@ -2387,7 +2672,7 @@ const RegistrarPanel = () => {
                 <AnimatedTransition type="slide" direction="up" delay={200}>
                   <h1 style={{ 
                     margin: 0, 
-                    fontSize: getFontSize('3xl'), 
+                    fontSize: '48px', 
                     fontWeight: '400', 
                     lineHeight: '1.25',
                     display: 'flex', 
@@ -2395,11 +2680,11 @@ const RegistrarPanel = () => {
                     gap: '12px' 
                   }}>
                     {t('welcome')} в панель регистратора!
-                    <span style={{ fontSize: getFontSize('2xl') }}>👋</span>
+                    <span style={{ fontSize: '32px' }}>👋</span>
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={400}>
-                  <div style={{ fontSize: getFontSize('lg'), opacity: 0.9, lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '18px', opacity: 0.9, lineHeight: '1.5' }}>
                     {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { 
                       weekday: 'long', 
                       year: 'numeric', 
@@ -2417,11 +2702,9 @@ const RegistrarPanel = () => {
                 departmentStats={departmentStats}
                 language={language}
                 onExport={() => {
-                  // Экспорт данных
                   console.log('Экспорт статистики');
                 }}
                 onRefresh={() => {
-                  // Обновление данных - загружаем только записи
                   loadAppointments();
                 }}
               />
@@ -2882,12 +3165,12 @@ const RegistrarPanel = () => {
         {/* Онлайн-очередь по параметру view=queue */}
         {searchParams.get('view') === 'queue' && (
           <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
+            <Card variant="default" style={{ margin: `0 ${'2rem'} ${'2rem'} ${'2rem'}` }}>
               <Card.Header>
                 <AnimatedTransition type="slide" direction="up" delay={200}>
                   <h1 style={{ 
                     margin: 0, 
-                    fontSize: getFontSize('3xl'), 
+                    fontSize: '48px', 
                     fontWeight: '400', 
                     lineHeight: '1.25',
                     display: 'flex', 
@@ -2898,7 +3181,7 @@ const RegistrarPanel = () => {
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={400}>
-                  <div style={{ fontSize: getFontSize('lg'), opacity: 0.9, lineHeight: '1.5' }}>
+                  <div style={{ fontSize: '18px', opacity: 0.9, lineHeight: '1.5' }}>
                     Управление онлайн-записью и QR кодами для очереди
                   </div>
                 </AnimatedTransition>
@@ -2928,23 +3211,23 @@ const RegistrarPanel = () => {
             style={{
             ...tableContainerStyle, 
               // Убираем отрицательный отступ для идеальной стыковки с вкладками
-              margin: `0 ${isMobile ? getSpacing('md') : getSpacing('md')} ${getSpacing('xl')} ${isMobile ? getSpacing('md') : getSpacing('md')}`,
+              margin: `0 ${isMobile ? '1rem' : '1rem'} ${'2rem'} ${isMobile ? '1rem' : '1rem'}`,
             borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px',
               maxWidth: 'none',
               width: 'calc(100vw - 32px)'
           }}>
             <div style={{
               ...tableContentStyle,
-              padding: isMobile ? getSpacing('sm') : getSpacing('md')
+              padding: isMobile ? '0.5rem' : '1rem'
             }}>
               
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
               <div style={{
                 display: 'flex',
-                  gap: isMobile ? getSpacing('xs') : '12px', 
+                  gap: isMobile ? '0.25rem' : '12px', 
                 alignItems: 'center',
-                  padding: isMobile ? getSpacing('sm') : '16px',
+                  padding: isMobile ? '0.5rem' : '16px',
                   background: theme === 'light' ? '#f8f9fa' : '#374151',
                   borderRadius: isMobile ? '6px' : '8px',
                   flexWrap: isMobile ? 'wrap' : 'nowrap'

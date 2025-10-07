@@ -365,3 +365,4 @@ input:checked + .slider:before {
   .provider-toggle {
     align-self: flex-end;
   }
+}

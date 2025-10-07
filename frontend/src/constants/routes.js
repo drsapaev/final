@@ -109,6 +109,13 @@ export function getRouteForProfile(profile) {
   // Проверяем множественные роли
   const rolesArr = Array.isArray(profile.roles) ? profile.roles.map(r => String(r).toLowerCase()) : [];
   const roleLower = String(profile.role || profile.role_name || '').toLowerCase();
+
+  // Специализированный маппинг для известных пользователей-врачей
+  // Требование: при входе cardio@example.com показывать панель кардиолога
+  const usernameLower = String(profile.username || '').toLowerCase();
+  if (usernameLower === 'cardio@example.com') return '/cardiologist';
+  if (usernameLower === 'derma@example.com') return '/dermatologist';
+  if (usernameLower === 'dentist@example.com') return '/dentist';
   
   // Приоритет: admin > специализированные роли > общие роли
   if (rolesArr.includes('admin') || roleLower === 'admin') return '/admin';

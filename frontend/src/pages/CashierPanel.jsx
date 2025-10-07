@@ -409,7 +409,7 @@ const CashierPanel = () => {
         >
           <DialogTitle>
             <Box display="flex" alignItems="center">
-              <CheckCircle style={{ color: '#4caf50', marginRight: 8 }} />
+              <CheckCircle style={{ color: 'var(--color-status-success)', marginRight: 8 }} />
               Оплата успешна!
             </Box>
           </DialogTitle>

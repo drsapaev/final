@@ -51,8 +51,8 @@ const AppointmentsTable = ({
 
   const buttonWarningStyle = {
     ...buttonStyle,
-    backgroundColor: '#ffc107',
-    color: '#212529'
+    backgroundColor: 'var(--color-status-warning)',
+    color: 'var(--color-text-primary)'
   };
 
   const buttonInfoStyle = {

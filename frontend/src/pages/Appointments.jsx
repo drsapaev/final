@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Nav from '../components/layout/Nav.jsx';
 import RoleGate from '../components/RoleGate.jsx';
 import AppointmentFlow from '../components/AppointmentFlow.jsx';
-import AppointmentsTable from '../components/AppointmentsTable.jsx';
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
 import { api } from '../api/client.js';
 
 function todayStr() {
@@ -86,7 +86,7 @@ export default function Appointments() {
           {err && <div style={errBox}>{String(err)}</div>}
 
           {useAdvancedTable ? (
-            <AppointmentsTable 
+            <EnhancedAppointmentsTable
               appointments={filtered}
               appointmentsSelected={selectedAppointments}
               setAppointmentsSelected={setSelectedAppointments}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AIAssistant from '../components/ai/AIAssistant';
 import LabResultsManager from '../components/laboratory/LabResultsManager';
 import LabReportGenerator from '../components/laboratory/LabReportGenerator';
+import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal';
@@ -14,6 +15,12 @@ const LabPanel = () => {
   const [loading, setLoading] = useState(false);
   const [showTestForm, setShowTestForm] = useState(false);
   const [showResultForm, setShowResultForm] = useState(false);
+  
+  // Состояния для таблицы записей
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
+  
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const patientModal = useModal();
   const visitModal = useModal();
@@ -29,10 +36,110 @@ const LabPanel = () => {
     loadResults();
   }, []);
 
+  // Загрузка записей лаборатории
+  const loadLabAppointments = async () => {
+    setAppointmentsLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.log('Нет токена аутентификации');
+        setAppointmentsLoading(false);
+        return;
+      }
+      
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=lab', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Обрабатываем данные из API
+        let appointmentsData = [];
+        if (data && data.queues && Array.isArray(data.queues)) {
+          const labQueue = data.queues.find(queue => 
+            queue.specialty === 'lab' || queue.specialty === 'laboratory'
+          );
+          
+          if (labQueue && labQueue.entries) {
+            appointmentsData = labQueue.entries.map(entry => ({
+              id: entry.id,
+              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+              patient_phone: entry.patient?.phone || entry.phone || '',
+              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
+              address: entry.patient?.address || entry.address || '',
+              visit_type: entry.visit_type || 'Платный',
+              services: entry.services || [],
+              payment_type: entry.payment_status || 'Не оплачено',
+              doctor: entry.doctor_name || 'Лаборатория',
+              date: entry.appointment_date || new Date().toISOString().split('T')[0],
+              time: entry.appointment_time || '09:00',
+              status: entry.status || 'Ожидает',
+              cost: entry.total_cost || 0,
+              payment: entry.payment_status || 'Не оплачено'
+            }));
+          }
+        }
+        
+        setAppointments(appointmentsData);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки записей лаборатории:', error);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
+  // Загружаем записи при переключении на вкладку
+  useEffect(() => {
+    if (activeTab === 'appointments') {
+      loadLabAppointments();
+    }
+  }, [activeTab]);
+
+  // Обработчики для таблицы записей
+  const handleAppointmentRowClick = (row) => {
+    console.log('Клик по записи:', row);
+    // Можно открыть детали записи или переключиться на прием
+    if (row.patient_fio) {
+      // Создаем объект пациента для переключения на прием
+      const patientData = {
+        id: row.id,
+        patient_name: row.patient_fio,
+        phone: row.patient_phone,
+        number: row.id,
+        source: 'appointments'
+      };
+      setActiveTab('tests');
+    }
+  };
+
+  const handleAppointmentActionClick = (action, row, event) => {
+    console.log('Действие с записью:', action, row);
+    event.stopPropagation();
+    
+    switch (action) {
+      case 'view':
+        handleAppointmentRowClick(row);
+        break;
+      case 'edit':
+        // Логика редактирования записи
+        break;
+      case 'cancel':
+        // Логика отмены записи
+        break;
+      default:
+        break;
+    }
+  };
+
   const loadPatients = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/v1/patients?department=Lab&limit=100', { headers: authHeader() });
+      const res = await fetch('http://localhost:8000/api/v1/patients?department=Lab&limit=100', { headers: authHeader() });
       if (res.ok) setPatients(await res.json());
     } catch {
       // Игнорируем ошибки загрузки пациентов
@@ -41,7 +148,7 @@ const LabPanel = () => {
 
   const loadTests = async () => {
     try {
-      const res = await fetch('/api/v1/lab/tests?limit=100', { headers: authHeader() });
+      const res = await fetch('http://localhost:8000/api/v1/lab/tests?limit=100', { headers: authHeader() });
       if (res.ok) setTests(await res.json());
     } catch {
       // Игнорируем ошибки загрузки тестов
@@ -50,7 +157,7 @@ const LabPanel = () => {
 
   const loadResults = async () => {
     try {
-      const res = await fetch('/api/v1/lab/results?limit=100', { headers: authHeader() });
+      const res = await fetch('http://localhost:8000/api/v1/lab/results?limit=100', { headers: authHeader() });
       if (res.ok) setResults(await res.json());
     } catch {
       // Игнорируем ошибки загрузки результатов
@@ -60,7 +167,7 @@ const LabPanel = () => {
   const handleTestSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/v1/lab/tests', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(testForm) });
+      const res = await fetch('http://localhost:8000/api/v1/lab/tests', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(testForm) });
       if (res.ok) { setShowTestForm(false); setTestForm({ patient_id: '', test_date: '', test_type: '', sample_type: '', notes: '' }); loadTests(); }
     } catch {
       // Игнорируем ошибки создания теста
@@ -70,7 +177,7 @@ const LabPanel = () => {
   const handleResultSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/v1/lab/results', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(resultForm) });
+      const res = await fetch('http://localhost:8000/api/v1/lab/results', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader() }, body: JSON.stringify(resultForm) });
       if (res.ok) { setShowResultForm(false); setResultForm({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' }); loadResults(); }
     } catch {
       // Игнорируем ошибки создания результата
@@ -141,6 +248,7 @@ const LabPanel = () => {
 
       <div style={tabsStyle}>
         <button style={activeTab === 'tests' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('tests')}>🧪 Анализы</button>
+        <button style={activeTab === 'appointments' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('appointments')}>📅 Записи</button>
         <button style={activeTab === 'results' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('results')}>📊 Результаты</button>
         <button style={activeTab === 'patients' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('patients')}>👥 Пациенты</button>
         <button style={activeTab === 'reports' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('reports')}>📋 Отчеты</button>
@@ -171,6 +279,49 @@ const LabPanel = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'appointments' && (
+        <div>
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <h2 style={{ margin: 0, fontSize: '18px' }}>📅 Записи в лабораторию</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '14px', color: '#666' }}>Всего: {appointments.length}</span>
+                <button 
+                  style={{ ...buttonStyle, backgroundColor: 'white', color: '#28a745' }} 
+                  onClick={loadLabAppointments}
+                  disabled={appointmentsLoading}
+                >
+                  🔄 Обновить
+                </button>
+              </div>
+            </div>
+            <div style={cardContentStyle}>
+              <EnhancedAppointmentsTable
+                data={appointments}
+                loading={appointmentsLoading}
+                theme="light"
+                language="ru"
+                selectedRows={appointmentsSelected}
+                outerBorder={false}
+                services={{}}
+                showCheckboxes={false}
+                onRowSelect={(id, checked) => {
+                  const newSelected = new Set(appointmentsSelected);
+                  if (checked) {
+                    newSelected.add(id);
+                  } else {
+                    newSelected.delete(id);
+                  }
+                  setAppointmentsSelected(newSelected);
+                }}
+                onRowClick={handleAppointmentRowClick}
+                onActionClick={handleAppointmentActionClick}
+              />
             </div>
           </div>
         </div>

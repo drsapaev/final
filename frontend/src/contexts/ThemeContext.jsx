@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { designTokens, themes } from '../design-system';
+import { colors as tokenColors } from '../theme/tokens';
 
 const ThemeContext = createContext();
 
@@ -31,9 +32,17 @@ export const ThemeProvider = ({ children }) => {
   const isLight = theme === 'light';
   const themeConfig = themes[theme] || themes.light;
 
-  // Утилитарные функции для работы с токенами
+  // Утилитарные функции для работы с токенами (обновлены на новую систему)
   const getColor = (color, shade = 500) => {
-    return designTokens?.colors?.[color]?.[shade] || designTokens?.colors?.primary?.[500] || '#3b82f6';
+    // Используем консолидированную цветовую систему
+    if (color === 'primary' || color === 'secondary') {
+      return tokenColors[color]?.[shade] || tokenColors.primary?.[500] || '#0ea5e9';
+    } else if (color === 'success' || color === 'warning' || color === 'danger' || color === 'info') {
+      return tokenColors.status?.[color] || tokenColors.primary?.[500] || '#0ea5e9';
+    } else if (color === 'text' || color === 'background' || color === 'border' || color === 'surface') {
+      return tokenColors.semantic?.[color]?.primary || '#ffffff';
+    }
+    return tokenColors.primary?.[500] || '#0ea5e9';
   };
 
   const getSpacing = (size) => {
@@ -75,34 +84,34 @@ export const ThemeProvider = ({ children }) => {
     const root = document.documentElement;
     
     if (isDark) {
-      // Темная тема
-      root.style.setProperty('--bg-primary', designTokens?.colors?.secondary?.[900] || '#0f172a');
-      root.style.setProperty('--bg-secondary', designTokens?.colors?.secondary?.[800] || '#1e293b');
-      root.style.setProperty('--bg-tertiary', designTokens?.colors?.secondary?.[700] || '#334155');
-      root.style.setProperty('--text-primary', designTokens?.colors?.secondary?.[50] || '#f8fafc');
-      root.style.setProperty('--text-secondary', designTokens?.colors?.secondary?.[300] || '#cbd5e1');
-      root.style.setProperty('--text-tertiary', designTokens?.colors?.secondary?.[400] || '#94a3b8');
-      root.style.setProperty('--border-color', designTokens?.colors?.secondary?.[600] || '#475569');
-      root.style.setProperty('--hover-bg', designTokens?.colors?.secondary?.[700] || '#334155');
-      root.style.setProperty('--accent-color', designTokens?.colors?.primary?.[400] || '#60a5fa');
+      // Темная тема (обновлена на новую цветовую систему)
+      root.style.setProperty('--bg-primary', tokenColors.semantic.background.primary);
+      root.style.setProperty('--bg-secondary', tokenColors.semantic.background.secondary);
+      root.style.setProperty('--bg-tertiary', tokenColors.gray[700]);
+      root.style.setProperty('--text-primary', tokenColors.semantic.text.primary);
+      root.style.setProperty('--text-secondary', tokenColors.semantic.text.secondary);
+      root.style.setProperty('--text-tertiary', tokenColors.gray[400]);
+      root.style.setProperty('--border-color', tokenColors.semantic.border.medium);
+      root.style.setProperty('--hover-bg', tokenColors.semantic.surface.hover);
+      root.style.setProperty('--accent-color', tokenColors.primary[400]);
     } else {
-      // Светлая тема
-      root.style.setProperty('--bg-primary', '#ffffff');
-      root.style.setProperty('--bg-secondary', designTokens?.colors?.secondary?.[50] || '#f8fafc');
-      root.style.setProperty('--bg-tertiary', designTokens?.colors?.secondary?.[100] || '#f1f5f9');
-      root.style.setProperty('--text-primary', designTokens?.colors?.secondary?.[900] || '#0f172a');
-      root.style.setProperty('--text-secondary', designTokens?.colors?.secondary?.[600] || '#475569');
-      root.style.setProperty('--text-tertiary', designTokens?.colors?.secondary?.[500] || '#64748b');
-      root.style.setProperty('--border-color', designTokens?.colors?.secondary?.[200] || '#e2e8f0');
-      root.style.setProperty('--hover-bg', designTokens?.colors?.secondary?.[100] || '#f1f5f9');
-      root.style.setProperty('--accent-color', designTokens?.colors?.primary?.[500] || '#3b82f6');
+      // Светлая тема (обновлена на новую цветовую систему)
+      root.style.setProperty('--bg-primary', tokenColors.semantic.background.primary);
+      root.style.setProperty('--bg-secondary', tokenColors.semantic.background.secondary);
+      root.style.setProperty('--bg-tertiary', tokenColors.gray[100]);
+      root.style.setProperty('--text-primary', tokenColors.semantic.text.primary);
+      root.style.setProperty('--text-secondary', tokenColors.semantic.text.secondary);
+      root.style.setProperty('--text-tertiary', tokenColors.gray[500]);
+      root.style.setProperty('--border-color', tokenColors.semantic.border.medium);
+      root.style.setProperty('--hover-bg', tokenColors.semantic.surface.hover);
+      root.style.setProperty('--accent-color', tokenColors.primary[500]);
     }
     
-    // Дополнительные переменные для статусов
-    root.style.setProperty('--success-color', designTokens?.colors?.success?.[500] || '#10b981');
-    root.style.setProperty('--warning-color', designTokens?.colors?.warning?.[500] || '#f59e0b');
-    root.style.setProperty('--danger-color', designTokens?.colors?.danger?.[500] || '#ef4444');
-    root.style.setProperty('--info-color', designTokens?.colors?.info?.[500] || '#06b6d4');
+    // Дополнительные переменные для статусов (обновлены на новую систему)
+    root.style.setProperty('--success-color', tokenColors.status.success);
+    root.style.setProperty('--warning-color', tokenColors.status.warning);
+    root.style.setProperty('--danger-color', tokenColors.status.danger);
+    root.style.setProperty('--info-color', tokenColors.status.info);
     
     // Переменные для теней
     root.style.setProperty('--shadow-sm', designTokens?.boxShadow?.sm || '0 1px 2px 0 rgba(0, 0, 0, 0.05)');
