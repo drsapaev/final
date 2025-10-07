@@ -80,7 +80,7 @@ const DentistPanelUnified = () => {
   const user = authState.profile;
   
   // Состояние
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('appointments');
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [dentalExaminations, setDentalExaminations] = useState([]);
@@ -186,7 +186,6 @@ const DentistPanelUnified = () => {
     try {
       await Promise.all([
         loadPatients(),
-        loadAppointments(),
         loadDentalExaminations(),
         loadTreatmentPlans(),
         loadProsthetics()
@@ -830,6 +829,7 @@ const DentistPanelUnified = () => {
           loading={appointmentsLoading}
           theme="light"
           language="ru"
+          view="doctor"
           selectedRows={appointmentsSelected}
           outerBorder={false}
           services={{}}

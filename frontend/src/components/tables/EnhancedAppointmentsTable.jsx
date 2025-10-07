@@ -34,7 +34,8 @@ const EnhancedAppointmentsTable = ({
   onRowSelect,
   services = {},
   outerBorder = true,
-  showCheckboxes = true  // ✅ Новый проп для отключения чекбоксов
+  showCheckboxes = true,  // ✅ Новый проп для отключения чекбоксов
+  view = 'registrar'      // 'registrar' | 'doctor' — режим отображения
 }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterConfig, setFilterConfig] = useState({
@@ -52,6 +53,7 @@ const EnhancedAppointmentsTable = ({
   const selectedRows = externalSelectedRows || internalSelectedRows;
 
   const isDark = theme === 'dark';
+  const isDoctorView = String(view).toLowerCase() === 'doctor';
   
   // Цвета для темы
   // Используем консолидированную цветовую систему из tokens.js
@@ -1520,11 +1522,10 @@ const EnhancedAppointmentsTable = ({
                       gap: '4px',
                       flexWrap: 'wrap'
                     }}>
-                      {/* Оплата */}
-                      {(() => {
+                      {/* В режиме панели врача кнопки оплаты не показываем */}
+                      {!isDoctorView && (() => {
                         const status = (row.status || '').toLowerCase();
-                        const aymentStatus = (row.payment_status || '').toLowerCase();
-                        // Показываем кнопку оплаты если запись не оплачена
+                        const paymentStatus = (row.payment_status || '').toLowerCase();
                         return (
                           status === 'paid_pending' || 
                           paymentStatus === 'pending' || 
@@ -1533,11 +1534,11 @@ const EnhancedAppointmentsTable = ({
                           (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'cancelled')
                         );
                       })() && (
-                      <button
-                        className="action-button"
+                        <button
+                          className="action-button"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                          e.stopPropagation();
+                            e.stopPropagation();
                             onActionClick?.('payment', row, e);
                           }}
                           style={{
@@ -1557,7 +1558,7 @@ const EnhancedAppointmentsTable = ({
                       )}
                       
                       {/* Вызвать */}
-                      {row.status === 'queued' && (
+                      {(isDoctorView ? (row.status === 'queued' || row.payment_status === 'paid') : row.status === 'queued') && (
                         <button
                           className="action-button"
                           onMouseDown={(e) => {
