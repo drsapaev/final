@@ -429,7 +429,7 @@ def open_reception(
 @router.get("/registrar/queues/today")
 def get_today_queues(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "cardio", "derma", "dentist"))
 ):
     """
     Получить все очереди на сегодня для регистратуры
