@@ -428,23 +428,35 @@ def open_reception(
 
 @router.get("/registrar/queues/today")
 def get_today_queues(
+    target_date: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "cardio", "derma", "dentist"))
 ):
     """
-    Получить все очереди на сегодня для регистратуры
-    Из detail.md стр. 363: GET /api/queue/today?specialist_id
+    Получить все очереди на указанную дату для регистратуры
+    Из detail.md стр. 363: GET /api/queue/today?specialist_id&date=YYYY-MM-DD
     
     ОБНОВЛЕНО: Теперь получаем данные из Visit вместо DailyQueue
     Доступ: Admin, Registrar, Doctor, Lab
+    
+    Параметры:
+    - target_date: дата в формате YYYY-MM-DD (опционально, по умолчанию - сегодня)
     """
     try:
         from app.models.visit import Visit
         from app.models.appointment import Appointment
         from app.models.patient import Patient
         from app.models.clinic import Doctor
+        from datetime import datetime
         
-        today = date.today()
+        # Если дата не указана, используем сегодня
+        if target_date:
+            try:
+                today = datetime.strptime(target_date, '%Y-%m-%d').date()
+            except ValueError:
+                today = date.today()
+        else:
+            today = date.today()
         
         # Получаем все визиты на сегодня (новая система)
         visits = db.query(Visit).filter(
@@ -481,6 +493,8 @@ def get_today_queues(
                 queues_by_specialty[specialty]["doctor"] = visit.doctor
         
         # Обрабатываем Appointment (старая система)
+        # Подгружаем актуальный статус оплаты из payments при наличии
+        from app.models.payment import Payment
         for appointment in appointments:
             # Определяем специальность из appointment
             specialty = getattr(appointment, 'department', None) or "general"
@@ -574,7 +588,7 @@ def get_today_queues(
                         elif "registrar" in visit.confirmed_by.lower():
                             source = "confirmation"
                     
-                    # Определяем статус
+                    # Определяем статус визита в терминах очереди
                     status_mapping = {
                         "confirmed": "waiting",
                         "pending_confirmation": "waiting",
@@ -583,6 +597,28 @@ def get_today_queues(
                         "cancelled": "no_show"
                     }
                     entry_status = status_mapping.get(visit.status, "waiting")
+
+                    # Устойчивое определение факта оплаты по визиту
+                    is_paid = False
+                    try:
+                        v_status = (getattr(visit, 'status', None) or '').lower()
+                        if v_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                            is_paid = True
+                        elif getattr(visit, 'payment_processed_at', None):
+                            is_paid = True
+                        # Проверка записей оплаты в таблице payments по visit.id
+                        if not is_paid:
+                            try:
+                                payment_row = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
+                                if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+                                    is_paid = True
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                    if is_paid:
+                        discount_mode = 'paid'
                 
                 elif entry_type == "appointment":
                     # Обработка Appointment
@@ -623,12 +659,31 @@ def get_today_queues(
                     }
                     entry_status = status_mapping.get(appointment.status, "waiting")
                     
-                    # Определяем статус оплаты по статусу записи
-                    # В Appointment статус "paid" означает, что запись оплачена
-                    if appointment.status == "paid":
-                        discount_mode = "paid"
-                    else:
-                        discount_mode = appointment.visit_type if hasattr(appointment, 'visit_type') else "none"
+                    # Определяем статус оплаты по устойчивым признакам
+                    # paid, in_visit, completed/done считаем оплаченными (после оплаты на регистратуре)
+                    is_paid = False
+                    try:
+                        ap_status = (getattr(appointment, 'status', None) or '').lower()
+                        if ap_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                            is_paid = True
+                        # явные признаки оплаты по сумме/времени обработки
+                        elif (getattr(appointment, 'payment_amount', 0) or 0) > 0:
+                            is_paid = True
+                        elif getattr(appointment, 'payment_processed_at', None):
+                            is_paid = True
+                        # проверим таблицу payments по appointment.id (если связка через visit_id отсутствует — пропускаем)
+                        # попытка: ищем любой платёж с paid_at или статусом paid
+                        if not is_paid:
+                            try:
+                                payment_row = db.query(Payment).filter(Payment.visit_id == appointment.id).order_by(Payment.created_at.desc()).first()
+                                if payment_row and (payment_row.status.lower() == 'paid' or payment_row.paid_at):
+                                    is_paid = True
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                    discount_mode = "paid" if is_paid else (appointment.visit_type if hasattr(appointment, 'visit_type') else "none")
                     
                     source = "desk"  # Appointment обычно создается регистратором
                 

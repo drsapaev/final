@@ -291,6 +291,30 @@ const DentistPanelUnified = () => {
       case 'view':
         handleAppointmentRowClick(row);
         break;
+      case 'call': {
+        // Завершение приема аналогично кардио/дерма
+        (async () => {
+          try {
+            const token = localStorage.getItem('auth_token') || '';
+            if (!token) throw new Error('Нет токена');
+            const payload = { notes: 'Dentist: завершение приема' };
+            const res = await fetch(`http://localhost:8000/api/v1/doctor/queue/${row.id}/complete`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error(await res.text());
+            // Обновляем список
+            loadDentistryAppointments();
+          } catch (e) {
+            console.error('Ошибка завершения приема стоматолога:', e);
+          }
+        })();
+        break;
+      }
       case 'edit':
         // Логика редактирования записи
         break;

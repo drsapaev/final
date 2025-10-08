@@ -37,6 +37,15 @@ jobs:
         pip install requests
         pip install argon2-cffi
     
+    - name: Test server startup
+      run: |
+        cd backend
+        export DATABASE_URL="sqlite:///./clinic.db"
+        export CORS_DISABLE="1"
+        export WS_DEV_ALLOW="1"
+        echo "Тестируем запуск сервера..."
+        python test_server_startup.py
+    
     - name: Setup test database
       run: |
         cd backend
@@ -120,11 +129,44 @@ jobs:
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         echo "Запуск backend сервера..."
-        python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-        sleep 10
+        
+        # Запускаем сервер в фоне с перенаправлением вывода
+        nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        SERVER_PID=$!
+        echo "Сервер запущен с PID: $SERVER_PID"
+        
+        # Ждем больше времени для запуска
+        echo "Ожидание запуска сервера..."
+        sleep 15
+        
+        # Проверяем, что процесс еще работает
+        if ! kill -0 $SERVER_PID 2>/dev/null; then
+          echo "❌ Сервер не запустился"
+          echo "Логи сервера:"
+          cat server.log
+          exit 1
+        fi
+        
         echo "Проверка доступности сервера..."
-        curl -f http://127.0.0.1:8000/api/v1/health || exit 1
-        echo "Сервер успешно запущен"
+        # Пробуем несколько раз с задержкой
+        for i in {1..5}; do
+          echo "Попытка $i/5..."
+          if curl -f http://127.0.0.1:8000/api/v1/health; then
+            echo "✅ Сервер успешно запущен и отвечает"
+            break
+          else
+            echo "Попытка $i неудачна, ждем 3 секунды..."
+            sleep 3
+          fi
+        done
+        
+        # Финальная проверка
+        if ! curl -f http://127.0.0.1:8000/api/v1/health; then
+          echo "❌ Сервер не отвечает после всех попыток"
+          echo "Логи сервера:"
+          cat server.log
+          exit 1
+        fi
     
     - name: Run role system tests
       run: |
@@ -154,5 +196,10 @@ jobs:
       if: always()
       run: |
         echo "Останавливаем сервер..."
+        # Останавливаем по PID если он сохранен
+        if [ -n "$SERVER_PID" ]; then
+          kill $SERVER_PID 2>/dev/null || true
+        fi
+        # Дополнительная очистка процессов uvicorn
         pkill -f "uvicorn.*8000" 2>/dev/null || true
         echo "OK: Сервер остановлен"
