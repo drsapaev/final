@@ -10,7 +10,7 @@ on:
   workflow_dispatch:  # Ручной запуск
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.11.10'
   NODE_VERSION: '20'
   DATABASE_URL: 'sqlite:///./clinic.db'
   CORS_DISABLE: '1'
