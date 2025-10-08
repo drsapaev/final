@@ -9,9 +9,9 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 10
     reviewers:
-      - "admin"
+      - "drsapaev"
     assignees:
-      - "admin"
+      - "drsapaev"
     commit-message:
       prefix: "deps"
       include: "scope"
@@ -28,9 +28,9 @@ updates:
       time: "10:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "admin"
+      - "drsapaev"
     assignees:
-      - "admin"
+      - "drsapaev"
     commit-message:
       prefix: "ci"
       include: "scope"
@@ -38,21 +38,29 @@ updates:
       - "dependencies"
       - "github-actions"
       
-  # Обновление Docker образов (если понадобится)
+  # Обновление Docker образов
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/ops"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "11:00"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
     reviewers:
-      - "admin"
+      - "drsapaev"
     assignees:
-      - "admin"
+      - "drsapaev"
     commit-message:
       prefix: "docker"
       include: "scope"
     labels:
       - "dependencies"
       - "docker"
+    # Игнорировать определенные обновления для стабильности
+    ignore:
+      # Игнорировать обновления Python до стабильной версии
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+      # Игнорировать обновления Node.js до стабильной версии  
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
