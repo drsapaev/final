@@ -58,9 +58,9 @@ updates:
       - "docker"
     # Игнорировать определенные обновления для стабильности
     ignore:
-      # Игнорировать обновления Python до стабильной версии
+      # Игнорировать обновления Python до стабильной версии (3.14.0 нестабильна)
       - dependency-name: "python"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       # Игнорировать обновления Node.js до стабильной версии  
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
