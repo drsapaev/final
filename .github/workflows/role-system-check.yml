@@ -43,7 +43,11 @@ jobs:
         export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
+        # Ensure Python can import 'app' package
+        echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_ENV
+        export PYTHONPATH="${{ github.workspace }}/backend:$PYTHONPATH"
         echo "Тестируем запуск сервера..."
+        python -c "import sys; print('sys.path[0:3]=', sys.path[0:3])"
         python test_server_startup.py
     
     - name: Setup test database
