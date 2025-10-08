@@ -458,6 +458,8 @@ const RegistrarPanel = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Язык (тема теперь централизована)
   const [language, setLanguage] = useState(() => localStorage.getItem('ui_lang') || 'ru');
@@ -1138,8 +1140,26 @@ const RegistrarPanel = () => {
       
       console.log('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
 
-      // Используем новый эндпоинт для получения очередей на сегодня
-      const response = await fetch(`${API_BASE}/api/v1/registrar/queues/today${activeTab ? `?department=${activeTab}` : ''}`, {
+      // Используем новый эндпоинт для получения очередей на указанную дату
+      // Если календарь открыт, используем historyDate, иначе сегодня
+      const dateParam = showCalendar && historyDate ? historyDate : new Date().toISOString().split('T')[0];
+      console.log('📅 Параметры для loadAppointments:', {
+        showCalendar,
+        historyDate,
+        dateParam,
+        activeTab
+      });
+      
+      const params = new URLSearchParams();
+      if (activeTab) params.append('department', activeTab);
+      params.append('target_date', dateParam);
+      
+      const queryString = params.toString();
+      const url = `${API_BASE}/api/v1/registrar/queues/today${queryString ? `?${queryString}` : ''}`;
+      
+      console.log('🔍 loadAppointments: requesting URL:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -1372,6 +1392,7 @@ const RegistrarPanel = () => {
             setDataSource(prev => (prev === 'api' ? prev : 'api'));
           });
           console.debug('✅ Загружены и обогащены данные из API:', enriched.length, 'записей');
+          console.log('📊 Загруженные данные для даты', dateParam, ':', enriched);
           console.log('💾 Первая запись после обогащения:', enriched[0]);
         } else {
           // API вернул пустой массив - показываем демо-данные с учетом оверрайдов
@@ -1475,7 +1496,7 @@ const RegistrarPanel = () => {
     } finally {
       if (!silent) setAppointmentsLoading(false);
     }
-  }, [enrichAppointmentsWithPatientData]);
+  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab]);
 
   // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
   const initialLoadRef = useRef(false);
@@ -1491,10 +1512,28 @@ const RegistrarPanel = () => {
   // Перезагружаем данные при изменении фильтров
   useEffect(() => {
     if (initialLoadRef.current) {
-      console.log('🔄 Фильтры изменились, перезагружаем данные...');
-      loadAppointments({ silent: true });
+      console.log('🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)');
+      // Не перезагружаем данные - фильтрация происходит на клиенте через useMemo filteredAppointments
     }
-  }, [searchDate, searchQuery, statusFilter, loadAppointments]);
+  }, [searchQuery, statusFilter]);
+
+  // Перезагружаем данные при изменении даты в календаре
+  useEffect(() => {
+    if (showCalendar && historyDate && initialLoadRef.current) {
+      console.log('📅 Дата календаря изменилась на:', historyDate);
+      loadAppointments({ silent: false });
+    }
+  }, [historyDate, showCalendar, loadAppointments]);
+
+  // Отслеживаем изменения в appointments для отладки
+  useEffect(() => {
+    console.log('🔔 appointments state изменился:', {
+      count: appointments.length,
+      showCalendar,
+      historyDate,
+      first3: appointments.slice(0, 3).map(a => ({ id: a.id, fio: a.patient_fio, date: a.appointment_date }))
+    });
+  }, [appointments, showCalendar, historyDate]);
 
   // Функция для загрузки дополнительных записей
   const loadMoreAppointments = useCallback(async () => {
@@ -1661,11 +1700,12 @@ const RegistrarPanel = () => {
     
     const id = setInterval(() => {
       // Загружаем только записи тихо, без смены индикаторов
+      console.log('⏰ Автообновление: вызов loadAppointments');
       loadAppointments({ silent: true });
     }, 15000);
     
     return () => clearInterval(id);
-  }, [autoRefresh, showWizard, paymentDialog.open, printDialog.open, cancelDialog.open]);
+  }, [autoRefresh, showWizard, paymentDialog.open, printDialog.open, cancelDialog.open, loadAppointments]);
 
   // Функции для жесткого потока
   const handleStartVisit = async (appointment) => {
@@ -2347,6 +2387,13 @@ const RegistrarPanel = () => {
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
 
   const filteredAppointments = useMemo(() => {
+    console.log('🔍 filteredAppointments useMemo запущен:', {
+      appointmentsCount: appointments.length,
+      activeTab,
+      statusFilter,
+      searchQuery
+    });
+    
     // Если выбрана конкретная вкладка (не "Все отделения"), используем обычную фильтрацию
     if (activeTab) {
       const filtered = appointments.filter(appointment => {
@@ -2378,12 +2425,13 @@ const RegistrarPanel = () => {
         return true;
       });
 
+      console.log('🔍 Результат фильтрации для вкладки', activeTab, ':', filtered.length, 'записей');
       return filtered;
     }
 
     // Для вкладки "Все отделения" (activeTab === null) - агрегируем пациентов
     if (!activeTab) {
-      // Сначала фильтруем по статусу и дате, если заданы
+      // Сначала фильтруем по статусу, если задан
       let filtered = appointments.filter(appointment => {
         // Фильтр по статусу (если задан)
         if (statusFilter && appointment.status !== statusFilter) return false;
@@ -2421,7 +2469,7 @@ const RegistrarPanel = () => {
     }
 
     return appointments;
-  }, [appointments, activeTab, searchDate, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments]);
+  }, [appointments, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments]);
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   const DataSourceIndicator = memo(({ count }) => {
@@ -2862,20 +2910,18 @@ const RegistrarPanel = () => {
                             fontWeight: '500',
                             cursor: 'pointer',
                             pointerEvents: 'auto',
-                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            background: showCalendar ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                             color: 'white',
                             border: 'none',
                             boxShadow: '0 2px 4px 0 rgba(245, 158, 11, 0.3)',
                             transition: 'all 0.2s ease'
                           }}
                           onClick={(e) => {
-                            console.log('Кнопка "Записи на сегодня" нажата');
-                            // Переходим к основной таблице с фильтром по сегодняшней дате
-                            const today = new Date().toISOString().split('T')[0];
-                            window.location.href = `/registrar-panel?date=${today}`;
+                            console.log('Кнопка "Календарь" нажата');
+                            setShowCalendar(!showCalendar);
                           }}
                         >
-                          📅 Записи на сегодня
+                          📅 Календарь
                         </button>
                         
                         <button 
@@ -2999,16 +3045,144 @@ const RegistrarPanel = () => {
                           🔄 Обновить данные
                         </button>
                       </div>
+                      
+                      {/* Календарный виджет */}
+                      {showCalendar && (
+                        <div style={{
+                          marginTop: '16px',
+                          padding: '16px',
+                          background: theme === 'light' ? 'white' : '#1f2937',
+                          borderRadius: '12px',
+                          border: `1px solid ${theme === 'light' ? '#e9ecef' : '#4b5563'}`,
+                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px'
+                          }}>
+                            <label style={{
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              color: textColor,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              📅 Выберите дату для просмотра истории:
+                            </label>
+                            <input
+                              type="date"
+                              value={historyDate}
+                              onChange={(e) => {
+                                setHistoryDate(e.target.value);
+                                console.log('Выбрана дата:', e.target.value);
+                              }}
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                border: `1px solid ${theme === 'light' ? '#d1d5db' : '#4b5563'}`,
+                                background: theme === 'light' ? 'white' : '#374151',
+                                color: textColor,
+                                cursor: 'pointer'
+                              }}
+                            />
+                            <div style={{
+                              display: 'flex',
+                              gap: '8px',
+                              flexWrap: 'wrap'
+                            }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const today = new Date().toISOString().split('T')[0];
+                                  setHistoryDate(today);
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                  color: textColor,
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Сегодня
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const yesterday = new Date();
+                                  yesterday.setDate(yesterday.getDate() - 1);
+                                  setHistoryDate(yesterday.toISOString().split('T')[0]);
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                  color: textColor,
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Вчера
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const weekAgo = new Date();
+                                  weekAgo.setDate(weekAgo.getDate() - 7);
+                                  setHistoryDate(weekAgo.toISOString().split('T')[0]);
+                                }}
+                                style={{
+                                  padding: '8px 12px',
+                                  borderRadius: '6px',
+                                  fontSize: '13px',
+                                  background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                  color: textColor,
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Неделю назад
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </AnimatedTransition>
                 </div>
               </AnimatedTransition>
 
-              {/* Недавние записи */}
+              {/* История записей */}
                 <div>
-                  <h3 style={{ fontSize: '20px', marginBottom: '16px', color: accentColor }}>
-                    📋 Недавние записи
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                    <h3 style={{ fontSize: '20px', margin: 0, color: accentColor }}>
+                      📋 История записей
+                    </h3>
+                    {showCalendar && (
+                      <div style={{
+                        padding: '8px 16px',
+                        background: theme === 'light' ? '#f3f4f6' : '#374151',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: textColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        📅 {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
                   <div style={{ 
                     background: cardBg,
                     border: `1px solid ${borderColor}`,
@@ -3032,9 +3206,9 @@ const RegistrarPanel = () => {
               <div style={{
                 padding: '60px 20px',
                 textAlign: 'center',
-                background: colors.cardBg,
+                background: cardBg,
                 borderRadius: '12px',
-                border: `1px solid ${colors.border}`
+                border: `1px solid ${borderColor}`
               }}>
                 <div style={{
                   fontSize: '48px',
@@ -3046,14 +3220,14 @@ const RegistrarPanel = () => {
                 <h3 style={{
                   fontSize: '20px',
                   fontWeight: '600',
-                  color: colors.textPrimary,
+                  color: textColor,
                   marginBottom: '8px'
                 }}>
                   Очередь пуста
                 </h3>
                 <p style={{
                   fontSize: '14px',
-                  color: colors.textSecondary,
+                  color: textColor,
                   marginBottom: '24px'
                 }}>
                   {activeTab 
