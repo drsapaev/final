@@ -275,10 +275,10 @@ const CardiologistPanelUnified = () => {
         notes: visitData.notes
       };
 
-      const response = await fetch(`/api/v1/doctor/queue/${selectedPatient.id}/complete`, {
+      const response = await fetch(`http://localhost:8000/api/v1/doctor/queue/${selectedPatient.id}/complete`, {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(visitPayload)
