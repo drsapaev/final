@@ -46,8 +46,22 @@ jobs:
         # Ensure Python can import 'app' package
         echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_ENV
         export PYTHONPATH="${{ github.workspace }}/backend:$PYTHONPATH"
-        echo "Тестируем запуск сервера..."
+        
+        echo "🔍 Диагностика окружения..."
+        echo "Python version: $(python --version)"
+        echo "Python path: $(which python)"
+        echo "PYTHONPATH: $PYTHONPATH"
+        echo "Current directory: $(pwd)"
+        echo "Files in current directory:"
+        ls -la
+        
+        echo "🔍 Проверка установленных пакетов..."
         python -c "import sys; print('sys.path[0:3]=', sys.path[0:3])"
+        python -c "import fastapi; print('FastAPI version:', fastapi.__version__)"
+        python -c "import uvicorn; print('Uvicorn version:', uvicorn.__version__)"
+        python -c "import sqlalchemy; print('SQLAlchemy version:', sqlalchemy.__version__)"
+        
+        echo "🔍 Тестируем запуск сервера..."
         python test_server_startup.py
     
     - name: Setup test database

@@ -64,6 +64,7 @@ def get_registrar_services(
                 # ✅ НОВЫЕ ПОЛЯ ДЛЯ КЛАССИФИКАЦИИ
                 "category_code": getattr(service, 'category_code', None),
                 "service_code": getattr(service, 'service_code', None),
+                "queue_tag": getattr(service, 'queue_tag', None),  # 🎯 ДОБАВЛЯЕМ queue_tag ДЛЯ ЭКГ!
                 "is_consultation": getattr(service, 'is_consultation', False),  # Добавляем поле is_consultation
                 "group": None  # Добавим группу для frontend
             }

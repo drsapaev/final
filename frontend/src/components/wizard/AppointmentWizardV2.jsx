@@ -345,59 +345,17 @@ const AppointmentWizardV2 = ({
     }
   };
   
-  // Фильтрация услуг по выбранным врачам
+  // 🔧 УПРОЩЕННАЯ ФИЛЬТРАЦИЯ: Показываем все услуги без привязки к врачам
   const filterServices = (allServices, cartItems) => {
-    if (!showAllServices) {
-      // Если корзина пуста - показываем только основные консультации
-      if (cartItems.length === 0) {
-        const basicServices = allServices.filter(service => 
-          service.name.toLowerCase().includes('консультация') ||
-          service.service_code === 'K01' || // Консультация кардиолога
-          service.service_code === 'D01' || // Консультация дерматолога  
-          service.service_code === 'S01'    // Консультация стоматолога
-        );
-        setFilteredServices(basicServices);
-        return;
-      }
-      
-      // Если в корзине есть услуги - показываем только основные услуги выбранных врачей
-      const selectedDoctorIds = [...new Set(cartItems.map(item => item.doctor_id).filter(Boolean))];
-      
-      if (selectedDoctorIds.length > 0) {
-        const filtered = [];
-        
-        selectedDoctorIds.forEach(doctorId => {
-          const doctor = doctorsData.find(d => d.id === doctorId);
-          if (doctor) {
-            const categoryCode = getDoctorCategoryCode(doctor.specialty);
-            
-            // Показываем только основные услуги каждого врача (максимум 5-6 услуг)
-            const doctorServices = allServices.filter(service => 
-              service.category_code === categoryCode && service.requires_doctor
-            ).slice(0, 6); // Ограничиваем до 6 услуг на врача
-            
-            filtered.push(...doctorServices);
-          }
-        });
-        
-        // Добавляем основные лабораторные (без врача) - только самые популярные
-        const basicLab = allServices.filter(service => 
-          !service.requires_doctor && service.category_code === 'L' && (
-            service.service_code === 'L01' || // Общий анализ крови
-            service.service_code === 'L11' || // Глюкоза
-            service.service_code === 'L25' || // Общий анализ мочи
-            service.service_code === 'L30' || // HBsAg
-            service.service_code === 'L31' || // HCV
-            service.service_code === 'L32'    // HIV
-          )
-        );
-        
-        filtered.push(...basicLab);
-        setFilteredServices(filtered);
-        return;
-      }
+    
+    // Если нет услуг, показываем пустой массив
+    if (!Array.isArray(allServices) || allServices.length === 0) {
+      setFilteredServices([]);
+      return;
     }
     
+    // 🎯 НОВАЯ ЛОГИКА: Всегда показываем ВСЕ услуги
+    // Пользователь может выбирать любые услуги независимо от врачей
     setFilteredServices(allServices);
   };
   
@@ -780,12 +738,21 @@ const AppointmentWizardV2 = ({
     const service = servicesData.find(s => s.id === serviceId);
     
     if (!service) {
+      console.warn(`⚠️ Услуга ${serviceId} не найдена в servicesData`);
       return 'general';
+    }
+    
+    console.log(`🔍 getDepartmentByService: serviceId=${serviceId}, queue_tag=${service.queue_tag}, category_code=${service.category_code}`);
+    
+    // 🎯 СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ЭКГ: отдельный кабинет!
+    if (service.queue_tag === 'ecg') {
+      console.log(`✅ ЭКГ обнаружено! Возвращаем department='echokg'`);
+      return 'echokg';  // ЭКГ в отдельном кабинете (соответствует вкладке 'echokg')
     }
     
     // ✅ ИСПРАВЛЕННЫЙ МАППИНГ - соответствует вкладкам RegistrarPanel
     const mapping = {
-      'K': 'cardiology',    // Кардиология → вкладка cardio
+      'K': 'cardiology',    // Кардиология → вкладка cardio (БЕЗ ЭКГ!)
       'D': 'dermatology',   // Дерматология → вкладка derma (только консультации)
       'S': 'dentistry',     // Стоматология → вкладка dental
       'L': 'laboratory',    // Лаборатория → вкладка lab
@@ -795,7 +762,9 @@ const AppointmentWizardV2 = ({
       'O': 'procedures'     // Прочие процедуры → вкладка procedures
     };
     
-    return mapping[service.category_code] || 'general';
+    const result = mapping[service.category_code] || 'general';
+    console.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${service.category_code}, department=${result}`);
+    return result;
   };
   
   // ===================== ДЕЙСТВИЯ ДИАЛОГА =====================
