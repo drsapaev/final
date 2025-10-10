@@ -24,6 +24,7 @@ const ModernStatistics = ({
   appointments = [],
   departmentStats = {},
   language = 'ru',
+  selectedDate = null, // YYYY-MM-DD, если не передан — используется сегодня
   onExport,
   onRefresh,
   className = '',
@@ -64,26 +65,29 @@ const ModernStatistics = ({
 
   // Вычисление статистики
   const statistics = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayAppointments = appointments.filter(apt => {
+    const targetDate = selectedDate || new Date().toISOString().split('T')[0];
+    const dayAppointments = appointments.filter(apt => {
       const aptDate = apt.date || apt.appointment_date;
-      return aptDate === today;
+      return aptDate === targetDate;
     });
 
-    const completedToday = todayAppointments.filter(apt => 
+    // Завершенные визиты за выбранный день
+    const completedToday = dayAppointments.filter(apt => 
       apt.status === 'completed' || apt.status === 'done'
     );
 
-    const pendingPayments = appointments.filter(apt => 
+    // Ожидают оплаты за выбранный день
+    const pendingPayments = dayAppointments.filter(apt => 
       apt.status === 'paid_pending' || apt.payment_status === 'pending'
     );
 
-    const totalRevenue = completedToday.reduce((sum, apt) => 
-      sum + (apt.payment_amount || apt.cost || 0), 0
-    );
+    // Выручка: суммируем оплаченные записи (по payment_status), а не только завершенные
+    const totalRevenue = dayAppointments
+      .filter(apt => apt.payment_status === 'paid')
+      .reduce((sum, apt) => sum + (apt.payment_amount || apt.cost || 0), 0);
 
     // Уникальные пациенты
-    const uniquePatients = new Set(appointments.map(apt => apt.patient_id)).size;
+    const uniquePatients = new Set(dayAppointments.map(apt => apt.patient_id)).size;
 
     // Среднее время ожидания (мок)
     const averageWaitTime = Math.floor(Math.random() * 30) + 10;
@@ -105,7 +109,7 @@ const ModernStatistics = ({
 
     return {
       totalPatients: uniquePatients,
-      todayAppointments: todayAppointments.length,
+      todayAppointments: dayAppointments.length,
       completedToday: completedToday.length,
       pendingPayments: pendingPayments.length,
       revenue: totalRevenue,
@@ -113,7 +117,7 @@ const ModernStatistics = ({
       trends,
       trendValues
     };
-  }, [appointments]);
+  }, [appointments, selectedDate]);
 
   // Анимация счетчиков
   useEffect(() => {

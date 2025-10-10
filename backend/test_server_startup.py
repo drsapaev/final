@@ -99,6 +99,15 @@ def main():
     print("🚀 Запуск тестов сервера...")
     print("=" * 50)
     
+    # Диагностика окружения
+    print("🔍 Диагностика окружения:")
+    print(f"  Python version: {sys.version}")
+    print(f"  Current working directory: {os.getcwd()}")
+    print(f"  PYTHONPATH: {os.environ.get('PYTHONPATH', 'не установлен')}")
+    print(f"  DATABASE_URL: {os.environ.get('DATABASE_URL', 'не установлен')}")
+    print(f"  CORS_DISABLE: {os.environ.get('CORS_DISABLE', 'не установлен')}")
+    print(f"  WS_DEV_ALLOW: {os.environ.get('WS_DEV_ALLOW', 'не установлен')}")
+    
     tests = [
         test_imports,
         test_database_connection,
@@ -111,10 +120,16 @@ def main():
     
     for test in tests:
         try:
+            print(f"\n🔍 Запуск теста: {test.__name__}")
             if test():
                 passed += 1
+                print(f"✅ Тест {test.__name__} прошел успешно")
+            else:
+                print(f"❌ Тест {test.__name__} не прошел")
         except Exception as e:
-            print(f"  ❌ Тест {test.__name__} упал: {e}")
+            print(f"❌ Тест {test.__name__} упал с ошибкой: {e}")
+            print("Детали ошибки:")
+            traceback.print_exc()
     
     print("\n" + "=" * 50)
     print(f"📊 Результаты: {passed}/{total} тестов прошли")
@@ -124,6 +139,7 @@ def main():
         return 0
     else:
         print("❌ Некоторые тесты не прошли")
+        print("🔍 Рекомендуется проверить логи выше для диагностики")
         return 1
 
 if __name__ == "__main__":

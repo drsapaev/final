@@ -724,7 +724,7 @@ const RegistrarPanel = () => {
 
   // Контейнер таблицы, визуально "сливается" с вкладками
   const tableContainerStyle = {
-    background: theme === 'light'
+    background: theme === 'light' 
       ? 'rgba(255, 255, 255, 0.98)'
       : 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(20px)',
@@ -963,12 +963,12 @@ const RegistrarPanel = () => {
 
       if (doctorsRes.ok) {
         try {
-          const doctorsData = await doctorsRes.json();
-          const apiDoctors = doctorsData.doctors || [];
+        const doctorsData = await doctorsRes.json();
+        const apiDoctors = doctorsData.doctors || [];
           console.log('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
           // Если API вернул данные — используем их
-          if (apiDoctors.length > 0) {
-            setDoctors(apiDoctors);
+        if (apiDoctors.length > 0) {
+          setDoctors(apiDoctors);
             console.log('✅ Врачи обновлены из API');
           }
         } catch (error) {
@@ -980,12 +980,12 @@ const RegistrarPanel = () => {
 
       if (servicesRes.ok) {
         try {
-          const servicesData = await servicesRes.json();
-          const apiServices = servicesData.services_by_group || {};
+        const servicesData = await servicesRes.json();
+        const apiServices = servicesData.services_by_group || {};
           console.log('✅ Данные услуг получены:', Object.keys(apiServices));
           // Если API вернул данные — используем их
-          if (Object.keys(apiServices).length > 0) {
-            setServices(apiServices);
+        if (Object.keys(apiServices).length > 0) {
+          setServices(apiServices);
             console.log('✅ Услуги обновлены из API');
           }
         } catch (error) {
@@ -997,8 +997,8 @@ const RegistrarPanel = () => {
 
       if (queueRes.ok) {
         try {
-          const queueData = await queueRes.json();
-          setQueueSettings(queueData);
+        const queueData = await queueRes.json();
+        setQueueSettings(queueData);
           console.log('✅ Настройки очереди обновлены из API');
         } catch (error) {
           console.warn('Ошибка обработки данных настроек очереди:', error.message);
@@ -1008,10 +1008,10 @@ const RegistrarPanel = () => {
       }
 
       console.log('🎯 Загрузка интегрированных данных завершена');
-    } catch (fetchError) {
-      // Backend недоступен - используем демо-данные (уже установлены выше)
-      console.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
-    }
+      } catch (fetchError) {
+        // Backend недоступен - используем демо-данные (уже установлены выше)
+        console.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+      }
 
     } catch (error) {
       console.error('Ошибка загрузки интегрированных данных:', error);
@@ -1791,9 +1791,9 @@ const RegistrarPanel = () => {
       const realId = appointment.id;
       
       console.log('Попытка оплатить записи:', recordsToUpdate.map(r => r.id), 'Тип записи:', recordType);
-
+      
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-
+      
       // Используем первую запись для создания платежа (она содержит правильный record_type и ID)
       const paymentRecord = recordsToUpdate[0];
       const paymentRecordType = paymentRecord.record_type || (paymentRecord.id >= 20000 ? 'visit' : 'appointment');
@@ -1826,7 +1826,7 @@ const RegistrarPanel = () => {
       if (response.ok) {
         const updatedAppointment = await response.json();
         console.log('Успешный ответ:', updatedAppointment);
-
+        
         console.log('✅ Оплата успешна, обновляем локальное состояние для всех записей пациента');
         console.log('Обновляем записи:', recordsToUpdate.map(r => r.id));
 
@@ -1834,30 +1834,30 @@ const RegistrarPanel = () => {
         recordsToUpdate.forEach(record => {
           const recordWithQueuedStatus = {
             ...record,
-            status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
-            payment_status: 'paid',
-            _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
-          };
-
+          status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
+          payment_status: 'paid',
+          _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
+        };
+        
           // Сохраняем локальный оверрайд для каждой записи
-          try {
-            const overridesRaw = localStorage.getItem('appointments_local_overrides');
-            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+        try {
+          const overridesRaw = localStorage.getItem('appointments_local_overrides');
+          const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
             overrides[String(record.id)] = {
               status: recordWithQueuedStatus.status,
               payment_status: recordWithQueuedStatus.payment_status,
-              // TTL 10 минут
-              expiresAt: Date.now() + 10 * 60 * 1000
-            };
-            localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
-          } catch(_) {
-          // Игнорируем ошибки парсинга JSON
-        }
+            // TTL 10 минут
+            expiresAt: Date.now() + 10 * 60 * 1000
+          };
+          localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
+        } catch(_) {
+        // Игнорируем ошибки парсинга JSON
+      }
 
           // Обновляем состояние для каждой записи
-          setAppointments(prev => prev.map(apt => (
+        setAppointments(prev => prev.map(apt => (
             apt.id === record.id ? recordWithQueuedStatus : apt
-          )));
+        )));
         });
 
         toast.success(`Оплачено ${recordsToUpdate.length} записей пациента и добавлены в очередь!`);
@@ -2194,7 +2194,7 @@ const RegistrarPanel = () => {
     // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
     const departmentCategoryMapping = {
       'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
-      'echokg': ['ECG'],         // ЭКГ - отдельная категория (только ЭКГ)
+      'echokg': ['ECG'],         // 🎯 ЭКГ - отдельная категория (возвращается getServiceCategoryByCode!)
       'derma': ['D', 'DERM', 'DERM_PROC'],            // Дерматология: консультация и дерм. процедуры
       'dental': ['S', 'DENT', 'STOM'],           // Стоматология: консультация, рентген
       'lab': ['L'],              // Лаборатория: все лабораторные услуги
@@ -2207,7 +2207,7 @@ const RegistrarPanel = () => {
     // Маппинг кодов услуг к категориям (обновлен согласно новым требованиям)
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
-
+      
       // ЭКГ - отдельная категория (только ЭКГ)
       if (serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
 
@@ -2243,10 +2243,10 @@ const RegistrarPanel = () => {
       if (serviceCode.startsWith('COSM_')) return 'C';  // Косметология
       if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
       if (serviceCode.startsWith('DERM_PROC_') || serviceCode.startsWith('DERM_')) return 'D_PROC';  // Дерматологические процедуры
-
+      
       // Дополнительные паттерны для кардиологии
       if (serviceCode.startsWith('CARD_') && !serviceCode.includes('ECG')) return 'K';
-
+      
       return null;
     };
     
@@ -2396,16 +2396,16 @@ const RegistrarPanel = () => {
     
     // Если выбрана конкретная вкладка (не "Все отделения"), используем обычную фильтрацию
     if (activeTab) {
-      const filtered = appointments.filter(appointment => {
-        // Фильтр по вкладке (отдел)
+    const filtered = appointments.filter(appointment => {
+      // Фильтр по вкладке (отдел)
         if (!isInDepartment(appointment, activeTab)) {
-          return false;
-        }
+        return false;
+      }
         // Фильтр по статусу (если задан)
-        if (statusFilter && appointment.status !== statusFilter) return false;
+      if (statusFilter && appointment.status !== statusFilter) return false;
         // Поиск по ФИО/телефону/услугам/ID записи (если задан)
-        if (searchQuery) {
-          const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
+      if (searchQuery) {
+        const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
 
           // Поиск по ID записи
           const inId = String(appointment.id).includes(searchQuery);
@@ -2419,14 +2419,14 @@ const RegistrarPanel = () => {
                          phoneDigits.includes(searchDigits) ||
                          (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
 
-          const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
+        const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
           if (!inFio && !inPhone && !inServices && !inId) return false;
-        }
-        return true;
-      });
+      }
+    return true;
+  });
 
       console.log('🔍 Результат фильтрации для вкладки', activeTab, ':', filtered.length, 'записей');
-      return filtered;
+    return filtered;
     }
 
     // Для вкладки "Все отделения" (activeTab === null) - агрегируем пациентов
@@ -2749,6 +2749,7 @@ const RegistrarPanel = () => {
                 appointments={appointments}
                 departmentStats={departmentStats}
                 language={language}
+                selectedDate={showCalendar && historyDate ? historyDate : new Date().toISOString().split('T')[0]}
                 onExport={() => {
                   console.log('Экспорт статистики');
                 }}
@@ -3166,7 +3167,7 @@ const RegistrarPanel = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                     <h3 style={{ fontSize: '20px', margin: 0, color: accentColor }}>
                       📋 История записей
-                    </h3>
+                  </h3>
                     {showCalendar && (
                       <div style={{
                         padding: '8px 16px',
@@ -3712,7 +3713,7 @@ const RegistrarPanel = () => {
       />
 
       {/* ✅ Используется только новый мастер (V2) */}
-      <AppointmentWizardV2
+          <AppointmentWizardV2
             isOpen={showWizard}
             onClose={() => {
               console.log('AppointmentWizardV2 closing');
