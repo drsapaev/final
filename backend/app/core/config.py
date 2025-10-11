@@ -27,7 +27,12 @@ class Settings(BaseSettings):
 
     # --- CORS (при необходимости) ---
     BACKEND_CORS_ORIGINS: list[str] = Field(
-        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+        default_factory=lambda: [
+            "http://localhost:5173", 
+            "http://127.0.0.1:5173",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080"
+        ]
     )
 
     # --- Queue / Time ---
@@ -39,6 +44,19 @@ class Settings(BaseSettings):
     APP_NAME: str = "Clinic Manager"
     APP_VERSION: str = "0.9.0"
     ENV: str = "dev"
+    
+    # --- MCP Settings ---
+    MCP_ENABLED: bool = True
+    MCP_LOG_REQUESTS: bool = True
+    MCP_FALLBACK_TO_DIRECT: bool = True
+    MCP_REQUEST_TIMEOUT: int = 30  # seconds
+    MCP_HEALTH_CHECK_INTERVAL: int = 60  # seconds
+    MCP_MAX_BATCH_SIZE: int = 10
+
+    # --- AI Provider API Keys ---
+    OPENAI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    DEEPSEEK_API_KEY: Optional[str] = None
 
     # --- Printing / PDF ---
     PDF_FOOTER_ENABLED: bool = True

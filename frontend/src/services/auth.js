@@ -129,3 +129,10 @@ export const authService = {
     return user.role === requiredRoles;
   }
 };
+
+/**
+ * Получение токена авторизации
+ */
+export const getAuthToken = () => {
+  return localStorage.getItem('auth_token') || localStorage.getItem('token');
+};

@@ -29,13 +29,15 @@ import {
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { apiClient } from '../../api/client';
+import { mcpAPI } from '../../api/mcpClient';
 
 const AIAssistant = ({ 
   analysisType, 
   data, 
   onResult,
   title = "AI Ассистент",
-  expanded = true 
+  expanded = true,
+  useMCP = true  // Использовать MCP по умолчанию
 }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -54,10 +56,28 @@ const AIAssistant = ({
 
       switch (analysisType) {
         case 'complaint':
-          response = await apiClient.post('/api/v1/ai/complaint-to-plan', {
-            ...data,
-            ...config
-          });
+          if (useMCP) {
+            // Используем MCP для анализа жалоб
+            const mcpResult = await mcpAPI.analyzeComplaint({
+              complaint: data.complaint,
+              patientAge: data.patient_age,
+              patientGender: data.patient_gender,
+              provider: provider
+            });
+            
+            if (mcpResult.status === 'success') {
+              response = { data: mcpResult.data };
+            } else {
+              throw new Error(mcpResult.error || 'MCP analysis failed');
+            }
+          } else {
+            // Используем прямой API
+            response = await apiClient.post('/api/v1/ai/complaint-to-plan', {
+              ...data,
+              ...config,
+              use_mcp: false
+            });
+          }
           break;
 
         case 'icd10':

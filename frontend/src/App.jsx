@@ -88,6 +88,9 @@ function AppShell() {
                      path === '/cashier-panel' || 
                      path.startsWith('/admin');
   
+  // Полноэкранный режим для кардиолога
+  const isFullscreen = path === '/cardiologist';
+
   return (
     <div style={wrapStyle}>
       {/* Хедер на весь экран для всех панелей (новая версия) */}
@@ -96,7 +99,18 @@ function AppShell() {
       </header>
       <div style={{ display: 'grid', gridTemplateColumns: hideSidebar ? '1fr' : '240px 1fr' }}>
         {!hideSidebar && <Sidebar />}
-        <main style={{ ...main, ...(hideSidebar && { maxWidth: 'none', margin: 0, padding: 0 }) }}>
+        <main style={{
+          ...main,
+          ...(hideSidebar && { maxWidth: 'none', margin: 0, padding: 0 }),
+          ...(isFullscreen && {
+            maxWidth: 'none',
+            margin: 0,
+            padding: 0,
+            width: '100%',
+            minWidth: '100%',
+            overflow: 'visible'
+          })
+        }}>
           <Outlet />
         </main>
       </div>

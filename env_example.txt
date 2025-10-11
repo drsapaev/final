@@ -1,0 +1,33 @@
+# AI Provider API Keys
+# Получите ключи на соответствующих сайтах:
+# OpenAI: https://platform.openai.com/api-keys
+# Google Gemini: https://makersuite.google.com/app/apikey
+# DeepSeek: https://platform.deepseek.com/api_keys
+
+# OpenAI (рекомендуется для медицинских задач)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Google Gemini (бесплатный, хорошее качество)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# DeepSeek (дешевый, хорошее качество)
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+# MCP Settings
+MCP_ENABLED=true
+MCP_LOG_REQUESTS=true
+MCP_FALLBACK_TO_DIRECT=true
+MCP_REQUEST_TIMEOUT=30
+MCP_HEALTH_CHECK_INTERVAL=60
+MCP_MAX_BATCH_SIZE=10
+
+# Database
+DATABASE_URL=sqlite:///./clinic.db
+
+# Auth
+SECRET_KEY=dev-secret-key-for-clinic-management-system-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
+
+# CORS
+BACKEND_CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8080","http://127.0.0.1:8080"]

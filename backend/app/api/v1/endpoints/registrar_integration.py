@@ -21,7 +21,8 @@ def get_registrar_services(
     specialty: Optional[str] = Query(None, description="Фильтр по специальности"),
     active_only: bool = Query(True, description="Только активные услуги"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    # Разрешаем доступ также профильным ролям врачей
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Lab"))
 ):
     """
     Получить услуги для регистратуры из справочника админ панели
@@ -148,7 +149,8 @@ def get_registrar_doctors(
     specialty: Optional[str] = Query(None, description="Фильтр по специальности"),
     with_schedule: bool = Query(True, description="Включить расписание"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    # Разрешаем доступ также профильным ролям врачей
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Lab"))
 ):
     """
     Получить врачей с расписаниями для регистратуры
@@ -422,6 +424,73 @@ def open_reception(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка открытия приема: {str(e)}"
+        )
+
+
+# ===================== УПРАВЛЕНИЕ ОЧЕРЕДЯМИ =====================
+
+@router.post("/registrar/queue/{entry_id}/start-visit")
+def start_queue_visit(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar"))
+):
+    """
+    Начать прием для записи в очереди (статус в процессе)
+    Работает с Visit и Appointment записями
+    """
+    try:
+        from app.models.visit import Visit
+        from app.models.appointment import Appointment
+        
+        # Сначала ищем в Visit
+        visit = db.query(Visit).filter(Visit.id == entry_id).first()
+        if visit:
+            # Обновляем статус визита
+            visit.status = "in_progress"
+            db.commit()
+            db.refresh(visit)
+            
+            return {
+                "success": True,
+                "message": "Прием начат успешно",
+                "entry": {
+                    "id": visit.id,
+                    "status": visit.status,
+                    "patient_id": visit.patient_id
+                }
+            }
+        
+        # Если не найден в Visit, ищем в Appointment
+        appointment = db.query(Appointment).filter(Appointment.id == entry_id).first()
+        if appointment:
+            # Обновляем статус appointment
+            appointment.status = "in_progress"
+            db.commit()
+            db.refresh(appointment)
+            
+            return {
+                "success": True,
+                "message": "Прием начат успешно",
+                "entry": {
+                    "id": appointment.id,
+                    "status": appointment.status,
+                    "patient_id": appointment.patient_id
+                }
+            }
+        
+        # Если не найден ни в Visit, ни в Appointment
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись не найдена"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка начала приема: {str(e)}"
         )
 
 

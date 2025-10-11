@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Heart, 
-  Activity, 
-  FileText, 
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  Heart,
+  Activity,
+  FileText,
   User,
-  Users, 
+  Users,
   Settings,
   Save,
   RefreshCw,
@@ -15,7 +16,6 @@ import {
   Brain,
   Phone,
   Plus,
-  BarChart3,
   TestTube
 } from 'lucide-react';
 import { Card, Button, Badge } from '../components/ui/native';
@@ -35,8 +35,16 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 const CardiologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
   const { theme, isDark, getColor, getSpacing, getFontSize } = useTheme();
-  
-  const [activeTab, setActiveTab] = useState('queue');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Получаем активную вкладку из URL параметров
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'queue';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedServices, setSelectedServices] = useState([]);
   const [visitData, setVisitData] = useState({
@@ -48,11 +56,12 @@ const CardiologistPanelUnified = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState({ ldlThreshold: 100, showEcgEchoTogether: true });
   
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
 
   // Специализированные данные кардиолога
   const [ecgForm, setEcgForm] = useState({
@@ -82,8 +91,7 @@ const CardiologistPanelUnified = () => {
     interpretation: ''
   });
 
-  const [showEcgForm, setShowEcgForm] = useState(false);
-  const [showBloodTestForm, setShowBloodTestForm] = useState(false);
+  const [showForm, setShowForm] = useState({ open: false, type: 'blood' });
   const [ecgResults, setEcgResults] = useState([]);
   const [bloodTests, setBloodTests] = useState([]);
 
@@ -104,6 +112,24 @@ const CardiologistPanelUnified = () => {
       loadPatientData();
     }
   }, [selectedPatient]);
+
+  // Отслеживаем изменения URL для синхронизации активной вкладки
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search, activeTab]);
+
+  // Смена вкладки с синхронизацией URL
+  const goToTab = (tabId) => {
+    if (!tabId) return;
+    setActiveTab(tabId);
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tabId);
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  };
 
   // Загрузка записей кардиолога
   const loadCardiologyAppointments = async () => {
@@ -183,14 +209,14 @@ const CardiologistPanelUnified = () => {
         source: 'appointments'
       };
       setSelectedPatient(patientData);
-      setActiveTab('visit');
+      goToTab('visit');
     }
   };
 
   const handleAppointmentActionClick = (action, row, event) => {
     console.log('Действие с записью:', action, row);
     event.stopPropagation();
-    
+
     switch (action) {
       case 'view':
         handleAppointmentRowClick(row);
@@ -200,6 +226,10 @@ const CardiologistPanelUnified = () => {
         break;
       case 'cancel':
         // Логика отмены записи
+        break;
+      case 'schedule_next':
+        // Назначить следующий визит
+        setScheduleNextModal({ open: true, patient: row });
         break;
       default:
         break;
@@ -244,7 +274,7 @@ const CardiologistPanelUnified = () => {
   // Обработка выбора пациента из очереди
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
-    setActiveTab('visit');
+    goToTab('visit');
     setMessage({ type: 'info', text: `Выбран пациент: ${patient.patient_name}` });
   };
 
@@ -319,7 +349,7 @@ const CardiologistPanelUnified = () => {
       });
 
       if (response.ok) {
-        setShowEcgForm(false);
+        setShowForm({ open: false, type: 'ecg' });
         setEcgForm({
           patient_id: '',
           ecg_date: '',
@@ -356,7 +386,7 @@ const CardiologistPanelUnified = () => {
       });
 
       if (response.ok) {
-        setShowBloodTestForm(false);
+        setShowForm({ open: false, type: 'blood' });
         setBloodTestForm({
           patient_id: '',
           test_date: '',
@@ -379,13 +409,14 @@ const CardiologistPanelUnified = () => {
   };
 
   const pageStyle = {
-    padding: '20px',
-    maxWidth: '1400px',
-    margin: '0 auto',
+    padding: '0',
+    width: '100%',
+    height: '100%',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     background: isDark ? 'var(--bg-primary)' : '#f8fafc',
-    minHeight: '100vh',
-    color: isDark ? 'var(--text-primary)' : '#1a202c'
+    minHeight: 'calc(100vh - 60px)', // Вычитаем высоту хедера
+    color: isDark ? 'var(--text-primary)' : '#1a202c',
+    overflow: 'visible'
   };
 
   const headerStyle = {
@@ -420,42 +451,18 @@ const CardiologistPanelUnified = () => {
   };
 
   return (
-    <div style={pageStyle}>
-      {/* Заголовок */}
-      <div style={headerStyle}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center">
-              <Heart className="mr-3 text-red-600" size={28} />
-              Панель кардиолога
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Унифицированная панель с очередью, ЭКГ, анализами и AI помощником
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="primary"
-              onClick={() => setScheduleNextModal({ open: true, patient: selectedPatient?.patient || null })}
-              className="flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Назначить следующий визит
-            </Button>
-          </div>
-          
-          {selectedPatient && (
-            <div className="text-right">
-              <div className="font-medium">Пациент: {selectedPatient.patient_name}</div>
-              <div className="text-sm text-gray-500">Номер: #{selectedPatient.number}</div>
-              <Badge variant="info" className="mt-1">
-                {selectedPatient.source === 'online' ? '📱 Онлайн' : '🏥 Регистратура'}
-              </Badge>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="cardiologist-panel" style={{
+      ...pageStyle,
+      padding: '20px',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+      width: '100%',
+      position: 'relative',
+      zIndex: 1,
+      display: 'block',
+      maxWidth: '100%',
+      margin: 0
+    }}>
 
       {/* Сообщения */}
       {message.text && (
@@ -475,39 +482,44 @@ const CardiologistPanelUnified = () => {
         </div>
       )}
 
-      {/* Навигация по вкладкам */}
-      <div className="flex space-x-2 mb-6 overflow-x-auto">
-        {tabs.map(tab => {
-          const isActive = activeTab === tab.id;
-          const TabIcon = tab.icon;
-          
-          return (
-            <button
-              key={tab.id}
-              style={isActive ? activeTabStyle : tabStyle}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <TabIcon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Навигация по вкладкам удалена — управление через сайдбар и URL */}
 
       {/* Контент вкладок */}
-      <div>
+      <div style={{
+        width: '100%',
+        maxWidth: 'none',
+        overflow: 'visible',
+        boxSizing: 'border-box',
+        position: 'relative',
+        zIndex: 1,
+        display: 'block'
+      }}>
         {/* Очередь пациентов */}
         {activeTab === 'queue' && (
-          <DoctorQueuePanel
-            specialty="cardiology"
-            onPatientSelect={handlePatientSelect}
-          />
+          <div style={{ width: '100%', maxWidth: 'none', overflow: 'visible' }}>
+            <DoctorQueuePanel
+              specialty="cardiology"
+              onPatientSelect={handlePatientSelect}
+            />
+          </div>
         )}
 
         {/* Записи кардиолога */}
         {activeTab === 'appointments' && (
-          <div className="space-y-6">
-            <Card className="p-6">
+          <div style={{ 
+            width: '100%', 
+            maxWidth: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <Card padding="lg" style={{
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box',
+              overflow: 'hidden'
+            }}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium flex items-center">
                   <Calendar size={20} className="mr-2 text-green-600" />
@@ -534,19 +546,12 @@ const CardiologistPanelUnified = () => {
                 loading={appointmentsLoading}
                 theme={isDark ? 'dark' : 'light'}
                 language="ru"
-                selectedRows={appointmentsSelected}
+                selectedRows={new Set()}
                 outerBorder={false}
                 services={{}}
                 showCheckboxes={false}
-                onRowSelect={(id, checked) => {
-                  const newSelected = new Set(appointmentsSelected);
-                  if (checked) {
-                    newSelected.add(id);
-                  } else {
-                    newSelected.delete(id);
-                  }
-                  setAppointmentsSelected(newSelected);
-                }}
+                view="doctor"
+                onRowSelect={() => {}}
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick}
               />
@@ -556,9 +561,16 @@ const CardiologistPanelUnified = () => {
 
         {/* Прием пациента */}
         {activeTab === 'visit' && selectedPatient && (
-          <div className="space-y-6">
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
             {/* Информация о пациенте */}
-            <Card className="p-6">
+            <Card padding="lg">
               <h3 className="text-lg font-medium mb-4 flex items-center">
                 <User size={20} className="mr-2 text-blue-600" />
                 Пациент #{selectedPatient.number}
@@ -587,7 +599,7 @@ const CardiologistPanelUnified = () => {
             </Card>
 
             {/* Жалобы и диагноз */}
-            <Card className="p-6">
+            <Card padding="lg">
               <h3 className="text-lg font-medium mb-4">📝 Жалобы и диагноз</h3>
               
               <div className="space-y-4">
@@ -656,7 +668,7 @@ const CardiologistPanelUnified = () => {
             />
 
             {/* Действия */}
-            <Card className="p-6">
+            <Card padding="lg">
               <div className="flex justify-end space-x-3">
                 <Button
                   variant="outline"
@@ -685,7 +697,19 @@ const CardiologistPanelUnified = () => {
 
         {/* ЭКГ */}
         {activeTab === 'ecg' && (
-          <div className="space-y-6">
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <div className="flex justify-end">
+              <Button onClick={() => setShowForm({ open: true, type: 'ecg' })}>
+                <Plus size={16} className="mr-2" /> Добавить ЭКГ
+              </Button>
+            </div>
             {/* Используем новые компоненты ЭКГ и ЭхоКГ */}
             <ECGViewer 
               visitId={selectedPatient?.visitId || 'demo-visit-1'}
@@ -709,40 +733,81 @@ const CardiologistPanelUnified = () => {
         
         {/* Анализы крови */}
         {activeTab === 'blood' && (
-          <div className="space-y-6">
-            <Card className="p-6">
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <Card padding="lg">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium flex items-center">
                   <TestTube size={20} className="mr-2 text-purple-600" />
                   Анализы крови
                 </h3>
-                <Button onClick={() => setShowBloodTestForm(true)}>
+                <Button onClick={() => setShowForm({ open: true, type: 'blood' })}>
                   <Plus size={16} className="mr-2" />
                   Новый анализ
                 </Button>
               </div>
 
+              {/* Небольшая аналитика по имеющимся анализам */}
+              {bloodTests.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {(() => {
+                    const avg = (key) => {
+                      const nums = bloodTests
+                        .map(t => Number(t[key]))
+                        .filter(v => !Number.isNaN(v));
+                      if (nums.length === 0) return '—';
+                      const sum = nums.reduce((a,b)=>a+b,0);
+                      return Math.round((sum/nums.length) * 10) / 10;
+                    };
+                    const items = [
+                      { label: 'Средний общий холестерин', value: avg('cholesterol_total'), unit: 'мг/дл' },
+                      { label: 'Средний LDL', value: avg('cholesterol_ldl'), unit: 'мг/дл' },
+                      { label: 'Средняя глюкоза', value: avg('glucose'), unit: 'мг/дл' },
+                    ];
+                    return items.map((it, idx) => (
+                      <div key={idx} className="p-3 rounded-lg border" style={{
+                        borderColor: isDark ? '#374151' : '#e5e7eb',
+                        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                        color: isDark ? '#f9fafb' : '#111827'
+                      }}>
+                        <div className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{it.label}</div>
+                        <div className="text-xl font-semibold mt-1">{it.value} {typeof it.value === 'number' ? it.unit : ''}</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+
               {bloodTests.length > 0 ? (
                 <div className="space-y-4">
                   {bloodTests.map((test) => (
-                    <div key={test.id} className="border border-gray-200 rounded-lg p-4">
+                    <div key={test.id} className="rounded-lg p-4" style={{
+                      border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+                      backgroundColor: isDark ? '#1f2937' : '#ffffff'
+                    }}>
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">Анализ #{test.id}</h4>
+                        <h4 className="font-medium" style={{ color: isDark ? '#f9fafb' : '#111827' }}>Анализ #{test.id}</h4>
                         <Badge variant="info">{test.test_date}</Badge>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm" style={{ color: isDark ? '#d1d5db' : '#4b5563' }}>
                         <div>🩸 Холестерин: {test.cholesterol_total} мг/дл</div>
                         <div>HDL: {test.cholesterol_hdl}</div>
                         <div>LDL: {test.cholesterol_ldl}</div>
                         <div>Триглицериды: {test.triglycerides}</div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-600 mt-2">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-2" style={{ color: isDark ? '#d1d5db' : '#4b5563' }}>
                         <div>🍬 Глюкоза: {test.glucose} мг/дл</div>
                         <div>CRP: {test.crp} мг/л</div>
                         <div>Тропонин: {test.troponin} нг/мл</div>
                       </div>
                       {test.interpretation && (
-                        <div className="mt-2 text-sm">
+                        <div className="mt-2 text-sm" style={{ color: isDark ? '#f3f4f6' : '#374151' }}>
                           <strong>Интерпретация:</strong> {test.interpretation}
                         </div>
                       )}
@@ -750,16 +815,16 @@ const CardiologistPanelUnified = () => {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <TestTube size={48} className="mx-auto mb-4 text-gray-300" />
+                <div className="text-center py-8" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                  <TestTube size={48} className="mx-auto mb-4" style={{ color: isDark ? '#6b7280' : '#d1d5db' }} />
                   <p>Нет данных анализов</p>
                 </div>
               )}
             </Card>
 
             {/* Форма анализа крови */}
-            {showBloodTestForm && (
-              <Card className="p-6">
+            {showForm.open && showForm.type === 'blood' && (
+              <Card padding="lg">
                 <h3 className="text-lg font-medium mb-4">Новый анализ крови</h3>
                 <form onSubmit={handleBloodTestSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -884,7 +949,7 @@ const CardiologistPanelUnified = () => {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setShowBloodTestForm(false)}
+                      onClick={() => setShowForm({ open: false, type: 'blood' })}
                     >
                       Отмена
                     </Button>
@@ -901,33 +966,104 @@ const CardiologistPanelUnified = () => {
 
         {/* AI Помощник */}
         {activeTab === 'ai' && (
-          <AIAssistant
-            specialty="cardiology"
-            onSuggestionSelect={handleAISuggestion}
-          />
+          <div style={{ width: '100%', maxWidth: 'none', overflow: 'visible' }}>
+            <AIAssistant
+              specialty="cardiology"
+              onSuggestionSelect={handleAISuggestion}
+            />
+          </div>
         )}
 
         {/* Управление услугами */}
         {activeTab === 'services' && (
-          <DoctorServiceSelector
-            specialty="cardiology"
-            selectedServices={[]}
-            onServicesChange={() => {}}
-            canEditPrices={false}
-          />
+          <div style={{ width: '100%', maxWidth: 'none', overflow: 'visible' }}>
+            <DoctorServiceSelector
+              specialty="cardiology"
+              selectedServices={[]}
+              onServicesChange={() => {}}
+              canEditPrices={false}
+            />
+          </div>
         )}
 
         {/* История (заглушка) */}
         {activeTab === 'history' && (
-          <Card className="p-8 text-center">
-            <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              История приемов
-            </h3>
-            <p className="text-gray-500">
-              Функция в разработке
-            </p>
-          </Card>
+          <div style={{
+            width: '100%',
+            maxWidth: 'none',
+            overflow: 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            {!selectedPatient ? (
+              <Card className="p-8 text-center">
+                <Calendar size={48} className="mx-auto mb-4" style={{ color: isDark ? '#9ca3af' : '#6b7280' }} />
+                <h3 className="text-lg font-medium mb-2" style={{ color: isDark ? '#f9fafb' : '#111827' }}>История</h3>
+                <p style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Выберите пациента в очереди или из записей</p>
+              </Card>
+            ) : (
+              <>
+                <Card padding="lg">
+                  <h3 className="text-lg font-medium mb-4">Хронология записей пациента</h3>
+                  <div className="space-y-3">
+                    {bloodTests.length === 0 && ecgResults.length === 0 && (
+                      <div style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Нет данных по ЭКГ или анализам крови</div>
+                    )}
+                    {bloodTests.map((t) => (
+                      <div key={`blood-${t.id}`} className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-purple-500 mt-2" />
+                        <div>
+                          <div className="font-medium">Анализ крови — {t.test_date}</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Хол: {t.cholesterol_total}; LDL: {t.cholesterol_ldl}; Глюкоза: {t.glucose}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {ecgResults.map((e) => (
+                      <div key={`ecg-${e.id || e.ecg_date}`} className="flex items-start gap-3">
+                        <div className="w-2 h-2 rounded-full bg-green-500 mt-2" />
+                        <div>
+                          <div className="font-medium">ЭКГ — {e.ecg_date || '—'}</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Ритм: {e.rhythm || '—'}, ЧСС: {e.heart_rate || '—'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                <Card padding="lg">
+                  <h3 className="text-lg font-medium mb-4">Сводка по пациенту</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-3 rounded-lg border" style={{
+                      borderColor: isDark ? '#374151' : '#e5e7eb',
+                      backgroundColor: isDark ? '#1f2937' : '#ffffff'
+                    }}>
+                      <div className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Количество ЭКГ</div>
+                      <div className="text-xl font-semibold mt-1" style={{ color: isDark ? '#f9fafb' : '#111827' }}>{ecgResults.length}</div>
+                    </div>
+                    <div className="p-3 rounded-lg border" style={{
+                      borderColor: isDark ? '#374151' : '#e5e7eb',
+                      backgroundColor: isDark ? '#1f2937' : '#ffffff'
+                    }}>
+                      <div className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Количество анализов</div>
+                      <div className="text-xl font-semibold mt-1" style={{ color: isDark ? '#f9fafb' : '#111827' }}>{bloodTests.length}</div>
+                    </div>
+                    <div className="p-3 rounded-lg border" style={{
+                      borderColor: isDark ? '#374151' : '#e5e7eb',
+                      backgroundColor: isDark ? '#1f2937' : '#ffffff'
+                    }}>
+                      <div className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Выбранный пациент</div>
+                      <div className="text-xl font-semibold mt-1" style={{ color: isDark ? '#f9fafb' : '#111827' }}>{selectedPatient?.patient_name || '—'}</div>
+                    </div>
+                  </div>
+                </Card>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -940,6 +1076,55 @@ const CardiologistPanelUnified = () => {
           theme={{ isDark, getColor, getSpacing, getFontSize }}
           specialtyFilter="cardiology"
         />
+      )}
+
+      {/* Настройки кардиолога: плавающая кнопка и панель */}
+      <button
+        onClick={() => setSettingsOpen(true)}
+        style={{ position: 'fixed', right: 16, bottom: 16, background: isDark ? '#1f2937' : 'white', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`, borderRadius: 9999, padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+        aria-label="Открыть настройки"
+      >
+        <Settings size={18} />
+      </button>
+      {settingsOpen && (
+        <Card padding="lg" style={{ 
+          position: 'fixed', 
+          right: 16, 
+          bottom: 80, 
+          width: 360,
+          backgroundColor: isDark ? '#1f2937' : '#ffffff',
+          border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+          boxShadow: isDark ? '0 10px 25px rgba(0,0,0,0.5)' : '0 10px 25px rgba(0,0,0,0.15)'
+        }}>
+          <h3 className="text-lg font-medium mb-3" style={{ color: isDark ? '#f9fafb' : '#111827' }}>Настройки кардиолога</h3>
+          <div className="space-y-3">
+            <label className="flex items-center gap-2" style={{ color: isDark ? '#f3f4f6' : '#374151' }}>
+              <input type="checkbox" checked={settings.showEcgEchoTogether} onChange={(e)=>setSettings({ ...settings, showEcgEchoTogether: e.target.checked })} />
+              Показывать ЭКГ и ЭхоКГ вместе
+            </label>
+            <div>
+              <div className="text-sm mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Порог LDL (мг/дл)</div>
+              <input 
+                type="number" 
+                value={settings.ldlThreshold} 
+                onChange={(e)=>setSettings({ ...settings, ldlThreshold: Number(e.target.value) })} 
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: `1px solid ${isDark ? '#4b5563' : '#d1d5db'}`,
+                  borderRadius: '6px',
+                  backgroundColor: isDark ? '#374151' : '#ffffff',
+                  color: isDark ? '#f9fafb' : '#111827',
+                  outline: 'none'
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={()=>setSettingsOpen(false)}>Закрыть</Button>
+            <Button onClick={()=>setSettingsOpen(false)}><Save size={16} className="mr-2"/>Сохранить</Button>
+          </div>
+        </Card>
       )}
     </div>
   );

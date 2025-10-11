@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from ....services.ai import ai_manager, AIProviderType
+from ....services.mcp import get_mcp_manager
 from ....api.deps import get_current_user
 from ....models.user import User
 import json
 import logging
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,7 @@ class ComplaintAnalysisRequest(BaseModel):
     patient_age: Optional[int] = None
     patient_gender: Optional[str] = None
     provider: Optional[AIProviderType] = None
+    use_mcp: bool = True  # Использовать MCP по умолчанию
 
 
 class ICD10SuggestRequest(BaseModel):
@@ -75,6 +78,33 @@ async def analyze_complaint(
         if request.patient_gender:
             patient_info["gender"] = request.patient_gender
         
+        # Используем MCP если включено
+        if request.use_mcp:
+            try:
+                mcp_manager = await get_mcp_manager()
+                result = await mcp_manager.execute_request(
+                    server="complaint",
+                    method="tool/analyze_complaint",
+                    params={
+                        "complaint": request.complaint,
+                        "patient_info": patient_info if patient_info else None,
+                        "provider": request.provider.value if request.provider else None,
+                        "urgency_assessment": True
+                    }
+                )
+                
+                if result.get("status") == "success":
+                    return result.get("data", {})
+                elif result.get("fallback"):
+                    # Fallback to direct AI manager
+                    logger.warning("MCP failed, falling back to direct AI manager")
+                else:
+                    raise HTTPException(status_code=500, detail=result.get("error", "MCP error"))
+            except Exception as mcp_error:
+                logger.error(f"MCP error: {str(mcp_error)}")
+                # Fallback to direct AI manager if MCP fails
+        
+        # Direct AI manager call (fallback or if MCP disabled)
         result = await ai_manager.analyze_complaint(
             complaint=request.complaint,
             patient_info=patient_info if patient_info else None,
