@@ -192,6 +192,13 @@ api_router.include_router(print_templates.router, prefix="/print/templates", tag
 api_router.include_router(print_api.router, prefix="/print", tags=["print-api"])
 api_router.include_router(ai_integration.router, prefix="/ai", tags=["ai-integration"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])  # Новые AI endpoints
+
+# MCP (Model Context Protocol) endpoints
+try:
+    from app.api.v1.endpoints import mcp
+    api_router.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+except ImportError:
+    print("MCP module not available - skipping MCP routes")
 api_router.include_router(telegram_bot.router, prefix="/telegram/bot", tags=["telegram-bot"])  # Telegram Bot
 api_router.include_router(telegram_integration.router, prefix="/telegram", tags=["telegram-integration"])
 api_router.include_router(display_websocket.router, prefix="/display", tags=["display-websocket"])

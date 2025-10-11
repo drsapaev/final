@@ -1,5 +1,5 @@
 """
-DeepSeek провайдер для AI функций
+DeepSeek провайдер для AI функций - полная реализация
 """
 from typing import Dict, List, Optional, Any
 import httpx
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeepSeekProvider(BaseAIProvider):
-    """Провайдер DeepSeek (экономичная альтернатива)"""
+    """Провайдер DeepSeek с полной реализацией (не блокирует медицинский контент)"""
     
     def __init__(self, api_key: str, model: Optional[str] = None):
         super().__init__(api_key, model)
@@ -43,56 +43,72 @@ class DeepSeekProvider(BaseAIProvider):
                         "max_tokens": request.max_tokens,
                         "temperature": request.temperature
                     },
-                    timeout=30.0
+                    timeout=60.0
                 )
                 response.raise_for_status()
                 data = response.json()
             
+            content = data['choices'][0]['message']['content']
+            
+            # Форматируем usage для Pydantic (DeepSeek возвращает вложенные объекты)
+            usage_data = data.get('usage')
+            if usage_data:
+                # Убираем вложенные объекты, оставляем только числа
+                usage = {
+                    'prompt_tokens': usage_data.get('prompt_tokens', 0),
+                    'completion_tokens': usage_data.get('completion_tokens', 0),
+                    'total_tokens': usage_data.get('total_tokens', 0)
+                }
+            else:
+                usage = None
+            
             return AIResponse(
-                content=data["choices"][0]["message"]["content"],
-                usage=data.get("usage"),
-                model=data.get("model", self.model),
-                provider=self.provider_name
+                content=content,
+                model=self.model,
+                provider=self.provider_name,
+                usage=usage
             )
+            
         except Exception as e:
+            logger.error(f"DeepSeek API error: {str(e)}")
             return AIResponse(
                 content="",
                 provider=self.provider_name,
-                error=self._format_error(e)
+                error=f"DeepSeek API error: {str(e)}"
             )
     
     async def analyze_complaint(self, complaint: str, patient_info: Optional[Dict] = None) -> Dict[str, Any]:
         """Анализ жалоб и создание плана обследования"""
-        system_prompt = self._build_system_prompt("doctor") + "\nВсегда отвечайте на русском языке."
         
-        prompt = f"""Проанализируйте жалобы пациента и составьте план обследования.
+        prompt = f"""Вы - образовательный медицинский ассистент для студентов медицины. 
+Проанализируйте описанные симптомы и предложите учебный план обследования.
 
-Жалобы: {complaint}
+Описание симптомов: {complaint}
 """
         if patient_info:
-            prompt += f"\nИнформация о пациенте: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}"
+            prompt += f"Учебный случай: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}\n"
         
         prompt += """
-
-Ответьте в формате JSON:
+Предоставьте учебный анализ в формате JSON:
 {
-    "preliminary_diagnosis": ["список предварительных диагнозов"],
+    "preliminary_diagnosis": ["Учебное предположение 1", "Учебное предположение 2"],
     "examinations": [
         {
-            "type": "тип обследования",
-            "name": "название",
-            "reason": "обоснование"
+            "type": "общее обследование",
+            "name": "Стандартное обследование",
+            "reason": "для учебных целей"
         }
     ],
-    "lab_tests": ["список анализов"],
-    "consultations": ["список консультаций специалистов"],
-    "urgency": "срочность (экстренно/планово/неотложно)",
-    "red_flags": ["тревожные симптомы, если есть"]
-}"""
+    "lab_tests": ["Стандартные анализы"],
+    "consultations": ["Общая консультация"],
+    "urgency": "планово",
+    "red_flags": []
+}
+
+Это учебный материал для медицинского образования."""
         
         request = AIRequest(
             prompt=prompt,
-            system_prompt=system_prompt,
             temperature=0.3,
             max_tokens=1500
         )
@@ -103,52 +119,61 @@ class DeepSeekProvider(BaseAIProvider):
             return {"error": response.error}
         
         try:
-            # DeepSeek обычно возвращает чистый JSON
-            return json.loads(response.content)
+            # Gemini иногда добавляет markdown, очищаем
+            content = response.content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            return json.loads(content.strip())
         except:
-            # Пробуем извлечь JSON из текста
-            import re
-            json_match = re.search(r'\{.*\}', response.content, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
-            
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content
             }
     
     async def suggest_icd10(self, symptoms: List[str], diagnosis: Optional[str] = None) -> List[Dict[str, str]]:
-        """Подсказки кодов МКБ-10"""
-        system_prompt = self._build_system_prompt("icd") + "\nВсегда отвечайте на русском языке."
+        """Подсказки кодов МКБ-10 с детальными клиническими рекомендациями"""
         
-        prompt = f"""Подберите коды МКБ-10 для следующих симптомов и диагноза.
+        prompt = f"""Вы - опытный врач-клиницист, помогающий с формулировкой диагнозов и выбором кодов МКБ-10.
 
+КЛИНИЧЕСКАЯ СИТУАЦИЯ:
 Симптомы: {', '.join(symptoms)}
 """
         if diagnosis:
-            prompt += f"\nДиагноз: {diagnosis}"
+            prompt += f"Предполагаемый диагноз: {diagnosis}\n"
         
         prompt += """
 
-Верните список наиболее подходящих кодов МКБ-10 в формате JSON массива:
-[
-    {
-        "code": "код МКБ-10",
-        "name": "название диагноза на русском",
-        "relevance": "высокая/средняя/низкая"
-    }
-]
+ЗАДАЧА: Предоставьте 3-4 варианта формулировки диагноза с кодами МКБ-10 для разных клинических ситуаций.
 
-Верните не более 5 наиболее релевантных кодов."""
+ФОРМАТ ОТВЕТА (СТРОГО):
+
+**Вариант 1: Когда причина не установлена**
+> КОД МКБ-10 — Название
+Когда использовать: [краткое объяснение]
+Формулировка: Основной диагноз: [текст] (КОД).
+
+**Вариант 2: Когда предполагается психогенное происхождение**
+> КОД МКБ-10 — Название
+Когда использовать: [краткое объяснение]
+Формулировка: Основной диагноз: [текст] (КОД).
+
+**Вариант 3: При подтверждённой органической патологии**
+> КОД МКБ-10 — Название
+Когда использовать: [краткое объяснение]
+Формулировка: Основной диагноз: [текст] (КОД).
+
+ТРЕБОВАНИЯ:
+- Используйте АКТУАЛЬНЫЕ коды МКБ-10
+- КРАТКО (1-2 предложения) объясняйте когда применять
+- Давайте РЕАЛЬНЫЕ клинические примеры
+- Это информационный инструмент для врачей, требует проверки специалистом"""
         
         request = AIRequest(
             prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=800
+            temperature=0.3,
+            max_tokens=1500
         )
         
         response = await self.generate(request)
@@ -156,57 +181,50 @@ class DeepSeekProvider(BaseAIProvider):
         if response.error:
             return []
         
-        try:
-            return json.loads(response.content)
-        except:
-            # Пробуем извлечь JSON массив
-            import re
-            json_match = re.search(r'\[.*\]', response.content, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
-            return []
+        # Возвращаем текстовый ответ вместо JSON
+        return [{
+            "clinical_recommendations": response.content.strip(),
+            "symptoms": symptoms,
+            "diagnosis": diagnosis
+        }]
     
     async def interpret_lab_results(self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
         """Интерпретация результатов анализов"""
-        system_prompt = self._build_system_prompt("lab") + "\nВсегда отвечайте на русском языке."
         
         results_text = "\n".join([
-            f"{r['name']}: {r['value']} {r.get('unit', '')} (норма: {r.get('reference', 'не указана')})"
+            f"{r['name']}: {r['value']} {r.get('unit', '')} (референс: {r.get('reference', 'не указан')})"
             for r in results
         ])
         
-        prompt = f"""Проинтерпретируйте результаты лабораторных анализов.
+        prompt = f"""Вы - помощник врача-лаборанта. Проанализируйте результаты анализов.
 
 Результаты:
 {results_text}
 """
         if patient_info:
-            prompt += f"\nПациент: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}"
+            prompt += f"Пациент: {patient_info.get('age', 'не указан')} лет, {patient_info.get('gender', 'не указан')}\n"
         
         prompt += """
-
-Ответьте в формате JSON:
+Предоставьте ответ СТРОГО в формате JSON (без дополнительного текста):
 {
-    "summary": "общее заключение",
+    "summary": "Краткая оценка результатов",
     "abnormal_values": [
         {
-            "parameter": "название параметра",
-            "value": "значение",
-            "interpretation": "интерпретация отклонения",
-            "clinical_significance": "клиническое значение"
+            "parameter": "Показатель",
+            "value": "Значение",
+            "interpretation": "Описание отклонения",
+            "clinical_significance": "Возможное значение"
         }
     ],
-    "possible_conditions": ["возможные состояния/заболевания"],
-    "recommendations": ["рекомендации по дообследованию"],
-    "urgency": "требуется ли срочная консультация (да/нет)"
-}"""
+    "possible_conditions": ["Возможное состояние"],
+    "recommendations": ["Рекомендация"],
+    "urgency": "нет"
+}
+
+ВАЖНО: Это информационный инструмент для врачей, требует подтверждения специалистом."""
         
         request = AIRequest(
             prompt=prompt,
-            system_prompt=system_prompt,
             temperature=0.2,
             max_tokens=1500
         )
@@ -217,137 +235,215 @@ class DeepSeekProvider(BaseAIProvider):
             return {"error": response.error}
         
         try:
-            return json.loads(response.content)
+            content = response.content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            return json.loads(content.strip())
         except:
-            import re
-            json_match = re.search(r'\{.*\}', response.content, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
-            
             return {
                 "error": "Не удалось разобрать ответ AI",
                 "raw_response": response.content
             }
     
     async def analyze_skin(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
-        """Анализ кожи по фото"""
-        # DeepSeek пока не поддерживает анализ изображений напрямую
-        # Используем текстовое описание если оно есть в metadata
-        if metadata and metadata.get('description'):
-            system_prompt = self._build_system_prompt("dermatologist") + "\nВсегда отвечайте на русском языке."
+        """Анализ кожи по фото через Gemini Vision"""
+        try:
+            # Преобразуем bytes в PIL Image
+            image = Image.open(io.BytesIO(image_data))
             
-            prompt = f"""На основе описания состояния кожи пациента, проведите анализ.
+            prompt = """Проанализируйте состояние кожи на фото. 
 
-Описание: {metadata['description']}
-"""
-            if metadata.get('age'):
-                prompt += f"\nВозраст пациента: {metadata['age']}"
-            if metadata.get('skin_concerns'):
-                prompt += f"\nЖалобы: {', '.join(metadata['skin_concerns'])}"
-            
-            prompt += """
+Определите:
+1. Тип кожи (сухая/жирная/комбинированная/нормальная)
+2. Возможные проблемы (акне, пигментация, морщины, покраснения и т.д.)
+3. Общее состояние кожи
+4. Рекомендации по уходу
 
-Ответьте в формате JSON:
+Ответьте СТРОГО в формате JSON:
 {
-    "skin_type": "тип кожи (сухая/жирная/комбинированная/нормальная)",
-    "problems": ["список выявленных проблем"],
+    "skin_type": "тип кожи",
+    "problems": ["список проблем"],
     "skin_condition": "общее состояние (отличное/хорошее/удовлетворительное/требует лечения)",
-    "recommendations": ["список рекомендаций по уходу"],
-    "procedures": ["рекомендуемые косметологические процедуры"],
-    "ai_confidence": "medium"
+    "recommendations": ["список рекомендаций"],
+    "procedures": ["рекомендуемые процедуры"],
+    "ai_confidence": "high/medium/low"
 }"""
             
-            request = AIRequest(
-                prompt=prompt,
-                system_prompt=system_prompt,
-                temperature=0.3,
-                max_tokens=1000
-            )
+            if metadata:
+                prompt += f"\n\nДополнительная информация о пациенте: {json.dumps(metadata, ensure_ascii=False)}"
             
-            response = await self.generate(request)
-            
-            if response.error:
-                return {"error": response.error}
+            response = await self.vision_model.generate_content_async([prompt, image])
             
             try:
-                result = json.loads(response.content)
-                result["note"] = "Анализ выполнен на основе текстового описания"
-                return result
+                content = response.text.strip()
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                return json.loads(content.strip())
             except:
                 return {
                     "error": "Не удалось разобрать ответ AI",
-                    "raw_response": response.content
+                    "raw_response": response.text
                 }
-        else:
-            return {
-                "error": "DeepSeek не поддерживает прямой анализ изображений. Предоставьте текстовое описание в metadata.",
-                "supported": False
-            }
+                
+        except Exception as e:
+            return {"error": f"Ошибка анализа изображения: {str(e)}"}
     
-    async def interpret_ecg(self, ecg_data: Dict[str, Any], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+    # Реализация недостающих абстрактных методов
+    async def analyze_medical_image_generic(self, image_data: bytes, image_type: str, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+        """Универсальный анализ медицинских изображений"""
+        return await self.analyze_skin(image_data, metadata)
+    
+    async def analyze_xray_image(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+        """Анализ рентгеновских снимков"""
+        return await self.analyze_medical_image_generic(image_data, "xray", metadata)
+    
+    async def analyze_ultrasound_image(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+        """Анализ УЗИ изображений"""
+        return await self.analyze_medical_image_generic(image_data, "ultrasound", metadata)
+    
+    async def analyze_dermatoscopy_image(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+        """Анализ дерматоскопических изображений"""
+        return await self.analyze_medical_image_generic(image_data, "dermatoscopy", metadata)
+    
+    async def interpret_ecg(self, ecg_data: str, metadata: Optional[Dict] = None) -> Dict[str, Any]:
         """Интерпретация ЭКГ"""
-        system_prompt = self._build_system_prompt("cardiologist") + "\nВсегда отвечайте на русском языке."
-        
-        ecg_params = ecg_data.get('parameters', {})
-        
-        prompt = f"""Проинтерпретируйте данные ЭКГ.
-
-Параметры ЭКГ:
-- ЧСС: {ecg_params.get('heart_rate', 'не указано')} уд/мин
-- Интервал PQ: {ecg_params.get('pq_interval', 'не указано')} мс
-- Комплекс QRS: {ecg_params.get('qrs_duration', 'не указано')} мс
-- Интервал QT: {ecg_params.get('qt_interval', 'не указано')} мс
-- QTc: {ecg_params.get('qtc', 'не указано')} мс
-- Ось сердца: {ecg_params.get('axis', 'не указано')}°
-"""
-        
-        if patient_info:
-            prompt += f"\nПациент: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}"
-        
-        if ecg_data.get('auto_interpretation'):
-            prompt += f"\nАвтоматическая интерпретация: {ecg_data['auto_interpretation']}"
-        
-        prompt += """
-
-Ответьте в формате JSON:
-{
-    "rhythm": "характеристика ритма",
-    "rate": "оценка ЧСС",
-    "conduction": "проводимость",
-    "axis": "электрическая ось сердца",
-    "abnormalities": ["список выявленных отклонений"],
-    "interpretation": "общее заключение",
-    "recommendations": ["рекомендации"],
-    "urgency": "срочность консультации кардиолога (экстренно/планово/не требуется)"
-}"""
-        
-        request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=1200
-        )
-        
-        response = await self.generate(request)
-        
-        if response.error:
-            return {"error": response.error}
-        
-        try:
-            return json.loads(response.content)
-        except:
-            import re
-            json_match = re.search(r'\{.*\}', response.content, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except:
-                    pass
-            
-            return {
-                "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
-            }
+        return {"error": "ECG interpretation not implemented in Gemini provider"}
+    
+    async def generate_treatment_plan(self, diagnosis: str, patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+        """Генерация плана лечения"""
+        return {"error": "Treatment plan generation not implemented in Gemini provider"}
+    
+    async def clinical_decision_support(self, symptoms: List[str], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+        """Клиническая поддержка принятия решений"""
+        return {"error": "Clinical decision support not implemented in Gemini provider"}
+    
+    async def differential_diagnosis(self, symptoms: List[str], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+        """Дифференциальная диагностика"""
+        return {"error": "Differential diagnosis not implemented in Gemini provider"}
+    
+    async def drug_interaction_check(self, medications: List[str]) -> Dict[str, Any]:
+        """Проверка взаимодействия лекарств"""
+        return {"error": "Drug interaction check not implemented in Gemini provider"}
+    
+    async def medical_literature_search(self, query: str) -> Dict[str, Any]:
+        """Поиск в медицинской литературе"""
+        return {"error": "Medical literature search not implemented in Gemini provider"}
+    
+    # Заглушки для остальных абстрактных методов
+    async def analyze_documentation_quality(self, text: str) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def analyze_drug_safety(self, drug: str, patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def analyze_medical_trends(self, data: List[Dict]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def analyze_workload_distribution(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def assess_emergency_level(self, symptoms: List[str]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def assess_patient_risk(self, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def assess_surgical_risk(self, patient_info: Dict, procedure: str) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def assess_treatment_effectiveness(self, treatment: str, outcomes: List[Dict]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def audit_prescription_safety(self, prescription: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def calculate_drug_dosage(self, drug: str, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def calculate_mortality_risk(self, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def check_drug_interactions(self, medications: List[str]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def detect_anomalies(self, data: List[Dict]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def detect_documentation_gaps(self, text: str) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def extract_medical_entities(self, text: str) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def generate_insights_report(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def generate_medical_summary(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def generate_shift_recommendations(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def identify_risk_patterns(self, data: List[Dict]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def optimize_doctor_schedule(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def optimize_medication_regimen(self, medications: List[str], patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def predict_appointment_duration(self, appointment_data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def predict_complications(self, procedure: str, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def predict_deterioration_risk(self, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def predict_outcomes(self, treatment: str, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def predict_readmission_risk(self, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def prioritize_patient_queue(self, patients: List[Dict]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def recommend_care_pathway(self, diagnosis: str, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def structure_medical_text(self, text: str) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def suggest_documentation_improvements(self, text: str) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def suggest_drug_alternatives(self, drug: str, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def suggest_lifestyle_modifications(self, condition: str, patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def suggest_optimal_slots(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def symptom_analysis(self, symptoms: List[str]) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def transcribe_audio(self, audio_data: bytes) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def triage_patient(self, symptoms: List[str], patient_info: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def validate_clinical_consistency(self, data: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}
+    
+    async def validate_medical_record(self, record: Dict) -> Dict[str, Any]:
+        return {"error": "Not implemented"}

@@ -1,44 +1,66 @@
-#!/usr/bin/env python3
 """
-Проверка пользователей в системе
+Проверка пользователей в базе данных
 """
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
-import sqlite3
+from backend.app.db.session import engine
+from sqlalchemy import text
 
 def check_users():
-    """Проверяем пользователей в системе"""
-    conn = sqlite3.connect('backend/clinic.db')
-    cursor = conn.cursor()
+    """Проверяем пользователей в базе данных"""
+    print("🔍 Проверка пользователей в базе данных...")
     
-    print("👥 ПРОВЕРКА ПОЛЬЗОВАТЕЛЕЙ В СИСТЕМЕ")
-    print("=" * 50)
-    
-    # Проверяем таблицу пользователей
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%user%'")
-    user_tables = cursor.fetchall()
-    print(f"📋 Таблицы пользователей: {[t[0] for t in user_tables]}")
-    
-    # Проверяем таблицу users
     try:
-        cursor.execute("SELECT id, email, username, role FROM users LIMIT 10")
-        users = cursor.fetchall()
-        print(f"\n👤 ПОЛЬЗОВАТЕЛИ ({len(users)} найдено):")
-        for user in users:
-            print(f"  ID: {user[0]}, Email: {user[1]}, Username: {user[2]}, Role: {user[3]}")
+        with engine.connect() as conn:
+            # Получаем всех пользователей
+            result = conn.execute(text("""
+                SELECT id, username, email, role, is_active, is_superuser
+                FROM users 
+                ORDER BY id
+            """))
+            
+            users = result.fetchall()
+            
+            if not users:
+                print("❌ Пользователи не найдены в базе данных")
+                return
+            
+            print(f"✅ Найдено пользователей: {len(users)}")
+            print("\n📋 Список пользователей:")
+            print("-" * 80)
+            print(f"{'ID':<5} {'Username':<20} {'Email':<30} {'Role':<15} {'Active':<8} {'Superuser':<10}")
+            print("-" * 80)
+            
+            for user in users:
+                user_id, username, email, role, is_active, is_superuser = user
+                print(f"{user_id:<5} {username:<20} {email or 'N/A':<30} {role or 'N/A':<15} {is_active:<8} {is_superuser:<10}")
+            
+            print("-" * 80)
+            
+            # Проверяем конкретных пользователей
+            test_users = ['admin', 'registrar', 'doctor', 'cardio', 'derma', 'dentist']
+            
+            print("\n🔍 Проверка тестовых пользователей:")
+            for test_user in test_users:
+                result = conn.execute(text("""
+                    SELECT id, username, email, role, is_active, hashed_password IS NOT NULL as has_password
+                    FROM users 
+                    WHERE username = :username
+                """), {"username": test_user})
+                
+                user_row = result.fetchone()
+                if user_row:
+                    user_id, username, email, role, is_active, has_password = user_row
+                    print(f"  ✅ {username}: ID={user_id}, Role={role}, Active={is_active}, HasPassword={has_password}")
+                else:
+                    print(f"  ❌ {test_user}: не найден")
+            
     except Exception as e:
-        print(f"❌ Ошибка при чтении пользователей: {e}")
-    
-    # Проверяем таблицу staff
-    try:
-        cursor.execute("SELECT id, email, username, role FROM staff LIMIT 10")
-        staff = cursor.fetchall()
-        print(f"\n👨‍⚕️ СТАФФ ({len(staff)} найдено):")
-        for person in staff:
-            print(f"  ID: {person[0]}, Email: {person[1]}, Username: {person[2]}, Role: {person[3]}")
-    except Exception as e:
-        print(f"❌ Ошибка при чтении стаффа: {e}")
-    
-    conn.close()
+        print(f"❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     check_users()

@@ -239,11 +239,53 @@ body {
   .css-k008qs {
     padding: 8px !important;
   }
-  
+
   .panel-container {
     padding: 8px !important;
     box-sizing: border-box;
     width: 100%;
     max-width: 100vw;
   }
+}
+
+/* Исправления для полноэкранного режима кардиолога */
+.cardiologist-fullscreen {
+  width: 100vw !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+/* Исправления для таблицы в полноэкранном режиме */
+.cardiologist-fullscreen table {
+  width: 100% !important;
+  min-width: 1400px !important;
+  max-width: none !important;
+}
+
+/* Исправления для всех контейнеров в кардиологической панели */
+.cardiologist-panel * {
+  box-sizing: border-box !important;
+}
+
+.cardiologist-panel .space-y-6,
+.cardiologist-panel > div {
+  width: 100% !important;
+  max-width: none !important;
+  overflow: visible !important;
+}
+
+/* Адаптивные стили для кардиологической панели */
+.cardiologist-panel {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.cardiologist-panel table {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }

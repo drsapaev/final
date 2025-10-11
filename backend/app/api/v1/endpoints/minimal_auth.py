@@ -30,6 +30,11 @@ class MinimalLoginResponse(BaseModel):
     user: Dict[str, Any]
 
 
+@router.options("/minimal-login")
+async def minimal_login_options():
+    """Обработка OPTIONS запроса для CORS"""
+    return {"message": "OK"}
+
 @router.post("/minimal-login", response_model=MinimalLoginResponse)
 async def minimal_login(
     request_data: MinimalLoginRequest,

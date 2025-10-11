@@ -33,6 +33,8 @@ class AIManager:
     
     def _initialize_providers(self):
         """Инициализация доступных провайдеров"""
+        from .mock_provider import MockProvider
+        
         provider_classes: Dict[AIProviderType, Type[BaseAIProvider]] = {
             AIProviderType.OPENAI: OpenAIProvider,
             AIProviderType.GEMINI: GeminiProvider,
@@ -48,19 +50,37 @@ class AIManager:
             AIProviderType.MOCK: "mock-api-key"  # Mock провайдер всегда доступен
         }
         
+        # Инициализируем Mock провайдер сначала как fallback
+        try:
+            from .mock_provider import MockProvider
+            self.providers[AIProviderType.MOCK] = MockProvider()
+            logger.info("Initialized Enhanced Mock provider (realistic medical responses)")
+        except Exception as e:
+            logger.error(f"Failed to initialize mock provider: {str(e)}")
+        
         # Инициализируем провайдеры с доступными ключами
-        for provider_type, api_key in api_keys.items():
-            if api_key:
+        # Приоритет: DeepSeek > Gemini > OpenAI (DeepSeek - ОСНОВНОЙ!)
+        priority_order = [AIProviderType.DEEPSEEK, AIProviderType.GEMINI, AIProviderType.OPENAI]
+        
+        for provider_type in priority_order:
+            api_key = api_keys.get(provider_type)
+            if api_key and provider_type != AIProviderType.MOCK:
                 try:
                     provider_class = provider_classes[provider_type]
                     self.providers[provider_type] = provider_class(api_key)
-                    logger.info(f"Initialized {provider_type.value} provider")
+                    logger.info(f"✅ Initialized {provider_type.value} provider")
                     
                     # Устанавливаем первый доступный провайдер как default
                     if not self.default_provider:
                         self.default_provider = provider_type
+                        logger.info(f"🎯 Set {provider_type.value} as DEFAULT provider")
                 except Exception as e:
-                    logger.error(f"Failed to initialize {provider_type.value} provider: {str(e)}")
+                    logger.error(f"❌ Failed to initialize {provider_type.value} provider: {str(e)}")
+        
+        # Если нет других провайдеров, используем Mock
+        if not self.default_provider:
+            self.default_provider = AIProviderType.MOCK
+            logger.warning("⚠️  Using Enhanced Mock provider (no external API configured)")
         
         if not self.providers:
             logger.warning("No AI providers initialized. Please set API keys.")

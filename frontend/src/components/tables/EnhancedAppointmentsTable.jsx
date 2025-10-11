@@ -255,12 +255,26 @@ const EnhancedAppointmentsTable = ({
         text: 'Вызван',
         emoji: '📢'
       },
+      in_progress: {
+        color: themeColors.accent,
+        bg: `${themeColors.accent}20`,
+        icon: User,
+        text: 'На приёме',
+        emoji: '👨‍⚕️'
+      },
       in_cabinet: { 
         color: themeColors.accent, 
         bg: `${themeColors.accent}20`, 
         icon: User, 
         text: 'В кабинете',
         emoji: '👤'
+      },
+      in_visit: { 
+        color: themeColors.accent, 
+        bg: `${themeColors.accent}20`, 
+        icon: User, 
+        text: 'На приёме',
+        emoji: '👨‍⚕️'
       },
       
       // Завершённые статусы
@@ -665,32 +679,47 @@ const EnhancedAppointmentsTable = ({
     };
 
     const csvContent = [
-      // Заголовки
-      [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
+      // Заголовки - для doctor view убираем телефон и адрес
+      isDoctorView 
+        ? [t.number, t.patient, t.birthYear, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(',')
+        : [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
       // Данные
-      ...filteredData.map((row, index) => [
-        // Номера очередей для CSV
-        row.queue_numbers && row.queue_numbers.length > 0 
-          ? row.queue_numbers.map(q => `${q.queue_name}: №${q.number}`).join('; ')
-          : index + 1,
-        row.patient_fio || '',
-          formatPhoneNumber(row.patient_phone),
-        row.patient_birth_year || '',
-        row.address || '',
-        (() => {
-          const discountMode = row.discount_mode;
-          if (discountMode === 'benefit') return t.free;
-          if (discountMode === 'repeat') return t.repeat;
-          if (discountMode === 'all_free') return t.free;
-          return t.paid;
-        })(),
-        formatServicesForCsv(row.services),
-        t[row.payment_type] || row.payment_type || '',
-        row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : (row.appointment_date || ''),
-        row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (row.appointment_time || ''),
-        t[row.status] || row.status || '',
-        row.total_amount || row.cost || row.payment_amount || ''
-      ].join(','))
+      ...filteredData.map((row, index) => {
+        const baseData = [
+          // Номера очередей для CSV
+          row.queue_numbers && row.queue_numbers.length > 0 
+            ? row.queue_numbers.map(q => `${q.queue_name}: №${q.number}`).join('; ')
+            : index + 1,
+          row.patient_fio || '',
+        ];
+        
+        // Для doctor view не включаем телефон и адрес
+        if (!isDoctorView) {
+          baseData.push(
+            formatPhoneNumber(row.patient_phone),
+            row.patient_birth_year || '',
+            row.address || ''
+          );
+        } else {
+          baseData.push(row.patient_birth_year || '');
+        }
+        
+        return baseData.concat([
+          (() => {
+            const discountMode = row.discount_mode;
+            if (discountMode === 'benefit') return t.free;
+            if (discountMode === 'repeat') return t.repeat;
+            if (discountMode === 'all_free') return t.free;
+            return t.paid;
+          })(),
+          formatServicesForCsv(row.services),
+          t[row.payment_type] || row.payment_type || '',
+          row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : (row.appointment_date || ''),
+          row.created_at ? new Date(row.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : (row.appointment_time || ''),
+          t[row.status] || row.status || '',
+          row.total_amount || row.cost || row.payment_amount || ''
+        ]).join(',');
+      })
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -948,12 +977,24 @@ const EnhancedAppointmentsTable = ({
 
       {/* Таблица */}
       {loading ? loaderNode : null}
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '100%',
+        overflowX: 'auto',
+        overflowY: 'visible',
+        boxSizing: 'border-box',
+        position: 'relative',
+        zIndex: 1
+      }}>
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
-          tableLayout: 'fixed',
-          maxWidth: '100%'
+          tableLayout: 'auto',
+          minWidth: isDoctorView ? '100%' : '1400px',
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: '100%',
+          boxSizing: 'border-box'
         }}>
           <thead>
             <tr style={{ backgroundColor: themeColors.bgSecondary }}>
@@ -1008,9 +1049,8 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '200px',
-                  maxWidth: '200px',
-                  width: '200px'
+                  minWidth: isDoctorView ? '15%' : '200px',
+                  width: isDoctorView ? '15%' : 'auto'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1021,20 +1061,20 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Телефон */}
-              <th style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: `1px solid ${themeColors.border}`,
-                color: themeColors.text,
-                fontWeight: '600',
-                fontSize: '14px',
-                  minWidth: '170px',
-                  maxWidth: '170px',
-                  width: '170px'
-                }}>
-                  {t.phone}
-              </th>
+              {/* Телефон - скрыт для doctor view */}
+              {!isDoctorView && (
+                <th style={{
+                  padding: '12px 8px',
+                  textAlign: 'left',
+                  borderBottom: `1px solid ${themeColors.border}`,
+                  color: themeColors.text,
+                  fontWeight: '600',
+                  fontSize: '14px',
+                    minWidth: '170px'
+                  }}>
+                    {t.phone}
+                </th>
+              )}
 
               {/* Год рождения */}
               <th 
@@ -1047,9 +1087,8 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  width: '60px',
-                  minWidth: '60px',
-                  maxWidth: '60px'
+                  width: isDoctorView ? '5%' : '60px',
+                  minWidth: isDoctorView ? '5%' : '60px'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -1060,22 +1099,22 @@ const EnhancedAppointmentsTable = ({
                 </div>
               </th>
 
-              {/* Адрес */}
-              <th style={{
-                padding: '12px 8px',
-                textAlign: 'left',
-                borderBottom: `1px solid ${themeColors.border}`,
-                color: themeColors.text,
-                fontWeight: '600',
-                fontSize: '14px',
-                  minWidth: '140px',
-                  maxWidth: '140px',
-                  width: '140px'
-                }}
-                className="hide-on-mobile"
-              >
-                {t.address}
-              </th>
+              {/* Адрес - скрыт для doctor view */}
+              {!isDoctorView && (
+                <th style={{
+                  padding: '12px 8px',
+                  textAlign: 'left',
+                  borderBottom: `1px solid ${themeColors.border}`,
+                  color: themeColors.text,
+                  fontWeight: '600',
+                  fontSize: '14px',
+                    minWidth: '140px'
+                  }}
+                  className="hide-on-mobile"
+                >
+                  {t.address}
+                </th>
+              )}
 
               {/* Тип обращения */}
               <th style={{
@@ -1085,10 +1124,9 @@ const EnhancedAppointmentsTable = ({
                 color: themeColors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                  minWidth: '80px',
-                  maxWidth: '80px',
-                  width: '80px'
-                }}>
+                minWidth: isDoctorView ? '70px' : '80px',
+                width: isDoctorView ? '70px' : 'auto'
+              }}>
                   {t.visitType}
               </th>
 
@@ -1100,10 +1138,9 @@ const EnhancedAppointmentsTable = ({
                 color: themeColors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                  minWidth: '180px',
-                  maxWidth: '180px',
-                  width: '180px'
-                }}>
+                  minWidth: isDoctorView ? '12%' : '180px',
+                  width: isDoctorView ? '12%' : 'auto'
+              }}>
                   {t.services}
               </th>
 
@@ -1115,10 +1152,9 @@ const EnhancedAppointmentsTable = ({
                 color: themeColors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                  minWidth: '100px',
-                  maxWidth: '100px',
-                  width: '100px'
-                }}>
+                  minWidth: isDoctorView ? '8%' : '100px',
+                  width: isDoctorView ? '8%' : 'auto'
+              }}>
                   {t.paymentType}
               </th>
 
@@ -1133,9 +1169,8 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '100px',
-                  maxWidth: '100px',
-                  width: '100px'
+                  minWidth: isDoctorView ? '9%' : '100px',
+                  width: isDoctorView ? '9%' : 'auto'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -1157,9 +1192,8 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '80px',
-                  maxWidth: '80px',
-                  width: '80px'
+                  minWidth: isDoctorView ? '7%' : '80px',
+                  width: isDoctorView ? '7%' : 'auto'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -1182,9 +1216,8 @@ const EnhancedAppointmentsTable = ({
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
-                  minWidth: '90px',
-                  maxWidth: '90px',
-                  width: '90px'
+                  minWidth: isDoctorView ? '8%' : '90px',
+                  width: isDoctorView ? '8%' : 'auto'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
@@ -1203,10 +1236,9 @@ const EnhancedAppointmentsTable = ({
                 color: themeColors.text,
                 fontWeight: '600',
                 fontSize: '14px',
-                  width: '165px',
-                  minWidth: '165px',
-                  maxWidth: '165px'
-                }}>
+                width: isDoctorView ? '15%' : 'auto',
+                  minWidth: isDoctorView ? '15%' : '200px'
+              }}>
                   {t.actions}
               </th>
             </tr>
@@ -1279,13 +1311,14 @@ const EnhancedAppointmentsTable = ({
                     color: themeColors.text,
                     fontSize: '14px',
                     fontWeight: '500',
-                    minWidth: '200px',
-                    maxWidth: '200px',
-                    width: '200px',
+                    minWidth: isDoctorView ? '15%' : '200px',
+                    width: isDoctorView ? '15%' : 'auto',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
-                  }}>
+                  }}
+                  title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
+                  >
                     <div>
                       <div>{row.patient_fio || '—'}</div>
                       {row.patient_birth_year && (
@@ -1300,27 +1333,27 @@ const EnhancedAppointmentsTable = ({
                     </div>
                   </td>
 
-                  {/* Телефон */}
-                  <td style={{
-                    padding: '12px 8px',
-                    color: themeColors.text,
-                    fontSize: '14px',
-                    minWidth: '170px',
-                    maxWidth: '170px',
-                    width: '170px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
+                  {/* Телефон - скрыт для doctor view */}
+                  {!isDoctorView && (
+                    <td style={{
+                      padding: '12px 8px',
+                      color: themeColors.text,
+                      fontSize: '14px',
+                      minWidth: '170px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
                     }}>
-                      <Phone size={18} style={{ color: themeColors.accent, fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
-                      {formatPhoneNumber(row.patient_phone)}
-                    </div>
-                  </td>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <Phone size={18} style={{ color: themeColors.accent, fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
+                        {formatPhoneNumber(row.patient_phone)}
+                      </div>
+                    </td>
+                  )}
 
                   {/* Год рождения */}
                   <td style={{
@@ -1328,61 +1361,59 @@ const EnhancedAppointmentsTable = ({
                     textAlign: 'center',
                     color: themeColors.text,
                     fontSize: '14px',
-                    width: '60px',
-                    minWidth: '60px',
-                    maxWidth: '60px'
+                    width: isDoctorView ? '50px' : '60px',
+                    minWidth: isDoctorView ? '50px' : '60px',
+                    maxWidth: isDoctorView ? '50px' : '60px'
                   }}>
                     {row.patient_birth_year || '—'}
                   </td>
 
-                  {/* Адрес */}
-                  <td style={{
-                    padding: '12px 8px',
-                    color: themeColors.text,
-                    fontSize: '14px',
-                    minWidth: '140px',
-                    maxWidth: '140px',
-                    width: '140px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'normal',
-                    lineHeight: '1.4'
-                  }}
-                  className="hide-on-mobile"
-                  title={row.address}
-                  >
-                    {row.address ? (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        <Home size={18} style={{ 
-                          color: themeColors.accent, 
-                          fontWeight: 'bold', 
-                          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
-                          flexShrink: 0  // ✅ Иконка не сжимается
-                        }} />
-                        <span style={{ 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical'
+                  {/* Адрес - скрыт для doctor view */}
+                  {!isDoctorView && (
+                    <td style={{
+                      padding: '12px 8px',
+                      color: themeColors.text,
+                      fontSize: '14px',
+                      minWidth: '140px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'normal',
+                      lineHeight: '1.4'
+                    }}
+                    className="hide-on-mobile"
+                    title={row.address}
+                    >
+                      {row.address ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
                         }}>
-                          {row.address}
-                        </span>
-                      </div>
-                    ) : '—'}
-                  </td>
+                          <Home size={18} style={{ 
+                            color: themeColors.accent, 
+                            fontWeight: 'bold', 
+                            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
+                            flexShrink: 0  // ✅ Иконка не сжимается
+                          }} />
+                          <span style={{ 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}>
+                            {row.address}
+                          </span>
+                        </div>
+                      ) : '—'}
+                    </td>
+                  )}
 
                   {/* Тип обращения */}
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    minWidth: '80px',
-                    maxWidth: '80px',
-                    width: '80px'
+                    minWidth: '80px'
                   }}>
                     {renderVisitType((() => {
                       const discountMode = row.discount_mode;
@@ -1396,9 +1427,7 @@ const EnhancedAppointmentsTable = ({
                   {/* Услуги */}
                   <td style={{ 
                     padding: '12px 8px',
-                    minWidth: '180px',
-                    maxWidth: '180px',
-                    width: '180px'
+                    minWidth: '180px'
                   }}>
                     {renderServices(row.services)}
                   </td>
@@ -1407,9 +1436,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    minWidth: '100px',
-                    maxWidth: '100px',
-                    width: '100px'
+                    minWidth: '100px'
                   }}>
                     {renderPaymentType(row.payment_type || 'cash', row.payment_status)}
                   </td>
@@ -1420,9 +1447,7 @@ const EnhancedAppointmentsTable = ({
                     textAlign: 'center',
                     color: themeColors.text,
                     fontSize: '14px',
-                    minWidth: '100px',
-                    maxWidth: '100px',
-                    width: '100px'
+                    minWidth: '100px'
                   }}>
                     <div>
                       {/* Дата и время регистрации */}
@@ -1480,8 +1505,6 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     textAlign: 'center',
                     minWidth: '80px',
-                    maxWidth: '80px',
-                    width: '80px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
@@ -1497,9 +1520,7 @@ const EnhancedAppointmentsTable = ({
                     color: themeColors.success,
                     fontSize: '14px',
                     fontWeight: '600',
-                    minWidth: '90px',
-                    maxWidth: '90px',
-                    width: '90px'
+                    minWidth: '90px'
                   }}>
                     {(() => {
                       const amount = row.total_amount || row.cost || row.payment_amount || 0;
@@ -1511,9 +1532,9 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    width: '165px',
-                    minWidth: '165px',
-                    maxWidth: '165px'
+                    width: '200px',
+                    minWidth: '200px',
+                    maxWidth: '200px'
                   }}>
                     <div style={{
                       display: 'flex',
@@ -1674,6 +1695,31 @@ const EnhancedAppointmentsTable = ({
                       >
                         <MoreHorizontal size={14} />
                       </button>
+
+                      {/* Назначить следующий визит */}
+                      {isDoctorView && row.status === 'done' && (
+                        <button
+                          className="action-button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onActionClick?.('schedule_next', row, e);
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            backgroundColor: themeColors.info,
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                          }}
+                          title="Назначить следующий визит"
+                        >
+                          📅 Следующий
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

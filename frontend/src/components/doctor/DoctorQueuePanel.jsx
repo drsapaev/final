@@ -24,16 +24,10 @@ const DoctorQueuePanel = ({
   onPatientSelect,
   className = ''
 }) => {
-  // Проверяем демо-режим в самом начале
+  // Проверяем демо-режим в самом начале (в демо не скрываем компонент, а показываем моковые данные)
   const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                    window.location.hostname === 'localhost' && 
-                    window.location.port === '5173';
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('DoctorQueuePanel: Skipping render in demo mode');
-    return null;
-  }
+                    (window.location.hostname === 'localhost' && 
+                     window.location.port === '5173');
   
   const [loading, setLoading] = useState(true);
   const [queueData, setQueueData] = useState(null);
@@ -68,38 +62,50 @@ const DoctorQueuePanel = ({
       specialty
     });
     
-    if (isDemoMode) {
-      // В демо-режиме используем моковые данные
-      console.log('Setting demo data for DoctorQueuePanel');
-      setDoctorInfo({
-        id: 1,
-        name: 'Dr. Demo',
-        specialty: specialty,
-        department: 'Demo Department'
-      });
-      
-      setQueueData({
-        queue_exists: true,
-        entries: [
-          {
-            id: 1,
-            patient_name: 'Иван Иванов',
-            ticket_number: 'A001',
-            status: 'waiting',
-            source: 'online',
-            created_at: '2024-01-15T09:00:00Z'
-          },
-          {
-            id: 2,
-            patient_name: 'Мария Петрова',
-            ticket_number: 'A002',
-            status: 'waiting',
-            source: 'desk',
-            created_at: '2024-01-15T09:15:00Z'
-          }
-        ]
-      });
-    } else {
+  if (isDemoMode) {
+    // В демо-режиме используем моковые данные
+    console.log('Setting demo data for DoctorQueuePanel');
+    setDoctorInfo({
+      id: 1,
+      name: 'Dr. Demo',
+      specialty: specialty,
+      department: 'Demo Department',
+      queue_settings: {
+        start_number: 'A000',
+        max_per_day: 50,
+        timezone: 'UTC+5'
+      },
+      doctor: {
+        cabinet: '101'
+      }
+    });
+
+    setQueueData({
+      queue_exists: true,
+      stats: { total: 2, waiting: 2, served: 0, online_entries: 1 },
+      doctor: { name: 'Dr. Demo', specialty, cabinet: '101' },
+      entries: [
+        {
+          id: 1,
+          number: 'A001',
+          patient_name: 'Иван Иванов',
+          status: 'waiting',
+          source: 'online',
+          phone: '+998 90 123-45-67',
+          created_at: '2024-01-15T09:00:00Z'
+        },
+        {
+          id: 2,
+          number: 'A002',
+          patient_name: 'Мария Петрова',
+          status: 'waiting',
+          source: 'desk',
+          phone: '+998 90 765-43-21',
+          created_at: '2024-01-15T09:15:00Z'
+        }
+      ]
+    });
+  } else {
       console.log('Loading real data for DoctorQueuePanel');
       loadDoctorData();
       loadQueueData();
@@ -172,13 +178,13 @@ const DoctorQueuePanel = ({
   };
 
   const handleCallPatient = async (entryId) => {
-    // Проверяем демо-режим
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                      window.location.hostname === 'localhost' && 
-                      window.location.port === '5173';
-    
+    // В демо-режиме имитируем вызов
     if (isDemoMode) {
       setMessage({ type: 'success', text: 'Пациент вызван (демо)' });
+      setQueueData((prev) => ({
+        ...prev,
+        entries: prev.entries.map(e => e.id === entryId ? { ...e, status: 'called', called_at: new Date().toISOString() } : e)
+      }));
       return;
     }
     
@@ -203,13 +209,13 @@ const DoctorQueuePanel = ({
   };
 
   const handleStartVisit = async (entryId) => {
-    // Проверяем демо-режим
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                      window.location.hostname === 'localhost' && 
-                      window.location.port === '5173';
-    
+    // В демо-режиме имитируем старт приема
     if (isDemoMode) {
       setMessage({ type: 'success', text: 'Прием начат (демо)' });
+      setQueueData((prev) => ({
+        ...prev,
+        entries: prev.entries.map(e => e.id === entryId ? { ...e, status: 'in_progress' } : e)
+      }));
       return;
     }
     
@@ -234,13 +240,14 @@ const DoctorQueuePanel = ({
   };
 
   const handleCompleteVisit = async (entryId) => {
-    // Проверяем демо-режим
-    const isDemoMode = window.location.pathname.includes('/medilab-demo') || 
-                      window.location.hostname === 'localhost' && 
-                      window.location.port === '5173';
-    
+    // В демо-режиме имитируем завершение приема
     if (isDemoMode) {
       setMessage({ type: 'success', text: 'Прием завершен (демо)' });
+      setQueueData((prev) => ({
+        ...prev,
+        entries: prev.entries.map(e => e.id === entryId ? { ...e, status: 'served' } : e),
+        stats: { ...prev.stats, served: (prev.stats?.served || 0) + 1, waiting: Math.max(0, (prev.stats?.waiting || 1) - 1) }
+      }));
       return;
     }
     
@@ -506,10 +513,10 @@ const DoctorQueuePanel = ({
             ⚙️ Настройки очереди:
           </h4>
           <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-            <div>Стартовый номер онлайн: #{doctorInfo.queue_settings.start_number}</div>
-            <div>Лимит в день: {doctorInfo.queue_settings.max_per_day}</div>
-            <div>Часовой пояс: {doctorInfo.queue_settings.timezone}</div>
-            {doctorInfo.doctor.cabinet && (
+            <div>Стартовый номер онлайн: #{doctorInfo?.queue_settings?.start_number || '—'}</div>
+            <div>Лимит в день: {doctorInfo?.queue_settings?.max_per_day ?? '—'}</div>
+            <div>Часовой пояс: {doctorInfo?.queue_settings?.timezone || '—'}</div>
+            {doctorInfo?.doctor?.cabinet && (
               <div>Кабинет: {doctorInfo.doctor.cabinet}</div>
             )}
           </div>

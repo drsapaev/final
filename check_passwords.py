@@ -1,55 +1,47 @@
-#!/usr/bin/env python3
 """
 Проверка паролей пользователей
 """
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
-import sqlite3
-import hashlib
+from backend.app.db.session import engine
+from backend.app.core.security import verify_password, get_password_hash
+from sqlalchemy import text
 
 def check_passwords():
     """Проверяем пароли пользователей"""
-    conn = sqlite3.connect('backend/clinic.db')
-    cursor = conn.cursor()
+    print("🔍 Проверка паролей пользователей...")
     
-    print("🔐 ПРОВЕРКА ПАРОЛЕЙ ПОЛЬЗОВАТЕЛЕЙ")
-    print("=" * 50)
+    test_passwords = ["admin", "test123", "registrar", "doctor"]
     
-    # Проверяем пользователя registrar
-    cursor.execute("SELECT id, email, username, password_hash FROM users WHERE username = 'registrar'")
-    registrar = cursor.fetchone()
-    
-    if registrar:
-        print(f"👤 Пользователь registrar:")
-        print(f"  ID: {registrar[0]}")
-        print(f"  Email: {registrar[1]}")
-        print(f"  Username: {registrar[2]}")
-        print(f"  Password hash: {registrar[3][:50]}...")
-        
-        # Проверяем возможные пароли
-        possible_passwords = ['registrar123', 'registrar', 'password', '123456']
-        
-        print(f"\n🔍 Проверяем возможные пароли:")
-        for pwd in possible_passwords:
-            # Проверяем разные алгоритмы хеширования
-            md5_hash = hashlib.md5(pwd.encode()).hexdigest()
-            sha1_hash = hashlib.sha1(pwd.encode()).hexdigest()
-            sha256_hash = hashlib.sha256(pwd.encode()).hexdigest()
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, username, email, hashed_password
+                FROM users 
+                WHERE username IN ('admin', 'mcp_test', 'registrar')
+            """))
             
-            print(f"  {pwd}:")
-            print(f"    MD5: {md5_hash}")
-            print(f"    SHA1: {sha1_hash}")
-            print(f"    SHA256: {sha256_hash}")
+            users = result.fetchall()
             
-            if registrar[3] == md5_hash:
-                print(f"    ✅ MD5 совпадает!")
-            elif registrar[3] == sha1_hash:
-                print(f"    ✅ SHA1 совпадает!")
-            elif registrar[3] == sha256_hash:
-                print(f"    ✅ SHA256 совпадает!")
-    else:
-        print("❌ Пользователь registrar не найден")
-    
-    conn.close()
+            for user_id, username, email, hashed_password in users:
+                print(f"\n👤 Пользователь: {username} (ID: {user_id})")
+                print(f"   Email: {email}")
+                print(f"   Хеш пароля: {hashed_password[:50]}...")
+                
+                for test_password in test_passwords:
+                    is_valid = verify_password(test_password, hashed_password)
+                    print(f"   Пароль '{test_password}': {'✅' if is_valid else '❌'}")
+                
+                # Попробуем создать новый хеш для тестирования
+                new_hash = get_password_hash("test123")
+                print(f"   Новый хеш для 'test123': {new_hash[:50]}...")
+                
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     check_passwords()

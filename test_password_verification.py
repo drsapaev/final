@@ -1,67 +1,67 @@
-#!/usr/bin/env python3
 """
-Тест верификации паролей
+Тест функции verify_password
 """
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
-from app.core.security import verify_password, get_password_hash
-from app.db.session import SessionLocal
+from backend.app.db.session import engine
+from backend.app.core.security import verify_password
 from sqlalchemy import text
 
 def test_password_verification():
-    """Тест верификации паролей"""
+    """Тестируем функцию проверки пароля"""
+    print("🔍 Тестирование функции verify_password...")
     
-    # Тестируем создание и верификацию хеша
-    test_password = "admin123"
-    hash1 = get_password_hash(test_password)
-    hash2 = get_password_hash(test_password)
-    
-    print(f"🔐 Тестирование хеширования паролей:")
-    print(f"Пароль: {test_password}")
-    print(f"Хеш 1: {hash1[:50]}...")
-    print(f"Хеш 2: {hash2[:50]}...")
-    print(f"Хеши разные (это нормально): {hash1 != hash2}")
-    
-    # Тестируем верификацию
-    verify1 = verify_password(test_password, hash1)
-    verify2 = verify_password(test_password, hash2)
-    verify_wrong = verify_password("wrong_password", hash1)
-    
-    print(f"\n✅ Верификация:")
-    print(f"Правильный пароль с хешем 1: {verify1}")
-    print(f"Правильный пароль с хешем 2: {verify2}")
-    print(f"Неправильный пароль: {verify_wrong}")
-    
-    # Проверяем пароль admin из БД
-    db = SessionLocal()
     try:
-        result = db.execute(text("SELECT email, hashed_password FROM users WHERE email = 'admin@example.com';"))
-        user_data = result.fetchone()
-        
-        if user_data:
-            email, stored_hash = user_data
-            print(f"\n👤 Проверка пароля admin из БД:")
-            print(f"Email: {email}")
-            print(f"Stored hash: {stored_hash[:50]}...")
+        with engine.connect() as conn:
+            # Получаем пользователя mcp_test
+            result = conn.execute(text("""
+                SELECT id, username, email, hashed_password
+                FROM users 
+                WHERE username = 'mcp_test'
+            """))
             
-            # Проверяем разные варианты паролей
-            passwords_to_test = ["admin123", "admin", "123", "Admin123", "ADMIN123"]
+            user_row = result.fetchone()
             
-            for pwd in passwords_to_test:
-                is_valid = verify_password(pwd, stored_hash)
-                print(f"Пароль '{pwd}': {'✅' if is_valid else '❌'}")
+            if not user_row:
+                print("❌ Пользователь mcp_test не найден")
+                return
+            
+            user_id, username, email, hashed_password = user_row
+            
+            print(f"👤 Пользователь: {username} (ID: {user_id})")
+            print(f"   Email: {email}")
+            print(f"   Хеш пароля: {hashed_password[:50]}...")
+            
+            # Тестируем разные пароли
+            test_passwords = ["test123", "admin", "password", "mcp_test"]
+            
+            for password in test_passwords:
+                try:
+                    is_valid = verify_password(password, hashed_password)
+                    print(f"   Пароль '{password}': {'✅' if is_valid else '❌'}")
+                except Exception as e:
+                    print(f"   Пароль '{password}': ❌ Ошибка: {e}")
+            
+            # Тестируем с пустым паролем
+            try:
+                is_valid = verify_password("", hashed_password)
+                print(f"   Пустой пароль: {'✅' if is_valid else '❌'}")
+            except Exception as e:
+                print(f"   Пустой пароль: ❌ Ошибка: {e}")
+            
+            # Тестируем с None
+            try:
+                is_valid = verify_password(None, hashed_password)
+                print(f"   None пароль: {'✅' if is_valid else '❌'}")
+            except Exception as e:
+                print(f"   None пароль: ❌ Ошибка: {e}")
                 
-        else:
-            print("❌ Пользователь admin@example.com не найден в БД")
-            
     except Exception as e:
-        print(f"❌ Ошибка при проверке БД: {e}")
-    finally:
-        db.close()
+        print(f"❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    print("🧪 Тестирование верификации паролей...")
     test_password_verification()
-
