@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Camera, 
   Activity, 
@@ -48,9 +49,31 @@ import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 const DermatologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
   const { theme, isDark, getColor, getSpacing, getFontSize } = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
   
-  const [activeTab, setActiveTab] = useState('queue');
+  // Синхронизация активной вкладки с URL
+  const getActiveTabFromURL = () => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'queue';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
   const [selectedPatient, setSelectedPatient] = useState(null);
+  
+  // Синхронизация URL с активной вкладкой
+  useEffect(() => {
+    const urlTab = getActiveTabFromURL();
+    if (urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [location.search]);
+  
+  // Функция для изменения активной вкладки с обновлением URL
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    navigate(`/dermatologist?tab=${tabId}`, { replace: true });
+  };
   const [selectedServices, setSelectedServices] = useState([]);
   const [visitData, setVisitData] = useState({
     complaint: '',
@@ -153,6 +176,28 @@ const DermatologistPanelUnified = () => {
     }
   }, [selectedPatient]);
 
+  // Функция для получения всех услуг пациента из всех записей
+  const getAllPatientServices = useCallback((patientId, allAppointments) => {
+    const patientServices = new Set();
+    const patientServiceCodes = new Set();
+    
+    allAppointments.forEach(appointment => {
+      if (appointment.patient_id === patientId) {
+        if (appointment.services && Array.isArray(appointment.services)) {
+          appointment.services.forEach(service => patientServices.add(service));
+        }
+        if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
+          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+        }
+      }
+    });
+    
+    return {
+      services: Array.from(patientServices),
+      service_codes: Array.from(patientServiceCodes)
+    };
+  }, []);
+
   // Загрузка записей дерматолога
   const loadDermatologyAppointments = async () => {
     setAppointmentsLoading(true);
@@ -164,7 +209,8 @@ const DermatologistPanelUnified = () => {
         return;
       }
       
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=derma', {
+      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -174,34 +220,54 @@ const DermatologistPanelUnified = () => {
       if (response.ok) {
         const data = await response.json();
         
-        // Обрабатываем данные из API
-        let appointmentsData = [];
+        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
+        let allAppointments = [];
         if (data && data.queues && Array.isArray(data.queues)) {
-          const dermaQueue = data.queues.find(queue => 
-            queue.specialty === 'derma' || queue.specialty === 'dermatology'
-          );
-          
-          if (dermaQueue && dermaQueue.entries) {
-            appointmentsData = dermaQueue.entries.map(entry => ({
-              id: entry.id,
-              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-              patient_phone: entry.patient?.phone || entry.phone || '',
-              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
-              address: entry.patient?.address || entry.address || '',
-              visit_type: entry.visit_type || 'Платный',
-              services: entry.services || [],
-              payment_type: entry.payment_status || 'Не оплачено',
-              doctor: entry.doctor_name || 'Дерматолог',
-              date: entry.appointment_date || new Date().toISOString().split('T')[0],
-              time: entry.appointment_time || '09:00',
-              status: entry.status || 'Ожидает',
-              cost: entry.total_cost || 0,
-              payment: entry.payment_status || 'Не оплачено'
-            }));
-          }
+          data.queues.forEach(queue => {
+            if (queue.entries) {
+              queue.entries.forEach(entry => {
+                allAppointments.push({
+                  id: entry.id,
+                  patient_id: entry.patient_id,
+                  patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+                  patient_phone: entry.phone || '',
+                  patient_birth_year: entry.patient_birth_year || '',
+                  address: entry.address || '',
+                  visit_type: entry.discount_mode === 'paid' ? 'Оплачено' : 'Платный',
+                  discount_mode: entry.discount_mode || 'none',
+                  services: entry.services || [],
+                  service_codes: entry.service_codes || [],
+                  payment_type: entry.payment_status || 'Не оплачено',
+                  payment_status: entry.payment_status || 'pending',
+                  doctor: entry.doctor_name || 'Врач',
+                  specialty: queue.specialty,
+                  created_at: entry.created_at,
+                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                  appointment_time: entry.visit_time || '09:00',
+                  status: entry.status || 'waiting',
+                  cost: entry.cost || 0
+                });
+              });
+            }
+          });
         }
+
+        // Фильтруем только дерматологические записи для отображения
+        const appointmentsData = allAppointments.filter(apt => 
+          apt.specialty === 'derma' || apt.specialty === 'dermatology'
+        );
+
+        // Добавляем информацию о всех услугах пациента в каждую запись
+        const enrichedAppointmentsData = appointmentsData.map(apt => {
+          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+          return {
+            ...apt,
+            all_patient_services: allPatientServices.services,
+            all_patient_service_codes: allPatientServices.service_codes
+          };
+        });
         
-        setAppointments(appointmentsData);
+        setAppointments(enrichedAppointmentsData);
       }
     } catch (error) {
       console.error('Ошибка загрузки записей дерматолога:', error);
@@ -231,7 +297,7 @@ const DermatologistPanelUnified = () => {
         source: 'appointments'
       };
       setSelectedPatient(patientData);
-      setActiveTab('visit');
+        handleTabChange('visit');
     }
   };
 
@@ -444,7 +510,7 @@ const DermatologistPanelUnified = () => {
   // Обработка выбора пациента из очереди
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
-    setActiveTab('visit');
+        handleTabChange('visit');
     setMessage({ type: 'info', text: `Выбран пациент: ${patient.patient_name}` });
   };
 
@@ -491,7 +557,7 @@ const DermatologistPanelUnified = () => {
         setSelectedPatient(null);
         setSelectedServices([]);
         setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-        setActiveTab('queue');
+        handleTabChange('queue');
       } else {
         const error = await response.json();
         throw new Error(error.detail);
@@ -615,42 +681,18 @@ const DermatologistPanelUnified = () => {
   };
 
   return (
-    <div style={pageStyle}>
-      {/* Заголовок */}
-      <div style={headerStyle}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center">
-              <Camera className="mr-3 text-orange-600" size={28} />
-              Панель дерматолога
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Унифицированная панель с фото до/после, осмотрами кожи и косметологией
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="primary"
-              onClick={() => setScheduleNextModal({ open: true, patient: selectedPatient?.patient || null })}
-              className="flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Назначить следующий визит
-            </Button>
-          </div>
-          
-          {selectedPatient && (
-            <div className="text-right">
-              <div className="font-medium">Пациент: {selectedPatient.patient_name}</div>
-              <div className="text-sm text-gray-500">Номер: #{selectedPatient.number}</div>
-              <Badge variant="info" className="mt-1">
-                {selectedPatient.source === 'online' ? '📱 Онлайн' : '🏥 Регистратура'}
-              </Badge>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="dermatologist-panel" style={{
+      ...pageStyle,
+      padding: '20px',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+      width: '100%',
+      position: 'relative',
+      zIndex: 1,
+      display: 'block',
+      maxWidth: '100%',
+      margin: 0
+    }}>
 
       {/* Сообщения */}
       {message.text && (
@@ -670,24 +712,6 @@ const DermatologistPanelUnified = () => {
         </div>
       )}
 
-      {/* Навигация по вкладкам */}
-      <div className="flex space-x-2 mb-6 overflow-x-auto">
-        {tabs.map(tab => {
-          const isActive = activeTab === tab.id;
-          const TabIcon = tab.icon;
-          
-          return (
-            <button
-              key={tab.id}
-              style={isActive ? activeTabStyle : tabStyle}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <TabIcon size={18} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
 
       {/* Контент вкладок */}
       <div>
@@ -703,7 +727,7 @@ const DermatologistPanelUnified = () => {
                 department="Derma"
                 onSelectAppointment={(appointment) => {
                   setCurrentAppointment(appointment);
-                  setActiveTab('visit');
+                  handleTabChange('visit');
                 }}
                 onStartVisit={startVisit}
               />
@@ -713,8 +737,20 @@ const DermatologistPanelUnified = () => {
 
         {/* Записи дерматолога */}
         {activeTab === 'appointments' && (
-          <div className="space-y-6">
-            <Card className="p-6">
+          <div style={{ 
+            width: '100%', 
+            maxWidth: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <Card padding="lg" style={{
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              boxSizing: 'border-box',
+              overflow: 'hidden'
+            }}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium flex items-center">
                   <Calendar size={20} className="mr-2 text-green-600" />
@@ -741,19 +777,12 @@ const DermatologistPanelUnified = () => {
                 loading={appointmentsLoading}
                 theme={isDark ? 'dark' : 'light'}
                 language="ru"
-                selectedRows={appointmentsSelected}
+                selectedRows={new Set()}
                 outerBorder={false}
                 services={{}}
                 showCheckboxes={false}
-                onRowSelect={(id, checked) => {
-                  const newSelected = new Set(appointmentsSelected);
-                  if (checked) {
-                    newSelected.add(id);
-                  } else {
-                    newSelected.delete(id);
-                  }
-                  setAppointmentsSelected(newSelected);
-                }}
+                view="doctor"
+                onRowSelect={() => {}}
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick}
               />
@@ -1052,7 +1081,7 @@ const DermatologistPanelUnified = () => {
                   variant="outline"
                   onClick={() => {
                     setSelectedPatient(null);
-                    setActiveTab('queue');
+                    handleTabChange('queue');
                   }}
                 >
                   Отменить

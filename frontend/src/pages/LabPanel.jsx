@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AIAssistant from '../components/ai/AIAssistant';
 import LabResultsManager from '../components/laboratory/LabResultsManager';
 import LabReportGenerator from '../components/laboratory/LabReportGenerator';
@@ -8,7 +9,30 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 import useModal from '../hooks/useModal';
 
 const LabPanel = () => {
-  const [activeTab, setActiveTab] = useState('tests');
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Синхронизация активной вкладки с URL
+  const getActiveTabFromURL = () => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'tests';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
+  
+  // Синхронизация URL с активной вкладкой
+  useEffect(() => {
+    const urlTab = getActiveTabFromURL();
+    if (urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [location.search]);
+  
+  // Функция для изменения активной вкладки с обновлением URL
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    navigate(`/lab-panel?tab=${tabId}`, { replace: true });
+  };
   const [tests, setTests] = useState([]);
   const [results, setResults] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -36,6 +60,28 @@ const LabPanel = () => {
     loadResults();
   }, []);
 
+  // Функция для получения всех услуг пациента из всех записей
+  const getAllPatientServices = useCallback((patientId, allAppointments) => {
+    const patientServices = new Set();
+    const patientServiceCodes = new Set();
+    
+    allAppointments.forEach(appointment => {
+      if (appointment.patient_id === patientId) {
+        if (appointment.services && Array.isArray(appointment.services)) {
+          appointment.services.forEach(service => patientServices.add(service));
+        }
+        if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
+          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+        }
+      }
+    });
+    
+    return {
+      services: Array.from(patientServices),
+      service_codes: Array.from(patientServiceCodes)
+    };
+  }, []);
+
   // Загрузка записей лаборатории
   const loadLabAppointments = async () => {
     setAppointmentsLoading(true);
@@ -47,7 +93,8 @@ const LabPanel = () => {
         return;
       }
       
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=lab', {
+      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -57,34 +104,54 @@ const LabPanel = () => {
       if (response.ok) {
         const data = await response.json();
         
-        // Обрабатываем данные из API
-        let appointmentsData = [];
+        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
+        let allAppointments = [];
         if (data && data.queues && Array.isArray(data.queues)) {
-          const labQueue = data.queues.find(queue => 
-            queue.specialty === 'lab' || queue.specialty === 'laboratory'
-          );
-          
-          if (labQueue && labQueue.entries) {
-            appointmentsData = labQueue.entries.map(entry => ({
-              id: entry.id,
-              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-              patient_phone: entry.patient?.phone || entry.phone || '',
-              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
-              address: entry.patient?.address || entry.address || '',
-              visit_type: entry.visit_type || 'Платный',
-              services: entry.services || [],
-              payment_type: entry.payment_status || 'Не оплачено',
-              doctor: entry.doctor_name || 'Лаборатория',
-              date: entry.appointment_date || new Date().toISOString().split('T')[0],
-              time: entry.appointment_time || '09:00',
-              status: entry.status || 'Ожидает',
-              cost: entry.total_cost || 0,
-              payment: entry.payment_status || 'Не оплачено'
-            }));
-          }
+          data.queues.forEach(queue => {
+            if (queue.entries) {
+              queue.entries.forEach(entry => {
+                allAppointments.push({
+                  id: entry.id,
+                  patient_id: entry.patient_id,
+                  patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+                  patient_phone: entry.phone || '',
+                  patient_birth_year: entry.patient_birth_year || '',
+                  address: entry.address || '',
+                  visit_type: entry.discount_mode === 'paid' ? 'Оплачено' : 'Платный',
+                  discount_mode: entry.discount_mode || 'none',
+                  services: entry.services || [],
+                  service_codes: entry.service_codes || [],
+                  payment_type: entry.payment_status || 'Не оплачено',
+                  payment_status: entry.payment_status || 'pending',
+                  doctor: entry.doctor_name || 'Врач',
+                  specialty: queue.specialty,
+                  created_at: entry.created_at,
+                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                  appointment_time: entry.visit_time || '09:00',
+                  status: entry.status || 'waiting',
+                  cost: entry.cost || 0
+                });
+              });
+            }
+          });
         }
+
+        // Фильтруем только лабораторные записи для отображения
+        const appointmentsData = allAppointments.filter(apt => 
+          apt.specialty === 'lab' || apt.specialty === 'laboratory'
+        );
+
+        // Добавляем информацию о всех услугах пациента в каждую запись
+        const enrichedAppointmentsData = appointmentsData.map(apt => {
+          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+          return {
+            ...apt,
+            all_patient_services: allPatientServices.services,
+            all_patient_service_codes: allPatientServices.service_codes
+          };
+        });
         
-        setAppointments(appointmentsData);
+        setAppointments(enrichedAppointmentsData);
       }
     } catch (error) {
       console.error('Ошибка загрузки записей лаборатории:', error);
@@ -240,20 +307,21 @@ const LabPanel = () => {
   const labelStyle = { display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' };
 
   return (
-    <div style={pageStyle}>
-      <div style={{ marginBottom: '30px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px', color: '#28a745' }}>🧪 Лабораторная панель</h1>
-        <p style={{ color: '#666', fontSize: '14px' }}>Анализы, результаты, пациенты и отчеты</p>
-      </div>
-
-      <div style={tabsStyle}>
-        <button style={activeTab === 'tests' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('tests')}>🧪 Анализы</button>
-        <button style={activeTab === 'appointments' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('appointments')}>📅 Записи</button>
-        <button style={activeTab === 'results' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('results')}>📊 Результаты</button>
-        <button style={activeTab === 'patients' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('patients')}>👥 Пациенты</button>
-        <button style={activeTab === 'reports' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('reports')}>📋 Отчеты</button>
-        <button style={activeTab === 'ai' ? activeTabStyle : tabStyle} onClick={() => setActiveTab('ai')}>🧠 AI Анализ</button>
-      </div>
+    <div className="lab-panel" style={{
+      padding: '20px',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+      width: '100%',
+      position: 'relative',
+      zIndex: 1,
+      display: 'block',
+      maxWidth: '100%',
+      margin: 0,
+      minHeight: '100vh',
+      background: 'var(--bg-primary)',
+      color: 'var(--text-primary)',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
 
       {activeTab === 'tests' && (
         <div>
@@ -285,8 +353,21 @@ const LabPanel = () => {
       )}
 
       {activeTab === 'appointments' && (
-        <div>
-          <div style={cardStyle}>
+        <div style={{ 
+          width: '100%', 
+          maxWidth: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px'
+        }}>
+          <div style={{
+            ...cardStyle,
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
+            overflow: 'hidden'
+          }}>
             <div style={cardHeaderStyle}>
               <h2 style={{ margin: 0, fontSize: '18px' }}>📅 Записи в лабораторию</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -306,19 +387,12 @@ const LabPanel = () => {
                 loading={appointmentsLoading}
                 theme="light"
                 language="ru"
-                selectedRows={appointmentsSelected}
+                selectedRows={new Set()}
                 outerBorder={false}
                 services={{}}
                 showCheckboxes={false}
-                onRowSelect={(id, checked) => {
-                  const newSelected = new Set(appointmentsSelected);
-                  if (checked) {
-                    newSelected.add(id);
-                  } else {
-                    newSelected.delete(id);
-                  }
-                  setAppointmentsSelected(newSelected);
-                }}
+                view="doctor"
+                onRowSelect={() => {}}
                 onRowClick={handleAppointmentRowClick}
                 onActionClick={handleAppointmentActionClick}
               />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -131,6 +131,28 @@ const CardiologistPanelUnified = () => {
     navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
   };
 
+  // Функция для получения всех услуг пациента из всех записей
+  const getAllPatientServices = useCallback((patientId, allAppointments) => {
+    const patientServices = new Set();
+    const patientServiceCodes = new Set();
+    
+    allAppointments.forEach(appointment => {
+      if (appointment.patient_id === patientId) {
+        if (appointment.services && Array.isArray(appointment.services)) {
+          appointment.services.forEach(service => patientServices.add(service));
+        }
+        if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
+          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+        }
+      }
+    });
+    
+    return {
+      services: Array.from(patientServices),
+      service_codes: Array.from(patientServiceCodes)
+    };
+  }, []);
+
   // Загрузка записей кардиолога
   const loadCardiologyAppointments = async () => {
     setAppointmentsLoading(true);
@@ -142,7 +164,8 @@ const CardiologistPanelUnified = () => {
         return;
       }
       
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=cardio', {
+      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -152,34 +175,54 @@ const CardiologistPanelUnified = () => {
       if (response.ok) {
         const data = await response.json();
         
-        // Обрабатываем данные из API
-        let appointmentsData = [];
+        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
+        let allAppointments = [];
         if (data && data.queues && Array.isArray(data.queues)) {
-          const cardioQueue = data.queues.find(queue => 
-            queue.specialty === 'cardio' || queue.specialty === 'cardiology'
-          );
-          
-          if (cardioQueue && cardioQueue.entries) {
-            appointmentsData = cardioQueue.entries.map(entry => ({
-              id: entry.id,
-              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-              patient_phone: entry.patient?.phone || entry.phone || '',
-              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
-              address: entry.patient?.address || entry.address || '',
-              visit_type: entry.visit_type || 'Платный',
-              services: entry.services || [],
-              payment_type: entry.payment_status || 'Не оплачено',
-              doctor: entry.doctor_name || 'Кардиолог',
-              date: entry.appointment_date || new Date().toISOString().split('T')[0],
-              time: entry.appointment_time || '09:00',
-              status: entry.status || 'Ожидает',
-              cost: entry.total_cost || 0,
-              payment: entry.payment_status || 'Не оплачено'
-            }));
-          }
+          data.queues.forEach(queue => {
+            if (queue.entries) {
+              queue.entries.forEach(entry => {
+                allAppointments.push({
+                  id: entry.id,
+                  patient_id: entry.patient_id,
+                  patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+                  patient_phone: entry.phone || '',
+                  patient_birth_year: entry.patient_birth_year || '',
+                  address: entry.address || '',
+                  visit_type: entry.discount_mode === 'paid' ? 'Оплачено' : 'Платный',
+                  discount_mode: entry.discount_mode || 'none',
+                  services: entry.services || [],
+                  service_codes: entry.service_codes || [],
+                  payment_type: entry.payment_status || 'Не оплачено',
+                  payment_status: entry.payment_status || 'pending',
+                  doctor: entry.doctor_name || 'Врач',
+                  specialty: queue.specialty,
+                  created_at: entry.created_at,
+                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                  appointment_time: entry.visit_time || '09:00',
+                  status: entry.status || 'waiting',
+                  cost: entry.cost || 0
+                });
+              });
+            }
+          });
         }
+
+        // Фильтруем только кардиологические записи для отображения
+        const appointmentsData = allAppointments.filter(apt => 
+          apt.specialty === 'cardio' || apt.specialty === 'cardiology'
+        );
+
+        // Добавляем информацию о всех услугах пациента в каждую запись
+        const enrichedAppointmentsData = appointmentsData.map(apt => {
+          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+          return {
+            ...apt,
+            all_patient_services: allPatientServices.services,
+            all_patient_service_codes: allPatientServices.service_codes
+          };
+        });
         
-        setAppointments(appointmentsData);
+        setAppointments(enrichedAppointmentsData);
       }
     } catch (error) {
       console.error('Ошибка загрузки записей кардиолога:', error);

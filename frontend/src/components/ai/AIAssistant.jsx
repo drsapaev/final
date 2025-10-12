@@ -37,28 +37,32 @@ const AIAssistant = ({
   onResult,
   title = "AI Ассистент",
   expanded = true,
-  useMCP = true  // Использовать MCP по умолчанию
+  useMCP = true,  // Использовать MCP по умолчанию
+  providerOptions = ['deepseek', 'gemini', 'openai', 'default'] // Доступные AI провайдеры
 }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [provider, setProvider] = useState('default');
+  const [provider, setProvider] = useState('deepseek'); // DeepSeek по умолчанию
+  const [retryCount, setRetryCount] = useState(0);
   const { enqueueSnackbar } = useSnackbar();
 
-  const analyzeData = async () => {
+  const analyzeData = async (manualRetry = false) => {
     setLoading(true);
     setError(null);
-    setResult(null);
+    if (!manualRetry) {
+      setResult(null);
+      setRetryCount(0);
+    }
 
     try {
       let response;
-      const config = { provider };
+      let mcpResult;
 
       switch (analysisType) {
         case 'complaint':
           if (useMCP) {
-            // Используем MCP для анализа жалоб
-            const mcpResult = await mcpAPI.analyzeComplaint({
+            mcpResult = await mcpAPI.analyzeComplaint({
               complaint: data.complaint,
               patientAge: data.patient_age,
               patientGender: data.patient_gender,
@@ -71,48 +75,121 @@ const AIAssistant = ({
               throw new Error(mcpResult.error || 'MCP analysis failed');
             }
           } else {
-            // Используем прямой API
             response = await apiClient.post('/api/v1/ai/complaint-to-plan', {
               ...data,
-              ...config,
+              provider,
               use_mcp: false
             });
           }
           break;
 
         case 'icd10':
-          response = await apiClient.post('/api/v1/ai/icd-suggest', {
-            ...data,
-            ...config
-          });
+          if (useMCP) {
+            mcpResult = await mcpAPI.suggestICD10({
+              symptoms: data.symptoms || [],
+              diagnosis: data.diagnosis,
+              specialty: data.specialty,
+              provider: provider,
+              maxSuggestions: data.maxSuggestions || 5
+            });
+            
+            if (mcpResult.status === 'success') {
+              // Поддержка нового формата с clinical_recommendations
+              if (mcpResult.data.clinical_recommendations) {
+                response = { data: mcpResult.data };
+              } else if (mcpResult.data.suggestions) {
+                response = { data: mcpResult.data.suggestions };
+              } else {
+                response = { data: [] };
+              }
+            } else {
+              throw new Error(mcpResult.error || 'MCP ICD10 suggestion failed');
+            }
+          } else {
+            response = await apiClient.post('/api/v1/ai/icd-suggest', {
+              ...data,
+              provider
+            });
+          }
           break;
 
         case 'lab':
-          response = await apiClient.post('/api/v1/ai/lab-interpret', {
-            ...data,
-            ...config
-          });
+          if (useMCP) {
+            mcpResult = await mcpAPI.interpretLabResults({
+              results: data.results || data.lab_results,
+              patientAge: data.patient_age,
+              patientGender: data.patient_gender,
+              provider: provider,
+              includeRecommendations: true
+            });
+            
+            if (mcpResult.status === 'success') {
+              response = { data: mcpResult.data };
+            } else {
+              throw new Error(mcpResult.error || 'MCP lab interpretation failed');
+            }
+          } else {
+            response = await apiClient.post('/api/v1/ai/lab-interpret', {
+              ...data,
+              provider
+            });
+          }
           break;
 
         case 'ecg':
           response = await apiClient.post('/api/v1/ai/ecg-interpret', {
             ...data,
-            ...config
+            provider
           });
           break;
 
         case 'skin':
-          const formData = new FormData();
-          formData.append('image', data.image);
-          if (data.metadata) {
-            formData.append('metadata', JSON.stringify(data.metadata));
+          if (useMCP && data.image) {
+            mcpResult = await mcpAPI.analyzeSkinLesion(
+              data.image,
+              data.lesionInfo,
+              data.patientHistory,
+              provider
+            );
+            
+            if (mcpResult.status === 'success') {
+              response = { data: mcpResult.data };
+            } else {
+              throw new Error(mcpResult.error || 'MCP skin analysis failed');
+            }
+          } else {
+            const formData = new FormData();
+            formData.append('image', data.image);
+            if (data.metadata) {
+              formData.append('metadata', JSON.stringify(data.metadata));
+            }
+            formData.append('provider', provider);
+            response = await apiClient.post('/api/v1/ai/skin-analyze', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
           }
-          if (config.provider) {
-            formData.append('provider', config.provider);
+          break;
+
+        case 'imaging':
+          if (useMCP && data.image) {
+            mcpResult = await mcpAPI.analyzeImage(
+              data.image,
+              data.imageType || 'general',
+              {
+                modality: data.modality,
+                clinicalContext: data.clinicalContext,
+                provider: provider
+              }
+            );
+            
+            if (mcpResult.status === 'success') {
+              response = { data: mcpResult.data };
+            } else {
+              throw new Error(mcpResult.error || 'MCP imaging analysis failed');
+            }
+          } else {
+            throw new Error('Imaging analysis requires MCP mode');
           }
-          response = await apiClient.post('/api/v1/ai/skin-analyze', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
           break;
 
         default:
@@ -124,9 +201,12 @@ const AIAssistant = ({
         onResult(response.data);
       }
       enqueueSnackbar('AI анализ завершен', { variant: 'success' });
+      setRetryCount(0);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message);
-      enqueueSnackbar('Ошибка AI анализа', { variant: 'error' });
+      const errorMsg = err.response?.data?.detail || err.message;
+      setError(errorMsg);
+      enqueueSnackbar(`Ошибка AI анализа: ${errorMsg}`, { variant: 'error' });
+      setRetryCount(prev => prev + 1);
     } finally {
       setLoading(false);
     }
@@ -234,6 +314,59 @@ const AIAssistant = ({
   };
 
   const renderICD10Result = () => {
+    // Поддержка нового формата с clinical_recommendations
+    if (result && result.clinical_recommendations) {
+      return (
+        <Box>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+              {result.clinical_recommendations}
+            </Typography>
+          </Alert>
+          
+          {result.suggestions && result.suggestions.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Коды МКБ-10:
+              </Typography>
+              <List>
+                {result.suggestions.map((item, idx) => (
+                  <ListItem
+                    key={idx}
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}
+                      >
+                        <ContentCopy />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemText
+                      primary={`${item.code} - ${item.name || item.description}`}
+                      secondary={
+                        item.relevance && (
+                          <Chip
+                            label={item.relevance}
+                            size="small"
+                            color={
+                              item.relevance === 'высокая' ? 'success' :
+                              item.relevance === 'средняя' ? 'warning' : 'default'
+                            }
+                          />
+                        )
+                      }
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </Box>
+      );
+    }
+
+    // Старый формат - простой массив кодов
     if (!result || !Array.isArray(result)) return null;
 
     return (
@@ -244,23 +377,25 @@ const AIAssistant = ({
             secondaryAction={
               <IconButton
                 edge="end"
-                onClick={() => copyToClipboard(`${item.code} - ${item.name}`)}
+                onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}
               >
                 <ContentCopy />
               </IconButton>
             }
           >
             <ListItemText
-              primary={`${item.code} - ${item.name}`}
+              primary={`${item.code} - ${item.name || item.description}`}
               secondary={
-                <Chip
-                  label={item.relevance}
-                  size="small"
-                  color={
-                    item.relevance === 'высокая' ? 'success' :
-                    item.relevance === 'средняя' ? 'warning' : 'default'
-                  }
-                />
+                item.relevance && (
+                  <Chip
+                    label={item.relevance}
+                    size="small"
+                    color={
+                      item.relevance === 'высокая' ? 'success' :
+                      item.relevance === 'средняя' ? 'warning' : 'default'
+                    }
+                  />
+                )
               }
             />
           </ListItem>
@@ -491,11 +626,29 @@ const AIAssistant = ({
         <Box display="flex" alignItems="center" gap={1}>
           <Psychology color="primary" />
           <Typography variant="h6">{title}</Typography>
+          {useMCP && (
+            <Chip label="MCP" size="small" color="success" variant="outlined" />
+          )}
         </Box>
-        <Box>
+        <Box display="flex" alignItems="center" gap={1}>
+          {/* Выбор AI провайдера */}
+          <Stack direction="row" spacing={0.5}>
+            {providerOptions.map((prov) => (
+              <Chip
+                key={prov}
+                label={prov.toUpperCase()}
+                size="small"
+                color={provider === prov ? 'primary' : 'default'}
+                variant={provider === prov ? 'filled' : 'outlined'}
+                onClick={() => setProvider(prov)}
+                disabled={loading}
+              />
+            ))}
+          </Stack>
+          
           <Tooltip title="Повторить анализ">
             <IconButton 
-              onClick={analyzeData} 
+              onClick={() => analyzeData(true)} 
               disabled={loading || !data}
               size="small"
             >
@@ -508,8 +661,11 @@ const AIAssistant = ({
       <Divider sx={{ mb: 2 }} />
 
       {loading ? (
-        <Box display="flex" justifyContent="center" p={4}>
+        <Box display="flex" flexDirection="column" alignItems="center" p={4}>
           <CircularProgress />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Анализ через {provider.toUpperCase()} AI...
+          </Typography>
         </Box>
       ) : (
         renderResult()
@@ -518,6 +674,14 @@ const AIAssistant = ({
       {!result && !loading && !error && (
         <Alert severity="info">
           Нажмите кнопку обновления для запуска AI анализа
+        </Alert>
+      )}
+      
+      {error && retryCount > 0 && (
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          <Typography variant="body2">
+            Попытка {retryCount}. Попробуйте сменить AI провайдер или повторить запрос.
+          </Typography>
         </Alert>
       )}
     </Paper>
