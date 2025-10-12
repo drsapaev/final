@@ -431,8 +431,10 @@ const DentistPanelUnified = () => {
 
   const loadDentalExaminations = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/dental/examinations?limit=100', { headers: authHeader() });
-      if (res.ok) setDentalExaminations(await res.json());
+      // TODO: Implement dental examinations endpoint
+      // const res = await fetch('http://localhost:8000/api/v1/dental/examinations?limit=100', { headers: authHeader() });
+      // if (res.ok) setDentalExaminations(await res.json());
+      console.log('Dental examinations endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки обследований
     }
@@ -440,8 +442,10 @@ const DentistPanelUnified = () => {
 
   const loadTreatmentPlans = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/dental/treatments?limit=100', { headers: authHeader() });
-      if (res.ok) setTreatmentPlans(await res.json());
+      // TODO: Implement treatment plans endpoint
+      // const res = await fetch('http://localhost:8000/api/v1/dental/treatments?limit=100', { headers: authHeader() });
+      // if (res.ok) setTreatmentPlans(await res.json());
+      console.log('Treatment plans endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки планов лечения
     }
@@ -449,8 +453,10 @@ const DentistPanelUnified = () => {
 
   const loadProsthetics = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
-      if (res.ok) setProsthetics(await res.json());
+      // TODO: Implement prosthetics endpoint
+      // const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
+      // if (res.ok) setProsthetics(await res.json());
+      console.log('Prosthetics endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки протезирования
     }

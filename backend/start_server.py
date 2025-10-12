@@ -6,12 +6,15 @@ import os
 import sys
 import uvicorn
 
+# Получаем текущую директорию
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Устанавливаем правильные переменные окружения
 os.environ["DATABASE_URL"] = "sqlite:///./clinic.db"
-os.environ["PYTHONPATH"] = "C:\\final\\backend"
+os.environ["PYTHONPATH"] = current_dir
 
 # Добавляем путь к проекту
-sys.path.insert(0, "C:\\final\\backend")
+sys.path.insert(0, current_dir)
 
 if __name__ == "__main__":
     print("🚀 Запуск сервера с правильными настройками...")

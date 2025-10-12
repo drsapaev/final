@@ -433,7 +433,7 @@ def open_reception(
 def start_queue_visit(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "derma", "dentist", "Lab"))
 ):
     """
     Начать прием для записи в очереди (статус в процессе)
