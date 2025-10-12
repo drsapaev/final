@@ -396,8 +396,10 @@ const EnhancedAppointmentsTable = ({
   }, [services]);
 
   // Рендер услуг с динамическим маппингом
-  const renderServices = useCallback((appointmentServices) => {
-    if (!appointmentServices) return '—';
+  const renderServices = useCallback((appointmentServices, allPatientServices = null) => {
+    if (!appointmentServices) {
+      return '—';
+    }
     
     const { mapping: serviceMapping, categoryMapping } = createServiceMapping();
     
@@ -452,7 +454,9 @@ const EnhancedAppointmentsTable = ({
       return String(appointmentServices);
     }
     
-    if (servicesList.length === 0) return '—';
+    if (servicesList.length === 0) {
+      return '—';
+    }
     
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
     const compactCodes = servicesList.map((serviceName, index) => {
@@ -478,14 +482,33 @@ const EnhancedAppointmentsTable = ({
         }
       }
       
-      // Если ничего не найдено, возвращаем пустую строку для скрытия
-      return '';
-    }).filter(code => code); // Убираем пустые коды
+      // Если ничего не найдено, возвращаем само название услуги
+      return serviceName;
+    });
     
-    // Создаем tooltip в виде списка для лучшей читаемости
-    const tooltipText = servicesList.length > 1 
-      ? `Услуги:\n${servicesList.map((service, idx) => `${idx + 1}. ${service}`).join('\n')}`
-      : servicesList[0] || '';
+    // Создаем tooltip с полным списком услуг пациента
+    let tooltipText = '';
+    
+    if (allPatientServices && allPatientServices.length > 0) {
+      // Показываем все услуги пациента из всех отделений
+      tooltipText = `🏥 Все услуги пациента (${allPatientServices.length}):\n\n`;
+      allPatientServices.forEach((service, idx) => {
+        tooltipText += `${idx + 1}. ${service}\n`;
+      });
+      
+      // Добавляем информацию о текущих услугах
+      if (servicesList.length > 0) {
+        tooltipText += `\n📋 Текущие услуги (${servicesList.length}):\n`;
+        servicesList.forEach((service, idx) => {
+          tooltipText += `• ${service}\n`;
+        });
+      }
+    } else {
+      // Fallback: показываем только текущие услуги
+      tooltipText = servicesList.length > 1 
+        ? `Услуги:\n${servicesList.map((service, idx) => `${idx + 1}. ${service}`).join('\n')}`
+        : servicesList[0] || '';
+    }
     
     return (
       <div 
@@ -1429,7 +1452,7 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     minWidth: '180px'
                   }}>
-                    {renderServices(row.services)}
+                    {renderServices(row.services, row.all_patient_services)}
                   </td>
 
                   {/* Вид оплаты */}

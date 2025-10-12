@@ -27,18 +27,8 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
   const loadQueue = async () => {
     setLoading(true);
     try {
-      // Определяем правильный URL в зависимости от специалиста
-      let apiUrl = '';
-      if (specialist === 'Дерматолог') {
-        apiUrl = 'http://localhost:8000/api/v1/queue/Дерматолог/today';
-      } else if (specialist === 'Кардиолог') {
-        apiUrl = 'http://localhost:8000/api/v1/queue/Кардиолог/today';
-      } else if (specialist === 'Стоматолог') {
-        apiUrl = 'http://localhost:8000/api/v1/queue/Стоматолог/today';
-      } else {
-        // Для других специалистов используем относительный URL
-        apiUrl = `/api/v1/queue/${encodeURIComponent(specialist)}/today`;
-      }
+      // Используем новый API endpoint для получения всех очередей
+      const apiUrl = 'http://localhost:8000/api/v1/registrar/queues/today';
 
       const response = await fetch(apiUrl, {
         headers: {
@@ -48,7 +38,35 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
       
       if (response.ok) {
         const data = await response.json();
-        setQueue(data.queue || []);
+        
+        // Обрабатываем новую структуру API с массивами очередей
+        let queueEntries = [];
+        if (data && data.queues && Array.isArray(data.queues)) {
+          // Находим очередь для текущего специалиста
+          const specialistQueue = data.queues.find(queue => {
+            const queueSpecialty = queue.specialty;
+            if (specialist === 'Дерматолог') {
+              return queueSpecialty === 'derma' || queueSpecialty === 'dermatology';
+            } else if (specialist === 'Кардиолог') {
+              return queueSpecialty === 'cardio' || queueSpecialty === 'cardiology';
+            } else if (specialist === 'Стоматолог') {
+              return queueSpecialty === 'dental' || queueSpecialty === 'dentist' || queueSpecialty === 'dentistry';
+            }
+            return false;
+          });
+          
+          if (specialistQueue && specialistQueue.entries) {
+            queueEntries = specialistQueue.entries.map(entry => ({
+              id: entry.id,
+              patient_name: entry.patient_name,
+              number: entry.number,
+              status: entry.status,
+              created_at: entry.created_at
+            }));
+          }
+        }
+        
+        setQueue(queueEntries);
       }
     } catch (error) {
       console.error('QueueIntegration: Load queue error:', error);
@@ -59,34 +77,23 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
 
   const callPatient = async (patient) => {
     try {
-      // Определяем правильный URL в зависимости от специалиста
-      let apiUrl = '';
-      if (specialist === 'Дерматолог') {
-        apiUrl = 'http://localhost:8000/api/v1/queue/Дерматолог/call';
-      } else if (specialist === 'Кардиолог') {
-        apiUrl = 'http://localhost:8000/api/v1/queue/Кардиолог/call';
-      } else if (specialist === 'Стоматолог') {
-        apiUrl = 'http://localhost:8000/api/v1/queue/Стоматолог/call';
-      } else {
-        apiUrl = `/api/v1/queue/${encodeURIComponent(specialist)}/call`;
-      }
+      // Используем новый API endpoint для вызова пациента
+      const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${patient.id}/start-visit`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({
-          patient_id: patient.id,
-          number: patient.number
-        })
+        }
       });
 
       if (response.ok) {
         setCurrentCall(patient);
-        // Убираем пациента из очереди
-        setQueue(prev => prev.filter(p => p.id !== patient.id));
+        // Обновляем статус пациента в очереди
+        setQueue(prev => prev.map(p => 
+          p.id === patient.id ? { ...p, status: 'called' } : p
+        ));
         
         // Автоматически скрываем вызов через 30 секунд
         setTimeout(() => {

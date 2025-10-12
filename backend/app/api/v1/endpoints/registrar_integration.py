@@ -710,7 +710,12 @@ def get_today_queues(
                     
                     # Загружаем услуги из appointment
                     if hasattr(appointment, 'services') and appointment.services:
-                        services = appointment.services if isinstance(appointment.services, list) else []
+                        if isinstance(appointment.services, list):
+                            services = appointment.services
+                            # Если services содержит коды услуг (например, "ECG-001"), добавляем их в service_codes
+                            for service in services:
+                                if isinstance(service, str) and '-' in service:
+                                    service_codes.append(service)
                     
                     # Стоимость
                     if hasattr(appointment, 'payment_amount') and appointment.payment_amount:

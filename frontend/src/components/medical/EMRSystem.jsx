@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Save, Plus, X, Camera, Upload, AlertCircle, CheckCircle, Brain } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../../constants/appointmentStatus';
 import { AIButton, AISuggestions, AIAssistant } from '../ai';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { Box, Grid, Divider } from '@mui/material';
+import { useDebounce } from '../../utils/debounce';
 
 const EMRSystem = ({ appointment, onSave, onComplete }) => {
-  // Используем AI хук для работы с искусственным интеллектом
+  // Используем AI хук для работы с искусственным интеллектом через MCP
   const {
     loading: aiLoading,
     error: aiError,
     icd10Suggestions,
+    clinicalRecommendations,
     getICD10Suggestions,
     analyzeComplaints,
+    analyzeSkinLesion,
+    analyzeImage,
     clearError
-  } = useEMRAI();
+  } = useEMRAI(true, 'deepseek'); // Используем MCP с DeepSeek по умолчанию
 
   const [emrData, setEmrData] = useState({
     complaints: '',           // Жалобы
@@ -32,6 +36,8 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [selectedImageForAI, setSelectedImageForAI] = useState(null);
+  const [imageAnalysisResult, setImageAnalysisResult] = useState(null);
 
   useEffect(() => {
     // Загрузка существующего EMR
@@ -124,6 +130,22 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
     }
   };
 
+  // Debounced автоматический запрос МКБ-10 подсказок при вводе диагноза
+  const debouncedICD10Request = useDebounce(
+    useCallback(async (complaints, diagnosis) => {
+      if ((complaints || diagnosis) && canSaveEMR) {
+        await getICD10Suggestions(complaints, diagnosis, appointment?.specialty);
+      }
+    }, [getICD10Suggestions, canSaveEMR, appointment?.specialty]),
+    800 // 800ms задержка
+  );
+
+  // Обработка изменения диагноза с автоподсказками
+  const handleDiagnosisChange = (value) => {
+    handleFieldChange('diagnosis', value);
+    debouncedICD10Request(emrData.complaints, value);
+  };
+
   const canStartEMR = appointment?.status === APPOINTMENT_STATUS.PAID;
   const canSaveEMR = appointment?.status === APPOINTMENT_STATUS.IN_VISIT;
   const canComplete = canSaveEMR && !emrData.isDraft;
@@ -202,7 +224,27 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
         {/* Анамнез */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Анамнез</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Анамнез</h3>
+            <AIButton
+              onClick={async () => {
+                if (emrData.complaints) {
+                  const result = await analyzeComplaints({
+                    complaint: emrData.complaints,
+                    patient_age: appointment?.patient?.age,
+                    patient_gender: appointment?.patient?.gender
+                  });
+                  if (result && result.patient_history) {
+                    handleFieldChange('anamnesis', result.patient_history);
+                  }
+                }
+              }}
+              loading={aiLoading}
+              variant="icon"
+              tooltip="AI помощь с анамнезом"
+              disabled={!emrData.complaints || !canSaveEMR}
+            />
+          </div>
           <textarea
             value={emrData.anamnesis}
             onChange={(e) => handleFieldChange('anamnesis', e.target.value)}
@@ -214,7 +256,28 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
         {/* Объективный осмотр */}
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Объективный осмотр</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Объективный осмотр</h3>
+            <AIButton
+              onClick={async () => {
+                if (emrData.complaints) {
+                  const result = await analyzeComplaints({
+                    complaint: emrData.complaints,
+                    patient_age: appointment?.patient?.age,
+                    patient_gender: appointment?.patient?.gender
+                  });
+                  if (result && result.examinations) {
+                    const examText = result.examinations.map(e => `${e.type}: ${e.name}`).join('\n');
+                    handleFieldChange('examination', examText);
+                  }
+                }
+              }}
+              loading={aiLoading}
+              variant="icon"
+              tooltip="AI рекомендации по осмотру"
+              disabled={!emrData.complaints || !canSaveEMR}
+            />
+          </div>
           <textarea
             value={emrData.examination}
             onChange={(e) => handleFieldChange('examination', e.target.value)}
@@ -245,8 +308,8 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
             <input
               type="text"
               value={emrData.diagnosis}
-              onChange={(e) => handleFieldChange('diagnosis', e.target.value)}
-              placeholder="Клинический диагноз"
+              onChange={(e) => handleDiagnosisChange(e.target.value)}
+              placeholder="Клинический диагноз (автоподсказки МКБ-10)"
               className="w-full p-3 border border-gray-300 rounded-lg"
               disabled={!canSaveEMR}
             />
@@ -258,14 +321,14 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
               className="w-full p-3 border border-gray-300 rounded-lg"
               disabled={!canSaveEMR}
             />
-            {icd10Suggestions.length > 0 && (
+            {(icd10Suggestions.length > 0 || clinicalRecommendations) && (
               <AISuggestions
                 suggestions={icd10Suggestions}
+                clinicalRecommendations={clinicalRecommendations}
                 type="icd10"
                 onSelect={(item) => {
                   handleFieldChange('icd10', item.code);
-                  handleFieldChange('diagnosis', item.name);
-                  setIcd10Suggestions([]);
+                  handleFieldChange('diagnosis', item.name || item.description);
                 }}
                 title="AI подсказки МКБ-10"
               />
@@ -336,7 +399,35 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
 
       {/* Рекомендации */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Рекомендации</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Рекомендации</h3>
+          <AIButton
+            onClick={async () => {
+              if (emrData.diagnosis || emrData.complaints) {
+                const result = await analyzeComplaints({
+                  complaint: emrData.complaints,
+                  diagnosis: emrData.diagnosis,
+                  patient_age: appointment?.patient?.age,
+                  patient_gender: appointment?.patient?.gender
+                });
+                if (result && result.lab_tests) {
+                  const recommendations = [
+                    'Лабораторные исследования:',
+                    ...result.lab_tests,
+                    '',
+                    'Дополнительное обследование:',
+                    ...(result.imaging_studies || [])
+                  ].join('\n');
+                  handleFieldChange('recommendations', recommendations);
+                }
+              }
+            }}
+            loading={aiLoading}
+            variant="icon"
+            tooltip="AI рекомендации по лечению"
+            disabled={(!emrData.diagnosis && !emrData.complaints) || !canSaveEMR}
+          />
+        </div>
         <textarea
           value={emrData.recommendations}
           onChange={(e) => handleFieldChange('recommendations', e.target.value)}
@@ -380,11 +471,51 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {emrData.attachments.map(attachment => (
-              <div key={attachment.id} className="p-3 border border-gray-200 rounded-lg">
+              <div key={attachment.id} className="p-3 border border-gray-200 rounded-lg relative">
                 <div className="text-sm font-medium truncate">{attachment.name}</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 mb-2">
                   {(attachment.size / 1024).toFixed(1)} KB
                 </div>
+                
+                {/* AI анализ для изображений */}
+                {attachment.type?.startsWith('image/') && (
+                  <AIButton
+                    onClick={async () => {
+                      setSelectedImageForAI(attachment);
+                      try {
+                        const result = attachment.category === 'examination' 
+                          ? await analyzeSkinLesion(
+                              attachment.file,
+                              { location: 'Не указано', size: 'Не указано' },
+                              { complaints: emrData.complaints }
+                            )
+                          : await analyzeImage(
+                              attachment.file,
+                              'general',
+                              { clinicalContext: emrData.complaints }
+                            );
+                        
+                        setImageAnalysisResult(result);
+                        
+                        // Добавляем результат в рекомендации
+                        if (result && result.findings) {
+                          const aiAnalysis = `\n\nAI Анализ изображения "${attachment.name}":\n${result.findings}`;
+                          handleFieldChange('examination', emrData.examination + aiAnalysis);
+                        }
+                      } catch (err) {
+                        console.error('Image AI analysis error:', err);
+                      }
+                    }}
+                    loading={aiLoading && selectedImageForAI?.id === attachment.id}
+                    variant="text"
+                    size="sm"
+                    tooltip="AI анализ изображения"
+                    disabled={!canSaveEMR}
+                  >
+                    <Brain className="w-3 h-3 mr-1" />
+                    AI
+                  </AIButton>
+                )}
               </div>
             ))}
           </div>

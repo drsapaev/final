@@ -89,7 +89,7 @@ function AppShell() {
                      path.startsWith('/admin');
   
   // Полноэкранный режим для кардиолога
-  const isFullscreen = path === '/cardiologist';
+  const isFullscreen = path === '/cardiologist' || path === '/dermatologist' || path === '/dentist' || path === '/lab-panel';
 
   return (
     <div style={wrapStyle}>

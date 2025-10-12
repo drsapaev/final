@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
 import { Button, AnimatedTransition, Badge, Card } from '../components/ui/native';
@@ -70,6 +71,8 @@ const DentistPanelUnified = () => {
   // Всегда вызываем хуки первыми
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const isTouch = useTouchDevice();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [authState, setAuthState] = useState(auth.getState());
   
   useEffect(() => {
@@ -79,8 +82,28 @@ const DentistPanelUnified = () => {
   
   const user = authState.profile;
   
+  // Синхронизация активной вкладки с URL
+  const getActiveTabFromURL = () => {
+    const params = new URLSearchParams(location.search);
+    return params.get('tab') || 'appointments';
+  };
+  
   // Состояние
-  const [activeTab, setActiveTab] = useState('appointments');
+  const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
+  
+  // Синхронизация URL с активной вкладкой
+  useEffect(() => {
+    const urlTab = getActiveTabFromURL();
+    if (urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [location.search]);
+  
+  // Функция для изменения активной вкладки с обновлением URL
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    navigate(`/dentist?tab=${tabId}`, { replace: true });
+  };
   const [patients, setPatients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [dentalExaminations, setDentalExaminations] = useState([]);
@@ -201,6 +224,28 @@ const DentistPanelUnified = () => {
     loadData();
   }, []);
 
+  // Функция для получения всех услуг пациента из всех записей
+  const getAllPatientServices = useCallback((patientId, allAppointments) => {
+    const patientServices = new Set();
+    const patientServiceCodes = new Set();
+    
+    allAppointments.forEach(appointment => {
+      if (appointment.patient_id === patientId) {
+        if (appointment.services && Array.isArray(appointment.services)) {
+          appointment.services.forEach(service => patientServices.add(service));
+        }
+        if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
+          appointment.service_codes.forEach(code => patientServiceCodes.add(code));
+        }
+      }
+    });
+    
+    return {
+      services: Array.from(patientServices),
+      service_codes: Array.from(patientServiceCodes)
+    };
+  }, []);
+
   // Загрузка записей стоматолога
   const loadDentistryAppointments = async () => {
     setAppointmentsLoading(true);
@@ -212,7 +257,8 @@ const DentistPanelUnified = () => {
         return;
       }
       
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today?department=dental', {
+      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
+      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -222,34 +268,54 @@ const DentistPanelUnified = () => {
       if (response.ok) {
         const data = await response.json();
         
-        // Обрабатываем данные из API
-        let appointmentsData = [];
+        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
+        let allAppointments = [];
         if (data && data.queues && Array.isArray(data.queues)) {
-          const dentalQueue = data.queues.find(queue => 
-            queue.specialty === 'dental' || queue.specialty === 'dentist' || queue.specialty === 'dentistry'
-          );
-          
-          if (dentalQueue && dentalQueue.entries) {
-            appointmentsData = dentalQueue.entries.map(entry => ({
-              id: entry.id,
-              patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
-              patient_phone: entry.patient?.phone || entry.phone || '',
-              patient_birth_year: entry.patient?.birth_year || entry.birth_year || '',
-              address: entry.patient?.address || entry.address || '',
-              visit_type: entry.visit_type || 'Платный',
-              services: entry.services || [],
-              payment_type: entry.payment_status || 'Не оплачено',
-              doctor: entry.doctor_name || 'Стоматолог',
-              date: entry.appointment_date || new Date().toISOString().split('T')[0],
-              time: entry.appointment_time || '09:00',
-              status: entry.status || 'Ожидает',
-              cost: entry.total_cost || 0,
-              payment: entry.payment_status || 'Не оплачено'
-            }));
-          }
+          data.queues.forEach(queue => {
+            if (queue.entries) {
+              queue.entries.forEach(entry => {
+                allAppointments.push({
+                  id: entry.id,
+                  patient_id: entry.patient_id,
+                  patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
+                  patient_phone: entry.phone || '',
+                  patient_birth_year: entry.patient_birth_year || '',
+                  address: entry.address || '',
+                  visit_type: entry.discount_mode === 'paid' ? 'Оплачено' : 'Платный',
+                  discount_mode: entry.discount_mode || 'none',
+                  services: entry.services || [],
+                  service_codes: entry.service_codes || [],
+                  payment_type: entry.payment_status || 'Не оплачено',
+                  payment_status: entry.payment_status || 'pending',
+                  doctor: entry.doctor_name || 'Врач',
+                  specialty: queue.specialty,
+                  created_at: entry.created_at,
+                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                  appointment_time: entry.visit_time || '09:00',
+                  status: entry.status || 'waiting',
+                  cost: entry.cost || 0
+                });
+              });
+            }
+          });
         }
+
+        // Фильтруем только стоматологические записи для отображения
+        const appointmentsData = allAppointments.filter(apt => 
+          apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
+        );
+
+        // Добавляем информацию о всех услугах пациента в каждую запись
+        const enrichedAppointmentsData = appointmentsData.map(apt => {
+          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+          return {
+            ...apt,
+            all_patient_services: allPatientServices.services,
+            all_patient_service_codes: allPatientServices.service_codes
+          };
+        });
         
-        setAppointmentsTableData(appointmentsData);
+        setAppointmentsTableData(enrichedAppointmentsData);
       }
     } catch (error) {
       console.error('Ошибка загрузки записей стоматолога:', error);
@@ -279,7 +345,7 @@ const DentistPanelUnified = () => {
         source: 'appointments'
       };
       setSelectedPatient(patientData);
-      setActiveTab('examinations');
+      handleTabChange('examinations');
     }
   };
 
@@ -640,21 +706,21 @@ const DentistPanelUnified = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
-            onClick={() => setActiveTab('patients')}
+            onClick={() => handleTabChange('patients')}
             className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm"
           >
             <Plus className="h-5 w-5" />
             <span className="font-medium">Новый пациент</span>
           </button>
           <button
-            onClick={() => setActiveTab('appointments')}
+            onClick={() => handleTabChange('appointments')}
             className="flex items-center gap-3 px-6 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm"
           >
             <Calendar className="h-5 w-5" />
             <span className="font-medium">Записать на прием</span>
           </button>
           <button
-            onClick={() => setActiveTab('dental-chart')}
+            onClick={() => handleTabChange('dental-chart')}
             className="flex items-center gap-3 px-6 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm"
           >
             <Tooth className="h-5 w-5" />
@@ -825,8 +891,20 @@ const DentistPanelUnified = () => {
 
   // Рендер записей
   const renderAppointments = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
+    <div style={{ 
+      width: '100%', 
+      maxWidth: 'none',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '24px'
+    }}>
+      <Card padding="lg" style={{
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      }}>
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium flex items-center">
             <Calendar size={20} className="mr-2 text-green-600" />
@@ -854,19 +932,11 @@ const DentistPanelUnified = () => {
           theme="light"
           language="ru"
           view="doctor"
-          selectedRows={appointmentsSelected}
+          selectedRows={new Set()}
           outerBorder={false}
           services={{}}
           showCheckboxes={false}
-          onRowSelect={(id, checked) => {
-            const newSelected = new Set(appointmentsSelected);
-            if (checked) {
-              newSelected.add(id);
-            } else {
-              newSelected.delete(id);
-            }
-            setAppointmentsSelected(newSelected);
-          }}
+          onRowSelect={() => {}}
           onRowClick={handleAppointmentRowClick}
           onActionClick={handleAppointmentActionClick}
         />
@@ -1349,150 +1419,22 @@ const DentistPanelUnified = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Сайдбар */}
-      <div className="w-72 bg-white shadow-xl border-r border-slate-200 flex flex-col">
-        {/* Заголовок сайдбара */}
-        <div className="p-6 border-b border-slate-200">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Stethoscope className="h-6 w-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-slate-900">
-                Стоматология
-              </h1>
-              <p className="text-sm text-slate-600">
-                {user?.name || 'Доктор'}
-              </p>
-            </div>
-          </div>
-          
-          {/* Кнопка назначить следующий визит */}
-          <div className="mt-4">
-            <Button 
-              variant="primary"
-              onClick={() => setScheduleNextModal({ open: true, patient: selectedPatient })}
-              className="w-full flex items-center justify-center gap-2 text-sm"
-              size="sm"
-            >
-              <Plus size={14} />
-              Назначить следующий визит
-            </Button>
-          </div>
-        </div>
-
-        {/* Поиск */}
-        <div className="p-4 border-b border-slate-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Поиск пациентов..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-            />
-          </div>
-        </div>
-
-        {/* Навигация */}
-        <nav className="flex-1 p-4">
-          <div className="space-y-1">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
-                  activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-              >
-                <tab.icon className={`h-5 w-5 transition-colors ${
-                  activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-700'
-                }`} />
-                <span className="truncate">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {/* Футер сайдбара */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
-          <div className="text-center mb-4">
-            <p className="text-sm font-medium text-slate-900">
-              {new Date().toLocaleDateString('ru-RU', { 
-                day: 'numeric',
-                month: 'short'
-              })}
-            </p>
-            <p className="text-xs text-slate-600">
-              {new Date().toLocaleTimeString('ru-RU', { 
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </p>
-          </div>
-          
-          <div className="space-y-1">
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-white rounded-xl transition-colors">
-              <Settings className="h-4 w-4" />
-              Настройки
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-white rounded-xl transition-colors">
-              <LogOut className="h-4 w-4" />
-              Выход
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Основной контент */}
-      <div className="flex-1 flex flex-col">
-        {/* Заголовок контента */}
-        <div className="bg-white shadow-sm border-b border-slate-200 px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">
-                {tabs.find(tab => tab.id === activeTab)?.label || 'Дашборд'}
-              </h2>
-              <p className="text-slate-600 mt-1">
-                {activeTab === 'dashboard' && 'Обзор статистики и активности'}
-                {activeTab === 'patients' && 'Управление пациентами и их данными'}
-                {activeTab === 'appointments' && 'Расписание и записи на прием'}
-                {activeTab === 'examinations' && 'Осмотры и диагностика'}
-                {activeTab === 'diagnoses' && 'Диагнозы и назначения'}
-                {activeTab === 'visits' && 'Протоколы визитов'}
-                {activeTab === 'photos' && 'Фото и рентген архив'}
-                {activeTab === 'templates' && 'Шаблоны протоколов'}
-                {activeTab === 'reports' && 'Отчеты и аналитика'}
-                {activeTab === 'dental-chart' && 'Схемы зубов'}
-                {activeTab === 'treatment-plans' && 'Планы лечения'}
-                {activeTab === 'prosthetics' && 'Протезирование'}
-                {activeTab === 'ai-assistant' && 'AI Помощник'}
-              </p>
-            </div>
-            
-            {/* Быстрые действия */}
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
-                <Plus className="h-4 w-4" />
-                Добавить
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                <Filter className="h-4 w-4" />
-                Фильтры
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Контент */}
-        <div className="flex-1 p-8 overflow-auto">
-          <AnimatedTransition>
-            {renderContent()}
-          </AnimatedTransition>
-        </div>
-      </div>
+    <div className="dentist-panel" style={{
+      padding: '20px',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
+      width: '100%',
+      position: 'relative',
+      zIndex: 1,
+      display: 'block',
+      maxWidth: '100%',
+      margin: 0,
+      minHeight: '100vh',
+      background: '#f8fafc'
+    }}>
+      <AnimatedTransition>
+        {renderContent()}
+      </AnimatedTransition>
 
       {/* Модальные окна */}
       {showPatientCard && selectedPatient && (

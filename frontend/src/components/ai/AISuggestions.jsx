@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import { useState } from 'react';
 import { useSnackbar } from 'notistack';
+import AIClinicalText from './AIClinicalText';
 
 const AISuggestions = ({ 
   suggestions = [], 
@@ -32,7 +33,9 @@ const AISuggestions = ({
   onSelect,
   title = 'AI Подсказки',
   showConfidence = true,
-  maxHeight = 400
+  maxHeight = 400,
+  clinicalRecommendations = null, // Новый формат клинических рекомендаций
+  fallbackProvider = null // Провайдер, используемый при fallback
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
@@ -62,60 +65,75 @@ const AISuggestions = ({
   };
 
   const renderICD10Suggestions = () => {
-    if (!suggestions || suggestions.length === 0) {
-      return (
-        <Alert severity="info">
-          Нет подсказок МКБ-10
-        </Alert>
-      );
-    }
-
     return (
-      <List dense sx={{ maxHeight, overflow: 'auto' }}>
-        {suggestions.map((item, index) => (
-          <ListItem
-            key={index}
-            disablePadding
-            secondaryAction={
-              <IconButton
-                edge="end"
-                size="small"
-                onClick={() => handleCopy(`${item.code} - ${item.name}`, index)}
+      <Box sx={{ p: 2 }}>
+        {/* Показываем fallback провайдер если используется */}
+        {fallbackProvider && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Используется резервный провайдер: {fallbackProvider.toUpperCase()}
+          </Alert>
+        )}
+
+        {/* Клинические рекомендации (новый формат) */}
+        {clinicalRecommendations && (
+          <Box mb={3}>
+            <AIClinicalText content={clinicalRecommendations} variant="info" />
+          </Box>
+        )}
+
+        {/* Список кодов МКБ-10 */}
+        {(!suggestions || suggestions.length === 0) ? (
+          <Alert severity="info">
+            Нет подсказок МКБ-10
+          </Alert>
+        ) : (
+          <List dense sx={{ maxHeight, overflow: 'auto' }}>
+            {suggestions.map((item, index) => (
+              <ListItem
+                key={index}
+                disablePadding
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    size="small"
+                    onClick={() => handleCopy(`${item.code} - ${item.name || item.description}`, index)}
+                  >
+                    {copiedId === index ? <Check color="success" /> : <ContentCopy />}
+                  </IconButton>
+                }
               >
-                {copiedId === index ? <Check color="success" /> : <ContentCopy />}
-              </IconButton>
-            }
-          >
-            <ListItemButton onClick={() => onSelect && onSelect(item)}>
-              <ListItemIcon>
-                <LocalHospital color="primary" />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="body2" fontWeight="bold">
-                      {item.code}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {item.name}
-                    </Typography>
-                  </Box>
-                }
-                secondary={
-                  showConfidence && item.relevance && (
-                    <Chip
-                      label={item.relevance}
-                      size="small"
-                      color={getRelevanceColor(item.relevance)}
-                      sx={{ mt: 0.5 }}
-                    />
-                  )
-                }
-              />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
+                <ListItemButton onClick={() => onSelect && onSelect(item)}>
+                  <ListItemIcon>
+                    <LocalHospital color="primary" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Typography variant="body2" fontWeight="bold">
+                          {item.code}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {item.name || item.description}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={
+                      showConfidence && item.relevance && (
+                        <Chip
+                          label={item.relevance}
+                          size="small"
+                          color={getRelevanceColor(item.relevance)}
+                          sx={{ mt: 0.5 }}
+                        />
+                      )
+                    }
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Box>
     );
   };
 
