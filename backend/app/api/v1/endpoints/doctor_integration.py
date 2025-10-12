@@ -323,40 +323,52 @@ def complete_patient_visit(
     Из passport.md стр. 1425: POST /api/visits/:id/complete
     """
     try:
-        queue_entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        from app.models.visit import Visit
+        from app.models.appointment import Appointment
         
-        if not queue_entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись в очереди не найдена"
-            )
+        # Сначала ищем в Visit
+        visit = db.query(Visit).filter(Visit.id == entry_id).first()
+        if visit:
+            # Обновляем статус визита
+            visit.status = "completed"
+            db.commit()
+            db.refresh(visit)
+            
+            # Завершаем визит с медицинскими данными
+            if visit_data:
+                crud_visit.complete_visit(
+                    db=db,
+                    visit_id=visit.id,
+                    medical_data=visit_data
+                )
+            
+            return {
+                "success": True,
+                "message": "Прием пациента завершен",
+                "entry_id": entry_id,
+                "status": "completed"
+            }
         
-        # Обновляем статус на завершен
-        queue_entry.status = "served"
+        # Если не найден в Visit, ищем в Appointment
+        appointment = db.query(Appointment).filter(Appointment.id == entry_id).first()
+        if appointment:
+            # Обновляем статус appointment
+            appointment.status = "completed"
+            db.commit()
+            db.refresh(appointment)
+            
+            return {
+                "success": True,
+                "message": "Прием пациента завершен",
+                "entry_id": entry_id,
+                "status": "completed"
+            }
         
-        # Завершаем визит в таблице visits
-        visit = crud_visit.find_or_create_today_visit(
-            db=db,
-            patient_id=queue_entry.patient_id,
-            doctor_id=current_user.id,
-            department=queue_entry.queue.department if hasattr(queue_entry, 'queue') else "general"
+        # Если не найден ни в Visit, ни в Appointment
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись в очереди не найдена"
         )
-        
-        # Завершаем визит с медицинскими данными
-        crud_visit.complete_visit(
-            db=db,
-            visit_id=visit.id,
-            medical_data=visit_data
-        )
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Прием пациента завершен",
-            "entry_id": entry_id,
-            "status": "served"
-        }
         
     except HTTPException:
         raise

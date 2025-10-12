@@ -66,7 +66,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
   // Форма для создания/редактирования шаблона
   const [templateForm, setTemplateForm] = useState({
     name: '',
-    category: 'cosmetology',
+    category: 'injection',
     description: '',
     duration: 30,
     price: '',
@@ -215,7 +215,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
     setEditMode(false);
     setTemplateForm({
       name: '',
-      category: 'cosmetology',
+      category: 'injection',
       description: '',
       duration: 30,
       price: '',
@@ -327,7 +327,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                     <ListItemText
                       primary={template.name}
                       secondary={
-                        <Box>
+                        <Box component="div">
                           <Typography variant="caption" display="block">
                             {template.description}
                           </Typography>
