@@ -1,0 +1,443 @@
+/**
+ * macOS Design System Tokens
+ * CSS Variables and Tailwind Configuration for macOS-style UI
+ */
+
+:root {
+  /* macOS Color Palette */
+  --mac-bg-primary: #ffffff;
+  --mac-bg-secondary: #f8f9fa;
+  --mac-bg-tertiary: #f1f3f4;
+  --mac-bg-quaternary: #e8eaed;
+
+  --mac-text-primary: #1d1d1f;
+  --mac-text-secondary: #86868b;
+  --mac-text-tertiary: #515154;
+
+  --mac-border: #d2d2d7;
+  --mac-border-secondary: #e5e5e7;
+
+  --mac-accent-blue: #007aff;
+  --mac-accent-blue-hover: #0056cc;
+  --mac-accent-blue-active: #004499;
+
+  --mac-success: #34c759;
+  --mac-success-hover: #2aa944;
+  --mac-warning: #ff9500;
+  --mac-warning-hover: #cc7700;
+  --mac-danger: #ff3b30;
+  --mac-danger-hover: #cc2f26;
+
+  --mac-separator: #e5e5ea;
+
+  /* macOS Spacing Scale (8px base) */
+  --mac-spacing-1: 4px;
+  --mac-spacing-2: 8px;
+  --mac-spacing-3: 12px;
+  --mac-spacing-4: 16px;
+  --mac-spacing-5: 20px;
+  --mac-spacing-6: 24px;
+  --mac-spacing-8: 32px;
+  --mac-spacing-10: 40px;
+  --mac-spacing-12: 48px;
+  --mac-spacing-16: 64px;
+
+  /* macOS Typography Scale */
+  --mac-font-size-xs: 11px;
+  --mac-font-size-sm: 12px;
+  --mac-font-size-base: 13px;
+  --mac-font-size-lg: 15px;
+  --mac-font-size-xl: 17px;
+  --mac-font-size-2xl: 22px;
+  --mac-font-size-3xl: 28px;
+
+  /* macOS Font Weights */
+  --mac-font-weight-regular: 400;
+  --mac-font-weight-medium: 500;
+  --mac-font-weight-semibold: 600;
+  --mac-font-weight-bold: 700;
+
+  /* macOS Border Radius */
+  --mac-radius-sm: 4px;
+  --mac-radius-md: 6px;
+  --mac-radius-lg: 8px;
+  --mac-radius-xl: 12px;
+  --mac-radius-full: 9999px;
+
+  /* macOS Shadows */
+  --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --mac-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+  --mac-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.15);
+
+  /* macOS Blur Effects */
+  --mac-blur-light: blur(20px);
+  --mac-blur-medium: blur(12px);
+  --mac-blur-heavy: blur(8px);
+
+  /* macOS Z-Index Scale */
+  --mac-z-dropdown: 1000;
+  --mac-z-modal: 1100;
+  --mac-z-popover: 1200;
+  --mac-z-tooltip: 1300;
+}
+
+/* Dark Theme (macOS Dark Mode) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mac-bg-primary: #1d1d1f;
+    --mac-bg-secondary: #2d2d30;
+    --mac-bg-tertiary: #3d3d40;
+    --mac-bg-quaternary: #4d4d50;
+
+    --mac-text-primary: #f5f5f7;
+    --mac-text-secondary: #a1a1a6;
+    --mac-text-tertiary: #8e8e93;
+
+    --mac-border: #424245;
+    --mac-border-secondary: #515154;
+
+    --mac-separator: #38383a;
+
+    /* macOS Shadows in Dark Mode */
+    --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --mac-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+    --mac-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* macOS Font Stack */
+.mac-font {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+}
+
+/* macOS Control Styles */
+.mac-control {
+  background: var(--mac-bg-secondary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-regular);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mac-control:hover {
+  background: var(--mac-bg-tertiary);
+  border-color: var(--mac-border-secondary);
+}
+
+.mac-control:focus {
+  outline: none;
+  ring: 2px solid var(--mac-accent-blue);
+  ring-offset: 2px;
+  border-color: var(--mac-accent-blue);
+}
+
+.mac-control:active {
+  transform: scale(0.98);
+}
+
+/* macOS Button Styles */
+.mac-button {
+  background: var(--mac-bg-secondary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-regular);
+  padding: var(--mac-spacing-2) var(--mac-spacing-4);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.mac-button:hover {
+  background: var(--mac-bg-tertiary);
+  border-color: var(--mac-border-secondary);
+  box-shadow: var(--mac-shadow-md);
+}
+
+.mac-button:active {
+  transform: scale(0.98);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.mac-button--primary {
+  background: var(--mac-accent-blue);
+  color: white;
+  border-color: var(--mac-accent-blue);
+}
+
+.mac-button--primary:hover {
+  background: var(--mac-accent-blue-hover);
+  border-color: var(--mac-accent-blue-hover);
+}
+
+.mac-button--primary:active {
+  background: var(--mac-accent-blue-active);
+  border-color: var(--mac-accent-blue-active);
+}
+
+/* macOS Input Styles */
+.mac-input {
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  color: var(--mac-text-primary);
+  font-size: var(--mac-font-size-base);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mac-input:focus {
+  outline: none;
+  border-color: var(--mac-accent-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.mac-input::placeholder {
+  color: var(--mac-text-tertiary);
+}
+
+/* macOS Card Styles */
+.mac-card {
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  box-shadow: var(--mac-shadow-sm);
+  padding: var(--mac-spacing-6);
+}
+
+/* macOS Sidebar Styles */
+.mac-sidebar {
+  background: var(--mac-bg-secondary);
+  border-right: 1px solid var(--mac-separator);
+  width: 240px;
+  min-height: 100vh;
+  padding: var(--mac-spacing-4);
+}
+
+/* macOS Navigation Item Styles */
+.mac-nav-item {
+  display: flex;
+  align-items: center;
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+  border-radius: var(--mac-radius-md);
+  color: var(--mac-text-secondary);
+  text-decoration: none;
+  font-size: var(--mac-font-size-base);
+  font-weight: var(--mac-font-weight-regular);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  margin-bottom: var(--mac-spacing-1);
+}
+
+.mac-nav-item:hover {
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-primary);
+}
+
+.mac-nav-item--active {
+  background: var(--mac-accent-blue);
+  color: white;
+  border-color: var(--mac-accent-blue);
+}
+
+.mac-nav-item--active:hover {
+  background: var(--mac-accent-blue-hover);
+  border-color: var(--mac-accent-blue-hover);
+}
+
+/* macOS Modal Styles */
+.mac-modal {
+  background: var(--mac-bg-primary);
+  border-radius: var(--mac-radius-xl);
+  box-shadow: var(--mac-shadow-xl);
+  border: 1px solid var(--mac-border);
+  overflow: hidden;
+}
+
+.mac-modal-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: var(--mac-blur-medium);
+}
+
+/* macOS Tooltip Styles */
+.mac-tooltip {
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-md);
+  box-shadow: var(--mac-shadow-md);
+  font-size: var(--mac-font-size-sm);
+  padding: var(--mac-spacing-2) var(--mac-spacing-3);
+}
+
+/* macOS Table Styles */
+.mac-table {
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--mac-shadow-sm);
+}
+
+.mac-table-header {
+  background: var(--mac-bg-secondary);
+  border-bottom: 1px solid var(--mac-separator);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  font-size: var(--mac-font-size-sm);
+  font-weight: var(--mac-font-weight-semibold);
+  color: var(--mac-text-secondary);
+}
+
+.mac-table-row {
+  border-bottom: 1px solid var(--mac-separator);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  transition: background-color 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mac-table-row:hover {
+  background: var(--mac-bg-secondary);
+}
+
+.mac-table-row:last-child {
+  border-bottom: none;
+}
+
+/* macOS Chat Styles */
+.mac-chat-bubble {
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-xl);
+  padding: var(--mac-spacing-3) var(--mac-spacing-4);
+  margin-bottom: var(--mac-spacing-2);
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.mac-chat-bubble--user {
+  background: var(--mac-accent-blue);
+  color: white;
+  margin-left: auto;
+  text-align: right;
+}
+
+.mac-chat-bubble--assistant {
+  background: var(--mac-bg-tertiary);
+  color: var(--mac-text-primary);
+}
+
+/* macOS AI Assistant Styles */
+.mac-ai-assistant {
+  background: linear-gradient(135deg, var(--mac-bg-secondary) 0%, var(--mac-bg-tertiary) 100%);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-xl);
+  padding: var(--mac-spacing-6);
+  box-shadow: var(--mac-shadow-md);
+}
+
+.mac-ai-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--mac-accent-blue), var(--mac-accent-blue-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--mac-font-size-lg);
+  font-weight: var(--mac-font-weight-semibold);
+}
+
+/* macOS Chart Styles */
+.mac-chart-container {
+  background: var(--mac-bg-primary);
+  border: 1px solid var(--mac-border);
+  border-radius: var(--mac-radius-lg);
+  padding: var(--mac-spacing-6);
+  box-shadow: var(--mac-shadow-sm);
+}
+
+/* macOS Dashboard Styles */
+.mac-dashboard {
+  background: var(--mac-bg-secondary);
+  border-radius: var(--mac-radius-xl);
+  padding: var(--mac-spacing-8);
+  box-shadow: var(--mac-shadow-md);
+}
+
+/* macOS Animation Classes */
+.mac-fade-in {
+  animation: mac-fade-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mac-slide-up {
+  animation: mac-slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mac-slide-down {
+  animation: mac-slide-down 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes mac-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mac-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mac-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* macOS Responsive Design */
+@media (prefers-reduced-motion: reduce) {
+  .mac-control,
+  .mac-button,
+  .mac-input,
+  .mac-nav-item {
+    transition: none;
+  }
+
+  .mac-fade-in,
+  .mac-slide-up,
+  .mac-slide-down {
+    animation: none;
+  }
+}
+
+/* macOS Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .mac-control:hover,
+  .mac-button:hover,
+  .mac-nav-item:hover {
+    background: var(--mac-bg-secondary);
+  }
+}
+
+/* macOS High Contrast Support */
+@media (prefers-contrast: high) {
+  :root {
+    --mac-border: #000000;
+    --mac-border-secondary: #000000;
+    --mac-text-secondary: #000000;
+    --mac-text-tertiary: #000000;
+  }
+}
