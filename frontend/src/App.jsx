@@ -7,6 +7,7 @@ import { ThemeProvider } from './theme';
 import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
+import './theme/macos-tokens.css';
 
 // Временно переключаемся на новый хедер (старый оставляем для сравнения)
 import HeaderNew from './components/layout/HeaderNew.jsx';
@@ -40,6 +41,7 @@ import CSSTestPage from './pages/CSSTestPage';
 import PaymentSuccess from './pages/PaymentSuccess.jsx';
 import PaymentCancel from './pages/PaymentCancel.jsx';
 import PaymentTest from './pages/PaymentTest.jsx';
+import MacOSDemoPage from './pages/MacOSDemoPage.jsx';
 
 // Стилизованные компоненты
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
@@ -139,6 +141,7 @@ function AppContent() {
         <Route path="/health" element={<Health />} />
         <Route path="/" element={<Landing />} />
         <Route path="/medilab-demo" element={<MediLabDemo />} />
+        <Route path="/macos-demo" element={<MacOSDemoPage />} />
         <Route path="/queue-reorder-demo" element={<QueueReorderDemo />} />
         <Route path="/css-test" element={<CSSTestPage />} />
         <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
