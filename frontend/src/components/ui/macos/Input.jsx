@@ -32,9 +32,9 @@ const Input = React.forwardRef(({
       fontSize: '13px',
       fontWeight: '400',
       borderRadius: '6px',
-      border: `1px solid ${error ? '#ff3b30' : isFocused ? '#007aff' : 'rgba(0, 0, 0, 0.1)'}`,
-      backgroundColor: disabled ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.8)',
-      color: 'var(--mac-text-primary)',
+      border: `1px solid ${error ? '#ff3b30' : isFocused ? 'var(--mac-focus-color)' : 'var(--mac-border)'}`,
+      backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : 'rgba(255, 255, 255, 0.8)',
+      color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
       padding: '8px 12px',
       transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
       outline: 'none',
@@ -173,7 +173,7 @@ const Input = React.forwardRef(({
           }
 
           .mac-input::placeholder {
-            color: rgba(255, 255, 255, 0.3) !important;
+            color: var(--mac-placeholder-text, rgba(255, 255, 255, 0.3)) !important;
           }
 
           .mac-input:focus {
