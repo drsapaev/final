@@ -47,13 +47,13 @@ const Input = React.forwardRef(({
 
     // Focus ring effect
     if (isFocused && !error) {
-      baseStyles.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
+      baseStyles.boxShadow = 'var(--mac-focus-ring)';
     }
 
     // Error state
     if (error) {
       baseStyles.borderColor = '#ff3b30';
-      baseStyles.boxShadow = '0 0 0 3px rgba(255, 59, 48, 0.1)';
+      baseStyles.boxShadow = '0 0 0 3px rgba(255, 59, 48, 0.12)';
     }
 
     // Disabled state
@@ -177,8 +177,8 @@ const Input = React.forwardRef(({
           }
 
           .mac-input:focus {
-            border-color: #007aff !important;
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2) !important;
+            border-color: var(--mac-focus-color) !important;
+            box-shadow: var(--mac-focus-ring) !important;
           }
         }
 
@@ -210,3 +210,4 @@ const Input = React.forwardRef(({
 Input.displayName = 'macOS Input';
 
 export default Input;
+

@@ -213,8 +213,9 @@ const Button = React.forwardRef(({
 
         /* Focus ring for accessibility */
         button:focus-visible {
-          outline: 2px solid #007aff;
+          outline: var(--mac-focus-outline-width) solid var(--mac-focus-color);
           outline-offset: 2px;
+          box-shadow: var(--mac-focus-ring);
         }
 
         /* Dark mode adjustments */
@@ -246,3 +247,4 @@ const Button = React.forwardRef(({
 Button.displayName = 'macOS Button';
 
 export default Button;
+
