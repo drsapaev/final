@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Button } from './Button';
+import Button from './Button';
 
 /**
  * macOS-style Modal Component
@@ -263,7 +263,7 @@ const Modal = ({
 
         /* Focus trap for accessibility */
         .mac-modal:focus {
-          outline: 2px solid #007aff;
+          outline: var(--mac-focus-outline-width) solid var(--mac-focus-color);
           outline-offset: 2px;
         }
       `}</style>
@@ -390,3 +390,4 @@ export const ModalFooter = React.forwardRef(({
 ModalFooter.displayName = 'macOS Modal Footer';
 
 export default Modal;
+
