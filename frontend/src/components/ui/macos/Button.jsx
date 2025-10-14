@@ -64,47 +64,47 @@ const Button = React.forwardRef(({
 
     const variantStyles = {
       default: {
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(0, 0, 0, 0.1)'
+        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : 'rgba(0, 0, 0, 0.05)',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
+        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : 'rgba(0, 0, 0, 0.1)'}`
       },
       primary: {
-        backgroundColor: '#007aff',
-        color: 'white',
-        border: '1px solid #007aff',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#007aff',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
+        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#007aff'}`,
+        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       secondary: {
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        color: 'var(--mac-text-primary)',
-        border: '1px solid rgba(0, 0, 0, 0.1)'
+        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : 'rgba(0, 0, 0, 0.05)',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
+        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : 'rgba(0, 0, 0, 0.1)'}`
       },
       success: {
-        backgroundColor: '#34c759',
-        color: 'white',
-        border: '1px solid #34c759',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#34c759',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
+        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#34c759'}`,
+        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       warning: {
-        backgroundColor: '#ff9500',
-        color: 'white',
-        border: '1px solid #ff9500',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#ff9500',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
+        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#ff9500'}`,
+        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       danger: {
-        backgroundColor: '#ff3b30',
-        color: 'white',
-        border: '1px solid #ff3b30',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#ff3b30',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
+        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#ff3b30'}`,
+        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       ghost: {
-        backgroundColor: 'transparent',
-        color: 'var(--mac-text-primary)',
+        backgroundColor: disabled ? 'transparent' : 'transparent',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
         border: '1px solid transparent'
       },
       link: {
         backgroundColor: 'transparent',
-        color: '#007aff',
+        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : '#007aff',
         border: 'none',
         padding: '4px 8px',
         textDecoration: 'none'
@@ -116,10 +116,6 @@ const Button = React.forwardRef(({
       ...sizeStyles[size],
       ...variantStyles[variant],
       ...(fullWidth && { width: '100%' }),
-      ...(disabled && {
-        opacity: 0.5,
-        pointerEvents: 'none'
-      }),
       ...style
     };
   };

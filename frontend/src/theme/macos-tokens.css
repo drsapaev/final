@@ -118,6 +118,12 @@
     /* Dark mode scrollbars */
     --mac-scrollbar-thumb: rgba(255, 255, 255, 0.28);
     --mac-scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
+
+    /* Dark mode disabled/placeholder states */
+    --mac-disabled-bg: rgba(255, 255, 255, 0.03);
+    --mac-disabled-text: rgba(255, 255, 255, 0.25);
+    --mac-placeholder-text: rgba(255, 255, 255, 0.35);
+    --mac-disabled-border: rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -454,6 +460,32 @@
     --mac-text-tertiary: #000000;
     --mac-focus-outline-width: 3px;
     --mac-focus-ring: 0 0 0 3px rgba(0, 0, 0, 0.6);
+  }
+
+  /* High contrast overrides for better visibility */
+  .mac-control,
+  .mac-button,
+  .mac-input,
+  .mac-select {
+    border-width: 2px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .mac-table {
+    border-width: 2px !important;
+  }
+
+  .mac-table-row {
+    border-bottom-width: 2px !important;
+  }
+
+  .mac-modal-content {
+    border-width: 2px !important;
+  }
+
+  .mac-tooltip-content {
+    border-width: 2px !important;
   }
 }
 
