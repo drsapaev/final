@@ -3,6 +3,44 @@
  * Унифицированная система стилей для всего приложения
  */
 
+/* Анимации */
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Убираем outline у кнопок вкладок */
+button[role="tab"],
+button[role="tab"]:focus,
+button[role="tab"]:active,
+button[role="tab"]:focus-visible,
+button[role="tab"]:focus-within {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Убираем outline у всех кнопок вкладок */
+.mac-tab-button,
+.mac-tab-button:focus,
+.mac-tab-button:active,
+.mac-tab-button:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Убираем outline у всех кнопок вообще */
+button:focus,
+button:active,
+button:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
 /* Сброс стилей и базовые настройки */
 *,
 *::before,

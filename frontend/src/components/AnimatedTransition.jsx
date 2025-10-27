@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useFadeIn, useSlide, useScale } from '../hooks/useAnimation';
+import { useFadeIn, useSlide, useScale } from './ui/native';
 
 const AnimatedTransition = ({
   children,

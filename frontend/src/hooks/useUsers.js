@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import api from '../utils/api';
+import { api } from '../utils/api';
 const API_BASE = import.meta.env?.VITE_API_BASE || 'http://localhost:8000/api/v1';
 import { toast } from 'react-toastify';
 

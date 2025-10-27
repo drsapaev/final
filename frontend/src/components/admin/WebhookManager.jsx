@@ -18,10 +18,28 @@ import {
   Eye,
   Settings,
   Globe,
-  Zap
+  Zap,
+  Users,
+  Calendar,
+  CreditCard,
+  UserPlus
 } from 'lucide-react';
-import { Card, Button, Badge, Skeleton } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSBadge, 
+  MacOSTab, 
+  MacOSStatCard, 
+  MacOSTable, 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton,
+  MacOSAlert,
+  MacOSModal
+} from '../ui/macos';
 import { toast } from 'react-toastify';
+import { api } from '../../utils/api';
 
 const WebhookManager = () => {
   const [activeTab, setActiveTab] = useState('webhooks');
@@ -42,40 +60,18 @@ const WebhookManager = () => {
   // Загрузка данных
   const loadWebhooks = useCallback(async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/webhooks/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setWebhooks(data.items || []);
-      } else {
-        toast.error('Ошибка загрузки webhook\'ов');
-      }
+      const { data } = await api.get('/webhooks/');
+      setWebhooks(data.items || data || []);
     } catch (error) {
       console.error('Ошибка загрузки webhook\'ов:', error);
-      toast.error('Ошибка загрузки данных');
+      toast.error('Ошибка загрузки webhook\'ов');
     }
   }, []);
 
   const loadSystemStats = useCallback(async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/webhooks/system/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/webhooks/system/stats');
         setStats(data);
-      }
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
     }
@@ -83,18 +79,8 @@ const WebhookManager = () => {
 
   const loadWebhookCalls = useCallback(async (webhookId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/webhooks/${webhookId}/calls`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCalls(data.items || []);
-      }
+      const { data } = await api.get(`/webhooks/${webhookId}/calls`);
+      setCalls(data.items || data || []);
     } catch (error) {
       console.error('Ошибка загрузки вызовов:', error);
     }
@@ -231,254 +217,269 @@ const WebhookManager = () => {
   // Получение статуса badge
   const getStatusBadge = (status, isActive) => {
     if (!isActive) {
-      return <Badge variant="secondary">Неактивен</Badge>;
+      return <MacOSBadge variant="secondary">Неактивен</MacOSBadge>;
     }
     
     switch (status) {
       case 'active':
-        return <Badge variant="success">Активен</Badge>;
+        return <MacOSBadge variant="success">Активен</MacOSBadge>;
       case 'suspended':
-        return <Badge variant="warning">Приостановлен</Badge>;
+        return <MacOSBadge variant="warning">Приостановлен</MacOSBadge>;
       case 'failed':
-        return <Badge variant="destructive">Ошибка</Badge>;
+        return <MacOSBadge variant="error">Ошибка</MacOSBadge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <MacOSBadge variant="secondary">{status}</MacOSBadge>;
     }
   };
 
   const getCallStatusBadge = (status) => {
     switch (status) {
       case 'success':
-        return <Badge variant="success">Успех</Badge>;
+        return <MacOSBadge variant="success">Успех</MacOSBadge>;
       case 'failed':
-        return <Badge variant="destructive">Ошибка</Badge>;
+        return <MacOSBadge variant="error">Ошибка</MacOSBadge>;
       case 'pending':
-        return <Badge variant="secondary">Ожидание</Badge>;
+        return <MacOSBadge variant="secondary">Ожидание</MacOSBadge>;
       case 'retrying':
-        return <Badge variant="warning">Повтор</Badge>;
+        return <MacOSBadge variant="warning">Повтор</MacOSBadge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <MacOSBadge variant="secondary">{status}</MacOSBadge>;
     }
   };
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <MacOSLoadingSkeleton style={{ height: '32px', width: '256px' }} />
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSLoadingSkeleton style={{ height: '128px' }} />
+          <MacOSLoadingSkeleton style={{ height: '128px' }} />
+          <MacOSLoadingSkeleton style={{ height: '128px' }} />
         </div>
-        <Skeleton className="h-96" />
+        <MacOSLoadingSkeleton style={{ height: '384px' }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок */}
-      <div className="flex justify-between items-center">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Управление Webhook'ами</h1>
-          <p className="text-gray-600">Настройка и мониторинг внешних интеграций</p>
+          <h1 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>Управление Webhook'ами</h1>
+          <p style={{ 
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-base)',
+            margin: '4px 0 0 0'
+          }}>Настройка и мониторинг внешних интеграций</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
+        <MacOSButton onClick={() => setShowCreateModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Plus style={{ width: '16px', height: '16px' }} />
           Создать Webhook
-        </Button>
+        </MacOSButton>
       </div>
 
       {/* Статистика */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Всего Webhook'ов</p>
-                <p className="text-2xl font-bold">{stats.total_webhooks}</p>
-              </div>
-              <Globe className="w-8 h-8 text-blue-500" />
-            </div>
-          </Card>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSStatCard
+            title="Всего Webhook'ов"
+            value={stats.total_webhooks}
+            icon={Globe}
+            color="blue"
+          />
           
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Активных</p>
-                <p className="text-2xl font-bold text-green-600">{stats.active_webhooks}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-          </Card>
+          <MacOSStatCard
+            title="Активных"
+            value={stats.active_webhooks}
+            icon={CheckCircle}
+            color="green"
+          />
           
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Вызовов за 24ч</p>
-                <p className="text-2xl font-bold">{stats.recent_24h.total_calls}</p>
-              </div>
-              <Activity className="w-8 h-8 text-purple-500" />
-            </div>
-          </Card>
+          <MacOSStatCard
+            title="Вызовов за 24ч"
+            value={stats.recent_24h.total_calls}
+            icon={Activity}
+            color="orange"
+          />
           
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Успешность</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.recent_24h.success_rate.toFixed(1)}%</p>
-              </div>
-              <Zap className="w-8 h-8 text-yellow-500" />
-            </div>
-          </Card>
+          <MacOSStatCard
+            title="Успешность"
+            value={`${stats.recent_24h.success_rate.toFixed(1)}%`}
+            icon={Zap}
+            color="blue"
+          />
         </div>
       )}
 
       {/* Табы */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('webhooks')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'webhooks'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Webhook'и
-          </button>
-          <button
-            onClick={() => setActiveTab('calls')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'calls'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Вызовы
-          </button>
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'events'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            События
-          </button>
-        </nav>
-      </div>
+      <MacOSTab
+        tabs={[
+          { id: 'webhooks', label: 'Webhook\'и', icon: Globe },
+          { id: 'calls', label: 'Вызовы', icon: Activity },
+          { id: 'events', label: 'События', icon: Clock }
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        size="md"
+        variant="default"
+      />
 
       {/* Контент табов */}
       {activeTab === 'webhooks' && (
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Фильтры */}
-          <Card className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <MacOSCard style={{ padding: '16px' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '16px' 
+            }}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '4px'
+                }}>
                   Поиск
                 </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Название или URL..."
-                    value={filters.search}
-                    onChange={(e) => setFilters({...filters, search: e.target.value})}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 w-full"
-                  />
-                </div>
+                <MacOSInput
+                  type="text"
+                  placeholder="Название или URL..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({...filters, search: e.target.value})}
+                  icon={Search}
+                  iconPosition="left"
+                />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '4px'
+                }}>
                   Статус
                 </label>
-                <select
+                <MacOSSelect
                   value={filters.status}
                   onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Все статусы</option>
-                  <option value="active">Активен</option>
-                  <option value="inactive">Неактивен</option>
-                  <option value="suspended">Приостановлен</option>
-                  <option value="failed">Ошибка</option>
-                </select>
+                  options={[
+                    { value: '', label: 'Все статусы' },
+                    { value: 'active', label: 'Активен' },
+                    { value: 'inactive', label: 'Неактивен' },
+                    { value: 'suspended', label: 'Приостановлен' },
+                    { value: 'failed', label: 'Ошибка' }
+                  ]}
+                />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '4px'
+                }}>
                   Тип события
                 </label>
-                <select
+                <MacOSSelect
                   value={filters.event_type}
                   onChange={(e) => setFilters({...filters, event_type: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Все события</option>
-                  <option value="patient.created">Пациент создан</option>
-                  <option value="appointment.created">Запись создана</option>
-                  <option value="visit.completed">Визит завершен</option>
-                  <option value="payment.completed">Платеж завершен</option>
-                </select>
+                  options={[
+                    { value: '', label: 'Все события' },
+                    { value: 'patient.created', label: 'Пациент создан' },
+                    { value: 'appointment.created', label: 'Запись создана' },
+                    { value: 'visit.completed', label: 'Визит завершен' },
+                    { value: 'payment.completed', label: 'Платеж завершен' }
+                  ]}
+                />
               </div>
               
-              <div className="flex items-end">
-                <Button 
+              <div style={{ display: 'flex', alignItems: 'end' }}>
+                <MacOSButton 
                   onClick={() => setFilters({status: '', event_type: '', search: ''})}
                   variant="outline"
-                  className="w-full"
+                  style={{ width: '100%' }}
                 >
                   Сбросить
-                </Button>
+                </MacOSButton>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
 
           {/* Список webhook'ов */}
-          <div className="grid grid-cols-1 gap-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {filteredWebhooks.map((webhook) => (
-              <Card key={webhook.id} className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{webhook.name}</h3>
+              <MacOSCard key={webhook.id} style={{ padding: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div style={{ flex: '1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <h3 style={{ 
+                        fontSize: 'var(--mac-font-size-lg)', 
+                        fontWeight: 'var(--mac-font-weight-semibold)', 
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>
+                        {webhook.name}
+                      </h3>
                       {getStatusBadge(webhook.status, webhook.is_active)}
                     </div>
                     
                     {webhook.description && (
-                      <p className="text-gray-600 mb-2">{webhook.description}</p>
+                      <p style={{ 
+                        color: 'var(--mac-text-secondary)',
+                        fontSize: 'var(--mac-font-size-sm)',
+                        marginBottom: '8px'
+                      }}>
+                        {webhook.description}
+                      </p>
                     )}
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                      <span className="flex items-center gap-1">
-                        <Globe className="w-4 h-4" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-tertiary)', marginBottom: '12px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Globe style={{ width: '16px', height: '16px' }} />
                         {webhook.url}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Activity className="w-4 h-4" />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Activity style={{ width: '16px', height: '16px' }} />
                         {webhook.total_calls} вызовов
                       </span>
-                      <span className="flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4" />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle style={{ width: '16px', height: '16px' }} />
                         {((webhook.successful_calls / webhook.total_calls) * 100 || 0).toFixed(1)}% успешных
                       </span>
                     </div>
                     
-                    <div className="flex flex-wrap gap-1">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                       {webhook.events.map((event, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
+                        <MacOSBadge key={index} variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                           {event}
-                        </Badge>
+                        </MacOSBadge>
                       ))}
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '16px' }}>
+                    <MacOSButton
                       size="sm"
                       variant="outline"
                       onClick={() => {
@@ -486,10 +487,10 @@ const WebhookManager = () => {
                         loadWebhookCalls(webhook.id);
                       }}
                     >
-                      <Eye className="w-4 h-4" />
-                    </Button>
+                      <Eye style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
                     
-                    <Button
+                    <MacOSButton
                       size="sm"
                       variant="outline"
                       onClick={() => {
@@ -497,10 +498,10 @@ const WebhookManager = () => {
                         setShowTestModal(true);
                       }}
                     >
-                      <TestTube className="w-4 h-4" />
-                    </Button>
+                      <TestTube style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
                     
-                    <Button
+                    <MacOSButton
                       size="sm"
                       variant="outline"
                       onClick={() => {
@@ -508,95 +509,172 @@ const WebhookManager = () => {
                         setShowEditModal(true);
                       }}
                     >
-                      <Edit className="w-4 h-4" />
-                    </Button>
+                      <Edit style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
                     
                     {webhook.is_active ? (
-                      <Button
+                      <MacOSButton
                         size="sm"
                         variant="outline"
                         onClick={() => handleDeactivateWebhook(webhook.id)}
                       >
-                        <Pause className="w-4 h-4" />
-                      </Button>
+                        <Pause style={{ width: '16px', height: '16px' }} />
+                      </MacOSButton>
                     ) : (
-                      <Button
+                      <MacOSButton
                         size="sm"
                         variant="outline"
                         onClick={() => handleActivateWebhook(webhook.id)}
                       >
-                        <Play className="w-4 h-4" />
-                      </Button>
+                        <Play style={{ width: '16px', height: '16px' }} />
+                      </MacOSButton>
                     )}
                     
-                    <Button
+                    <MacOSButton
                       size="sm"
                       variant="outline"
                       onClick={() => handleDeleteWebhook(webhook.id)}
-                      className="text-red-600 hover:text-red-700"
+                      style={{ color: 'var(--mac-error)' }}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      <Trash2 style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
                   </div>
                 </div>
-              </Card>
+              </MacOSCard>
             ))}
           </div>
 
           {filteredWebhooks.length === 0 && (
-            <Card className="p-8 text-center">
-              <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Webhook'и не найдены</h3>
-              <p className="text-gray-600 mb-4">
-                {webhooks.length === 0 
+            <MacOSEmptyState
+              icon={Globe}
+              title="Webhook'и не найдены"
+              description={
+                webhooks.length === 0 
                   ? 'Создайте первый webhook для начала работы с внешними интеграциями'
                   : 'Попробуйте изменить фильтры поиска'
                 }
-              </p>
-              {webhooks.length === 0 && (
-                <Button onClick={() => setShowCreateModal(true)}>
+              action={
+                webhooks.length === 0 ? (
+                  <MacOSButton onClick={() => setShowCreateModal(true)}>
                   Создать Webhook
-                </Button>
-              )}
-            </Card>
+                  </MacOSButton>
+                ) : null
+              }
+              iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }}
+            />
           )}
         </div>
       )}
 
-      {activeTab === 'calls' && selectedWebhook && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">
-              Вызовы для "{selectedWebhook.name}"
+      {activeTab === 'calls' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Все вызовы webhook'ов
             </h2>
-            <Button
-              onClick={() => loadWebhookCalls(selectedWebhook.id)}
+            <MacOSButton
+              onClick={() => {
+                // Загружаем вызовы для всех webhook'ов
+                Promise.all(webhooks.map(webhook => loadWebhookCalls(webhook.id)));
+              }}
               variant="outline"
               size="sm"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Обновить
-            </Button>
+            </MacOSButton>
           </div>
 
-          <div className="space-y-2">
+          {/* Фильтры для вызовов */}
+          <MacOSCard style={{ padding: '16px' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '16px' 
+            }}>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '4px'
+                }}>
+                  Webhook
+                </label>
+                <MacOSSelect
+                  value={selectedWebhook?.id || ''}
+                  onChange={(e) => {
+                    const webhook = webhooks.find(w => w.id === e.target.value);
+                    setSelectedWebhook(webhook);
+                    if (webhook) loadWebhookCalls(webhook.id);
+                  }}
+                  options={[
+                    { value: '', label: 'Все webhook\'и' },
+                    ...webhooks.map(webhook => ({ value: webhook.id, label: webhook.name }))
+                  ]}
+                />
+              </div>
+              
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '4px'
+                }}>
+                  Статус вызова
+                </label>
+                <MacOSSelect
+                  value={filters.call_status || ''}
+                  onChange={(e) => setFilters({...filters, call_status: e.target.value})}
+                  options={[
+                    { value: '', label: 'Все статусы' },
+                    { value: 'success', label: 'Успешные' },
+                    { value: 'failed', label: 'Ошибки' },
+                    { value: 'pending', label: 'Ожидание' },
+                    { value: 'retrying', label: 'Повтор' }
+                  ]}
+                />
+              </div>
+            </div>
+          </MacOSCard>
+
+          {/* Список вызовов */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {calls.map((call) => (
-              <Card key={call.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-medium">{call.event_type}</span>
+              <MacOSCard key={call.id} style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ flex: '1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <span style={{ 
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)'
+                      }}>
+                        {call.event_type}
+                      </span>
                       {getCallStatusBadge(call.status)}
                       {call.response_status_code && (
-                        <Badge variant="outline">
+                        <MacOSBadge variant="outline">
                           HTTP {call.response_status_code}
-                        </Badge>
+                        </MacOSBadge>
+                      )}
+                      {selectedWebhook && (
+                        <MacOSBadge variant="secondary" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                          {selectedWebhook.name}
+                        </MacOSBadge>
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-tertiary)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock style={{ width: '16px', height: '16px' }} />
                         {new Date(call.created_at).toLocaleString()}
                       </span>
                       {call.duration_ms && (
@@ -606,39 +684,241 @@ const WebhookManager = () => {
                     </div>
                     
                     {call.error_message && (
-                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                      <div style={{ 
+                        marginTop: '8px', 
+                        padding: '8px', 
+                        backgroundColor: 'var(--mac-error-bg)', 
+                        border: '1px solid var(--mac-error-border)', 
+                        borderRadius: 'var(--mac-radius-sm)', 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        color: 'var(--mac-error)' 
+                      }}>
                         {call.error_message}
                       </div>
                     )}
                   </div>
                 </div>
-              </Card>
+              </MacOSCard>
             ))}
           </div>
 
           {calls.length === 0 && (
-            <Card className="p-8 text-center">
-              <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Вызовы не найдены</h3>
-              <p className="text-gray-600">
-                Для этого webhook'а еще не было вызовов
-              </p>
-            </Card>
+            <MacOSEmptyState
+              icon={Activity}
+              title="Вызовы не найдены"
+              description={selectedWebhook ? "Для этого webhook'а еще не было вызовов" : "Выберите webhook для просмотра его вызовов"}
+              iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }}
+            />
           )}
         </div>
       )}
 
-      {/* Модальные окна будут добавлены позже */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-bold mb-4">Создать Webhook</h2>
-            <p className="text-gray-600 mb-4">Функционал создания webhook'а будет добавлен в следующей итерации</p>
-            <Button onClick={() => setShowCreateModal(false)}>
-              Закрыть
-            </Button>
+      {activeTab === 'events' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Типы событий
+            </h2>
+            <MacOSButton
+              onClick={() => {
+                // Обновляем список событий
+                loadWebhooks();
+              }}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              Обновить
+            </MacOSButton>
           </div>
+
+          {/* Статистика событий */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <MacOSStatCard
+              title="Всего типов событий"
+              value={new Set(webhooks.flatMap(w => w.events)).size}
+              icon={Clock}
+              color="blue"
+            />
+            
+            <MacOSStatCard
+              title="Активных событий"
+              value={webhooks.filter(w => w.is_active).flatMap(w => w.events).length}
+              icon={CheckCircle}
+              color="green"
+            />
+            
+            <MacOSStatCard
+              title="Пациентские события"
+              value={webhooks.flatMap(w => w.events).filter(e => e.includes('patient')).length}
+              icon={Users}
+              color="orange"
+            />
+            
+            <MacOSStatCard
+              title="Платежные события"
+              value={webhooks.flatMap(w => w.events).filter(e => e.includes('payment')).length}
+              icon={CreditCard}
+              color="purple"
+            />
+          </div>
+
+          {/* Список типов событий */}
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 16px 0'
+            }}>
+              Доступные типы событий
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+              {[
+                { 
+                  type: 'patient.created', 
+                  name: 'Создание пациента', 
+                  description: 'Отправляется при создании нового пациента',
+                  icon: UserPlus,
+                  color: 'var(--mac-success)'
+                },
+                { 
+                  type: 'patient.updated', 
+                  name: 'Обновление пациента', 
+                  description: 'Отправляется при изменении данных пациента',
+                  icon: Edit,
+                  color: 'var(--mac-info)'
+                },
+                { 
+                  type: 'appointment.created', 
+                  name: 'Создание записи', 
+                  description: 'Отправляется при создании новой записи на прием',
+                  icon: Calendar,
+                  color: 'var(--mac-accent-blue)'
+                },
+                { 
+                  type: 'appointment.updated', 
+                  name: 'Обновление записи', 
+                  description: 'Отправляется при изменении записи на прием',
+                  icon: Edit,
+                  color: 'var(--mac-info)'
+                },
+                { 
+                  type: 'visit.completed', 
+                  name: 'Завершение визита', 
+                  description: 'Отправляется при завершении визита пациента',
+                  icon: CheckCircle,
+                  color: 'var(--mac-success)'
+                },
+                { 
+                  type: 'payment.completed', 
+                  name: 'Завершение платежа', 
+                  description: 'Отправляется при успешном завершении платежа',
+                  icon: CreditCard,
+                  color: 'var(--mac-success)'
+                },
+                { 
+                  type: 'payment.failed', 
+                  name: 'Ошибка платежа', 
+                  description: 'Отправляется при неудачной попытке платежа',
+                  icon: AlertTriangle,
+                  color: 'var(--mac-error)'
+                },
+                { 
+                  type: 'system.maintenance', 
+                  name: 'Техническое обслуживание', 
+                  description: 'Отправляется при начале/завершении технических работ',
+                  icon: Settings,
+                  color: 'var(--mac-warning)'
+                }
+              ].map((event) => {
+                const IconComponent = event.icon;
+                const webhookCount = webhooks.filter(w => w.events.includes(event.type)).length;
+                
+                return (
+                  <div key={event.type} style={{ 
+                    padding: '16px', 
+                    border: '1px solid var(--mac-border)', 
+                    borderRadius: 'var(--mac-radius-md)',
+                    backgroundColor: 'var(--mac-bg-secondary)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <IconComponent style={{ width: '20px', height: '20px', color: event.color }} />
+                      <h4 style={{ 
+                        fontSize: 'var(--mac-font-size-base)', 
+                        fontWeight: 'var(--mac-font-weight-semibold)', 
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>
+                        {event.name}
+                      </h4>
+                      <MacOSBadge variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                        {event.type}
+                      </MacOSBadge>
+                    </div>
+                    
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)',
+                      margin: '0 0 8px 0'
+                    }}>
+                      {event.description}
+                    </p>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ 
+                        fontSize: 'var(--mac-font-size-xs)', 
+                        color: 'var(--mac-text-tertiary)' 
+                      }}>
+                        {webhookCount} webhook{webhookCount === 1 ? '' : webhookCount < 5 ? 'а' : 'ов'} используют это событие
+                      </span>
+                      {webhookCount > 0 && (
+                        <MacOSBadge variant="success" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
+                          Активно
+                        </MacOSBadge>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </MacOSCard>
         </div>
+      )}
+
+      {/* Модальные окна */}
+      {showCreateModal && (
+        <MacOSModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          title="Создать Webhook"
+          size="lg"
+        >
+          <div style={{ padding: '24px' }}>
+            <p style={{ 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              marginBottom: '16px'
+            }}>
+              Функционал создания webhook'а будет добавлен в следующей итерации
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <MacOSButton onClick={() => setShowCreateModal(false)}>
+              Закрыть
+              </MacOSButton>
+            </div>
+          </div>
+        </MacOSModal>
       )}
     </div>
   );

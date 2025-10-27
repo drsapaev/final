@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { designTokens, themes } from '../design-system';
-import { colors as tokenColors } from '../theme/tokens';
+import tokens, { colors as tokenColors } from '../theme/tokens';
 
 const ThemeContext = createContext();
 
@@ -30,7 +29,7 @@ export const ThemeProvider = ({ children }) => {
 
   const isDark = theme === 'dark';
   const isLight = theme === 'light';
-  const themeConfig = themes[theme] || themes.light;
+  const themeConfig = { mode: theme };
 
   // Утилитарные функции для работы с токенами (обновлены на новую систему)
   const getColor = (color, shade = 500) => {
@@ -46,15 +45,15 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const getSpacing = (size) => {
-    return designTokens?.spacing?.[size] || designTokens?.spacing?.md || '16px';
+    return tokens?.spacing?.[size] || tokens?.spacing?.md || '16px';
   };
 
   const getFontSize = (size) => {
-    return designTokens?.typography?.fontSize?.[size] || designTokens?.typography?.fontSize?.base || '16px';
+    return tokens?.typography?.fontSize?.[size] || tokens?.typography?.fontSize?.base || '16px';
   };
 
   const getShadow = (size) => {
-    return designTokens?.boxShadow?.[size] || designTokens?.boxShadow?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+    return tokens?.shadows?.[size] || tokens?.shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
   };
 
   const setTheme = (newTheme) => {
@@ -114,10 +113,10 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--info-color', tokenColors.status.info);
     
     // Переменные для теней
-    root.style.setProperty('--shadow-sm', designTokens?.boxShadow?.sm || '0 1px 2px 0 rgba(0, 0, 0, 0.05)');
-    root.style.setProperty('--shadow-md', designTokens?.boxShadow?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)');
-    root.style.setProperty('--shadow-lg', designTokens?.boxShadow?.lg || '0 10px 15px -3px rgba(0, 0, 0, 0.1)');
-    root.style.setProperty('--shadow-xl', designTokens?.boxShadow?.xl || '0 20px 25px -5px rgba(0, 0, 0, 0.1)');
+    root.style.setProperty('--shadow-sm', tokens?.shadows?.sm || '0 1px 2px 0 rgba(0, 0, 0, 0.05)');
+    root.style.setProperty('--shadow-md', tokens?.shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)');
+    root.style.setProperty('--shadow-lg', tokens?.shadows?.lg || '0 10px 15px -3px rgba(0, 0, 0, 0.1)');
+    root.style.setProperty('--shadow-xl', tokens?.shadows?.xl || '0 20px 25px -5px rgba(0, 0, 0, 0.1)');
     
   }, [theme, isDark]);
 
@@ -144,7 +143,7 @@ export const ThemeProvider = ({ children }) => {
     isLight,
     themeConfig,
     // Добавляем утилитарные функции
-    designTokens,
+    designTokens: tokens,
     getColor,
     getSpacing,
     getFontSize,

@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Option, Badge, Icon } from '../components/ui/macos';
+import { useTheme } from '../contexts/ThemeContext';
 import AIAssistant from '../components/ai/AIAssistant';
+import QueueIntegration from '../components/QueueIntegration';
 import LabResultsManager from '../components/laboratory/LabResultsManager';
 import LabReportGenerator from '../components/laboratory/LabReportGenerator';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal';
+import useModal from '../hooks/useModal.jsx';
 
 const LabPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, getColor, getSpacing } = useTheme();
   
   // Синхронизация активной вкладки с URL
   const getActiveTabFromURL = () => {
@@ -256,224 +260,438 @@ const LabPanel = () => {
     maxWidth: '1400px', 
     margin: '0 auto', 
     fontFamily: 'system-ui, -apple-system, sans-serif',
-    background: 'var(--bg-primary)',
-    color: 'var(--text-primary)',
+    background: 'var(--mac-bg-primary)',
+    color: 'var(--mac-text-primary)',
     minHeight: '100vh'
   };
   const cardStyle = { 
-    background: 'var(--bg-primary)', 
-    border: '1px solid var(--border-color)', 
-    borderRadius: '12px', 
+    background: 'var(--mac-bg-secondary)', 
+    border: '1px solid var(--mac-border)', 
+    borderRadius: 'var(--mac-radius-md)', 
     marginBottom: '20px', 
-    boxShadow: 'var(--shadow-md)' 
+    boxShadow: 'var(--mac-shadow-sm)' 
   };
   const cardHeaderStyle = { 
     padding: '20px', 
-    borderBottom: '1px solid var(--border-color)', 
+    borderBottom: '1px solid var(--mac-border)', 
     display: 'flex', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    backgroundColor: '#28a745', 
-    color: 'white', 
-    borderRadius: '12px 12px 0 0' 
+    backgroundColor: 'var(--mac-bg-tertiary)', 
+    color: 'var(--mac-text-primary)', 
+    borderRadius: 'var(--mac-radius-md) var(--mac-radius-md) 0 0' 
   };
   const cardContentStyle = { 
-    padding: '20px' 
+    padding: '20px',
+    backgroundColor: 'var(--mac-bg-secondary)'
   };
   const buttonStyle = { 
     padding: '8px 16px', 
-    backgroundColor: '#28a745', 
-    color: 'white', 
+    backgroundColor: 'var(--mac-accent)', 
+    color: 'var(--mac-text-on-accent)', 
     border: 'none', 
-    borderRadius: '4px', 
+    borderRadius: 'var(--mac-radius-sm)', 
     cursor: 'pointer', 
     marginRight: '8px', 
-    fontSize: '14px' 
+    fontSize: '14px',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
   };
   const buttonSecondaryStyle = { 
     ...buttonStyle, 
-    backgroundColor: '#6c757d' 
+    backgroundColor: 'var(--mac-bg-tertiary)',
+    color: 'var(--mac-text-primary)',
+    border: '1px solid var(--mac-border)'
   };
   const buttonSuccessStyle = { 
     ...buttonStyle, 
-    backgroundColor: '#0d6efd' 
+    backgroundColor: 'var(--mac-success)' 
   };
-  const tabsStyle = { display: 'flex', borderBottom: '1px solid #e5e5e5', marginBottom: '20px' };
-  const tabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid transparent' };
-  const activeTabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid #28a745', color: '#28a745' };
-  const listItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid #e5e5e5', borderRadius: '4px', marginBottom: '12px' };
+  const tabsStyle = { display: 'flex', borderBottom: '1px solid var(--mac-border)', marginBottom: '20px' };
+  const tabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid transparent', color: 'var(--mac-text-secondary)' };
+  const activeTabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid var(--mac-accent)', color: 'var(--mac-accent)' };
+  const listItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-sm)', marginBottom: '12px', backgroundColor: 'var(--mac-bg-primary)' };
   const formStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' };
-  const inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px', marginBottom: '12px' };
-  const labelStyle = { display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px' };
+  const inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-sm)', fontSize: '14px', marginBottom: '12px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' };
+  const labelStyle = { display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px', color: 'var(--mac-text-primary)' };
 
   return (
-    <div className="lab-panel" style={{
-      padding: '20px',
+    <div style={{
       boxSizing: 'border-box',
-      overflow: 'hidden',
       width: '100%',
-      position: 'relative',
-      zIndex: 1,
-      display: 'block',
-      maxWidth: '100%',
-      margin: 0,
-      minHeight: '100vh',
-      background: 'var(--bg-primary)',
-      color: 'var(--text-primary)',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
+      minHeight: 'calc(100vh - 120px)',
+      background: 'var(--mac-bg-primary)',
+      color: 'var(--mac-text-primary)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
     }}>
 
       {activeTab === 'tests' && (
-        <div>
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '18px' }}>Лабораторные исследования</h2>
-              <button style={{ ...buttonStyle, backgroundColor: 'white', color: '#28a745' }} onClick={() => setShowTestForm(true)}>➕ Новый анализ</button>
-            </div>
-            <div style={cardContentStyle}>
-              <div>
-                {tests.map((t) => (
-                  <div key={t.id} style={listItemStyle}>
+        <Card 
+          variant="filled"
+          padding="none"
+          style={{ 
+            marginBottom: getSpacing(4)
+          }}
+        >
+          <CardHeader style={{
+            backgroundColor: 'var(--mac-bg-tertiary)',
+            borderBottom: '1px solid var(--mac-border)',
+            padding: getSpacing(4)
+          }}>
+            <CardTitle style={{ 
+              color: 'var(--mac-text-primary)',
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              Лабораторные исследования
+            </CardTitle>
+            <Button 
+              variant="primary" 
+              onClick={() => setShowTestForm(true)}
+              style={{ marginLeft: 'auto' }}
+            >
+              <Icon name="plus" size={16} />
+              Новый анализ
+            </Button>
+          </CardHeader>
+          <CardContent style={{
+            padding: getSpacing(4),
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing(4) }}>
+              {tests.map((t) => (
+                <div 
+                  key={t.id} 
+                  style={{ 
+                    backgroundColor: 'var(--mac-bg-primary)',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 'var(--mac-radius-md)',
+                    boxShadow: 'var(--mac-shadow-sm)',
+                    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                        <h3 style={{ margin: 0, fontSize: '16px' }}>Анализ #{t.id} — Пациент ID: {t.patient_id}</h3>
-                        <span style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '12px', backgroundColor: '#e8f5e8', color: '#2e7d32', marginLeft: '8px' }}>{t.test_date}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: getSpacing(2) }}>
+                        <h3 style={{ 
+                          margin: 0, 
+                          fontSize: '16px', 
+                          fontWeight: '600',
+                          color: 'var(--mac-text-primary)'
+                        }}>
+                          Анализ #{t.id} — Пациент ID: {t.patient_id}
+                        </h3>
+                        <Badge variant="success" style={{ marginLeft: getSpacing(2) }}>
+                          {t.test_date}
+                        </Badge>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>Тип: {t.test_type} | Образец: {t.sample_type}</div>
+                      <div style={{ 
+                        fontSize: '14px', 
+                        color: 'var(--mac-text-secondary)',
+                        lineHeight: '1.4'
+                      }}>
+                        Тип: {t.test_type} | Образец: {t.sample_type}
+                      </div>
                     </div>
-                    <div>
-                      <button style={buttonStyle}>📋 Бланк</button>
-                    </div>
+                    <Button variant="outline" size="small">
+                      <Icon name="doc.text" size={16} />
+                      Бланк
+                    </Button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {activeTab === 'appointments' && (
-        <div style={{ 
-          width: '100%', 
-          maxWidth: 'none',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px'
-        }}>
-          <div style={{
-            ...cardStyle,
-            width: '100%',
-            maxWidth: '100%',
-            minWidth: 0,
-            boxSizing: 'border-box',
-            overflow: 'hidden'
+        <Card 
+          variant="filled"
+          padding="none"
+          style={{ 
+            marginBottom: getSpacing(4)
+          }}
+        >
+          <CardHeader style={{
+            backgroundColor: 'var(--mac-bg-tertiary)',
+            borderBottom: '1px solid var(--mac-border)',
+            padding: getSpacing(4)
           }}>
-            <div style={cardHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '18px' }}>📅 Записи в лабораторию</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '14px', color: '#666' }}>Всего: {appointments.length}</span>
-                <button 
-                  style={{ ...buttonStyle, backgroundColor: 'white', color: '#28a745' }} 
-                  onClick={loadLabAppointments}
-                  disabled={appointmentsLoading}
-                >
-                  🔄 Обновить
-                </button>
-              </div>
+            <CardTitle style={{ 
+              color: 'var(--mac-text-primary)',
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              <Icon name="calendar" size={20} style={{ marginRight: getSpacing(2) }} />
+              Записи в лабораторию
+            </CardTitle>
+            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing(2) }}>
+              <Badge variant="info">Всего: {appointments.length}</Badge>
+              <Button 
+                variant="outline" 
+                onClick={loadLabAppointments}
+                disabled={appointmentsLoading}
+              >
+                <Icon name="arrow.clockwise" size={16} />
+                Обновить
+              </Button>
             </div>
-            <div style={cardContentStyle}>
-              <EnhancedAppointmentsTable
-                data={appointments}
-                loading={appointmentsLoading}
-                theme="light"
-                language="ru"
-                selectedRows={new Set()}
-                outerBorder={false}
-                services={{}}
-                showCheckboxes={false}
-                view="doctor"
-                onRowSelect={() => {}}
-                onRowClick={handleAppointmentRowClick}
-                onActionClick={handleAppointmentActionClick}
-              />
-            </div>
-          </div>
-        </div>
+          </CardHeader>
+          <CardContent style={{
+            padding: getSpacing(4),
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            <EnhancedAppointmentsTable
+              data={appointments}
+              loading={appointmentsLoading}
+              theme="light"
+              language="ru"
+              selectedRows={new Set()}
+              outerBorder={false}
+              services={{}}
+              showCheckboxes={false}
+              view="doctor"
+              onRowSelect={() => {}}
+              onRowClick={handleAppointmentRowClick}
+              onActionClick={handleAppointmentActionClick}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {activeTab === 'results' && (
-        <div>
-          {/* Новый компонент управления результатами */}
-          <LabResultsManager
-            patientId={patientModal.selectedItem?.id || 'demo-patient-1'}
-            visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
-            onUpdate={() => {
-              console.log('Результаты обновлены');
-              // Обновляем список результатов
-              setResults(prev => [...prev]);
-            }}
-          />
-          
-          {/* Генератор отчетов */}
-          {results.length > 0 && (
-            <div style={{ marginTop: '20px' }}>
-              <LabReportGenerator
-                results={results}
-                patient={patientModal.selectedItem || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
-                doctor={{ name: 'Доктор Иванов', specialty: 'Терапевт' }}
-                clinic={{ name: 'Медицинская клиника' }}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing(4) }}>
+          <Card 
+            variant="filled"
+            padding="none"
+          >
+            <CardHeader style={{
+              backgroundColor: 'var(--mac-bg-tertiary)',
+              borderBottom: '1px solid var(--mac-border)',
+              padding: getSpacing(4)
+            }}>
+              <CardTitle style={{ 
+                color: 'var(--mac-text-primary)',
+                fontSize: '18px',
+                fontWeight: '600',
+                margin: 0
+              }}>
+                <Icon name="chart.bar" size={20} style={{ marginRight: getSpacing(2) }} />
+                Результаты анализов
+              </CardTitle>
+            </CardHeader>
+            <CardContent style={{
+              padding: getSpacing(4),
+              backgroundColor: 'var(--mac-bg-secondary)'
+            }}>
+              <LabResultsManager
+                patientId={patientModal.selectedItem?.id || 'demo-patient-1'}
                 visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
+                onUpdate={() => {
+                  console.log('Результаты обновлены');
+                  setResults(prev => [...prev]);
+                }}
               />
-            </div>
+            </CardContent>
+          </Card>
+          
+          {results.length > 0 && (
+            <Card 
+              variant="filled"
+              padding="none"
+            >
+              <CardHeader style={{
+                backgroundColor: 'var(--mac-bg-tertiary)',
+                borderBottom: '1px solid var(--mac-border)',
+                padding: getSpacing(4)
+              }}>
+                <CardTitle style={{ 
+                  color: 'var(--mac-text-primary)',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  margin: 0
+                }}>
+                  <Icon name="doc.text" size={20} style={{ marginRight: getSpacing(2) }} />
+                  Генератор отчетов
+                </CardTitle>
+              </CardHeader>
+              <CardContent style={{
+                padding: getSpacing(4),
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <LabReportGenerator
+                  results={results}
+                  patient={patientModal.selectedItem || { name: 'Демо пациент', birthDate: '01.01.1990', phone: '+998901234567' }}
+                  doctor={{ name: 'Доктор Иванов', specialty: 'Терапевт' }}
+                  clinic={{ name: 'Медицинская клиника' }}
+                  visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
+                />
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
 
+      {activeTab === 'queue' && (
+        <QueueIntegration
+          specialist="Лаборатория"
+          onPatientSelect={(patient) => {
+            console.log('Выбран пациент:', patient);
+            patientModal.open(patient);
+          }}
+          onStartVisit={(appointment) => {
+            console.log('Начало приема:', appointment);
+            patientModal.open(appointment);
+          }}
+        />
+      )}
+
       {activeTab === 'patients' && (
-        <div>
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '18px' }}>Пациенты лаборатории</h2>
-              <span style={{ fontSize: '14px' }}>Всего: {patients.length}</span>
-            </div>
-            <div style={cardContentStyle}>
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>Загрузка пациентов...</div>
-              ) : (
-                <div>
-                  {patients.map((p) => (
-                    <div key={p.id} style={listItemStyle}>
+        <Card 
+          variant="filled"
+          padding="none"
+          style={{ 
+            marginBottom: getSpacing(4)
+          }}
+        >
+          <CardHeader style={{
+            backgroundColor: 'var(--mac-bg-tertiary)',
+            borderBottom: '1px solid var(--mac-border)',
+            padding: getSpacing(4)
+          }}>
+            <CardTitle style={{ 
+              color: 'var(--mac-text-primary)',
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              <Icon name="person.2" size={20} style={{ marginRight: getSpacing(2) }} />
+              Пациенты лаборатории
+            </CardTitle>
+            <Badge variant="info">Всего: {patients.length}</Badge>
+          </CardHeader>
+          <CardContent style={{
+            padding: getSpacing(4),
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: getSpacing(8) }}>
+                <Icon name="arrow.clockwise" size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                <div style={{ marginTop: getSpacing(2) }}>Загрузка пациентов...</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing(4) }}>
+                {patients.map((p) => (
+                  <div 
+                    key={p.id} 
+                    style={{ 
+                      backgroundColor: 'var(--mac-bg-primary)',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-md)',
+                      boxShadow: 'var(--mac-shadow-sm)',
+                      transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                          <h3 style={{ margin: 0, fontSize: '16px' }}>{p.last_name} {p.first_name} {p.middle_name}</h3>
-                          <span style={{ padding: '4px 8px', fontSize: '12px', borderRadius: '12px', backgroundColor: '#fff3cd', color: '#856404', marginLeft: '8px' }}>Лаборатория</span>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: getSpacing(2) }}>
+                          <h3 style={{ 
+                            margin: 0, 
+                            fontSize: '16px', 
+                            fontWeight: '600',
+                            color: 'var(--mac-text-primary)'
+                          }}>
+                            {p.last_name} {p.first_name} {p.middle_name}
+                          </h3>
+                          <Badge variant="warning" style={{ marginLeft: getSpacing(2) }}>
+                            Лаборатория
+                          </Badge>
                         </div>
-                        <div style={{ fontSize: '12px', color: '#666' }}>📱 {p.phone} | 📅 {p.birth_date} | 🆔 ID: {p.id}</div>
+                        <div style={{ 
+                          fontSize: '14px', 
+                          color: 'var(--mac-text-secondary)',
+                          lineHeight: '1.4'
+                        }}>
+                          <Icon name="phone" size={14} style={{ marginRight: getSpacing(1) }} />
+                          {p.phone} | 
+                          <Icon name="calendar" size={14} style={{ marginLeft: getSpacing(1), marginRight: getSpacing(1) }} />
+                          {p.birth_date} | 
+                          <Icon name="person.badge" size={14} style={{ marginLeft: getSpacing(1), marginRight: getSpacing(1) }} />
+                          ID: {p.id}
+                        </div>
                       </div>
-                      <div>
-                        <button style={buttonStyle} onClick={() => { setShowTestForm(true); setTestForm({ ...testForm, patient_id: p.id }); }}>🧪 Назначить анализ</button>
-                        <button style={buttonSuccessStyle} onClick={() => { setShowResultForm(true); setResultForm({ ...resultForm, patient_id: p.id }); }}>📊 Внести результат</button>
+                      <div style={{ display: 'flex', gap: getSpacing(2) }}>
+                        <Button 
+                          variant="primary" 
+                          size="small"
+                          onClick={() => { setShowTestForm(true); setTestForm({ ...testForm, patient_id: p.id }); }}
+                        >
+                          <Icon name="testtube.2" size={16} />
+                          Назначить анализ
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="small"
+                          onClick={() => { setShowResultForm(true); setResultForm({ ...resultForm, patient_id: p.id }); }}
+                        >
+                          <Icon name="chart.bar" size={16} />
+                          Внести результат
+                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {activeTab === 'reports' && (
-        <div>
-          <div style={cardStyle}>
-            <div style={cardHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '18px' }}>Отчеты лаборатории</h2>
+        <Card 
+          variant="filled"
+          padding="none"
+          style={{ 
+            marginBottom: getSpacing(4)
+          }}
+        >
+          <CardHeader style={{
+            backgroundColor: 'var(--mac-bg-tertiary)',
+            borderBottom: '1px solid var(--mac-border)',
+            padding: getSpacing(4)
+          }}>
+            <CardTitle style={{ 
+              color: 'var(--mac-text-primary)',
+              fontSize: '18px',
+              fontWeight: '600',
+              margin: 0
+            }}>
+              <Icon name="doc.text" size={20} style={{ marginRight: getSpacing(2) }} />
+              Отчеты лаборатории
+            </CardTitle>
+          </CardHeader>
+          <CardContent style={{
+            padding: getSpacing(4),
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: getSpacing(8), 
+              color: 'var(--mac-text-secondary)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: getSpacing(2)
+            }}>
+              <Icon name="hammer" size={48} style={{ opacity: 0.5 }} />
+              <div style={{ fontSize: '16px', fontWeight: '500' }}>
+                Модуль отчетов будет доступен в следующей версии
+              </div>
             </div>
-            <div style={cardContentStyle}>
-              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>🚧 Модуль отчетов будет доступен в следующей версии</div>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {showTestForm && (

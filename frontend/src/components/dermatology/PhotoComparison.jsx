@@ -9,24 +9,19 @@ import {
   Card,
   CardContent,
   Typography,
-  Slider,
-  IconButton,
-  ToggleButton,
-  ToggleButtonGroup,
-  Chip,
-  Paper,
-  Tooltip,
-} from '@mui/material';
+  Button,
+  Badge,
+} from '../ui/macos';
 import {
-  CompareArrows,
-  SwapHoriz,
+  ArrowLeftRight,
+  RotateCcw,
   Fullscreen,
   ZoomIn, 
   ZoomOut,
-  RestartAlt,
-  ViewColumn,
-  ViewStream,
-} from '@mui/icons-material';
+  RefreshCw,
+  Columns,
+  Layout,
+} from 'lucide-react';
 
 const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -133,68 +128,150 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
   return (
     <Card>
       <CardContent>
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">
-            <CompareArrows sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <ArrowLeftRight style={{ marginRight: 8, verticalAlign: 'middle' }} />
             Сравнение результатов
           </Typography>
           
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {/* Режим отображения */}
-            <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={(e, newMode) => newMode && setViewMode(newMode)}
-              size="small"
-            >
-              <ToggleButton value="slider">
-                <Tooltip title="Слайдер">
-                  <SwapHoriz />
-                </Tooltip>
-              </ToggleButton>
-              <ToggleButton value="side-by-side">
-                <Tooltip title="Рядом">
-                  <ViewColumn />
-                </Tooltip>
-              </ToggleButton>
-              <ToggleButton value="overlay">
-                <Tooltip title="Наложение">
-                  <ViewStream />
-                </Tooltip>
-              </ToggleButton>
-            </ToggleButtonGroup>
+            <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
+              <button
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: viewMode === 'slider' ? 'var(--mac-accent-blue)' : 'transparent',
+                  color: viewMode === 'slider' ? 'white' : 'var(--mac-text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                onClick={() => setViewMode('slider')}
+                title="Слайдер"
+              >
+                <ArrowLeftRight style={{ width: 16, height: 16 }} />
+              </button>
+              <button
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: viewMode === 'side-by-side' ? 'var(--mac-accent-blue)' : 'transparent',
+                  color: viewMode === 'side-by-side' ? 'white' : 'var(--mac-text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                onClick={() => setViewMode('side-by-side')}
+                title="Рядом"
+              >
+                <Columns style={{ width: 16, height: 16 }} />
+              </button>
+              <button
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: viewMode === 'overlay' ? 'var(--mac-accent-blue)' : 'transparent',
+                  color: viewMode === 'overlay' ? 'white' : 'var(--mac-text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                onClick={() => setViewMode('overlay')}
+                title="Наложение"
+              >
+                <Layout style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
             
             {/* Зум контролы */}
-            <IconButton onClick={handleZoomOut} size="small">
-              <ZoomOut />
-            </IconButton>
-            <Chip label={`${Math.round(zoom * 100)}%`} size="small" />
-            <IconButton onClick={handleZoomIn} size="small">
-              <ZoomIn />
-            </IconButton>
-            <IconButton onClick={handleResetZoom} size="small">
-              <RestartAlt />
-            </IconButton>
-            <IconButton onClick={handleFullscreen} size="small">
-              <Fullscreen />
-            </IconButton>
-          </Box>
-        </Box>
+            <button
+              onClick={handleZoomOut}
+              style={{
+                padding: '8px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 4,
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <ZoomOut style={{ width: 16, height: 16 }} />
+            </button>
+            <Badge variant="info">{Math.round(zoom * 100)}%</Badge>
+            <button
+              onClick={handleZoomIn}
+              style={{
+                padding: '8px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 4,
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <ZoomIn style={{ width: 16, height: 16 }} />
+            </button>
+            <button
+              onClick={handleResetZoom}
+              style={{
+                padding: '8px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 4,
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <RefreshCw style={{ width: 16, height: 16 }} />
+            </button>
+            <button
+              onClick={handleFullscreen}
+              style={{
+                padding: '8px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 4,
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Fullscreen style={{ width: 16, height: 16 }} />
+            </button>
+          </div>
+        </div>
 
         {/* Метаданные */}
         {metadata.zone && (
-          <Box sx={{ mb: 2 }}>
-            <Chip label={`Зона: ${metadata.zone}`} size="small" sx={{ mr: 1 }} />
-            <Chip label={`Ракурс: ${metadata.angle || 'front'}`} size="small" sx={{ mr: 1 }} />
-            <Chip label={`Освещение: ${metadata.lighting || 'natural'}`} size="small" />
-          </Box>
+          <div style={{ marginBottom: 16 }}>
+            <Badge variant="info" style={{ marginRight: 8 }}>
+              Зона: {metadata.zone}
+            </Badge>
+            <Badge variant="info" style={{ marginRight: 8 }}>
+              Ракурс: {metadata.angle || 'front'}
+            </Badge>
+            <Badge variant="info" style={{ marginRight: 8 }}>
+              Освещение: {metadata.lighting || 'natural'}
+            </Badge>
+          </div>
         )}
 
         {/* Режим слайдера */}
         {viewMode === 'slider' && (
-          <Box
+          <div
             ref={containerRef}
-            sx={{
+            style={{
               position: 'relative',
               width: '100%',
               height: '500px',
@@ -211,8 +288,8 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
             onTouchEnd={handleMouseUp}
           >
             {/* Фото ПОСЛЕ (нижний слой) */}
-            <Box
-              sx={{
+            <div
+              style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
@@ -232,11 +309,11 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   transition: isDragging ? 'none' : 'transform 0.3s ease',
                 }}
               />
-            </Box>
+            </div>
             
             {/* Фото ДО (верхний слой с обрезкой) */}
-            <Box
-              sx={{
+            <div
+              style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
@@ -257,11 +334,11 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                   transition: isDragging ? 'none' : 'transform 0.3s ease',
                 }}
               />
-            </Box>
+            </div>
             
             {/* Слайдер-разделитель */}
-            <Box
-              sx={{
+            <div
+              style={{
                 position: 'absolute',
                 top: 0,
                 left: `${sliderPosition}%`,
@@ -274,67 +351,61 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                 justifyContent: 'center',
               }}
             >
-              <Paper
-                sx={{
+              <div
+                style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  bgcolor: 'white',
-                  boxShadow: 3,
+                  backgroundColor: 'white',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 }}
               >
-                <SwapHoriz />
-              </Paper>
-            </Box>
+                <ArrowLeftRight style={{ width: 20, height: 20 }} />
+              </div>
+            </div>
             
             {/* Метки */}
-            <Typography
-              sx={{
-                position: 'absolute',
-                top: 10,
-                left: 10,
-                bgcolor: 'rgba(0,0,0,0.7)',
-                color: 'white',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                fontSize: '0.875rem',
-              }}
-            >
+            <div style={{
+              position: 'absolute',
+              top: 10,
+              left: 10,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: '14px',
+            }}>
               ДО
-            </Typography>
-            <Typography
-              sx={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                bgcolor: 'rgba(0,0,0,0.7)',
-                color: 'white',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                fontSize: '0.875rem',
-              }}
-            >
+            </div>
+            <div style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: 4,
+              fontSize: '14px',
+            }}>
               ПОСЛЕ
-            </Typography>
-          </Box>
+            </div>
+          </div>
         )}
 
         {/* Режим рядом */}
         {viewMode === 'side-by-side' && (
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle2" align="center" gutterBottom>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <Typography variant="subtitle2" style={{ textAlign: 'center', marginBottom: 8 }}>
                 ДО
               </Typography>
-              <Box sx={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
+              <div style={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
                   src={beforePhoto}
-                    alt="До"
+                  alt="До"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -343,17 +414,17 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                     transition: 'transform 0.3s ease',
                   }}
                 />
-              </Box>
-            </Box>
+              </div>
+            </div>
             
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle2" align="center" gutterBottom>
+            <div style={{ flex: 1 }}>
+              <Typography variant="subtitle2" style={{ textAlign: 'center', marginBottom: 8 }}>
                 ПОСЛЕ
               </Typography>
-              <Box sx={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
+              <div style={{ position: 'relative', overflow: 'hidden', height: '400px' }}>
                 <img
                   src={afterPhoto}
-                    alt="После"
+                  alt="После"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -362,14 +433,14 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
                     transition: 'transform 0.3s ease',
                   }}
                 />
-              </Box>
-            </Box>
-          </Box>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Режим наложения */}
         {viewMode === 'overlay' && (
-          <Box sx={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', height: '500px', overflow: 'hidden' }}>
             <img
               src={beforePhoto}
                     alt="До"
@@ -397,22 +468,27 @@ const PhotoComparison = ({ beforePhoto, afterPhoto, metadata = {} }) => {
               }}
             />
             
-            <Box sx={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
-              <Typography variant="caption" color="white" gutterBottom>
+            <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+              <Typography variant="caption" color="white" style={{ marginBottom: 8, display: 'block' }}>
                 Прозрачность
               </Typography>
-              <Slider
+              <input
+                type="range"
+                min="0"
+                max="100"
                 value={sliderPosition}
-                onChange={(e, value) => setSliderPosition(value)}
-                sx={{
-                  color: 'white',
-                  '& .MuiSlider-thumb': {
-                    bgcolor: 'white',
-                  },
+                onChange={(e) => setSliderPosition(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '4px',
+                  borderRadius: '2px',
+                  background: 'rgba(255,255,255,0.3)',
+                  outline: 'none',
+                  appearance: 'none',
                 }}
               />
-            </Box>
-          </Box>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

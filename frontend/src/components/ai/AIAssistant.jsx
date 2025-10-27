@@ -1,32 +1,6 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  Paper,
-  Typography,
-  CircularProgress,
-  Alert,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Chip,
-  Stack,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
-  IconButton,
-  Tooltip
-} from '@mui/material';
-import {
-  ExpandMore,
-  Psychology,
-  Warning,
-  CheckCircle,
-  Info,
-  ContentCopy,
-  Refresh
-} from '@mui/icons-material';
+import { Box, Card, CardContent, Typography, Alert, Badge, CircularProgress, Button } from '../../components/ui/macos';
+import { ChevronDown, ChevronUp, Brain, AlertTriangle, CheckCircle, Info, Copy, RefreshCw } from 'lucide-react';
 import { useSnackbar } from 'notistack';
 import { apiClient } from '../../api/client';
 import { mcpAPI } from '../../api/mcpClient';
@@ -37,14 +11,15 @@ const AIAssistant = ({
   onResult,
   title = "AI Ассистент",
   expanded = true,
-  useMCP = true,  // Использовать MCP по умолчанию
-  providerOptions = ['deepseek', 'gemini', 'openai', 'default'] // Доступные AI провайдеры
+  useMCP = true,
+  providerOptions = ['deepseek', 'gemini', 'openai', 'default']
 }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [provider, setProvider] = useState('deepseek'); // DeepSeek по умолчанию
+  const [provider, setProvider] = useState('deepseek');
   const [retryCount, setRetryCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(expanded);
   const { enqueueSnackbar } = useSnackbar();
 
   const analyzeData = async (manualRetry = false) => {
@@ -68,7 +43,6 @@ const AIAssistant = ({
               patientGender: data.patient_gender,
               provider: provider
             });
-            
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -92,9 +66,7 @@ const AIAssistant = ({
               provider: provider,
               maxSuggestions: data.maxSuggestions || 5
             });
-            
             if (mcpResult.status === 'success') {
-              // Поддержка нового формата с clinical_recommendations
               if (mcpResult.data.clinical_recommendations) {
                 response = { data: mcpResult.data };
               } else if (mcpResult.data.suggestions) {
@@ -106,10 +78,7 @@ const AIAssistant = ({
               throw new Error(mcpResult.error || 'MCP ICD10 suggestion failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/icd-suggest', {
-              ...data,
-              provider
-            });
+            response = await apiClient.post('/api/v1/ai/icd-suggest', { ...data, provider });
           }
           break;
 
@@ -122,25 +91,18 @@ const AIAssistant = ({
               provider: provider,
               includeRecommendations: true
             });
-            
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
               throw new Error(mcpResult.error || 'MCP lab interpretation failed');
             }
           } else {
-            response = await apiClient.post('/api/v1/ai/lab-interpret', {
-              ...data,
-              provider
-            });
+            response = await apiClient.post('/api/v1/ai/lab-interpret', { ...data, provider });
           }
           break;
 
         case 'ecg':
-          response = await apiClient.post('/api/v1/ai/ecg-interpret', {
-            ...data,
-            provider
-          });
+          response = await apiClient.post('/api/v1/ai/ecg-interpret', { ...data, provider });
           break;
 
         case 'skin':
@@ -151,7 +113,6 @@ const AIAssistant = ({
               data.patientHistory,
               provider
             );
-            
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -160,13 +121,9 @@ const AIAssistant = ({
           } else {
             const formData = new FormData();
             formData.append('image', data.image);
-            if (data.metadata) {
-              formData.append('metadata', JSON.stringify(data.metadata));
-            }
+            if (data.metadata) formData.append('metadata', JSON.stringify(data.metadata));
             formData.append('provider', provider);
-            response = await apiClient.post('/api/v1/ai/skin-analyze', formData, {
-              headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            response = await apiClient.post('/api/v1/ai/skin-analyze', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
           }
           break;
 
@@ -175,13 +132,8 @@ const AIAssistant = ({
             mcpResult = await mcpAPI.analyzeImage(
               data.image,
               data.imageType || 'general',
-              {
-                modality: data.modality,
-                clinicalContext: data.clinicalContext,
-                provider: provider
-              }
+              { modality: data.modality, clinicalContext: data.clinicalContext, provider: provider }
             );
-            
             if (mcpResult.status === 'success') {
               response = { data: mcpResult.data };
             } else {
@@ -197,9 +149,7 @@ const AIAssistant = ({
       }
 
       setResult(response.data);
-      if (onResult) {
-        onResult(response.data);
-      }
+      if (onResult) onResult(response.data);
       enqueueSnackbar('AI анализ завершен', { variant: 'success' });
       setRetryCount(0);
     } catch (err) {
@@ -217,389 +167,247 @@ const AIAssistant = ({
     enqueueSnackbar('Скопировано в буфер обмена', { variant: 'info' });
   };
 
+  const Pill = ({ children, color = 'default' }) => {
+    const colors = {
+      default: { border: 'var(--mac-border)', bg: 'transparent' },
+      primary: { border: 'var(--mac-accent-blue)', bg: 'rgba(0,122,255,0.08)' },
+      success: { border: 'rgba(52,199,89,0.45)', bg: 'rgba(52,199,89,0.08)' },
+      warning: { border: 'rgba(255,149,0,0.45)', bg: 'rgba(255,149,0,0.08)' },
+      error: { border: 'rgba(255,59,48,0.45)', bg: 'rgba(255,59,48,0.08)' },
+      info: { border: 'rgba(0,122,255,0.45)', bg: 'rgba(0,122,255,0.08)' }
+    }[color] || {};
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        border: `1px solid ${colors.border}`,
+        background: colors.bg,
+        padding: '4px 8px', borderRadius: 9999, fontSize: 12
+      }}>{children}</span>
+    );
+  };
+
   const renderComplaintResult = () => {
     if (!result) return null;
-
     return (
-      <Box>
-        {/* Предварительные диагнозы */}
+      <div>
         {result.preliminary_diagnosis && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              Предварительные диагнозы:
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+          <div style={{ marginBottom: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Предварительные диагнозы:</Typography>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {result.preliminary_diagnosis.map((diagnosis, idx) => (
-                <Chip
-                  key={idx}
-                  label={diagnosis}
-                  color="primary"
-                  variant="outlined"
-                  size="small"
-                />
+                <Pill key={idx} color="primary">{diagnosis}</Pill>
               ))}
-            </Stack>
-          </Box>
+            </div>
+          </div>
         )}
-
-        {/* План обследований */}
         {result.examinations && result.examinations.length > 0 && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              План обследований:
-            </Typography>
-            <List dense>
+          <div style={{ marginBottom: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>План обследований:</Typography>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
               {result.examinations.map((exam, idx) => (
-                <ListItem key={idx}>
-                  <ListItemIcon>
-                    <CheckCircle color="success" fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={`${exam.type}: ${exam.name}`}
-                    secondary={exam.reason}
-                  />
-                </ListItem>
+                <li key={idx}>
+                  <span><CheckCircle style={{ width: 14, height: 14, marginRight: 6 }} />{`${exam.type}: ${exam.name}`}</span>
+                  {exam.reason && (
+                    <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)' }}>{exam.reason}</div>
+                  )}
+                </li>
               ))}
-            </List>
-          </Box>
+            </ul>
+          </div>
         )}
-
-        {/* Лабораторные анализы */}
         {result.lab_tests && result.lab_tests.length > 0 && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              Лабораторные анализы:
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+          <div style={{ marginBottom: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Лабораторные анализы:</Typography>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {result.lab_tests.map((test, idx) => (
-                <Chip
-                  key={idx}
-                  label={test}
-                  size="small"
-                  variant="outlined"
-                />
+                <Pill key={idx}>{test}</Pill>
               ))}
-            </Stack>
-          </Box>
+            </div>
+          </div>
         )}
-
-        {/* Тревожные симптомы */}
         {result.red_flags && result.red_flags.length > 0 && (
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Тревожные симптомы:
-            </Typography>
-            <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {result.red_flags.map((flag, idx) => (
-                <li key={idx}>{flag}</li>
-              ))}
+          <Alert severity="warning" style={{ marginTop: 8 }}>
+            <Typography variant="subtitle2" gutterBottom>Тревожные симптомы:</Typography>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {result.red_flags.map((flag, idx) => (<li key={idx}>{flag}</li>))}
             </ul>
           </Alert>
         )}
-
-        {/* Срочность */}
         {result.urgency && (
-          <Box mt={2}>
-            <Chip
-              label={`Срочность: ${result.urgency}`}
-              color={
-                result.urgency === 'экстренно' ? 'error' :
-                result.urgency === 'неотложно' ? 'warning' : 'info'
-              }
-            />
-          </Box>
+          <div style={{ marginTop: 8 }}>
+            <Pill color={
+              result.urgency === 'экстренно' ? 'error' :
+              result.urgency === 'неотложно' ? 'warning' : 'info'
+            }>
+              Срочность: {result.urgency}
+            </Pill>
+          </div>
         )}
-      </Box>
+      </div>
     );
   };
 
   const renderICD10Result = () => {
-    // Поддержка нового формата с clinical_recommendations
     if (result && result.clinical_recommendations) {
       return (
-        <Box>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+        <div>
+          <Alert severity="info" style={{ marginBottom: 12 }}>
+            <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>
               {result.clinical_recommendations}
             </Typography>
           </Alert>
-          
           {result.suggestions && result.suggestions.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Коды МКБ-10:
-              </Typography>
-              <List>
+            <div>
+              <Typography variant="subtitle2" gutterBottom>Коды МКБ-10:</Typography>
+              <div>
                 {result.suggestions.map((item, idx) => (
-                  <ListItem
-                    key={idx}
-                    secondaryAction={
-                      <IconButton
-                        edge="end"
-                        onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}
-                      >
-                        <ContentCopy />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemText
-                      primary={`${item.code} - ${item.name || item.description}`}
-                      secondary={
-                        item.relevance && (
-                          <Chip
-                            label={item.relevance}
-                            size="small"
-                            color={
-                              item.relevance === 'высокая' ? 'success' :
-                              item.relevance === 'средняя' ? 'warning' : 'default'
-                            }
-                          />
-                        )
-                      }
-                    />
-                  </ListItem>
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
+                    <div>
+                      {`${item.code} - ${item.name || item.description}`}
+                      {item.relevance && (
+                        <span style={{ marginLeft: 8 }}>
+                          <Pill color={item.relevance === 'высокая' ? 'success' : item.relevance === 'средняя' ? 'warning' : 'default'}>
+                            {item.relevance}
+                          </Pill>
+                        </span>
+                      )}
+                    </div>
+                    <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
+                      <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
+                    </Button>
+                  </div>
                 ))}
-              </List>
-            </Box>
+              </div>
+            </div>
           )}
-        </Box>
+        </div>
       );
     }
-
-    // Старый формат - простой массив кодов
     if (!result || !Array.isArray(result)) return null;
-
     return (
-      <List>
+      <div>
         {result.map((item, idx) => (
-          <ListItem
-            key={idx}
-            secondaryAction={
-              <IconButton
-                edge="end"
-                onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}
-              >
-                <ContentCopy />
-              </IconButton>
-            }
-          >
-            <ListItemText
-              primary={`${item.code} - ${item.name || item.description}`}
-              secondary={
-                item.relevance && (
-                  <Chip
-                    label={item.relevance}
-                    size="small"
-                    color={
-                      item.relevance === 'высокая' ? 'success' :
-                      item.relevance === 'средняя' ? 'warning' : 'default'
-                    }
-                  />
-                )
-              }
-            />
-          </ListItem>
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--mac-border)' }}>
+            <div>
+              {`${item.code} - ${item.name || item.description}`}
+              {item.relevance && (
+                <span style={{ marginLeft: 8 }}>
+                  <Pill color={item.relevance === 'высокая' ? 'success' : item.relevance === 'средняя' ? 'warning' : 'default'}>
+                    {item.relevance}
+                  </Pill>
+                </span>
+              )}
+            </div>
+            <Button variant="outline" onClick={() => copyToClipboard(`${item.code} - ${item.name || item.description}`)}>
+              <Copy style={{ width: 14, height: 14, marginRight: 6 }} />Копировать
+            </Button>
+          </div>
         ))}
-      </List>
+      </div>
     );
   };
 
   const renderLabResult = () => {
     if (!result) return null;
-
     return (
-      <Box>
-        {/* Общее заключение */}
+      <div>
         {result.summary && (
-          <Alert severity="info" sx={{ mb: 2 }}>
+          <Alert severity="info" style={{ marginBottom: 12 }}>
             <Typography variant="body2">{result.summary}</Typography>
           </Alert>
         )}
-
-        {/* Отклонения от нормы */}
         {result.abnormal_values && result.abnormal_values.length > 0 && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              Отклонения от нормы:
-            </Typography>
+          <div style={{ marginBottom: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Отклонения от нормы:</Typography>
             {result.abnormal_values.map((item, idx) => (
-              <Accordion key={idx} defaultExpanded={idx === 0}>
-                <AccordionSummary expandIcon={<ExpandMore />}>
-                  <Typography>
-                    {item.parameter}: {item.value}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Box>
-                    <Typography variant="body2" gutterBottom>
-                      <strong>Интерпретация:</strong> {item.interpretation}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Клиническое значение:</strong> {item.clinical_significance}
-                    </Typography>
-                  </Box>
-                </AccordionDetails>
-              </Accordion>
+              <details key={idx} open={idx === 0} style={{
+                border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginBottom: 8
+              }}>
+                <summary style={{ cursor: 'pointer', listStyle: 'none' }}>
+                  {item.parameter}: {item.value}
+                </summary>
+                <div style={{ marginTop: 8 }}>
+                  <Typography variant="body2" gutterBottom><strong>Интерпретация:</strong> {item.interpretation}</Typography>
+                  <Typography variant="body2"><strong>Клиническое значение:</strong> {item.clinical_significance}</Typography>
+                </div>
+              </details>
             ))}
-          </Box>
+          </div>
         )}
-
-        {/* Возможные состояния */}
         {result.possible_conditions && result.possible_conditions.length > 0 && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              Возможные состояния:
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+          <div style={{ marginBottom: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Возможные состояния:</Typography>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {result.possible_conditions.map((condition, idx) => (
-                <Chip
-                  key={idx}
-                  label={condition}
-                  color="warning"
-                  variant="outlined"
-                  size="small"
-                />
+                <Pill key={idx} color="warning">{condition}</Pill>
               ))}
-            </Stack>
-          </Box>
+            </div>
+          </div>
         )}
-
-        {/* Рекомендации */}
         {result.recommendations && result.recommendations.length > 0 && (
-          <Box mb={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              Рекомендации:
-            </Typography>
-            <List dense>
-              {result.recommendations.map((rec, idx) => (
-                <ListItem key={idx}>
-                  <ListItemIcon>
-                    <Info color="primary" fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText primary={rec} />
-                </ListItem>
-              ))}
-            </List>
-          </Box>
+          <div style={{ marginBottom: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Рекомендации:</Typography>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {result.recommendations.map((rec, idx) => (<li key={idx}>{rec}</li>))}
+            </ul>
+          </div>
         )}
-
-        {/* Срочность консультации */}
         {result.urgency && (
-          <Alert 
-            severity={result.urgency === 'да' ? 'warning' : 'info'}
-            sx={{ mt: 2 }}
-          >
+          <Alert severity={result.urgency === 'да' ? 'warning' : 'info'} style={{ marginTop: 8 }}>
             Срочная консультация: {result.urgency}
           </Alert>
         )}
-      </Box>
+      </div>
     );
   };
 
   const renderECGResult = () => {
     if (!result) return null;
-
     return (
-      <Box>
-        <Stack spacing={2}>
-          {/* Основные параметры */}
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Основные параметры:
-            </Typography>
-            <Stack spacing={1}>
-              {result.rhythm && (
-                <Typography variant="body2">
-                  <strong>Ритм:</strong> {result.rhythm}
-                </Typography>
-              )}
-              {result.rate && (
-                <Typography variant="body2">
-                  <strong>ЧСС:</strong> {result.rate}
-                </Typography>
-              )}
-              {result.conduction && (
-                <Typography variant="body2">
-                  <strong>Проводимость:</strong> {result.conduction}
-                </Typography>
-              )}
-              {result.axis && (
-                <Typography variant="body2">
-                  <strong>Электрическая ось:</strong> {result.axis}
-                </Typography>
-              )}
-            </Stack>
-          </Paper>
-
-          {/* Выявленные отклонения */}
-          {result.abnormalities && result.abnormalities.length > 0 && (
-            <Alert severity="warning">
-              <Typography variant="subtitle2" gutterBottom>
-                Выявленные отклонения:
-              </Typography>
-              <ul style={{ margin: 0, paddingLeft: 20 }}>
-                {result.abnormalities.map((item, idx) => (
-                  <li key={idx}>{item}</li>
-                ))}
-              </ul>
-            </Alert>
-          )}
-
-          {/* Заключение */}
-          {result.interpretation && (
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Заключение:
-              </Typography>
-              <Typography variant="body2">{result.interpretation}</Typography>
-            </Paper>
-          )}
-
-          {/* Рекомендации */}
-          {result.recommendations && result.recommendations.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                Рекомендации:
-              </Typography>
-              <List dense>
-                {result.recommendations.map((rec, idx) => (
-                  <ListItem key={idx}>
-                    <ListItemIcon>
-                      <CheckCircle color="success" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary={rec} />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
-
-          {/* Срочность */}
-          {result.urgency && (
-            <Chip
-              label={`Консультация кардиолога: ${result.urgency}`}
-              color={
-                result.urgency === 'экстренно' ? 'error' :
-                result.urgency === 'планово' ? 'info' : 'default'
-              }
-            />
-          )}
-        </Stack>
-      </Box>
+      <div>
+        <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <Typography variant="subtitle2" gutterBottom>Основные параметры:</Typography>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {result.rhythm && (<Typography variant="body2"><strong>Ритм:</strong> {result.rhythm}</Typography>)}
+            {result.rate && (<Typography variant="body2"><strong>ЧСС:</strong> {result.rate}</Typography>)}
+            {result.conduction && (<Typography variant="body2"><strong>Проводимость:</strong> {result.conduction}</Typography>)}
+            {result.axis && (<Typography variant="body2"><strong>Электрическая ось:</strong> {result.axis}</Typography>)}
+          </div>
+        </div>
+        {result.abnormalities && result.abnormalities.length > 0 && (
+          <Alert severity="warning">
+            <Typography variant="subtitle2" gutterBottom>Выявленные отклонения:</Typography>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {result.abnormalities.map((item, idx) => (<li key={idx}>{item}</li>))}
+            </ul>
+          </Alert>
+        )}
+        {result.interpretation && (
+          <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12, marginTop: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Заключение:</Typography>
+            <Typography variant="body2">{result.interpretation}</Typography>
+          </div>
+        )}
+        {result.recommendations && result.recommendations.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <Typography variant="subtitle2" gutterBottom>Рекомендации:</Typography>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {result.recommendations.map((rec, idx) => (<li key={idx}>{rec}</li>))}
+            </ul>
+          </div>
+        )}
+        {result.urgency && (
+          <Pill color={result.urgency === 'экстренно' ? 'error' : result.urgency === 'планово' ? 'info' : 'default'}>
+            Консультация кардиолога: {result.urgency}
+          </Pill>
+        )}
+      </div>
     );
   };
 
   const renderResult = () => {
-    if (error) {
-      return (
-        <Alert severity="error">
-          {error}
-        </Alert>
-      );
-    }
-
+    if (error) return <Alert severity="error">{error}</Alert>;
     if (!result) return null;
-
     switch (analysisType) {
       case 'complaint':
         return renderComplaintResult();
@@ -611,80 +419,62 @@ const AIAssistant = ({
         return renderECGResult();
       default:
         return (
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </Paper>
+          <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12 }}>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(result, null, 2)}</pre>
+          </div>
         );
     }
   };
 
   return (
-    <Paper elevation={1} sx={{ p: 2 }}>
-      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <Psychology color="primary" />
-          <Typography variant="h6">{title}</Typography>
-          {useMCP && (
-            <Chip label="MCP" size="small" color="success" variant="outlined" />
-          )}
-        </Box>
-        <Box display="flex" alignItems="center" gap={1}>
-          {/* Выбор AI провайдера */}
-          <Stack direction="row" spacing={0.5}>
-            {providerOptions.map((prov) => (
-              <Chip
-                key={prov}
-                label={prov.toUpperCase()}
-                size="small"
-                color={provider === prov ? 'primary' : 'default'}
-                variant={provider === prov ? 'filled' : 'outlined'}
-                onClick={() => setProvider(prov)}
-                disabled={loading}
-              />
-            ))}
-          </Stack>
-          
-          <Tooltip title="Повторить анализ">
-            <IconButton 
-              onClick={() => analyzeData(true)} 
-              disabled={loading || !data}
-              size="small"
-            >
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Box>
+    <Card>
+      <CardContent>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Brain style={{ color: 'var(--mac-accent-blue)' }} />
+            <Typography variant="h6">{title}</Typography>
+            {useMCP && (<Badge variant="success">MCP</Badge>)}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {providerOptions.map((prov) => (
+                <Button key={prov} size="small" variant={provider === prov ? 'primary' : 'outline'} onClick={() => setProvider(prov)} disabled={loading}>
+                  {prov.toUpperCase()}
+                </Button>
+              ))}
+            </div>
+            <Button size="small" variant="outline" onClick={() => analyzeData(true)} disabled={loading || !data}>
+              <RefreshCw style={{ width: 14, height: 14, marginRight: 6 }} />
+              Обновить
+            </Button>
+            <Button size="small" variant="outline" onClick={() => setIsOpen(v => !v)}>
+              {isOpen ? <ChevronUp style={{ width: 14, height: 14 }} /> : <ChevronDown style={{ width: 14, height: 14 }} />}
+            </Button>
+          </div>
+        </div>
 
-      <Divider sx={{ mb: 2 }} />
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 32 }}>
+            <CircularProgress />
+            <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
+              Анализ через {provider.toUpperCase()} AI...
+            </Typography>
+          </div>
+        ) : (
+          isOpen && renderResult()
+        )}
 
-      {loading ? (
-        <Box display="flex" flexDirection="column" alignItems="center" p={4}>
-          <CircularProgress />
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Анализ через {provider.toUpperCase()} AI...
-          </Typography>
-        </Box>
-      ) : (
-        renderResult()
-      )}
+        {!result && !loading && !error && (
+          <Alert severity="info">Нажмите Обновить для запуска AI анализа</Alert>
+        )}
 
-      {!result && !loading && !error && (
-        <Alert severity="info">
-          Нажмите кнопку обновления для запуска AI анализа
-        </Alert>
-      )}
-      
-      {error && retryCount > 0 && (
-        <Alert severity="warning" sx={{ mt: 2 }}>
-          <Typography variant="body2">
-            Попытка {retryCount}. Попробуйте сменить AI провайдер или повторить запрос.
-          </Typography>
-        </Alert>
-      )}
-    </Paper>
+        {error && retryCount > 0 && (
+          <Alert severity="warning" style={{ marginTop: 8 }}>
+            <Typography variant="body2">Попытка {retryCount}. Попробуйте сменить AI провайдер или повторить запрос.</Typography>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

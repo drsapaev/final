@@ -144,22 +144,32 @@ body {
   color: var(--text-primary, #f8fafc) !important;
 }
 
-/* Исправления для скроллбара */
+/* Исправления для скроллбара - единый стиль как у админ панели */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary, #f8fafc);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color, #e2e8f0);
-  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.4);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary, #64748b);
+  background: rgba(128, 128, 128, 0.6);
+  background-clip: padding-box;
+}
+
+/* Для Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
 }
 
 /* Исправления для анимаций */

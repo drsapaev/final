@@ -4,24 +4,20 @@
 
 import React, { useState } from 'react';
 import {
-  Container,
   Card,
   CardContent,
   Typography,
   Button,
   Box,
-  Grid,
   Alert,
-  TextField,
-  FormControl,
-  InputLabel,
+  Input,
   Select,
-  MenuItem
-} from '@mui/material';
+  Option,
+} from '../components/ui/macos';
 import {
-  Payment as PaymentIcon,
-  Science as TestIcon
-} from '@mui/icons-material';
+  CreditCard,
+  TestTube,
+} from 'lucide-react';
 
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { setToken, getToken } from '../api/client';

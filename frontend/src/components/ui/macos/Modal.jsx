@@ -84,18 +84,20 @@ const Modal = ({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    animation: isOpen ? 'mac-modal-fade-in 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'mac-modal-fade-out 0.2s cubic-bezier(0.55, 0.055, 0.675, 0.19)'
+    animation: isOpen ? 'mac-modal-fade-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'mac-modal-fade-out 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)'
   };
 
   const contentStyles = {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'var(--mac-bg-primary)',
+    backdropFilter: 'var(--mac-blur-light)',
+    WebkitBackdropFilter: 'var(--mac-blur-light)',
     borderRadius: '12px',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-    border: '1px solid rgba(0, 0, 0, 0.1)',
+    border: '1px solid var(--mac-border)',
     position: 'relative',
     maxHeight: '80vh',
     overflow: 'hidden',
-    animation: isOpen ? 'mac-modal-slide-up 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'mac-modal-slide-down 0.25s cubic-bezier(0.4, 0.0, 0.2, 1)',
+    animation: isOpen ? 'mac-modal-slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'mac-modal-slide-down 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
     ...sizeStyles[size]
   };
 
@@ -191,7 +193,7 @@ const Modal = ({
         )}
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes mac-modal-fade-in {
           from {
             opacity: 0;
@@ -213,7 +215,7 @@ const Modal = ({
         @keyframes mac-modal-slide-up {
           from {
             opacity: 0;
-            transform: translateY(30px) scale(0.92);
+            transform: translateY(20px) scale(0.95);
           }
           to {
             opacity: 1;
@@ -228,7 +230,7 @@ const Modal = ({
           }
           to {
             opacity: 0;
-            transform: translateY(25px) scale(0.95);
+            transform: translateY(20px) scale(0.95);
           }
         }
 
@@ -263,7 +265,7 @@ const Modal = ({
 
         /* Focus trap for accessibility */
         .mac-modal:focus {
-          outline: var(--mac-focus-outline-width) solid var(--mac-focus-color);
+          outline: 2px solid #007aff;
           outline-offset: 2px;
         }
       `}</style>

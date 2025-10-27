@@ -73,8 +73,8 @@ const Tooltip = ({
     zIndex: 1300,
     pointerEvents: 'none',
     opacity: isVisible ? 1 : 0,
-    transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(4px) scale(0.98)',
-    transition: 'opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1)',
+    transform: isVisible ? 'scale(1)' : 'scale(0.95)',
+    transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
     transformOrigin: `${tooltipPosition.x === 'center' ? 'center' : tooltipPosition.x === 'left' ? 'right' : 'left'} ${tooltipPosition.y === 'center' ? 'center' : tooltipPosition.y === 'top' ? 'bottom' : 'top'}`
   };
 
@@ -214,7 +214,7 @@ const Tooltip = ({
             }}
           />
 
-          <style jsx>{`
+          <style>{`
             /* Dark mode adjustments */
             @media (prefers-color-scheme: dark) {
               .mac-tooltip-content {

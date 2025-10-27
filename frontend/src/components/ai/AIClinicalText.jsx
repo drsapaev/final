@@ -1,19 +1,16 @@
 import React from 'react';
 import {
   Box,
-  Paper,
   Typography,
-  Divider,
-  Chip,
-  Stack,
-  Alert
-} from '@mui/material';
+  Badge,
+  Alert,
+} from '../ui/macos';
 import {
-  LocalHospital,
+  Hospital,
   Info,
-  Warning,
-  CheckCircle
-} from '@mui/icons-material';
+  AlertTriangle,
+  CheckCircle,
+} from 'lucide-react';
 
 /**
  * Компонент для красивого отображения клинических рекомендаций AI
@@ -91,7 +88,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
           <Alert 
             key={idx} 
             severity="success" 
-            icon={<LocalHospital />}
+            icon={<Hospital />}
             sx={{ my: 1 }}
           >
             <Typography variant="body1" fontWeight="bold">

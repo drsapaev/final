@@ -3,17 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import auth, { setProfile } from '../../stores/auth.js';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
-
-import {
-  Home,
-  User,
-  LogOut,
-  Sun,
-  Moon,
-  CreditCard
-} from 'lucide-react';
-
-import '../../styles/header-new.css';
+import { Button, Icon } from '../ui/macos';
 
 /**
  * Новый компактный и предсказуемый хедер.
@@ -45,18 +35,28 @@ export default function HeaderNew() {
   const isRegistrarPanel = location.pathname === '/registrar-panel';
 
   const headerStyle = {
-    background: theme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-    borderBottom: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
-    backdropFilter: 'blur(20px)',
-    transition: 'background-color 0.3s ease, border-color 0.3s ease'
+    backgroundColor: 'var(--mac-bg-toolbar)',
+    borderBottom: '1px solid var(--mac-separator)',
+    backdropFilter: 'var(--mac-blur-light)',
+    WebkitBackdropFilter: 'var(--mac-blur-light)',
+    boxShadow: 'var(--mac-shadow-sm)',
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr auto',
+    alignItems: 'center',
+    columnGap: '12px',
+    overflow: 'hidden',
+    borderRadius: 'var(--mac-radius-md)',
+    padding: '0 16px',
+    height: '54px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif'
   };
 
   // Навигация по ролям (как в исходном хедере)
   const navItems = useMemo(() => {
     const items = [];
     if (roleLower !== 'admin') {
-      if (roleLower === 'registrar') items.push({ to: '/cashier-panel', label: 'Кассир', icon: <CreditCard size={16} /> });
-      if (roleLower === 'cashier') items.push({ to: '/cashier-panel', label: 'Касса', icon: <CreditCard size={16} /> });
+      if (roleLower === 'registrar') items.push({ to: '/cashier-panel', label: 'Кассир', icon: 'creditcard' });
+      if (roleLower === 'cashier') items.push({ to: '/cashier-panel', label: 'Касса', icon: 'creditcard' });
     }
     return items;
   }, [roleLower]);
@@ -67,133 +67,212 @@ export default function HeaderNew() {
   };
 
   const brand = (
-    <button
-      className="hdr-btn hdr-btn--brand"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={() => navigate('/')}
       title="На главную"
-      style={{ color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+      style={{
+        color: 'var(--mac-text-primary)',
+        fontWeight: '700',
+        fontSize: 'var(--mac-font-size-lg)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px 12px'
+      }}
     >
-      <span className="hdr-logo" aria-hidden>🏥</span>
-      <span className="hdr-title hdr-hide-xs">Clinic Management</span>
-    </button>
+      <Icon name="stethoscope" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+      <span className="hdr-hide-xs">Clinic Management</span>
+    </Button>
   );
 
   const roleNav = (
-    <div className="hdr-nav-scroll">
+    <div className="hdr-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap', overflowX: 'auto' }}>
       {navItems.map((item) => {
         const active = location.pathname === item.to;
         return (
-          <button
+          <Button
             key={item.to}
-            className={`hdr-btn hdr-btn--nav ${active ? 'is-active' : ''} hdr-hide-xs`}
+            variant={active ? "primary" : "outline"}
+            size="small"
             onClick={() => navigate(item.to)}
             title={item.label}
+            className="hdr-hide-xs"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexShrink: 0
+            }}
           >
-            {item.icon}
+            <Icon name={item.icon} size="small" style={{ color: active ? 'white' : 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">{item.label}</span>
-          </button>
+          </Button>
         );
       })}
 
       {roleLower === 'registrar' && isRegistrarPanel && (
         <>
-          <button
-            className="hdr-btn hdr-btn--nav"
+          <Button
+            variant="outline"
+            size="small"
             title="Главная"
             onClick={() => navigate('/registrar-panel?view=welcome')}
+            className="hdr-hide-md"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
           >
-            <Home size={16} />
+            <Icon name="house" size="small" />
             <span className="hdr-hide-md">Главная</span>
-          </button>
-          <button
-            className="hdr-btn hdr-btn--nav hdr-hide-xs"
+          </Button>
+          <Button
+            variant="outline"
+            size="small"
             title="Онлайн‑записи"
             onClick={() => navigate('/registrar-panel?view=queue')}
+            className="hdr-hide-xs"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
           >
-            <span aria-hidden>📱</span>
+            <Icon name="bell" size="small" style={{ color: 'var(--mac-text-primary)' }} />
             <span className="hdr-hide-sm">Онлайн‑записи</span>
-          </button>
-          <button
-            className="hdr-btn hdr-btn--primary"
+          </Button>
+          <Button
+            variant="primary"
+            size="small"
             title="Новая запись"
             onClick={() => {
               // Отправляем событие для открытия мастера записи
               window.dispatchEvent(new CustomEvent('openAppointmentWizard'));
             }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
           >
-            <span aria-hidden>➕</span>
+            <Icon name="plus" size="small" style={{ color: 'white' }} />
             <span className="hdr-hide-md">Новая запись</span>
-          </button>
+          </Button>
         </>
       )}
     </div>
   );
 
   const controls = (
-    <div className="hdr-controls">
-      <button
-        className="hdr-btn hdr-btn--icon"
+    <div className="hdr-controls" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+      {/* 1) Язык */}
+      <Button
+        variant="ghost"
+        size="small"
+        onClick={() => changeLang(lang === 'ru' ? 'uz' : lang === 'uz' ? 'en' : 'ru')}
+        title={`Switch to ${lang === 'ru' ? 'UZ' : lang === 'uz' ? 'EN' : 'RU'}`}
+        style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: '600',
+          padding: '6px 10px',
+          flex: '0 0 auto',
+          border: '1px solid var(--mac-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
+        }}
+      >
+        <Icon name="magnifyingglass" size="small" />
+        {lang.toUpperCase()}
+      </Button>
+
+      {/* 2) Сеть */}
+      <div style={{ flex: '0 0 auto' }}>
+        <CompactConnectionStatus className="mr-2" />
+      </div>
+
+      {/* 3) Тема */}
+      <Button
+        variant="ghost"
+        size="small"
         onClick={toggleTheme}
         title="Переключить тему"
         aria-label="Переключить тему"
+        style={{
+          width: '36px',
+          height: '36px',
+          padding: 0,
+          borderRadius: 'var(--mac-radius-sm)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: '0 0 auto'
+        }}
       >
-        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-      </button>
+        {theme === 'dark' ? (
+          <Icon name="sun" size="small" style={{ color: '#ff9500' }} />
+        ) : (
+          <Icon name="moon" size="small" style={{ color: '#5ac8fa' }} />
+        )}
+      </Button>
 
-      <select
-        className="hdr-select"
-        value={lang}
-        onChange={(e) => changeLang(e.target.value)}
-        aria-label="Выбор языка"
-      >
-        <option value="ru">RU</option>
-        <option value="uz">UZ</option>
-        <option value="en">EN</option>
-      </select>
-
-      {/* Индикатор подключения */}
-      <CompactConnectionStatus className="mr-2" />
-
+      {/* 4) Профиль / Войти */}
       {user ? (
         <>
-          <button
-            className="hdr-btn hdr-btn--ghost"
+          <Button
+            variant="outline"
+            size="small"
             onClick={() => navigate('/registrar-panel')}
             title="Панель регистратора"
+            className="hdr-hide-sm"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flex: '0 0 auto'
+            }}
           >
-            <User size={16} />
-            <span className="hdr-hide-sm" style={{ fontWeight: 700 }}>
+            <Icon name="person" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+            <span style={{ fontWeight: 600 }}>
               {user.full_name || user.username || 'Профиль'}
             </span>
-          </button>
+          </Button>
 
-          <button
+          {/* 5) Выход */}
+          <Button
             id="logout-header-btn"
-            className="hdr-btn hdr-btn--danger logout-button"
+            variant="danger"
+            size="small"
             onClick={() => { auth.clearToken(); setProfile(null); navigate('/login'); }}
             title="Выйти"
+            className="hdr-hide-sm"
+            style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flex: '0 0 auto' 
+            }}
           >
-            <LogOut size={16} />
-            <span className="hdr-hide-sm">Выйти</span>
-          </button>
+            <Icon name="person" size="small" style={{ color: 'white' }} />
+            <span>Выйти</span>
+          </Button>
         </>
       ) : (
-        <button
-          className="hdr-btn hdr-btn--primary"
+        <Button
+          variant="primary"
+          size="small"
           onClick={() => navigate('/login')}
+          className="hdr-hide-sm"
+          style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flex: '0 0 auto' 
+          }}
         >
-          <User size={16} />
-          <span className="hdr-hide-sm">Войти</span>
-        </button>
+          <Icon name="person" size="small" style={{ color: 'white' }} />
+          <span>Войти</span>
+        </Button>
       )}
     </div>
   );
 
   return (
     <div className="app-header" style={headerStyle}>
-      <div className="hdr-left">{brand}</div>
-      <div className="hdr-center">{roleNav}</div>
-      <div className="hdr-right">{controls}</div>
+      <div className="hdr-left" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{brand}</div>
+      <div className="hdr-center" style={{ minWidth: 0 }}>{roleNav}</div>
+      <div className="hdr-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{controls}</div>
     </div>
   );
 }

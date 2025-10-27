@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, Clock, User, Stethoscope, AlertCircle, Phone, Mail } from 'lucide-react';
-import { Card, Button } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea,
+  MacOSModal
+} from '../ui/macos';
 
 const AppointmentModal = ({ 
   isOpen, 
@@ -153,62 +160,59 @@ const AppointmentModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          {/* Заголовок */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {appointment ? 'Редактировать запись' : 'Создать запись на прием'}
-            </h2>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
+    <MacOSModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={appointment ? 'Редактировать запись' : 'Создать запись на прием'}
+      size="lg"
+    >
           {/* Форма */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Основная информация */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                marginBottom: '16px'
+              }}>
                 Основная информация
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
                 {/* Пациент */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Пациент *
                   </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.patientId}
-                      onChange={(e) => handleChange('patientId', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.patientId ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.patientId ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    >
-                      <option value="">Выберите пациента</option>
-                      {patients.map(patient => (
-                        <option key={patient.id} value={patient.id}>
-                          {patient.lastName} {patient.firstName} {patient.middleName} - {patient.phone}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <MacOSSelect
+                    value={formData.patientId}
+                    onChange={(e) => handleChange('patientId', e.target.value)}
+                    options={[
+                      { value: '', label: 'Выберите пациента' },
+                      ...patients.map(patient => ({
+                        value: patient.id,
+                        label: `${patient.lastName} ${patient.firstName} ${patient.middleName} - ${patient.phone}`
+                      }))
+                    ]}
+                    error={errors.patientId}
+                    icon={<User style={{ width: '16px', height: '16px' }} />}
+                  />
                   {errors.patientId && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-error)', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <AlertCircle style={{ width: '14px', height: '14px' }} />
                       {errors.patientId}
                     </p>
                   )}
@@ -216,67 +220,73 @@ const AppointmentModal = ({
 
                 {/* Врач */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Врач *
                   </label>
-                  <div className="relative">
-                    <Stethoscope className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                                 style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.doctorId}
-                      onChange={(e) => handleChange('doctorId', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.doctorId ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.doctorId ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    >
-                      <option value="">Выберите врача</option>
-                      {doctors.map(doctor => (
-                        <option key={doctor.id} value={doctor.id}>
-                          {doctor.name} - {doctor.specialization}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <MacOSSelect
+                    value={formData.doctorId}
+                    onChange={(e) => handleChange('doctorId', e.target.value)}
+                    options={[
+                      { value: '', label: 'Выберите врача' },
+                      ...doctors.map(doctor => ({
+                        value: doctor.id,
+                        label: `${doctor.name} - ${doctor.specialization}`
+                      }))
+                    ]}
+                    error={errors.doctorId}
+                    icon={<Stethoscope style={{ width: '16px', height: '16px' }} />}
+                  />
                   {errors.doctorId && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-error)', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <AlertCircle style={{ width: '14px', height: '14px' }} />
                       {errors.doctorId}
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                 {/* Дата записи */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Дата записи *
                   </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                              style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="date"
-                      value={formData.appointmentDate}
-                      onChange={(e) => handleChange('appointmentDate', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.appointmentDate ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.appointmentDate ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    />
-                  </div>
+                  <MacOSInput
+                    type="date"
+                    value={formData.appointmentDate}
+                    onChange={(e) => handleChange('appointmentDate', e.target.value)}
+                    error={errors.appointmentDate}
+                    icon={Calendar}
+                  />
                   {errors.appointmentDate && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-error)', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <AlertCircle style={{ width: '14px', height: '14px' }} />
                       {errors.appointmentDate}
                     </p>
                   )}
@@ -284,29 +294,32 @@ const AppointmentModal = ({
 
                 {/* Время записи */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Время записи *
                   </label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                           style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="time"
-                      value={formData.appointmentTime}
-                      onChange={(e) => handleChange('appointmentTime', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.appointmentTime ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.appointmentTime ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    />
-                  </div>
+                  <MacOSInput
+                    type="time"
+                    value={formData.appointmentTime}
+                    onChange={(e) => handleChange('appointmentTime', e.target.value)}
+                    error={errors.appointmentTime}
+                    icon={Clock}
+                  />
                   {errors.appointmentTime && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-error)', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <AlertCircle style={{ width: '14px', height: '14px' }} />
                       {errors.appointmentTime}
                     </p>
                   )}
@@ -314,28 +327,34 @@ const AppointmentModal = ({
 
                 {/* Длительность */}
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Длительность (мин)
                   </label>
-                  <input
+                  <MacOSInput
                     type="number"
                     value={formData.duration}
                     onChange={(e) => handleChange('duration', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.duration ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: errors.duration ? 'var(--danger-color)' : 'var(--border-color)'
-                    }}
+                    error={errors.duration}
                     min="15"
                     max="120"
                     step="15"
                   />
                   {errors.duration && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-error)', 
+                      marginTop: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <AlertCircle style={{ width: '14px', height: '14px' }} />
                       {errors.duration}
                     </p>
                   )}
@@ -344,167 +363,209 @@ const AppointmentModal = ({
 
               {/* Статус */}
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
+                }}>
                   Статус записи
                 </label>
-                <select
+                <MacOSSelect
                   value={formData.status}
                   onChange={(e) => handleChange('status', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border-color)'
-                  }}
-                >
-                  <option value="pending">Ожидает</option>
-                  <option value="confirmed">Подтверждена</option>
-                  <option value="paid">Оплачена</option>
-                  <option value="in_visit">На приеме</option>
-                  <option value="completed">Завершена</option>
-                  <option value="cancelled">Отменена</option>
-                  <option value="no_show">Не явился</option>
-                </select>
+                  options={[
+                    { value: 'pending', label: 'Ожидает' },
+                    { value: 'confirmed', label: 'Подтверждена' },
+                    { value: 'paid', label: 'Оплачена' },
+                    { value: 'in_visit', label: 'На приеме' },
+                    { value: 'completed', label: 'Завершена' },
+                    { value: 'cancelled', label: 'Отменена' },
+                    { value: 'no_show', label: 'Не явился' }
+                  ]}
+                />
               </div>
             </div>
 
             {/* Детали записи */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                marginBottom: '16px'
+              }}>
                 Детали записи
               </h3>
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
+                }}>
                   Причина обращения *
                 </label>
-                <textarea
+                <MacOSTextarea
                   value={formData.reason}
                   onChange={(e) => handleChange('reason', e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.reason ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: errors.reason ? 'var(--danger-color)' : 'var(--border-color)'
-                  }}
-                  rows="3"
-                  placeholder="Опишите причину обращения к врачу..."
+                  error={errors.reason}
+                  rows={3}
+                  placeholder="Опишите причину обращения к врачу"
                 />
                 {errors.reason && (
-                  <p className="text-sm text-red-500 mt-1 flex items-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-error)', 
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <AlertCircle style={{ width: '14px', height: '14px' }} />
                     {errors.reason}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
+                }}>
                   Дополнительные заметки
                 </label>
-                <textarea
+                <MacOSTextarea
                   value={formData.notes}
                   onChange={(e) => handleChange('notes', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border-color)'
-                  }}
-                  rows="2"
-                  placeholder="Дополнительная информация о записи..."
+                  rows={2}
+                  placeholder="Дополнительная информация о записи"
                 />
               </div>
             </div>
 
             {/* Контактная информация */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                marginBottom: '16px'
+              }}>
                 Контактная информация
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Телефон для связи
                   </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                           style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => handleChange('phone', e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                      placeholder="+998 90 123 45 67"
-                    />
-                  </div>
+                  <MacOSInput
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => handleChange('phone', e.target.value)}
+                    placeholder="+998 90 123 45 67"
+                    icon={Phone}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
                     Email для уведомлений
                   </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                      placeholder="patient@example.com"
-                    />
-                  </div>
+                  <MacOSInput
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                    placeholder="patient@example.com"
+                    icon={Mail}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Предварительный просмотр */}
             {(formData.patientId && formData.doctorId) && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ 
+                  fontSize: 'var(--mac-font-size-lg)', 
+                  fontWeight: 'var(--mac-font-weight-semibold)', 
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '16px'
+                }}>
                   Предварительный просмотр
                 </h3>
-                <div className="p-4 rounded-lg" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-                  <div className="space-y-2">
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <strong>Пациент:</strong> {getPatientName(formData.patientId)}
-                    </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <strong>Врач:</strong> {getDoctorName(formData.doctorId)}
-                    </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <strong>Дата и время:</strong> {formData.appointmentDate} в {formData.appointmentTime}
-                    </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <strong>Длительность:</strong> {formData.duration} минут
-                    </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <strong>Статус:</strong> {formData.status === 'pending' ? 'Ожидает' : 
-                                              formData.status === 'confirmed' ? 'Подтверждена' :
-                                              formData.status === 'paid' ? 'Оплачена' :
-                                              formData.status === 'in_visit' ? 'На приеме' :
-                                              formData.status === 'completed' ? 'Завершена' :
-                                              formData.status === 'cancelled' ? 'Отменена' : 'Не явился'}
-                    </p>
-                  </div>
+                <div style={{ 
+                  padding: '16px', 
+                  borderRadius: 'var(--mac-border-radius-lg)', 
+                  background: 'var(--mac-bg-secondary)', 
+                  border: '1px solid var(--mac-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    <strong style={{ color: 'var(--mac-text-primary)' }}>Пациент:</strong> {getPatientName(formData.patientId)}
+                  </p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    <strong style={{ color: 'var(--mac-text-primary)' }}>Врач:</strong> {getDoctorName(formData.doctorId)}
+                  </p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    <strong style={{ color: 'var(--mac-text-primary)' }}>Дата и время:</strong> {formData.appointmentDate} в {formData.appointmentTime}
+                  </p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    <strong style={{ color: 'var(--mac-text-primary)' }}>Длительность:</strong> {formData.duration} минут
+                  </p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    <strong style={{ color: 'var(--mac-text-primary)' }}>Статус:</strong> {formData.status === 'pending' ? 'Ожидает' : 
+                                                formData.status === 'confirmed' ? 'Подтверждена' :
+                                                formData.status === 'paid' ? 'Оплачена' :
+                                                formData.status === 'in_visit' ? 'На приеме' :
+                                                formData.status === 'completed' ? 'Завершена' :
+                                                formData.status === 'cancelled' ? 'Отменена' : 'Не явился'}
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Кнопки */}
-            <div className="flex gap-3 pt-4">
-              <Button
+            <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
+              <MacOSButton
                 type="submit"
                 disabled={isSubmitting || loading}
                 className="flex-1"
@@ -524,20 +585,18 @@ const AppointmentModal = ({
                     {appointment ? 'Сохранить изменения' : 'Создать запись'}
                   </>
                 )}
-              </Button>
-              <Button
+              </MacOSButton>
+              <MacOSButton
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={isSubmitting}
               >
                 Отмена
-              </Button>
+              </MacOSButton>
             </div>
           </form>
-        </div>
-      </Card>
-    </div>
+    </MacOSModal>
   );
 };
 

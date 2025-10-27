@@ -2,6 +2,7 @@
 API endpoints для управления Telegram в админ панели
 """
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import requests
@@ -390,7 +391,7 @@ def send_test_message(
 def get_telegram_stats(
     days_back: int = 7,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles(["Admin", "SuperAdmin", "admin"]))
 ):
     """Получить статистику Telegram"""
     try:
@@ -420,7 +421,7 @@ def get_telegram_users(
     limit: int = 100,
     active_only: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles(["Admin", "SuperAdmin", "admin"]))
 ):
     """Получить список пользователей Telegram"""
     try:

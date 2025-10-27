@@ -4,31 +4,42 @@
  */
 
 :root {
-  /* macOS Color Palette */
+  /* macOS System Color Palette - Light Mode */
   --mac-bg-primary: #ffffff;
-  --mac-bg-secondary: #f8f9fa;
-  --mac-bg-tertiary: #f1f3f4;
-  --mac-bg-quaternary: #e8eaed;
+  --mac-bg-secondary: #f5f5f7;
+  --mac-bg-tertiary: #f0f0f0;
+  --mac-bg-quaternary: #e8e8e8;
 
-  --mac-text-primary: #1d1d1f;
-  --mac-text-secondary: #86868b;
-  --mac-text-tertiary: #515154;
+  --mac-text-primary: #000000;
+  --mac-text-secondary: #6e6e73;
+  --mac-text-tertiary: #8e8e93;
 
-  --mac-border: #d2d2d7;
-  --mac-border-secondary: #e5e5e7;
+  --mac-border: #d1d1d6;
+  --mac-border-secondary: #e5e5ea;
 
   --mac-accent-blue: #007aff;
-  --mac-accent-blue-hover: #0056cc;
-  --mac-accent-blue-active: #004499;
+  --mac-accent-blue-hover: #0051d5;
+  --mac-accent-blue-active: #004bb5;
 
-  --mac-success: #34c759;
-  --mac-success-hover: #2aa944;
-  --mac-warning: #ff9500;
-  --mac-warning-hover: #cc7700;
-  --mac-danger: #ff3b30;
-  --mac-danger-hover: #cc2f26;
+  --mac-success: #30d158;
+  --mac-success-hover: #28cd41;
+  --mac-warning: #ff9f0a;
+  --mac-warning-hover: #ff8c00;
+  --mac-danger: #ff453a;
+  --mac-danger-hover: #ff3b30;
 
   --mac-separator: #e5e5ea;
+
+  /* macOS Background Patterns */
+  --mac-bg-window: #f5f5f7;
+  --mac-bg-content: #ffffff;
+  --mac-bg-sidebar: #f0f0f0;
+  --mac-bg-toolbar: #ffffff;
+  
+  /* macOS Gradients */
+  --mac-gradient-window: linear-gradient(180deg, #f5f5f7 0%, #f0f0f0 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, #f0f0f0 0%, #e8e8e8 100%);
+  --mac-gradient-button: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
 
   /* macOS Spacing Scale (8px base) */
   --mac-spacing-1: 4px;
@@ -58,9 +69,9 @@
   --mac-font-weight-bold: 700;
 
   /* macOS Border Radius */
-  --mac-radius-sm: 4px;
-  --mac-radius-md: 6px;
-  --mac-radius-lg: 8px;
+  --mac-radius-sm: 6px;
+  --mac-radius-md: 8px;
+  --mac-radius-lg: 10px;
   --mac-radius-xl: 12px;
   --mac-radius-full: 9999px;
 
@@ -75,56 +86,128 @@
   --mac-blur-medium: blur(12px);
   --mac-blur-heavy: blur(8px);
 
+  /* macOS Animation Timing */
+  --mac-duration-fast: 150ms;
+  --mac-duration-normal: 200ms;
+  --mac-duration-slow: 250ms;
+  --mac-duration-slower: 300ms;
+  
+  /* macOS Animation Easing */
+  --mac-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --mac-ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --mac-ease-in: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  --mac-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --mac-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
   /* macOS Z-Index Scale */
   --mac-z-dropdown: 1000;
   --mac-z-modal: 1100;
   --mac-z-popover: 1200;
   --mac-z-tooltip: 1300;
-
-  /* macOS Focus Rings */
-  --mac-focus-color: var(--mac-accent-blue);
-  --mac-focus-ring: 0 0 0 3px rgba(0, 122, 255, 0.18);
-  --mac-focus-outline-width: 2px;
-
-  /* macOS Scrollbars */
-  --mac-scrollbar-bg: transparent;
-  --mac-scrollbar-thumb: rgba(0, 0, 0, 0.25);
-  --mac-scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 }
 
 /* Dark Theme (macOS Dark Mode) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --mac-bg-primary: #1d1d1f;
-    --mac-bg-secondary: #232326;
-    --mac-bg-tertiary: #2f2f33;
-    --mac-bg-quaternary: #3a3a3f;
+    --mac-bg-primary: #1c1c1e;
+    --mac-bg-secondary: #2c2c2e;
+    --mac-bg-tertiary: #3a3a3c;
+    --mac-bg-quaternary: #48484a;
 
-    --mac-text-primary: #f5f5f7;
-    --mac-text-secondary: #c7c7cc;
-    --mac-text-tertiary: #a9a9af;
+    --mac-text-primary: #ffffff;
+    --mac-text-secondary: #8e8e93;
+    --mac-text-tertiary: #636366;
 
-    --mac-border: #424245;
-    --mac-border-secondary: #515154;
+    --mac-border: #38383a;
+    --mac-border-secondary: #48484a;
 
     --mac-separator: #38383a;
 
+    /* macOS Background Patterns - Dark Mode */
+    --mac-bg-window: #1c1c1e;
+    --mac-bg-content: #2c2c2e;
+    --mac-bg-sidebar: #2c2c2e;
+    --mac-bg-toolbar: #1c1c1e;
+    
+    /* macOS Gradients - Dark Mode */
+    --mac-gradient-window: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
+    --mac-gradient-sidebar: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
+    --mac-gradient-button: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
+
     /* macOS Shadows in Dark Mode */
-    --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4);
-    --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --mac-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
-    --mac-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.4);
-
-    /* Dark mode scrollbars */
-    --mac-scrollbar-thumb: rgba(255, 255, 255, 0.28);
-    --mac-scrollbar-thumb-hover: rgba(255, 255, 255, 0.4);
-
-    /* Dark mode disabled/placeholder states */
-    --mac-disabled-bg: rgba(255, 255, 255, 0.03);
-    --mac-disabled-text: rgba(255, 255, 255, 0.25);
-    --mac-placeholder-text: rgba(255, 255, 255, 0.35);
-    --mac-disabled-border: rgba(255, 255, 255, 0.08);
+    --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.5);
+    --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --mac-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+    --mac-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5);
   }
+}
+
+/* Light Theme (macOS Light Mode) - Explicit */
+.light-theme {
+  --mac-bg-primary: #ffffff;
+  --mac-bg-secondary: #f5f5f7;
+  --mac-bg-tertiary: #f0f0f0;
+  --mac-bg-quaternary: #e8e8e8;
+
+  --mac-text-primary: #000000;
+  --mac-text-secondary: #6e6e73;
+  --mac-text-tertiary: #8e8e93;
+
+  --mac-border: #d1d1d6;
+  --mac-border-secondary: #e5e5ea;
+
+  --mac-separator: #e5e5ea;
+
+  /* macOS Background Patterns - Light Mode */
+  --mac-bg-window: #f5f5f7;
+  --mac-bg-content: #ffffff;
+  --mac-bg-sidebar: #f0f0f0;
+  --mac-bg-toolbar: #ffffff;
+  
+  /* macOS Gradients - Light Mode */
+  --mac-gradient-window: linear-gradient(180deg, #f5f5f7 0%, #f0f0f0 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, #f0f0f0 0%, #e8e8e8 100%);
+  --mac-gradient-button: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
+
+  /* macOS Shadows in Light Mode */
+  --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --mac-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+  --mac-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark Theme (macOS Dark Mode) - Explicit */
+.dark-theme {
+  --mac-bg-primary: #1c1c1e;
+  --mac-bg-secondary: #2c2c2e;
+  --mac-bg-tertiary: #3a3a3c;
+  --mac-bg-quaternary: #48484a;
+
+  --mac-text-primary: #ffffff;
+  --mac-text-secondary: #8e8e93;
+  --mac-text-tertiary: #636366;
+
+  --mac-border: #38383a;
+  --mac-border-secondary: #48484a;
+
+  --mac-separator: #38383a;
+
+  /* macOS Background Patterns - Dark Mode */
+  --mac-bg-window: #1c1c1e;
+  --mac-bg-content: #2c2c2e;
+  --mac-bg-sidebar: #2c2c2e;
+  --mac-bg-toolbar: #1c1c1e;
+  
+  /* macOS Gradients - Dark Mode */
+  --mac-gradient-window: linear-gradient(180deg, #1c1c1e 0%, #2c2c2e 100%);
+  --mac-gradient-sidebar: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
+  --mac-gradient-button: linear-gradient(180deg, #2c2c2e 0%, #3a3a3c 100%);
+
+  /* macOS Shadows in Dark Mode */
+  --mac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.5);
+  --mac-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --mac-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+  --mac-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* macOS Font Stack */
@@ -150,8 +233,8 @@
 
 .mac-control:focus {
   outline: none;
-  border-color: var(--mac-focus-color);
-  box-shadow: var(--mac-focus-ring);
+  border-color: var(--mac-accent-blue);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
 }
 
 .mac-control:active {
@@ -212,8 +295,8 @@
 
 .mac-input:focus {
   outline: none;
-  border-color: var(--mac-focus-color);
-  box-shadow: var(--mac-focus-ring);
+  border-color: var(--mac-accent-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
 .mac-input::placeholder {
@@ -458,55 +541,6 @@
     --mac-border-secondary: #000000;
     --mac-text-secondary: #000000;
     --mac-text-tertiary: #000000;
-    --mac-focus-outline-width: 3px;
-    --mac-focus-ring: 0 0 0 3px rgba(0, 0, 0, 0.6);
   }
-
-  /* High contrast overrides for better visibility */
-  .mac-control,
-  .mac-button,
-  .mac-input,
-  .mac-select {
-    border-width: 2px !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  .mac-table {
-    border-width: 2px !important;
-  }
-
-  .mac-table-row {
-    border-bottom-width: 2px !important;
-  }
-
-  .mac-modal-content {
-    border-width: 2px !important;
-  }
-
-  .mac-tooltip-content {
-    border-width: 2px !important;
-  }
-}
-
-/* macOS Scrollbar Styling (WebKit/Blink) */
-*::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-*::-webkit-scrollbar-track {
-  background: var(--mac-scrollbar-bg);
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: var(--mac-scrollbar-thumb);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background-color: var(--mac-scrollbar-thumb-hover);
 }
 

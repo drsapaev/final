@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Button } from './Button';
-import { Icon } from './Icon';
+import Button from './Button';
+import Icon from './Icon';
 
 /**
  * macOS-style Sidebar Component
@@ -24,15 +24,17 @@ const Sidebar = React.forwardRef(({
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   const sidebarStyles = {
-    width: isCollapsed ? '64px' : '240px',
+    width: isCollapsed ? '72px' : '280px', // Стандартные размеры macOS
     minHeight: '100vh',
-    backgroundColor: 'var(--mac-bg-secondary)',
+    background: 'var(--mac-gradient-sidebar)',
     borderRight: '1px solid var(--mac-separator)',
+    borderRadius: 'var(--mac-radius-lg)',
+    boxShadow: 'var(--mac-shadow-md)',
     display: 'flex',
     flexDirection: 'column',
-    transition: 'width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+    backdropFilter: 'var(--mac-blur-light)',
+    WebkitBackdropFilter: 'var(--mac-blur-light)',
     position: 'relative',
     ...style
   };
@@ -93,15 +95,17 @@ const Sidebar = React.forwardRef(({
               style={{
                 width: '32px',
                 height: '32px',
-                borderRadius: '6px',
+                borderRadius: 'var(--mac-radius-sm)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                color: 'var(--mac-text-primary)'
               }}
             >
               <Icon
                 name={isCollapsed ? 'chevron.right' : 'chevron.left'}
                 size="small"
+                style={{ color: 'var(--mac-text-primary)' }}
               />
             </Button>
           )}
@@ -116,16 +120,16 @@ const Sidebar = React.forwardRef(({
             display: 'flex',
             alignItems: 'center',
             padding: isCollapsed ? '12px' : '8px 12px',
-            borderRadius: '6px',
-            backgroundColor: isActive ? 'var(--mac-accent-blue)' : 'transparent',
-            color: isActive ? 'white' : 'var(--mac-text-secondary)',
+            borderRadius: '4px', // Все 4 угла скруглены 4px
+            backgroundColor: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-bg-secondary)',
+            color: isActive ? 'white' : 'var(--mac-text-primary)',
             textDecoration: 'none',
             fontSize: '13px',
             fontWeight: isActive ? '600' : '400',
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
             cursor: 'pointer',
             transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            border: 'none',
+            border: isActive ? 'none' : '1px solid var(--mac-border)',
             width: '100%',
             justifyContent: isCollapsed ? 'center' : 'flex-start',
             gap: isCollapsed ? '0' : '8px'
@@ -150,7 +154,7 @@ const Sidebar = React.forwardRef(({
                   name={item.icon}
                   size="default"
                   style={{
-                    color: isActive ? 'white' : 'var(--mac-text-secondary)'
+                    color: isActive ? 'white' : 'var(--mac-text-primary)'
                   }}
                 />
               )}
@@ -161,7 +165,8 @@ const Sidebar = React.forwardRef(({
                   textAlign: 'left',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis'
+                  textOverflow: 'ellipsis',
+                  color: isActive ? 'white' : 'var(--mac-text-primary)'
                 }}>
                   {item.label}
                 </span>
@@ -169,8 +174,8 @@ const Sidebar = React.forwardRef(({
 
               {!isCollapsed && item.badge && (
                 <span style={{
-                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-tertiary)',
-                  color: isActive ? 'white' : 'var(--mac-text-secondary)',
+                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-secondary)',
+                  color: isActive ? 'white' : 'var(--mac-text-primary)',
                   fontSize: '11px',
                   fontWeight: '600',
                   padding: '2px 6px',
@@ -193,7 +198,7 @@ const Sidebar = React.forwardRef(({
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .mac-sidebar::-webkit-scrollbar {
           width: 6px;
         }
@@ -282,16 +287,16 @@ export const SidebarItem = React.forwardRef(({
         display: 'flex',
         alignItems: 'center',
         padding: '8px 12px',
-        borderRadius: '6px',
-        backgroundColor: active ? 'var(--mac-accent-blue)' : 'transparent',
-        color: active ? 'white' : 'var(--mac-text-secondary)',
+        borderRadius: '4px', // Все 4 угла скруглены 4px
+        backgroundColor: active ? 'var(--mac-accent-blue)' : 'var(--mac-bg-secondary)',
+        color: active ? 'white' : 'var(--mac-text-primary)',
         textDecoration: 'none',
         fontSize: '13px',
         fontWeight: active ? '600' : '400',
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
         cursor: 'pointer',
         transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-        border: 'none',
+        border: active ? 'none' : '1px solid var(--mac-border)',
         width: '100%',
         justifyContent: 'flex-start',
         gap: '8px',
@@ -305,7 +310,7 @@ export const SidebarItem = React.forwardRef(({
           name={icon}
           size="default"
           style={{
-            color: active ? 'white' : 'var(--mac-text-secondary)'
+            color: active ? 'white' : 'var(--mac-text-primary)'
           }}
         />
       )}
@@ -322,8 +327,8 @@ export const SidebarItem = React.forwardRef(({
 
       {badge && (
         <span style={{
-          backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-tertiary)',
-          color: active ? 'white' : 'var(--mac-text-secondary)',
+          backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : 'var(--mac-bg-secondary)',
+          color: active ? 'white' : 'var(--mac-text-primary)',
           fontSize: '11px',
           fontWeight: '600',
           padding: '2px 6px',
@@ -435,3 +440,4 @@ export const SidebarSection = React.forwardRef(({
 SidebarSection.displayName = 'macOS Sidebar Section';
 
 export default Sidebar;
+

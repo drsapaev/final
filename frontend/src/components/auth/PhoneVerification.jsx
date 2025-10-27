@@ -17,7 +17,7 @@ import {
   RefreshCw,
   Send
 } from 'lucide-react';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 const PhoneVerification = ({ 

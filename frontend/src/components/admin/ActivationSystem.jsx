@@ -20,7 +20,7 @@ import {
   User,
   Activity
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
 
 const ActivationSystem = () => {
   const [loading, setLoading] = useState(true);
@@ -149,35 +149,50 @@ const ActivationSystem = () => {
 
   if (loading) {
     return (
-      <Card className="p-8">
-        <div className="flex items-center justify-center">
-          <RefreshCw className="animate-spin mr-2" size={20} />
-          <span>Загрузка системы активации...</span>
+      <Card style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <RefreshCw style={{ 
+            width: '20px', 
+            height: '20px', 
+            marginRight: '8px', 
+            animation: 'spin 1s linear infinite' 
+          }} />
+          <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка системы активации...</span>
         </div>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            marginBottom: '4px'
+          }}>
             Система активации
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)',
+            margin: 0
+          }}>
             Управление лицензиями и активированными устройствами
           </p>
         </div>
         
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw size={16} className="mr-2" />
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
           </Button>
           <Button onClick={() => setShowCreateForm(true)}>
-            <Plus size={16} className="mr-2" />
+            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Создать ключ
           </Button>
         </div>
@@ -185,203 +200,299 @@ const ActivationSystem = () => {
 
       {/* Сообщения */}
       {message.text && (
-        <div className={`flex items-center p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '16px', 
+          borderRadius: 'var(--mac-radius-md)',
+          backgroundColor: message.type === 'success' 
+            ? 'var(--mac-success-bg)' 
+            : 'var(--mac-error-bg)',
+          color: message.type === 'success' 
+            ? 'var(--mac-success)' 
+            : 'var(--mac-error)',
+          border: `1px solid ${message.type === 'success' 
+            ? 'var(--mac-success-border)' 
+            : 'var(--mac-error-border)'}`
+        }}>
           {message.type === 'success' ? (
-            <CheckCircle size={20} className="mr-2" />
+            <CheckCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           ) : (
-            <AlertCircle size={20} className="mr-2" />
+            <AlertCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           )}
           {message.text}
         </div>
       )}
 
       {/* Статистика */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.total_activations || 0}</div>
-          <div className="text-sm text-gray-600">Всего активаций</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-accent-blue)',
+            marginBottom: '8px'
+          }}>
+            {stats.total_activations || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Всего активаций
+          </div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.active_activations || 0}</div>
-          <div className="text-sm text-gray-600">Активных</div>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-success)',
+            marginBottom: '8px'
+          }}>
+            {stats.active_activations || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Активных
+          </div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{stats.trial_activations || 0}</div>
-          <div className="text-sm text-gray-600">Пробных</div>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-warning)',
+            marginBottom: '8px'
+          }}>
+            {stats.trial_activations || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Пробных
+          </div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{stats.expired_activations || 0}</div>
-          <div className="text-sm text-gray-600">Истекших</div>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-error)',
+            marginBottom: '8px'
+          }}>
+            {stats.expired_activations || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Истекших
+          </div>
         </Card>
       </div>
 
       {/* Фильтры */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card style={{ padding: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Search size={16} className="inline mr-1" />
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              <Search style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               Поиск
             </label>
-            <input
+            <MacOSInput
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Ключ или ID устройства..."
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Filter size={16} className="inline mr-1" />
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              <Filter style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               Статус
             </label>
-            <select
+            <MacOSSelect
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">Все статусы</option>
-              <option value="active">Активные</option>
-              <option value="trial">Пробные</option>
-              <option value="expired">Истекшие</option>
-              <option value="revoked">Отозванные</option>
-            </select>
+              options={[
+                { value: 'all', label: 'Все статусы' },
+                { value: 'active', label: 'Активные' },
+                { value: 'trial', label: 'Пробные' },
+                { value: 'expired', label: 'Истекшие' },
+                { value: 'revoked', label: 'Отозванные' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
         </div>
       </Card>
 
       {/* Таблица активаций */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ключ активации
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Устройство
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Статус
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Срок действия
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Создан
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Действия
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredActivations.map(activation => {
+      <Card style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '16px' }}>
+          <MacOSTable
+          columns={[
+            {
+              key: 'key',
+              title: 'Ключ активации',
+              render: (activation) => (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Key style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
+                  <div>
+                    <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      fontFamily: 'monospace',
+                      color: 'var(--mac-text-primary)' 
+                    }}>
+                      {activation.key?.slice(0, 8)}...{activation.key?.slice(-4)}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(activation.key)}
+                      style={{ fontSize: 'var(--mac-font-size-xs)', marginTop: '4px' }}
+                    >
+                      <Copy style={{ width: '12px', height: '12px', marginRight: '4px' }} />
+                      Копировать
+                    </Button>
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'device',
+              title: 'Устройство',
+              render: (activation) => (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Smartphone style={{ width: '16px', height: '16px', marginRight: '8px', color: 'var(--mac-text-tertiary)' }} />
+                  <div>
+                    <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)' 
+                    }}>
+                      {activation.machine_hash?.slice(0, 12)}...
+                    </div>
+                    <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                      ID: {activation.id}
+                    </div>
+                  </div>
+                </div>
+              )
+            },
+            {
+              key: 'status',
+              title: 'Статус',
+              render: (activation) => {
                 const status = statusLabels[activation.status] || { label: activation.status, color: 'secondary' };
-                const isExpired = new Date(activation.expiry_date) < new Date();
-                
-                return (
-                  <tr key={activation.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Key size={16} className="mr-2 text-blue-500" />
-                        <div>
-                          <div className="text-sm font-mono font-medium text-gray-900 dark:text-white">
-                            {activation.key?.slice(0, 8)}...{activation.key?.slice(-4)}
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => copyToClipboard(activation.key)}
-                            className="text-xs mt-1"
-                          >
-                            <Copy size={12} className="mr-1" />
-                            Копировать
-                          </Button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Smartphone size={16} className="mr-2 text-gray-400" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {activation.machine_hash?.slice(0, 12)}...
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {activation.id}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={status.color}>
-                        {status.label}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {new Date(activation.expiry_date).toLocaleDateString('ru-RU')}
-                      </div>
-                      {isExpired && (
-                        <div className="text-xs text-red-500">
-                          Истек {Math.floor((new Date() - new Date(activation.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {new Date(activation.created_at).toLocaleDateString('ru-RU')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {/* Продлить лицензию */}}
-                          disabled={activation.status === 'revoked'}
-                        >
-                          <Calendar size={14} />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => revokeActivation(activation.id)}
-                          disabled={activation.status === 'revoked'}
-                        >
-                          <Shield size={14} />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredActivations.length === 0 && (
-          <div className="text-center py-12">
-            <Key size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Активации не найдены
-            </h3>
-            <p className="text-gray-500">
-              {searchTerm || statusFilter !== 'all'
-                ? 'Попробуйте изменить критерии поиска'
-                : 'Создайте первый ключ активации'
+                return <Badge variant={status.color}>{status.label}</Badge>;
               }
-            </p>
-          </div>
-        )}
+            },
+            {
+              key: 'expiry',
+              title: 'Срок действия',
+              render: (activation) => {
+                const isExpired = new Date(activation.expiry_date) < new Date();
+                return (
+                  <div>
+                    <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-primary)' 
+                    }}>
+                      {new Date(activation.expiry_date).toLocaleDateString('ru-RU')}
+                    </div>
+                    {isExpired && (
+                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-error)' }}>
+                        Истек {Math.floor((new Date() - new Date(activation.expiry_date)) / (1000 * 60 * 60 * 24))} дн. назад
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            },
+            {
+              key: 'created',
+              title: 'Создан',
+              render: (activation) => (
+                <div style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-text-primary)' 
+                }}>
+                  {new Date(activation.created_at).toLocaleDateString('ru-RU')}
+                </div>
+              )
+            },
+            {
+              key: 'actions',
+              title: 'Действия',
+              render: (activation) => (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {/* Продлить лицензию */}}
+                    disabled={activation.status === 'revoked'}
+                  >
+                    <Calendar style={{ width: '14px', height: '14px' }} />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => revokeActivation(activation.id)}
+                    disabled={activation.status === 'revoked'}
+                  >
+                    <Shield style={{ width: '14px', height: '14px' }} />
+                  </Button>
+                </div>
+              )
+            }
+          ]}
+          data={filteredActivations}
+          emptyState={
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '48px 24px',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              <Key style={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)', margin: '0 auto 16px' }} />
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                margin: '0 0 8px 0' 
+              }}>
+                Активации не найдены
+              </h3>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)', 
+                margin: 0 
+              }}>
+                {searchTerm || statusFilter !== 'all'
+                  ? 'Попробуйте изменить критерии поиска'
+                  : 'Создайте первый ключ активации'
+                }
+              </p>
+            </div>
+          }
+        />
+        </div>
       </Card>
 
       {/* Форма создания ключа */}
@@ -393,17 +504,34 @@ const ActivationSystem = () => {
       )}
 
       {/* Информация */}
-      <Card className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
-        <h3 className="text-lg font-medium mb-2 flex items-center text-blue-800 dark:text-blue-400">
-          <Shield size={20} className="mr-2" />
+      <Card style={{ 
+        padding: '24px', 
+        backgroundColor: 'var(--mac-info-bg)', 
+        border: '1px solid var(--mac-info-border)' 
+      }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          marginBottom: '8px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          color: 'var(--mac-info)' 
+        }}>
+          <Shield style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           Как работает система активации
         </h3>
-        <div className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
-          <p>• Каждое устройство требует уникальный ключ активации</p>
-          <p>• Ключи имеют срок действия и могут быть отозваны</p>
-          <p>• Пробные лицензии ограничены по функциональности</p>
-          <p>• Система работает офлайн после успешной активации</p>
-          <p>• Все активации логируются для аудита</p>
+        <div style={{ 
+          fontSize: 'var(--mac-font-size-sm)', 
+          color: 'var(--mac-text-secondary)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '8px' 
+        }}>
+          <p style={{ margin: 0 }}>• Каждое устройство требует уникальный ключ активации</p>
+          <p style={{ margin: 0 }}>• Ключи имеют срок действия и могут быть отозваны</p>
+          <p style={{ margin: 0 }}>• Пробные лицензии ограничены по функциональности</p>
+          <p style={{ margin: 0 }}>• Система работает офлайн после успешной активации</p>
+          <p style={{ margin: 0 }}>• Все активации логируются для аудита</p>
         </div>
       </Card>
     </div>
@@ -442,124 +570,157 @@ const ActivationKeyForm = ({ onSave, onCancel }) => {
   };
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-medium mb-4">
+    <Card style={{ padding: '24px' }}>
+      <h3 style={{ 
+        fontSize: 'var(--mac-font-size-lg)', 
+        fontWeight: 'var(--mac-font-weight-medium)', 
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)',
+        margin: 0
+      }}>
         Создание ключа активации
       </h3>
       
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Тип лицензии
             </label>
-            <select
+            <MacOSSelect
               value={formData.key_type}
               onChange={(e) => handleChange('key_type', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="trial">Пробная (30 дней)</option>
-              <option value="full">Полная лицензия</option>
-              <option value="enterprise">Корпоративная</option>
-            </select>
+              options={[
+                { value: 'trial', label: 'Пробная (30 дней)' },
+                { value: 'full', label: 'Полная лицензия' },
+                { value: 'enterprise', label: 'Корпоративная' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Срок действия (дни)
             </label>
-            <input
+            <MacOSInput
               type="number"
               min="1"
               max="3650"
               value={formData.duration_days}
               onChange={(e) => handleChange('duration_days', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Максимум устройств
             </label>
-            <input
+            <MacOSInput
               type="number"
               min="1"
               max="100"
               value={formData.max_devices}
               onChange={(e) => handleChange('max_devices', parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Описание
             </label>
-            <input
+            <MacOSInput
               type="text"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="Клиника №1, основная лицензия"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
 
         {/* Функции */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '12px' 
+          }}>
             Включенные функции:
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            <label style={{ display: 'flex', alignItems: 'center' }}>
+              <MacOSCheckbox
                 checked={formData.features.full_access}
                 onChange={(e) => handleFeatureChange('full_access', e.target.checked)}
-                className="mr-2"
+                style={{ marginRight: '8px' }}
               />
-              <span className="text-sm">Полный доступ</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>Полный доступ</span>
             </label>
 
-            <label className="flex items-center">
-              <input
-                type="checkbox"
+            <label style={{ display: 'flex', alignItems: 'center' }}>
+              <MacOSCheckbox
                 checked={formData.features.ai_features}
                 onChange={(e) => handleFeatureChange('ai_features', e.target.checked)}
-                className="mr-2"
+                style={{ marginRight: '8px' }}
               />
-              <span className="text-sm">AI функции</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>AI функции</span>
             </label>
 
-            <label className="flex items-center">
-              <input
-                type="checkbox"
+            <label style={{ display: 'flex', alignItems: 'center' }}>
+              <MacOSCheckbox
                 checked={formData.features.telegram_integration}
                 onChange={(e) => handleFeatureChange('telegram_integration', e.target.checked)}
-                className="mr-2"
+                style={{ marginRight: '8px' }}
               />
-              <span className="text-sm">Telegram интеграция</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>Telegram интеграция</span>
             </label>
 
-            <label className="flex items-center">
-              <input
-                type="checkbox"
+            <label style={{ display: 'flex', alignItems: 'center' }}>
+              <MacOSCheckbox
                 checked={formData.features.print_system}
                 onChange={(e) => handleFeatureChange('print_system', e.target.checked)}
-                className="mr-2"
+                style={{ marginRight: '8px' }}
               />
-              <span className="text-sm">Система печати</span>
+              <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>Система печати</span>
             </label>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <Button type="button" variant="outline" onClick={onCancel}>
             Отменить
           </Button>
           <Button type="submit">
-            <Key size={16} className="mr-2" />
+            <Key style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Создать ключ
           </Button>
         </div>

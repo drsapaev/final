@@ -19,6 +19,15 @@ import {
   FileX
 } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
+import { 
+  MacOSTab, 
+  MacOSStatCard, 
+  MacOSTable, 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton
+} from '../ui/macos';
 import { toast } from 'react-toastify';
 
 const ReportsManager = () => {
@@ -241,61 +250,94 @@ const ReportsManager = () => {
   };
 
   const renderGenerateTab = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Форма генерации отчета */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <BarChart3 className="w-5 h-5 mr-2" />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px', 
+          display: 'flex', 
+          alignItems: 'center',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          <BarChart3 style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
           Генерация отчета
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px', 
+          marginBottom: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium mb-2">Тип отчета</label>
-            <select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)'
+            }}>Тип отчета</label>
+            <MacOSSelect
               value={reportForm.type}
               onChange={(e) => setReportForm(prev => ({ ...prev, type: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            >
-              {availableReports.map(report => (
-                <option key={report.type} value={report.type}>
-                  {report.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Формат</label>
-            <select
-              value={reportForm.format}
-              onChange={(e) => setReportForm(prev => ({ ...prev, format: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            >
-              <option value="json">JSON</option>
-              <option value="excel">Excel</option>
-              <option value="csv">CSV</option>
-              <option value="pdf">PDF</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Дата начала</label>
-            <input
-              type="date"
-              value={reportForm.start_date}
-              onChange={(e) => setReportForm(prev => ({ ...prev, start_date: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md"
+              options={availableReports.map(report => ({
+                value: report.type,
+                label: report.name
+              }))}
+              placeholder="Выберите тип отчета"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Дата окончания</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)'
+            }}>Формат</label>
+            <MacOSSelect
+              value={reportForm.format}
+              onChange={(e) => setReportForm(prev => ({ ...prev, format: e.target.value }))}
+              options={[
+                { value: 'json', label: 'JSON' },
+                { value: 'excel', label: 'Excel' },
+                { value: 'csv', label: 'CSV' },
+                { value: 'pdf', label: 'PDF' }
+              ]}
+            />
+          </div>
+
+          <div>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)'
+            }}>Дата начала</label>
+            <MacOSInput
+              type="date"
+              value={reportForm.start_date}
+              onChange={(e) => setReportForm(prev => ({ ...prev, start_date: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)'
+            }}>Дата окончания</label>
+            <MacOSInput
               type="date"
               value={reportForm.end_date}
               onChange={(e) => setReportForm(prev => ({ ...prev, end_date: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md"
             />
           </div>
         </div>
@@ -303,186 +345,280 @@ const ReportsManager = () => {
         <Button
           onClick={generateReport}
           disabled={loading}
-          className="w-full md:w-auto"
+          style={{ width: '100%', maxWidth: '200px' }}
         >
           {loading ? (
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
           ) : (
-            <FileText className="w-4 h-4 mr-2" />
+            <FileText style={{ width: '16px', height: '16px', marginRight: '8px' }} />
           )}
           Сгенерировать отчет
         </Button>
       </Card>
 
       {/* Быстрые отчеты */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Clock className="w-5 h-5 mr-2" />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px', 
+          display: 'flex', 
+          alignItems: 'center',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          <Clock style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
           Быстрые отчеты
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {quickReports.daily && (
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">Сегодня</h4>
-              <div className="space-y-1 text-sm text-blue-700">
-                <div>Записи: {quickReports.daily.summary?.total_patients_served || 0}</div>
-                <div>Доход: {quickReports.daily.summary?.total_revenue || 0} сум</div>
-                <div>Новые пациенты: {quickReports.daily.summary?.new_patients || 0}</div>
-              </div>
-            </div>
-          )}
-          
-          <div className="p-4 bg-green-50 rounded-lg">
-            <h4 className="font-medium text-green-900 mb-2">Эта неделя</h4>
-            <div className="space-y-1 text-sm text-green-700">
-              <div>Загрузка...</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-purple-50 rounded-lg">
-            <h4 className="font-medium text-purple-900 mb-2">Этот месяц</h4>
-            <div className="space-y-1 text-sm text-purple-700">
-              <div>Загрузка...</div>
-            </div>
-          </div>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSStatCard
+            title="Сегодня"
+            value={quickReports.daily?.summary?.total_patients_served || 0}
+            subtitle={`${quickReports.daily?.summary?.total_revenue || 0} сум`}
+            icon={Clock}
+            color="blue"
+            trend={quickReports.daily ? `+${quickReports.daily.summary?.new_patients || 0}` : undefined}
+            trendType={quickReports.daily ? "positive" : "neutral"}
+            loading={!quickReports.daily}
+          />
+
+          <MacOSStatCard
+            title="Эта неделя"
+            value={quickReports.weekly?.summary?.total_patients_served || 0}
+            subtitle={`${quickReports.weekly?.summary?.total_revenue || 0} сум`}
+            icon={Calendar}
+            color="green"
+            trend={quickReports.weekly ? `+${quickReports.weekly.summary?.new_patients || 0}` : undefined}
+            trendType={quickReports.weekly ? "positive" : "neutral"}
+            loading={!quickReports.weekly}
+          />
+
+          <MacOSStatCard
+            title="Этот месяц"
+            value={quickReports.monthly?.summary?.total_patients_served || 0}
+            subtitle={`${quickReports.monthly?.summary?.total_revenue || 0} сум`}
+            icon={BarChart3}
+            color="purple"
+            trend={quickReports.monthly ? `+${quickReports.monthly.summary?.new_patients || 0}` : undefined}
+            trendType={quickReports.monthly ? "positive" : "neutral"}
+            loading={!quickReports.monthly}
+          />
         </div>
       </Card>
 
       {/* Последние отчеты */}
       {reports.length > 0 && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Последние отчеты</h3>
-          <div className="space-y-3">
-            {reports.slice(0, 5).map((report, index) => {
-              const IconComponent = getReportIcon(report.report_type);
-              return (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <IconComponent className="w-5 h-5 mr-3 text-gray-600" />
-                    <div>
-                      <div className="font-medium">{report.report_type}</div>
-                      <div className="text-sm text-gray-500">{report.generated_at}</div>
-                    </div>
+        <Card style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            marginBottom: '16px',
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>Последние отчеты</h3>
+          <MacOSTable
+            columns={[
+              {
+                key: 'report_type',
+                title: 'Тип отчета',
+                render: (value, row) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {React.createElement(getReportIcon(row.report_type), {
+                      style: { width: '16px', height: '16px', color: 'var(--mac-text-tertiary)' }
+                    })}
+                    <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                      {value}
+                    </span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={report.success ? 'success' : 'error'}>
-                      {report.success ? 'Успешно' : 'Ошибка'}
-                    </Badge>
-                    {report.filename && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => downloadFile(report.filename)}
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                )
+              },
+              {
+                key: 'generated_at',
+                title: 'Дата генерации',
+                render: (value) => (
+                  <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+                    {value}
+                  </span>
+                )
+              },
+              {
+                key: 'status',
+                title: 'Статус',
+                render: (_, row) => (
+                  <Badge variant={row.success ? 'success' : 'error'}>
+                    {row.success ? 'Успешно' : 'Ошибка'}
+                  </Badge>
+                )
+              },
+              {
+                key: 'actions',
+                title: 'Действия',
+                align: 'right',
+                render: (_, row) => (
+                  row.filename ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => downloadFile(row.filename)}
+                    >
+                      <Download style={{ width: '16px', height: '16px' }} />
+                    </Button>
+                  ) : null
+                )
+              }
+            ]}
+            data={reports.slice(0, 5)}
+            hoverable={true}
+            striped={true}
+          />
         </Card>
       )}
     </div>
   );
 
   const renderFilesTab = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center">
-            <FileSpreadsheet className="w-5 h-5 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            display: 'flex', 
+            alignItems: 'center',
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>
+            <FileSpreadsheet style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
             Файлы отчетов
           </h3>
-          <div className="flex space-x-2">
+          <div style={{ display: 'flex', gap: '8px' }}>
             <Button
               onClick={loadReportFiles}
               variant="outline"
               size="sm"
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Обновить
             </Button>
             <Button
               onClick={cleanupOldReports}
               variant="outline"
               size="sm"
-              className="text-red-600 hover:text-red-700"
+              style={{ color: 'var(--mac-error)' }}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
+              <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Очистить старые
             </Button>
           </div>
         </div>
 
         {files.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <FileX className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Файлы отчетов не найдены</p>
-          </div>
+          <MacOSEmptyState
+            icon={FileX}
+            title="Файлы отчетов не найдены"
+            description="Сгенерируйте первый отчет, чтобы увидеть файлы здесь"
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">Файл</th>
-                  <th className="text-left py-2">Размер</th>
-                  <th className="text-left py-2">Создан</th>
-                  <th className="text-left py-2">Изменен</th>
-                  <th className="text-right py-2">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((file, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="py-3">
-                      <div className="flex items-center">
-                        <FileText className="w-4 h-4 mr-2 text-gray-500" />
-                        <span className="font-medium">{file.filename}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 text-gray-600">
-                      {formatFileSize(file.size)}
-                    </td>
-                    <td className="py-3 text-gray-600">
-                      {new Date(file.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-3 text-gray-600">
-                      {new Date(file.modified_at).toLocaleString()}
-                    </td>
-                    <td className="py-3 text-right">
-                      <Button
-                        onClick={() => downloadFile(file.filename)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MacOSTable
+            columns={[
+              {
+                key: 'filename',
+                title: 'Файл',
+                render: (value, row) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText style={{ width: '16px', height: '16px', color: 'var(--mac-text-tertiary)' }} />
+                    <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>
+                      {value}
+                    </span>
+                  </div>
+                )
+              },
+              {
+                key: 'size',
+                title: 'Размер',
+                render: (value) => (
+                  <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+                    {formatFileSize(value)}
+                  </span>
+                )
+              },
+              {
+                key: 'created_at',
+                title: 'Создан',
+                render: (value) => (
+                  <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+                    {new Date(value).toLocaleString()}
+                  </span>
+                )
+              },
+              {
+                key: 'modified_at',
+                title: 'Изменен',
+                render: (value) => (
+                  <span style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>
+                    {new Date(value).toLocaleString()}
+                  </span>
+                )
+              },
+              {
+                key: 'actions',
+                title: 'Действия',
+                align: 'right',
+                render: (_, row) => (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => downloadFile(row.filename)}
+                  >
+                    <Download style={{ width: '16px', height: '16px' }} />
+                  </Button>
+                )
+              }
+            ]}
+            data={files}
+            hoverable={true}
+            striped={true}
+          />
         )}
       </Card>
     </div>
   );
 
   const renderSettingsTab = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Settings className="w-5 h-5 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px', 
+          display: 'flex', 
+          alignItems: 'center',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          <Settings style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
           Настройки отчетов
         </h3>
         
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <h4 className="font-medium mb-2">Автоматические отчеты</h4>
-            <p className="text-sm text-gray-600 mb-4">
+            <h4 style={{ 
+              fontSize: 'var(--mac-font-size-base)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)'
+            }}>Автоматические отчеты</h4>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)', 
+              marginBottom: '16px',
+              margin: 0
+            }}>
               Настройка автоматической генерации и отправки отчетов
             </p>
             <Button variant="outline">
@@ -491,11 +627,21 @@ const ReportsManager = () => {
           </div>
           
           <div>
-            <h4 className="font-medium mb-2">Хранение файлов</h4>
-            <p className="text-sm text-gray-600 mb-4">
+            <h4 style={{ 
+              fontSize: 'var(--mac-font-size-base)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)'
+            }}>Хранение файлов</h4>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)', 
+              marginBottom: '16px',
+              margin: 0
+            }}>
               Управление хранением файлов отчетов
             </p>
-            <div className="flex space-x-2">
+            <div style={{ display: 'flex', gap: '8px' }}>
               <Button variant="outline" size="sm">
                 Настроить очистку
               </Button>
@@ -510,40 +656,31 @@ const ReportsManager = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Система отчетов</h2>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ 
+          fontSize: 'var(--mac-font-size-2xl)', 
+          fontWeight: 'var(--mac-font-weight-bold)', 
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>Система отчетов</h2>
         <Badge variant="info">
           {files.length} файлов
         </Badge>
       </div>
 
       {/* Табы */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {[
-            { id: 'generate', label: 'Генерация', icon: BarChart3 },
-            { id: 'files', label: 'Файлы', icon: FileSpreadsheet },
-            { id: 'settings', label: 'Настройки', icon: Settings }
-          ].map(tab => {
-            const IconComponent = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <IconComponent className="w-4 h-4 mr-2" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      <MacOSTab
+        tabs={[
+          { id: 'generate', label: 'Генерация', icon: BarChart3 },
+          { id: 'files', label: 'Файлы', icon: FileSpreadsheet },
+          { id: 'settings', label: 'Настройки', icon: Settings }
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        size="md"
+        variant="default"
+      />
 
       {/* Контент табов */}
       {activeTab === 'generate' && renderGenerateTab()}

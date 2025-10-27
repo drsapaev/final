@@ -20,6 +20,13 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
+import { 
+  MacOSInput,
+  MacOSButton,
+  MacOSBadge,
+  MacOSSelect,
+  MacOSCard
+} from '../ui/macos';
 import './EnhancedAppointmentsTable.css';
 import { colors } from '../../theme/tokens';
 
@@ -55,18 +62,17 @@ const EnhancedAppointmentsTable = ({
   const isDark = theme === 'dark';
   const isDoctorView = String(view).toLowerCase() === 'doctor';
   
-  // Цвета для темы
-  // Используем консолидированную цветовую систему из tokens.js
+  // Цвета для темы - используем macOS CSS переменные
   const themeColors = {
-    bg: isDark ? '#1f2937' : '#ffffff',
-    bgSecondary: isDark ? '#374151' : '#f8fafc',
-    border: isDark ? '#4b5563' : '#e2e8f0',
-    text: isDark ? '#f9fafb' : '#1e293b',
-    textSecondary: isDark ? '#d1d5db' : '#64748b',
-    accent: '#3b82f6',
-    success: '#10b981',
-    warning: '#f59e0b',
-    error: '#ef4444'
+    bg: 'var(--mac-bg-primary)',
+    bgSecondary: 'var(--mac-bg-secondary)',
+    border: 'var(--mac-border)',
+    text: 'var(--mac-text-primary)',
+    textSecondary: 'var(--mac-text-secondary)',
+    accent: 'var(--mac-accent)',
+    success: 'var(--mac-success)',
+    warning: 'var(--mac-warning)',
+    error: 'var(--mac-error)'
   };
 
   // Переводы
@@ -892,108 +898,77 @@ const EnhancedAppointmentsTable = ({
     <div 
       className={`enhanced-table ${isDark ? 'dark-theme' : ''}`}
       style={{
-        backgroundColor: themeColors.bg,
+        backgroundColor: 'var(--mac-bg-primary)',
         overflow: 'hidden',
-        border: outerBorder ? `1px solid ${themeColors.border}` : 'none',
-        borderRadius: outerBorder ? '12px' : '0'
+        border: outerBorder ? '1px solid var(--mac-border)' : 'none',
+        borderRadius: outerBorder ? 'var(--mac-radius-lg)' : '0'
       }}>
       {/* Панель инструментов */}
       <div style={{
         padding: '16px',
-        borderBottom: `1px solid ${themeColors.border}`,
-        backgroundColor: themeColors.bgSecondary
+        borderBottom: '1px solid var(--mac-border)',
+        backgroundColor: 'var(--mac-bg-secondary)',
+        overflowX: 'auto',
+        minWidth: '600px'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          flexWrap: 'wrap'
+          flexWrap: 'nowrap',
+          minWidth: 0
         }}>
           {/* Поиск */}
-          <div style={{ position: 'relative', minWidth: '200px', flex: 1 }}>
-            <Search 
-              size={16} 
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: themeColors.textSecondary
-              }}
-            />
-            <input
+          <div style={{ position: 'relative', minWidth: '200px', maxWidth: '300px', flex: '1 1 auto' }}>
+            <MacOSInput
               type="text"
               placeholder={t.search}
               value={filterConfig.search}
               onChange={(e) => setFilterConfig(prev => ({ ...prev, search: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                border: `1px solid ${themeColors.border}`,
-                borderRadius: '6px',
-                backgroundColor: themeColors.bg,
-                color: themeColors.text,
-                fontSize: '14px'
-              }}
+              icon={Search}
+              style={{ width: '100%' }}
             />
           </div>
 
           {/* Фильтр по статусу */}
-          <select
+          <MacOSSelect
             value={filterConfig.status}
             onChange={(e) => setFilterConfig(prev => ({ ...prev, status: e.target.value }))}
-            style={{
-              padding: '8px 12px',
-              border: `1px solid ${themeColors.border}`,
-              borderRadius: '6px',
-              backgroundColor: themeColors.bg,
-              color: themeColors.text,
-              fontSize: '14px'
-            }}
-          >
-            <option value="">{t.filter}</option>
-            <option value="scheduled">{t.scheduled}</option>
-            <option value="confirmed">{t.confirmed}</option>
-            <option value="queued">{t.queued}</option>
-            <option value="in_cabinet">{t.in_cabinet}</option>
-            <option value="done">{t.done}</option>
-            <option value="cancelled">{t.cancelled}</option>
-            <option value="paid_pending">{t.paid_pending}</option>
-            <option value="paid">{t.paid}</option>
-          </select>
+            options={[
+              { value: '', label: t.filter },
+              { value: 'scheduled', label: t.scheduled },
+              { value: 'confirmed', label: t.confirmed },
+              { value: 'queued', label: t.queued },
+              { value: 'in_cabinet', label: t.in_cabinet },
+              { value: 'done', label: t.done },
+              { value: 'cancelled', label: t.cancelled },
+              { value: 'paid_pending', label: t.paid_pending },
+              { value: 'paid', label: t.paid }
+            ]}
+            style={{ minWidth: '120px', maxWidth: '150px', flex: '0 0 auto' }}
+          />
 
           {/* Экспорт */}
-          <button
+          <MacOSButton
+            variant="outline"
             onClick={handleExport}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
               gap: '6px',
-              padding: '8px 12px',
-              border: `1px solid ${themeColors.border}`,
-              borderRadius: '6px',
-              backgroundColor: themeColors.bg,
-              color: themeColors.text,
-              fontSize: '14px',
-              cursor: 'pointer'
+              flex: '0 0 auto',
+              minWidth: '100px'
             }}
           >
             <Download size={16} />
             {t.export}
-          </button>
+          </MacOSButton>
 
           {/* Информация о выбранных */}
           {showCheckboxes && selectedRows.size > 0 && (
-            <div style={{
-              padding: '8px 12px',
-              backgroundColor: themeColors.accent + '20',
-              color: themeColors.accent,
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500'
-            }}>
+            <MacOSBadge variant="info" style={{ flex: '0 0 auto' }}>
               {t.selected}: {selectedRows.size}
-            </div>
+            </MacOSBadge>
           )}
         </div>
       </div>

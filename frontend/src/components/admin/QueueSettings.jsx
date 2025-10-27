@@ -15,7 +15,13 @@ import {
   QrCode,
   Play
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSBadge
+} from '../ui/macos';
 
 const QueueSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -176,252 +182,510 @@ const QueueSettings = () => {
 
   if (loading) {
     return (
-      <Card className="p-8">
-        <div className="flex items-center justify-center">
-          <RefreshCw className="animate-spin mr-2" size={20} />
-          <span>Загрузка настроек очередей...</span>
-        </div>
-      </Card>
+      <div style={{ 
+        padding: 0,
+        backgroundColor: 'var(--mac-bg-primary)',
+        minHeight: '100vh'
+      }}>
+        <MacOSCard style={{ padding: 0, textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+            <RefreshCw style={{ 
+              width: '32px', 
+              height: '32px', 
+              color: 'var(--mac-accent-blue)',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <span style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              color: 'var(--mac-text-secondary)',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}>
+              Загрузка настроек очередей...
+            </span>
+          </div>
+        </MacOSCard>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Заголовок */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Настройки очередей
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Управление онлайн-очередью и стартовыми номерами
-          </p>
-        </div>
-        
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={loadSettings} disabled={loading}>
-            <RefreshCw size={16} className="mr-2" />
-            Обновить
-          </Button>
-          <Button onClick={saveSettings} disabled={saving}>
-            {saving ? (
-              <RefreshCw size={16} className="animate-spin mr-2" />
-            ) : (
-              <Save size={16} className="mr-2" />
-            )}
-            Сохранить
-          </Button>
-        </div>
-      </div>
-
-      {/* Сообщения */}
-      {message.text && (
-        <div className={`flex items-center p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
-          {message.type === 'success' ? (
-            <CheckCircle size={20} className="mr-2" />
-          ) : (
-            <AlertCircle size={20} className="mr-2" />
-          )}
-          {message.text}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Общие настройки */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4 flex items-center">
-            <Settings size={20} className="mr-2 text-blue-600" />
-            Общие настройки
-          </h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <Clock size={16} className="inline mr-1" />
-                Час начала онлайн-очереди
-              </label>
-              <select
-                value={settings.queue_start_hour}
-                onChange={(e) => handleSettingChange('queue_start_hour', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {String(i).padStart(2, '0')}:00
-                  </option>
-                ))}
-              </select>
-              <p className="text-sm text-gray-500 mt-1">
-                С этого времени доступна онлайн-запись через QR-код
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Время автозакрытия
-              </label>
-              <input
-                type="time"
-                value={settings.auto_close_time}
-                onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Автоматическое закрытие онлайн-записи (опционально)
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Часовой пояс
-              </label>
-              <select
-                value={settings.timezone}
-                onChange={(e) => handleSettingChange('timezone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="Asia/Tashkent">Ташкент (UTC+5)</option>
-                <option value="Asia/Almaty">Алматы (UTC+6)</option>
-                <option value="Europe/Moscow">Москва (UTC+3)</option>
-                <option value="Asia/Dubai">Дубай (UTC+4)</option>
-              </select>
-            </div>
-          </div>
-        </Card>
-
-        {/* Тестирование */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4 flex items-center">
-            <TestTube size={20} className="mr-2 text-green-600" />
-            Тестирование очереди
-          </h3>
-          
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Протестируйте генерацию QR-кода для каждой специальности
+    <div style={{ 
+      padding: 0,
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        {/* Заголовок */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          marginBottom: '24px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid var(--mac-border)'
+        }}>
+          <div>
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 8px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+              Настройки очередей
+            </h2>
+            <p style={{ 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              margin: 0
+            }}>
+              Управление онлайн-очередью и стартовыми номерами
             </p>
-
-            {specialties.map(specialty => (
-              <div key={specialty.key} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg dark:border-gray-700">
-                <div className="flex items-center">
-                  <specialty.icon size={20} className={`mr-3 ${specialty.color}`} />
-                  <div>
-                    <div className="font-medium">{specialty.name}</div>
-                    <div className="text-sm text-gray-500">{specialty.description}</div>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => testQueueGeneration(specialty.key)}
-                  disabled={testing}
-                >
-                  {testing ? (
-                    <RefreshCw size={14} className="animate-spin" />
-                  ) : (
-                    <Play size={14} />
-                  )}
-                </Button>
-              </div>
-            ))}
-
-            {testResult && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-700">
-                <h4 className="font-medium text-green-800 dark:text-green-400 mb-2">
-                  Результат тестирования:
-                </h4>
-                <div className="text-sm space-y-1">
-                  <div><strong>Токен:</strong> <code className="bg-green-100 px-1 rounded dark:bg-green-800">{testResult.token?.slice(0, 8)}...</code></div>
-                  <div><strong>Специальность:</strong> {testResult.doctor_specialty}</div>
-                  <div><strong>Кабинет:</strong> {testResult.doctor_cabinet}</div>
-                  <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
-                  <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
-                  <div><strong>QR URL:</strong> <code className="bg-green-100 px-1 rounded dark:bg-green-800">{testResult.qr_url}</code></div>
-                </div>
-              </div>
-            )}
           </div>
-        </Card>
-      </div>
+          
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <MacOSButton
+              variant="outline"
+              onClick={loadSettings}
+              disabled={loading}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                padding: '8px 16px'
+              }}
+            >
+              <RefreshCw style={{ width: '16px', height: '16px' }} />
+              Обновить
+            </MacOSButton>
+            <MacOSButton
+              onClick={saveSettings}
+              disabled={saving}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                backgroundColor: 'var(--mac-accent-blue)',
+                border: 'none',
+                padding: '8px 16px'
+              }}
+            >
+              {saving ? (
+                <RefreshCw style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  animation: 'spin 1s linear infinite'
+                }} />
+              ) : (
+                <Save style={{ width: '16px', height: '16px' }} />
+              )}
+              Сохранить
+            </MacOSButton>
+          </div>
+        </div>
 
-      {/* Настройки по специальностям */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {specialties.map(specialty => (
-          <Card key={specialty.key} className="p-6">
-            <h3 className="text-lg font-medium mb-4 flex items-center">
-              <specialty.icon size={20} className={`mr-2 ${specialty.color}`} />
-              {specialty.name}
+        {/* Сообщения */}
+        {message.text && (
+          <MacOSCard style={{ 
+            padding: '16px', 
+            marginBottom: '24px',
+            backgroundColor: message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+            border: message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {message.type === 'success' ? (
+                <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+              ) : (
+                <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+              )}
+              <span style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                {message.text}
+              </span>
+            </div>
+          </MacOSCard>
+        )}
+
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+          gap: '24px',
+          marginBottom: '24px'
+        }}>
+          {/* Общие настройки */}
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Settings style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+              Общие настройки
             </h3>
             
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <Hash size={16} className="inline mr-1" />
-                  Стартовый номер
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <Clock style={{ width: '16px', height: '16px' }} />
+                  Час начала онлайн-очереди
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={settings.start_numbers[specialty.key]}
-                  onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                <MacOSSelect
+                  value={settings.queue_start_hour}
+                  onChange={(e) => handleSettingChange('queue_start_hour', parseInt(e.target.value))}
+                  options={Array.from({ length: 24 }, (_, i) => ({
+                    value: i,
+                    label: `${String(i).padStart(2, '0')}:00`
+                  }))}
+                  style={{ width: '100%' }}
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  С какого номера начинается онлайн-очередь
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-tertiary)', 
+                  marginTop: '4px',
+                  margin: '4px 0 0 0'
+                }}>
+                  С этого времени доступна онлайн-запись через QR-код
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  <Users size={16} className="inline mr-1" />
-                  Лимит в день
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '8px' 
+                }}>
+                  Время автозакрытия
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={settings.max_per_day[specialty.key]}
-                  onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                <MacOSInput
+                  type="time"
+                  value={settings.auto_close_time}
+                  onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
+                  style={{ width: '100%' }}
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Максимум онлайн-записей в день
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-tertiary)', 
+                  marginTop: '4px',
+                  margin: '4px 0 0 0'
+                }}>
+                  Автоматическое закрытие онлайн-записи (опционально)
                 </p>
               </div>
 
-              {/* Текущие настройки */}
-              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Диапазон номеров:</span>
-                  <Badge variant="outline">
-                    {settings.start_numbers[specialty.key]} - {settings.start_numbers[specialty.key] + settings.max_per_day[specialty.key] - 1}
-                  </Badge>
-                </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '8px' 
+                }}>
+                  Часовой пояс
+                </label>
+                <MacOSSelect
+                  value={settings.timezone}
+                  onChange={(e) => handleSettingChange('timezone', e.target.value)}
+                  options={[
+                    { value: 'Asia/Tashkent', label: 'Ташкент (UTC+5)' },
+                    { value: 'Asia/Almaty', label: 'Алматы (UTC+6)' },
+                    { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
+                    { value: 'Asia/Dubai', label: 'Дубай (UTC+4)' }
+                  ]}
+                  style={{ width: '100%' }}
+                />
               </div>
             </div>
-          </Card>
-        ))}
-      </div>
+          </MacOSCard>
 
-      {/* Информационная панель */}
-      <Card className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
-        <h3 className="text-lg font-medium mb-2 flex items-center text-blue-800 dark:text-blue-400">
-          <QrCode size={20} className="mr-2" />
-          Как работает онлайн-очередь
-        </h3>
-        <div className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
-          <p>• Пациенты сканируют QR-код с {settings.queue_start_hour}:00 до открытия приема</p>
-          <p>• Каждый телефон/Telegram может получить только один номер в день</p>
-          <p>• При повторном запросе возвращается тот же номер</p>
-          <p>• Кнопка "Открыть прием" в регистратуре закрывает онлайн-набор</p>
-          <p>• Стартовые номера позволяют избежать конфликтов между специалистами</p>
+          {/* Тестирование */}
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <TestTube style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
+              Тестирование очереди
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: 0
+              }}>
+                Протестируйте генерацию QR-кода для каждой специальности
+              </p>
+
+              {specialties.map(specialty => (
+                <div key={specialty.key} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  padding: '12px', 
+                  border: '1px solid var(--mac-border)', 
+                  borderRadius: 'var(--mac-radius-md)',
+                  backgroundColor: 'var(--mac-bg-secondary)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <specialty.icon style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+                    <div>
+                      <div style={{ 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        fontWeight: 'var(--mac-font-weight-medium)', 
+                        color: 'var(--mac-text-primary)' 
+                      }}>
+                        {specialty.name}
+                      </div>
+                      <div style={{ 
+                        fontSize: 'var(--mac-font-size-xs)', 
+                        color: 'var(--mac-text-secondary)' 
+                      }}>
+                        {specialty.description}
+                      </div>
+                    </div>
+                  </div>
+                  <MacOSButton
+                    variant="outline"
+                    onClick={() => testQueueGeneration(specialty.key)}
+                    disabled={testing}
+                    style={{ 
+                      padding: '6px 12px',
+                      minWidth: 'auto'
+                    }}
+                  >
+                    {testing ? (
+                      <RefreshCw style={{ 
+                        width: '14px', 
+                        height: '14px',
+                        animation: 'spin 1s linear infinite'
+                      }} />
+                    ) : (
+                      <Play style={{ width: '14px', height: '14px' }} />
+                    )}
+                  </MacOSButton>
+                </div>
+              ))}
+
+              {testResult && (
+                <MacOSCard style={{ 
+                  padding: '16px', 
+                  backgroundColor: 'var(--mac-success-bg)', 
+                  border: '1px solid var(--mac-success-border)' 
+                }}>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-success)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Результат тестирования:
+                  </h4>
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-success)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    <div><strong>Токен:</strong> <code style={{ 
+                      backgroundColor: 'var(--mac-success-bg)', 
+                      padding: '2px 4px', 
+                      borderRadius: 'var(--mac-radius-sm)',
+                      fontSize: 'var(--mac-font-size-xs)'
+                    }}>{testResult.token?.slice(0, 8)}...</code></div>
+                    <div><strong>Специальность:</strong> {testResult.doctor_specialty}</div>
+                    <div><strong>Кабинет:</strong> {testResult.doctor_cabinet}</div>
+                    <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
+                    <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
+                    <div><strong>QR URL:</strong> <code style={{ 
+                      backgroundColor: 'var(--mac-success-bg)', 
+                      padding: '2px 4px', 
+                      borderRadius: 'var(--mac-radius-sm)',
+                      fontSize: 'var(--mac-font-size-xs)'
+                    }}>{testResult.qr_url}</code></div>
+                  </div>
+                </MacOSCard>
+              )}
+            </div>
+          </MacOSCard>
         </div>
-      </Card>
+
+        {/* Настройки по специальностям */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+          gap: '24px',
+          marginBottom: '24px'
+        }}>
+          {specialties.map(specialty => (
+            <MacOSCard key={specialty.key} style={{ padding: '20px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <specialty.icon style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
+                {specialty.name}
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <Hash style={{ width: '16px', height: '16px' }} />
+                    Стартовый номер
+                  </label>
+                  <MacOSInput
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.start_numbers[specialty.key]}
+                    onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-text-tertiary)', 
+                    marginTop: '4px',
+                    margin: '4px 0 0 0'
+                  }}>
+                    С какого номера начинается онлайн-очередь
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <Users style={{ width: '16px', height: '16px' }} />
+                    Лимит в день
+                  </label>
+                  <MacOSInput
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.max_per_day[specialty.key]}
+                    onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-text-tertiary)', 
+                    marginTop: '4px',
+                    margin: '4px 0 0 0'
+                  }}>
+                    Максимум онлайн-записей в день
+                  </p>
+                </div>
+
+                {/* Текущие настройки */}
+                <div style={{ 
+                  paddingTop: '16px', 
+                  borderTop: '1px solid var(--mac-border)' 
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>
+                    <span style={{ color: 'var(--mac-text-secondary)' }}>Диапазон номеров:</span>
+                    <div style={{ 
+                      backgroundColor: 'var(--mac-bg-secondary)', 
+                      color: 'var(--mac-text-primary)',
+                      padding: '4px 8px',
+                      borderRadius: 'var(--mac-radius-full)',
+                      fontSize: 'var(--mac-font-size-xs)',
+                      fontWeight: 'var(--mac-font-weight-medium)',
+                      border: '1px solid var(--mac-border)'
+                    }}>
+                      {settings.start_numbers[specialty.key]} - {settings.start_numbers[specialty.key] + settings.max_per_day[specialty.key] - 1}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </MacOSCard>
+          ))}
+        </div>
+
+        {/* Информационная панель */}
+        <MacOSCard style={{ 
+          padding: '24px', 
+          backgroundColor: 'var(--mac-info-bg)', 
+          border: '1px solid var(--mac-info-border)' 
+        }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-info)', 
+            marginBottom: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <QrCode style={{ width: '20px', height: '20px' }} />
+            Как работает онлайн-очередь
+          </h3>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-info)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <p style={{ margin: 0 }}>• Пациенты сканируют QR-код с {settings.queue_start_hour}:00 до открытия приема</p>
+            <p style={{ margin: 0 }}>• Каждый телефон/Telegram может получить только один номер в день</p>
+            <p style={{ margin: 0 }}>• При повторном запросе возвращается тот же номер</p>
+            <p style={{ margin: 0 }}>• Кнопка "Открыть прием" в регистратуре закрывает онлайн-набор</p>
+            <p style={{ margin: 0 }}>• Стартовые номера позволяют избежать конфликтов между специалистами</p>
+          </div>
+        </MacOSCard>
+      </MacOSCard>
     </div>
   );
 };

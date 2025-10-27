@@ -10,27 +10,21 @@ import {
   CardContent,
   Typography,
   Button,
-  Grid,
-  Paper,
-  Divider,
   Alert,
-  Chip,
+  Badge,
   List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-} from '@mui/material';
+} from '../ui/macos';
 import {
-  PictureAsPdf,
-  Print,
-  Email,
+  FileText,
+  Printer,
+  Mail,
   CheckCircle,
-  Warning,
+  AlertTriangle,
   TrendingUp,
   TrendingDown,
-  Science,
-  LocalHospital,
-} from '@mui/icons-material';
+  TestTube,
+  Hospital,
+} from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { api } from '../../api/client';
@@ -221,75 +215,67 @@ const LabReportGenerator = ({
     <Box className="lab-report-generator">
       <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <Typography variant="h6">
-              <Science sx={{ mr: 1, verticalAlign: 'middle' }} />
+              <TestTube style={{ marginRight: 8, verticalAlign: 'middle' }} />
               Отчет по анализам
             </Typography>
             
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box style={{ display: 'flex', gap: 8 }}>
               <Button
-                variant="contained"
-                startIcon={<PictureAsPdf />}
+                variant="primary"
                 onClick={generatePDF}
                 disabled={generating || results.length === 0}
               >
+                <FileText style={{ width: 16, height: 16, marginRight: 8 }} />
                 Скачать PDF
               </Button>
               <Button
-                variant="outlined"
-                startIcon={<Print />}
+                variant="outline"
                 onClick={printReport}
                 disabled={results.length === 0}
               >
+                <Print style={{ width: 16, height: 16, marginRight: 8 }} />
                 Печать
               </Button>
               <Button
-                variant="outlined"
-                startIcon={<Email />}
+                variant="outline"
                 onClick={sendByEmail}
                 disabled={!patient.email || results.length === 0}
               >
+                <Mail style={{ width: 16, height: 16, marginRight: 8 }} />
                 Email
               </Button>
             </Box>
           </Box>
 
           {/* Статистика */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={3}>
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h4">{stats.total}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Всего анализов
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={3}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light' }}>
-                <Typography variant="h4">{stats.normal}</Typography>
-                <Typography variant="caption">
-                  В норме
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={3}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'error.light' }}>
-                <Typography variant="h4">{stats.abnormal}</Typography>
-                <Typography variant="caption">
-                  Отклонения
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={3}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light' }}>
-                <Typography variant="h4">{stats.pending}</Typography>
-                <Typography variant="caption">
-                  Ожидается
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+              <Typography variant="h4">{stats.total}</Typography>
+              <Typography variant="caption" color="textSecondary">
+                Всего анализов
+              </Typography>
+            </div>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8, backgroundColor: 'rgba(52,199,89,0.1)' }}>
+              <Typography variant="h4">{stats.normal}</Typography>
+              <Typography variant="caption">
+                В норме
+              </Typography>
+            </div>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8, backgroundColor: 'rgba(255,59,48,0.1)' }}>
+              <Typography variant="h4">{stats.abnormal}</Typography>
+              <Typography variant="caption">
+                Отклонения
+              </Typography>
+            </div>
+            <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8, backgroundColor: 'rgba(255,149,0,0.1)' }}>
+              <Typography variant="h4">{stats.pending}</Typography>
+              <Typography variant="caption">
+                Ожидается
+              </Typography>
+            </div>
+          </div>
 
           {/* Предпросмотр отчета для печати */}
           <Paper sx={{ p: 3, display: 'none', '@media print': { display: 'block' } }}>
@@ -378,32 +364,14 @@ const LabReportGenerator = ({
                   {getCategoryName(category)}
                 </Typography>
                 
-                <List dense>
-                  {categoryResults.map((result, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        {result.status === 'abnormal' ? (
-                          <Warning color="error" />
-                        ) : (
-                          <CheckCircle color="success" />
-                        )}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={result.test_name}
-                        secondary={
-                          <Box sx={{ display: 'flex', gap: 2 }}>
-                            <Typography variant="caption">
-                              Результат: {result.value} {result.unit}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Норма: {result.reference_min}-{result.reference_max}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+                <List 
+                  items={categoryResults.map(result => ({
+                    label: result.test_name,
+                    icon: result.status === 'abnormal' ? Warning : CheckCircle,
+                    badge: `${result.value} ${result.unit}`
+                  }))}
+                  size="sm"
+                />
               </Box>
             ))}
             

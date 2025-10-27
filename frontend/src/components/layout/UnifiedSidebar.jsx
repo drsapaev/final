@@ -89,6 +89,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   // Дополнительные элементы
   const additionalItems = [
     {
+      id: 'emr-system',
+      label: 'EMR System',
+      iconName: 'FileText',
+      path: '/advanced-emr',
+      roles: ['admin', 'doctor', 'nurse']
+    },
+    {
       id: 'settings',
       label: 'Settings',
       iconName: 'Settings',

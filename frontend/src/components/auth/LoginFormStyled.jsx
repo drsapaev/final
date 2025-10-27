@@ -7,6 +7,22 @@ import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
 import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
+import { Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert } from '../ui/macos';
+
+// macOS-стиль анимации для декоративных элементов
+const floatingAnimation = `
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(180deg); }
+  }
+`;
+
+// Добавляем стили в head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = floatingAnimation;
+  document.head.appendChild(style);
+}
 
 const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const { theme } = useTheme();
@@ -28,6 +44,15 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const [requires2FA, setRequires2FA] = useState(false);
   const [pending2FAToken, setPending2FAToken] = useState('');
   const [twoFactorMethod, setTwoFactorMethod] = useState('totp');
+
+  // Функция для проверки защищенных панелей
+  const isProtectedPanelPath = (pathname) => {
+    const prefixes = [
+      '/admin','/registrar-panel','/doctor-panel','/lab-panel','/cashier-panel',
+      '/cardiologist','/dermatologist','/dentist'
+    ];
+    return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -82,12 +107,32 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           // Используем данные пользователя из ответа авторизации
           setProfile(data.user);
           
-          // Перенаправление
+          // Расширенная логика перенаправления
           await new Promise(resolve => setTimeout(resolve, 100));
           const state = auth.getState ? auth.getState() : { profile: null };
           const profile = state?.profile || null;
           const computedRoute = getRouteForProfile(profile);
-          const target = computedRoute || from || '/';
+          const fromClean = from || '/';
+
+          // Если from ведёт на другой защищённый раздел панели — игнорируем его
+          let target = computedRoute;
+          if (fromClean && fromClean !== '/' && fromClean !== '/login') {
+            if (isProtectedPanelPath(fromClean)) {
+              if (fromClean === computedRoute) target = fromClean;
+            } else {
+              // Нефреймовый/просмотровый маршрут (детали визита и т.п.) — разрешаем возврат
+              target = fromClean;
+            }
+          }
+
+          // Детальная аналитика входа
+          console.log('🔐 Login redirect:', { 
+            from: fromClean, 
+            computedRoute, 
+            target, 
+            profile: profile?.role || 'unknown',
+            timestamp: new Date().toISOString()
+          });
           
           navigate(target, { replace: true });
         } catch (profileError) {
@@ -98,6 +143,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         throw new Error('Не получен токен доступа');
       }
     } catch (err) {
+      // Улучшенная обработка ошибок с нормализацией
       let errorMessage = 'Ошибка входа';
       
       if (err?.response?.data?.detail) {
@@ -108,9 +154,21 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         } else if (typeof detail === 'string') {
           errorMessage = detail;
         }
+      } else if (err?.normalizedMessage) {
+        // Используем нормализованное сообщение об ошибке
+        errorMessage = err.normalizedMessage;
       } else if (err?.message) {
         errorMessage = err.message;
       }
+      
+      // Логирование ошибки для аналитики
+      console.error('🚨 Login error:', {
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+        username: formData.username,
+        loginType: formData.loginType
+      });
+      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -283,321 +341,132 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
+      // macOS-стиль фона: темно-серый как в macOS Dark Mode
+      background: '#1d1d1f',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '20px',
+      position: 'relative'
     }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-        padding: '40px',
-        width: '100%',
-        maxWidth: '400px',
-        position: 'relative'
+      
+      <Card style={{ 
+        width: '100%', 
+        maxWidth: '420px',
+        // macOS-стиль карточки: полупрозрачная с размытием
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: `
+          0 8px 32px rgba(0, 0, 0, 0.1),
+          0 0 0 1px rgba(255, 255, 255, 0.05),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1)
+        `,
+        borderRadius: '20px',
+        position: 'relative',
+        zIndex: 1
       }}>
-        {/* Заголовок */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '30px'
-        }}>
-          <div style={{
-            width: '60px',
-            height: '60px',
-            background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 20px',
-            fontSize: '24px',
-            color: 'white',
-            position: 'relative'
+        <CardHeader>
+          <CardTitle style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            gap: 8,
+            textAlign: 'center'
           }}>
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.2)',
-              borderRadius: '50%'
-            }} />
-            <span style={{ position: 'relative', zIndex: 1 }}>🏥</span>
-          </div>
-          <h1 style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: colors.semantic.text.primary,
-            margin: '0 0 8px 0'
-          }}>
-            Вход в систему
-          </h1>
-          <p style={{
-            color: colors.semantic.text.secondary,
-            margin: '0',
-            fontSize: '14px'
-          }}>
-            Система управления клиникой
-          </p>
-        </div>
-
-        {/* Форма */}
-        <form onSubmit={handleSubmit}>
-          {/* Тип входа */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: colors.semantic.text.primary
+            <span style={{ 
+              fontSize: '24px', 
+              fontWeight: '600',
+              color: '#1d1d1f',
+              letterSpacing: '-0.5px'
             }}>
-              Тип входа
-            </label>
-            <select
-              name="loginType"
-              value={formData.loginType}
-              onChange={handleInputChange}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '2px solid #e1e5e9',
-                borderRadius: '8px',
-                fontSize: '14px',
-                background: 'white',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-            >
-              <option value="username">Имя пользователя</option>
-              <option value="email">Email</option>
-              <option value="phone">Телефон</option>
-            </select>
-          </div>
-
-          {/* Имя пользователя */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: colors.semantic.text.primary
+              🔐 Вход в систему
+            </span>
+            <span style={{ 
+              fontSize: '14px', 
+              fontWeight: '400', 
+              color: '#86868b',
+              letterSpacing: '0.1px'
             }}>
-              {formData.loginType === 'username' ? 'Имя пользователя' : 
-               formData.loginType === 'email' ? 'Email' : 'Телефон'} *
-            </label>
-            <input
-              type={formData.loginType === 'email' ? 'email' : 'text'}
-              name="username"
-              value={formData.username}
-              onChange={handleInputChange}
-              required
-              autoComplete={formData.loginType === 'email' ? 'email' : 'username'}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '2px solid #e1e5e9',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-              placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : 
-                          formData.loginType === 'email' ? 'email' : 'телефон'}`}
-            />
-          </div>
+              Система управления клиникой
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>Тип входа</label>
+              <Select
+                value={formData.loginType}
+                onChange={(val) => setFormData(prev => ({ ...prev, loginType: val }))}
+                options={[
+                  { value: 'username', label: 'Имя пользователя' },
+                  { value: 'email', label: 'Email' },
+                  { value: 'phone', label: 'Телефон' }
+                ]}
+              />
+            </div>
 
-          {/* Пароль */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: colors.semantic.text.primary
-            }}>
-              Пароль *
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>
+                {formData.loginType === 'username' ? 'Имя пользователя' : formData.loginType === 'email' ? 'Email' : 'Телефон'} *
+              </label>
+              <Input
+                type={formData.loginType === 'email' ? 'email' : 'text'}
+                name="username"
+                value={formData.username}
                 onChange={handleInputChange}
                 required
-                autoComplete="current-password"
-                style={{
-                  width: '100%',
-                  padding: '12px 40px 12px 12px',
-                  border: '2px solid #e1e5e9',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                placeholder="Введите пароль"
+                autoComplete={formData.loginType === 'email' ? 'email' : 'username'}
+                placeholder={`Введите ${formData.loginType === 'username' ? 'имя пользователя' : formData.loginType === 'email' ? 'email' : 'телефон'}`}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: colors.semantic.text.secondary,
-                  fontSize: '18px'
-                }}
-              >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
-              </button>
             </div>
-          </div>
 
-          {/* Запомнить меня и забыли пароль */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '30px'
-          }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: colors.semantic.text.primary
-            }}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                style={{ marginRight: '8px' }}
-              />
-              Запомнить меня
-            </label>
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: colors.primary[500],
-                cursor: 'pointer',
-                fontSize: '14px',
-                textDecoration: 'underline'
-              }}
-            >
-              Забыли пароль?
-            </button>
-          </div>
-
-          {/* Ошибка */}
-          {error && (
-            <div style={{
-              background: '#fee',
-              color: '#c33',
-              padding: '12px',
-              borderRadius: '8px',
-              marginBottom: '20px',
-              fontSize: '14px',
-              textAlign: 'center'
-            }}>
-              {error}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px' }}>Пароль *</label>
+              <div style={{ position: 'relative' }}>
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                  autoComplete="current-password"
+                  placeholder="Введите пароль"
+                />
+                <Button type="button" variant="ghost" size="small" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 4, top: 4 }}>
+                  {showPassword ? 'Скрыть' : 'Показать'}
+                </Button>
+              </div>
             </div>
-          )}
 
-          {/* Кнопка входа */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: `linear-gradient(135deg, ${colors.primary[500]} 0%, ${colors.primary[700]} 100%)`,
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              transition: 'opacity 0.2s',
-              textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)'
-            }}
-          >
-            {loading ? 'Вход...' : 'ВОЙТИ →'}
-          </button>
-        </form>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} /> Запомнить меня
+              </label>
+              <Button type="button" variant="ghost" onClick={onForgotPassword}>
+                Забыли пароль?
+              </Button>
+            </div>
 
-        {/* Разделитель */}
-        <div style={{
-          margin: '30px 0',
-          textAlign: 'center',
-          position: 'relative'
-        }}>
-          <div style={{
-            height: '1px',
-            background: '#e1e5e9',
-            position: 'relative'
-          }}>
-            <span style={{
-              background: 'white',
-              padding: '0 20px',
-              color: colors.semantic.text.secondary,
-              fontSize: '14px',
-              position: 'absolute',
-              top: '-10px',
-              left: '50%',
-              transform: 'translateX(-50%)'
-            }}>
-              или
-            </span>
+            {error && (
+              <Alert variant="danger" style={{ marginBottom: 12 }}>{error}</Alert>
+            )}
+
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? 'Вход...' : 'ВОЙТИ →'}
+            </Button>
+          </form>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <Button type="button" variant="outline" fullWidth onClick={onRegister}>Регистрация</Button>
+            <Button type="button" variant="outline" fullWidth>Гость</Button>
           </div>
-        </div>
-
-        {/* Кнопки регистрации */}
-        <div style={{
-          display: 'flex',
-          gap: '10px'
-        }}>
-          <button
-            type="button"
-            onClick={onRegister}
-            style={{
-              flex: 1,
-              padding: '12px',
-              background: 'white',
-              border: '2px solid #e1e5e9',
-              borderRadius: '8px',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'border-color 0.2s'
-            }}
-          >
-            Регистрация
-          </button>
-          <button
-            type="button"
-            style={{
-              flex: 1,
-              padding: '12px',
-              background: 'white',
-              border: '2px solid #e1e5e9',
-              borderRadius: '8px',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'border-color 0.2s'
-            }}
-          >
-            Гость
-          </button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

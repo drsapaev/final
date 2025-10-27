@@ -485,9 +485,9 @@ async def send_bulk_notification(
         recipients=recipients,
         template_data=request.template_data,
     )
-
     return {
         "message": "Массовая отправка запущена",
         "recipients_count": len(recipients),
         "channels": request.channels,
     }
+

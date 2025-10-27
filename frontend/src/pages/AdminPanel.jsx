@@ -1,62 +1,87 @@
-// AdminPanel.jsx - Force cache refresh - Updated: 2025-01-26
+// AdminPanel.jsx - macOS UI/UX Compliant - Updated: 2025-01-26
 import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Users, 
-  Building2, 
-  Calendar, 
+  Badge, 
+  Progress,
+  Icon,
+  Sidebar,
+  MacOSTab,
+  MacOSStatCard,
+  MacOSMetricCard,
+  MacOSTable,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea,
+  MacOSCheckbox,
+  MacOSRadio,
+  MacOSBreadcrumb,
+  MacOSPagination,
+  MacOSList,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton,
+  MacOSAlert,
+  MacOSModal,
+  MacOSButton,
+  MacOSBadge,
+  Card as MacOSCard
+} from '../components/ui/macos';
+import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
+import { useTheme } from '../contexts/ThemeContext';
+import { 
   BarChart3, 
+  TrendingUp, 
+  Clock, 
+  Brain, 
+  Globe, 
+  FileText, 
+  Server, 
+  Printer, 
+  Stethoscope, 
+  Package, 
+  Receipt, 
+  Percent, 
+  Database, 
+  Users, 
+  UserPlus, 
+  Calendar, 
+  AlertTriangle, 
   Settings, 
+  Monitor, 
+  CreditCard, 
+  Building2, 
   Shield, 
-  FileText,
+  Heart, 
+  Pill, 
   Mic, 
-  CreditCard,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  UserPlus,
+  ClipboardCheck, 
+  Bot, 
+  Bell, 
+  Phone, 
+  Download, 
+  MessageSquare, 
+  Key, 
+  CheckCircle, 
   Activity,
-  Search,
-  Filter,
-  Download,
-  Upload,
   Eye,
+  Plus,
+  Search,
+  RefreshCw,
   Edit,
   Trash2,
-  Plus,
-  RefreshCw,
-  Package,
-  Percent,
-  Brain,
-  MessageSquare,
-  Heart,
-  Pill,
-  ClipboardCheck,
-  Bot,
-  Bell,
-  Phone,
-  Monitor,
-  Key,
+  Filter,
   DollarSign,
-  Receipt,
+  AlertCircle,
   X,
+  Upload,
   TrendingDown,
   XCircle,
-  Globe,
-  AlertCircle,
-  Printer,
-  Server,
-  Database,
-  Stethoscope
+  Palette
 } from 'lucide-react';
-import { Card, Badge, Button, Skeleton, useFade, useSlide, useScale } from '../components/ui/native';
-import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
-import { useTheme } from '../contexts/ThemeContext';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal';
+import { useModal } from '../hooks/useModal.jsx';
 import useAsyncAction from '../hooks/useAsyncAction';
 
 // ✅ УЛУЧШЕНИЕ: Унифицированные компоненты (будут использованы в следующих итерациях)
@@ -66,7 +91,6 @@ import useAsyncAction from '../hooks/useAsyncAction';
 import KPICard from '../components/admin/KPICard';
 import AdminNavigation from '../components/admin/AdminNavigation';
 import ErrorBoundary from '../components/admin/ErrorBoundary';
-import LoadingSkeleton from '../components/admin/LoadingSkeleton';
 import EmptyState from '../components/admin/EmptyState';
 import useAdminData from '../hooks/useAdminData';
 import useUsers from '../hooks/useUsers';
@@ -85,7 +109,6 @@ import FinanceModal from '../components/admin/FinanceModal';
 import ReportGenerator from '../components/admin/ReportGenerator';
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import ClinicSettings from '../components/admin/ClinicSettings';
-import ClinicManagement from '../components/admin/ClinicManagement';
 import QueueSettings from '../components/admin/QueueSettings';
 import ServiceCatalog from '../components/admin/ServiceCatalog';
 import AISettings from '../components/admin/AISettings';
@@ -94,6 +117,7 @@ import DisplayBoardSettings from '../components/admin/DisplayBoardSettings';
 import ActivationSystem from '../components/admin/ActivationSystem';
 import SecuritySettings from '../components/admin/SecuritySettings';
 import SecurityMonitor from '../components/admin/SecurityMonitor';
+import ColorSchemeSelector from '../components/admin/ColorSchemeSelector';
 import AllFreeApproval from '../components/admin/AllFreeApproval';
 import BenefitSettings from '../components/admin/BenefitSettings';
 import WizardSettings from '../components/admin/WizardSettings';
@@ -114,6 +138,11 @@ import UserDataTransferManager from '../components/admin/UserDataTransferManager
 import GroupPermissionsManager from '../components/admin/GroupPermissionsManager';
 import UserExportManager from '../components/admin/UserExportManager';
 import RegistrarNotificationManager from '../components/admin/RegistrarNotificationManager';
+import ClinicManagement from '../components/admin/ClinicManagement';
+import BranchManagement from '../components/admin/BranchManagement';
+import EquipmentManagement from '../components/admin/EquipmentManagement';
+import LicenseManagement from '../components/admin/LicenseManagement';
+import BackupManagement from '../components/admin/BackupManagement';
 import WaitTimeAnalytics from '../components/analytics/WaitTimeAnalytics';
 import AIAnalytics from '../components/analytics/AIAnalytics'; 
 import GraphQLExplorer from '../components/admin/GraphQLExplorer'; 
@@ -160,7 +189,7 @@ const AdminPanel = () => {
     users: () => navigate('/admin/users'),
     doctors: () => navigate('/admin/doctors'),
     services: () => navigate('/admin/services'),
-    settings: () => navigate('/admin/clinic-settings'),
+    settings: () => navigate('/admin/settings'),
     shortcuts: () => setShowHotkeysModal(true),
     closeModal: () => setShowHotkeysModal(false),
     help: () => setShowHotkeysModal(true)
@@ -359,6 +388,54 @@ const AdminPanel = () => {
   
   // Состояние для настроек
   const [settingsSubTab, setSettingsSubTab] = useState('general');
+  
+  // Состояние для логотипа
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  
+  // Настройки по умолчанию
+  const defaultSettings = {
+    clinicName: '',
+    clinicAddress: '',
+    clinicPhone: '',
+    clinicEmail: '',
+    timezone: 'Europe/Moscow',
+    language: 'ru',
+    currency: 'RUB',
+    logoUrl: ''
+  };
+  
+  // Функции для работы с логотипом
+  const handleLogoSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Проверяем тип файла
+      if (!file.type.startsWith('image/')) {
+        alert('Выберите файл изображения');
+        return;
+      }
+
+      // Проверяем размер (макс 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Размер файла не должен превышать 5MB');
+        return;
+      }
+
+      setLogoFile(file);
+      
+      // Создаем превью
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+  };
   
   // Хук для управления безопасностью
   const {
@@ -644,17 +721,17 @@ const AdminPanel = () => {
 
   const getStatusIcon = (status) => {
     const colorMap = {
-      success: 'var(--success-color)',
-      warning: 'var(--warning-color)',
-      error: 'var(--danger-color)',
-      info: 'var(--info-color)',
-      default: 'var(--text-tertiary)'
+      success: 'var(--mac-success)',
+      warning: 'var(--mac-warning)',
+      error: 'var(--mac-error)',
+      info: 'var(--mac-info)',
+      default: 'var(--mac-text-tertiary)'
     };
-    if (status === 'success') return <CheckCircle className="w-4 h-4" style={{ color: colorMap.success }} />;
-    if (status === 'warning') return <AlertTriangle className="w-4 h-4" style={{ color: colorMap.warning }} />;
-    if (status === 'error') return <AlertTriangle className="w-4 h-4" style={{ color: colorMap.error }} />;
-    if (status === 'info') return <Clock className="w-4 h-4" style={{ color: colorMap.info }} />;
-    return <Clock className="w-4 h-4" style={{ color: colorMap.default }} />;
+    if (status === 'success') return <CheckCircle style={{ width: '16px', height: '16px', color: colorMap.success }} />;
+    if (status === 'warning') return <AlertTriangle style={{ width: '16px', height: '16px', color: colorMap.warning }} />;
+    if (status === 'error') return <AlertTriangle style={{ width: '16px', height: '16px', color: colorMap.error }} />;
+    if (status === 'info') return <Clock style={{ width: '16px', height: '16px', color: colorMap.info }} />;
+    return <Clock style={{ width: '16px', height: '16px', color: colorMap.default }} />;
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для пользователей с универсальным хуком
@@ -715,7 +792,7 @@ const AdminPanel = () => {
 
 
   const getStatusColor = (isActive) => {
-    return isActive ? 'var(--success-color)' : 'var(--warning-color)';
+    return isActive ? 'var(--mac-success)' : 'var(--mac-warning)';
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для врачей с универсальным хуком
@@ -783,11 +860,11 @@ const AdminPanel = () => {
 
   const getDoctorStatusColor = (status) => {
     const colorMap = {
-      active: 'var(--success-color)',
-      inactive: 'var(--warning-color)',
-      on_leave: 'var(--info-color)'
+      active: 'var(--mac-success)',
+      inactive: 'var(--mac-warning)',
+      on_leave: 'var(--mac-info)'
     };
-    return colorMap[status] || 'var(--text-tertiary)';
+    return colorMap[status] || 'var(--mac-text-tertiary)';
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для пациентов с универсальным хуком
@@ -907,15 +984,15 @@ const AdminPanel = () => {
 
   const getAppointmentStatusColor = (status) => {
     const colorMap = {
-      pending: 'var(--warning-color)',
-      confirmed: 'var(--info-color)',
-      paid: 'var(--success-color)',
-      in_visit: 'var(--accent-color)',
-      completed: 'var(--success-color)',
-      cancelled: 'var(--danger-color)',
-      no_show: 'var(--text-tertiary)'
+      pending: 'var(--mac-warning)',
+      confirmed: 'var(--mac-info)',
+      paid: 'var(--mac-success)',
+      in_visit: 'var(--mac-accent-blue)',
+      completed: 'var(--mac-success)',
+      cancelled: 'var(--mac-danger)',
+      no_show: 'var(--mac-text-tertiary)'
     };
-    return colorMap[status] || 'var(--text-tertiary)';
+    return colorMap[status] || 'var(--mac-text-tertiary)';
   };
 
   const getAppointmentStatusVariant = (status) => {
@@ -1087,46 +1164,42 @@ const AdminPanel = () => {
     }))
   );
 
-  // Вычисляем текущую вкладку из URL
-  const path = location.pathname || '/admin';
-  let current = 'dashboard';
-  
-  if (path === '/admin' || path === '/admin/') {
-    current = 'dashboard';
-  } else if (path.startsWith('/admin/')) {
-    const segments = path.split('/').filter(Boolean);
-    const adminIndex = segments.indexOf('admin');
-    if (adminIndex !== -1 && segments[adminIndex + 1]) {
-      current = segments[adminIndex + 1];
-    } else {
-      current = 'dashboard';
-    }
-  }
+  // Вычисляем текущую вкладку из URL параметров
+  const searchParams = new URLSearchParams(location.search);
+  const current = searchParams.get('section') || 'dashboard';
 
   const renderDashboard = () => (
     <ErrorBoundary>
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Красивые KPI карточки */}
         {statsLoading ? (
-          <div className="admin-kpi-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            <LoadingSkeleton type="card" count={6} />
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '24px' 
+          }}>
+            <MacOSLoadingSkeleton type="card" count={6} />
           </div>
         ) : statsError ? (
-          <EmptyState
-            type="default"
+          <MacOSEmptyState
+            icon={AlertCircle}
             title="Ошибка загрузки статистики"
             description="Не удалось загрузить данные. Проверьте подключение к серверу."
             action={
-              <Button onClick={refreshStats} variant="primary">
+              <MacOSButton onClick={refreshStats} variant="primary">
                 <RefreshCw size={16} />
                 Повторить попытку
-              </Button>
+              </MacOSButton>
             }
           />
         ) : (
-          <div className="admin-kpi-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            <KPICard
-              title="Всего пользователей"
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '24px' 
+          }}>
+            <MacOSStatCard
+              title="Total Users"
               value={stats.totalUsers}
               icon={Users}
               color="blue"
@@ -1135,18 +1208,18 @@ const AdminPanel = () => {
               loading={isLoading}
             />
         
-            <KPICard
-              title="Врачи"
+            <MacOSStatCard
+              title="Doctors"
               value={stats.totalDoctors}
-              icon={UserPlus}
+              icon={Stethoscope}
               color="green"
               trend="+2"
               trendType="positive"
               loading={isLoading}
             />
         
-            <KPICard
-              title="Пациенты"
+            <MacOSStatCard
+              title="Patients"
               value={stats.totalPatients}
               icon={Users}
               color="purple"
@@ -1155,8 +1228,8 @@ const AdminPanel = () => {
               loading={isLoading}
             />
             
-            <KPICard
-              title="Доход"
+            <MacOSStatCard
+              title="Revenue"
               value={formatCurrency(stats.totalRevenue)}
               icon={TrendingUp}
               color="green"
@@ -1165,8 +1238,8 @@ const AdminPanel = () => {
               loading={isLoading}
             />
             
-            <KPICard
-              title="Записи сегодня"
+            <MacOSStatCard
+              title="Today's Appointments"
               value={stats.appointmentsToday}
               icon={Calendar}
               color="orange"
@@ -1175,8 +1248,8 @@ const AdminPanel = () => {
               loading={isLoading}
             />
             
-            <KPICard
-              title="Ожидают одобрения"
+            <MacOSStatCard
+              title="Pending Approvals"
               value={stats.pendingApprovals}
               icon={Clock}
               color="red"
@@ -1188,133 +1261,237 @@ const AdminPanel = () => {
         )}
 
         {/* Графики и аналитика */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Активность системы</h3>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: '24px' 
+        }}>
+           <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>Активность системы</h3>
+              <MacOSButton variant="outline" size="sm">
+                <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Экспорт
-              </Button>
+              </MacOSButton>
             </div>
-            <div className="h-64 rounded-lg flex items-center justify-center" style={{ background: 'var(--bg-secondary)' }}>
-              <div className="text-center">
-                <Activity className="w-12 h-12 mx-auto mb-2" style={{ color: 'var(--text-tertiary)' }} />
-                <p style={{ color: 'var(--text-secondary)' }}>График активности</p>
+            <div style={{ 
+              height: '256px', 
+              borderRadius: 'var(--mac-radius-md)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              background: 'var(--mac-bg-secondary)' 
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <Activity style={{ 
+                  width: '48px', 
+                  height: '48px', 
+                  margin: '0 auto 16px auto', 
+                  color: 'var(--mac-text-tertiary)' 
+                }} />
+                <p style={{ color: 'var(--mac-text-secondary)' }}>График активности</p>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
 
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Последние действия</h3>
-              <Button variant="outline" size="sm">
-                <Eye className="w-4 h-4 mr-2" />
+          <MacOSCard 
+            style={{ padding: 0 }}
+          >
+            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>Последние действия</h3>
+              <MacOSButton variant="outline" size="sm">
+                <Eye style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Все
-              </Button>
+              </MacOSButton>
             </div>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-center space-x-3 p-3 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
+                <div key={activity.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  padding: '12px', 
+                  borderRadius: 'var(--mac-radius-md)',
+                  background: 'var(--mac-bg-secondary)' 
+                }}>
                   {getStatusIcon(activity.status)}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{activity.message}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{activity.user} • {activity.time}</p>
+                  <div style={{ flex: '1' }}>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)',
+                      margin: 0
+                    }}>{activity.message}</p>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-text-secondary)',
+                      margin: '4px 0 0 0'
+                    }}>{activity.user} • {activity.time}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
 
         {/* Системные уведомления */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Системные уведомления</h3>
-            <Badge variant="warning">{systemAlerts.length}</Badge>
+        <MacOSCard 
+          style={{ padding: 0, marginTop: '24px' }}
+        >
+          <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>Системные уведомления</h3>
+            <MacOSBadge variant="warning">{systemAlerts.length}</MacOSBadge>
           </div>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {systemAlerts.map((alert) => (
-                <div key={alert.id} className="flex items-center space-x-3 p-3 border rounded-lg" style={{ borderColor: 'var(--border-color)' }}>
-                  <AlertTriangle className="w-5 h-5" style={{ color: 'var(--warning-color)' }} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{alert.message}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{alert.time}</p>
+                <div key={alert.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  padding: '12px', 
+                  border: '1px solid var(--mac-border)', 
+                  borderRadius: 'var(--mac-radius-md)' 
+                }}>
+                  <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
+                  <div style={{ flex: '1' }}>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)',
+                      margin: 0
+                    }}>{alert.message}</p>
+                    <p style={{ 
+                      fontSize: '12px', 
+                      color: 'var(--mac-text-secondary)',
+                      margin: '4px 0 0 0'
+                    }}>{alert.time}</p>
                   </div>
-                  <Badge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
+                  <MacOSBadge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
                     {alert.priority}
-                  </Badge>
+                  </MacOSBadge>
                 </div>
               ))}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
     </ErrorBoundary>
   );
 
   const renderUsers = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление пользователями</h2>
-          <Button onClick={handleCreateUser}>
-            <Plus className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard 
+        variant="default"
+        style={{ padding: '24px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>Управление пользователями</h2>
+          <MacOSButton onClick={handleCreateUser}>
+            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Добавить пользователя
-          </Button>
+          </MacOSButton>
         </div>
         
         {/* Поиск и фильтры */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-            <input
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <div style={{ flex: '1' }}>
+            <MacOSInput
               type="text"
               placeholder="Поиск пользователей..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              icon={Search}
+              iconPosition="left"
+              style={{
+                width: '100%',
+                paddingLeft: '40px',
+                paddingRight: '16px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                borderRadius: 'var(--mac-radius-sm)',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                outline: 'none',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
             />
           </div>
-          <select
+          <MacOSSelect
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все роли</option>
-            <option value="Admin">Администратор</option>
-            <option value="Doctor">Врач</option>
-            <option value="Nurse">Медсестра</option>
-            <option value="Receptionist">Регистратор</option>
-            <option value="Patient">Пациент</option>
-          </select>
-          <select
+            options={[
+              { value: '', label: 'Все роли' },
+              { value: 'Admin', label: 'Администратор' },
+              { value: 'Doctor', label: 'Врач' },
+              { value: 'Nurse', label: 'Медсестра' },
+              { value: 'Receptionist', label: 'Регистратор' },
+              { value: 'Patient', label: 'Пациент' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
+          <MacOSSelect
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все статусы</option>
-            <option value="true">Активен</option>
-            <option value="false">Неактивен</option>
-          </select>
+            options={[
+              { value: '', label: 'Все статусы' },
+              { value: 'true', label: 'Активен' },
+              { value: 'false', label: 'Неактивен' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
         </div>
 
         {/* Таблица пользователей */}
-        <div className="overflow-x-auto">
+        <div style={{ overflowX: 'auto' }}>
           {usersLoading ? (
-            <LoadingSkeleton type="table" count={5} />
+            <MacOSLoadingSkeleton type="table" count={5} />
           ) : usersError ? (
             <EmptyState
               type="error"
               title="Ошибка загрузки пользователей"
               description="Не удалось загрузить список пользователей"
               action={
-                <Button onClick={() => window.location.reload()}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                <MacOSButton onClick={() => window.location.reload()}>
+                  <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Обновить
-                </Button>
+                </MacOSButton>
               }
             />
           ) : users.length === 0 ? (
@@ -1326,75 +1503,186 @@ const AdminPanel = () => {
                 : 'В системе пока нет пользователей'
               }
               action={
-                <Button onClick={handleCreateUser}>
-                  <Plus className="w-4 h-4 mr-2" />
+                <MacOSButton onClick={handleCreateUser}>
+                  <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Добавить первого пользователя
-                </Button>
+                </MacOSButton>
               }
             />
           ) : (
-            <table className="w-full" role="table" aria-label="Таблица пользователей">
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              border: '1px solid var(--mac-border)'
+            }} role="table" aria-label="Таблица пользователей">
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пользователь</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Роль</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Последний вход</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                <tr style={{ 
+                  backgroundColor: 'var(--mac-bg-tertiary)', 
+                  borderBottom: '1px solid var(--mac-border)' 
+                }}>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    borderRight: '1px solid var(--mac-border)',
+                    borderBottom: '1px solid var(--mac-border)'
+                  }}>Пользователь</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    borderRight: '1px solid var(--mac-border)',
+                    borderBottom: '1px solid var(--mac-border)'
+                  }}>Роль</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    borderRight: '1px solid var(--mac-border)',
+                    borderBottom: '1px solid var(--mac-border)'
+                  }}>Статус</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    borderRight: '1px solid var(--mac-border)',
+                    borderBottom: '1px solid var(--mac-border)'
+                  }}>Последний вход</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    borderBottom: '1px solid var(--mac-border)'
+                  }}>Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
-                          <span className="text-white text-sm font-medium">
+                  <tr key={user.id} style={{ 
+                    borderBottom: '1px solid var(--mac-border)', 
+                    transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{ 
+                      padding: '12px 16px',
+                      borderRight: '1px solid var(--mac-border)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--mac-accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: 'var(--mac-font-size-sm)',
+                          fontWeight: '500'
+                        }}>
+                          <span>
                             {(user.profile?.full_name || user.full_name || user.username || 'U').split(' ').map(n => n[0]).join('').toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                          <p style={{ 
+                            fontWeight: 'var(--mac-font-weight-medium)', 
+                            color: 'var(--mac-text-primary)',
+                            fontSize: 'var(--mac-font-size-sm)',
+                            margin: 0
+                          }}>
                             {user.profile?.full_name || user.full_name || user.username}
                           </p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{user.email}</p>
+                          <p style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>{user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <Badge 
+                    <td style={{ 
+                      padding: '12px 16px',
+                      borderRight: '1px solid var(--mac-border)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
+                      <MacOSBadge 
                         variant={user.role === 'Admin' ? 'error' : user.role === 'Doctor' ? 'success' : 'info'}
                       >
                         {getRoleLabel(user.role)}
-                      </Badge>
+                      </MacOSBadge>
                     </td>
-                    <td className="py-3 px-4">
-                      <Badge 
+                    <td style={{ 
+                      padding: '12px 16px',
+                      borderRight: '1px solid var(--mac-border)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
+                      <MacOSBadge 
                         variant={user.is_active ? 'success' : 'warning'}
                       >
                         {getUserStatusLabel(user.is_active)}
-                      </Badge>
+                      </MacOSBadge>
                     </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <td style={{ 
+                      padding: '12px 16px', 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)',
+                      borderRight: '1px solid var(--mac-border)',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
                       {user.profile?.last_login ? new Date(user.profile.last_login).toLocaleString('ru-RU') : 'Никогда'}
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
+                    <td style={{ 
+                      padding: '12px 16px',
+                      borderBottom: '1px solid var(--mac-border)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button 
                           onClick={() => handleEditUser(user)}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                          style={{ color: 'var(--text-secondary)' }}
+                          style={{ 
+                            padding: '4px', 
+                            borderRadius: 'var(--mac-radius-sm)', 
+                            transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                            color: 'var(--mac-text-secondary)',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           title="Редактировать"
                         >
-                          <Edit className="w-4 h-4" />
+                          <Edit style={{ width: '16px', height: '16px' }} />
                         </button>
                         <button 
                           onClick={() => handleDeleteUser(user)}
-                          className="p-1 hover:bg-red-100 rounded transition-colors" 
-                          style={{ color: 'var(--danger-color)' }}
+                          style={{ 
+                            padding: '4px', 
+                            borderRadius: 'var(--mac-radius-sm)', 
+                            transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                            color: 'var(--mac-error)',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           title="Удалить"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 style={{ width: '16px', height: '16px' }} />
                         </button>
                       </div>
                     </td>
@@ -1407,22 +1695,22 @@ const AdminPanel = () => {
 
         {/* Пагинация */}
         {pagination.total_pages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
               Показано {((pagination.page - 1) * pagination.per_page) + 1}-{Math.min(pagination.page * pagination.per_page, pagination.total)} из {pagination.total} пользователей
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MacOSButton
                 variant="outline"
                 onClick={() => changePage(pagination.page - 1)}
                 disabled={pagination.page <= 1}
-                className="px-3 py-1"
+                style={{ padding: '4px 12px' }}
               >
                 Назад
-              </Button>
+              </MacOSButton>
               
               {/* Номера страниц */}
-              <div className="flex items-center space-x-1">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
                   let pageNum;
                   if (pagination.total_pages <= 5) {
@@ -1439,14 +1727,25 @@ const AdminPanel = () => {
                     <button
                       key={pageNum}
                       onClick={() => changePage(pageNum)}
-                      className={`px-3 py-1 rounded ${
-                        pageNum === pagination.page
-                          ? 'bg-blue-500 text-white'
-                          : 'hover:bg-gray-100'
-                      }`}
                       style={{
-                        background: pageNum === pagination.page ? 'var(--accent-color)' : 'transparent',
-                        color: pageNum === pagination.page ? 'white' : 'var(--text-primary)'
+                        padding: '4px 12px',
+                        borderRadius: 'var(--mac-radius-sm)',
+                        background: pageNum === pagination.page ? 'var(--mac-accent-blue)' : 'transparent',
+                        color: pageNum === pagination.page ? 'white' : 'var(--mac-text-primary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 'var(--mac-font-size-sm)',
+                        transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (pageNum !== pagination.page) {
+                          e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (pageNum !== pagination.page) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
                       }}
                     >
                       {pageNum}
@@ -1455,18 +1754,18 @@ const AdminPanel = () => {
                 })}
               </div>
               
-              <Button
+              <MacOSButton
                 variant="outline"
                 onClick={() => changePage(pagination.page + 1)}
                 disabled={pagination.page >= pagination.total_pages}
-                className="px-3 py-1"
+                style={{ padding: '4px 12px' }}
               >
                 Далее
-              </Button>
+              </MacOSButton>
             </div>
           </div>
         )}
-      </Card>
+      </MacOSCard>
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пользователя с универсальным хуком */}
       <UserModal
@@ -1479,156 +1778,346 @@ const AdminPanel = () => {
     </div>
   );
 
-  const renderAnalytics = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Аналитика и отчеты</h2>
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
+  const renderAnalytics = () => {
+    const [analyticsFilters, setAnalyticsFilters] = useState({
+      period: 'week',
+      department: 'all',
+      doctor: 'all'
+    });
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasData, setHasData] = useState(true); // Показываем данные по умолчанию
+
+    const handleFilterChange = (filterType, value) => {
+      setAnalyticsFilters(prev => ({
+        ...prev,
+        [filterType]: value
+      }));
+    };
+
+    const applyFilters = () => {
+      setIsLoading(true);
+      // Симуляция загрузки данных
+      setTimeout(() => {
+        setIsLoading(false);
+        setHasData(true); // Всегда показываем данные для демо
+      }, 1000);
+    };
+
+    return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <MacOSCard 
+        variant="default"
+          style={{ padding: '24px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>Аналитика и отчеты</h2>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <MacOSButton 
+              variant="outline"
+              onClick={() => {
+                // Экспорт данных в CSV
+                const csvData = "Период,Записи,Доходы,Пациенты\nСегодня,1,247,₽2.4M,892\nНеделя,8,729,₽16.8M,6,244\nМесяц,37,416,₽74.8M,29,792";
+                const blob = new Blob([csvData], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'analytics-export.csv';
+                a.click();
+                window.URL.revokeObjectURL(url);
+              }}
+            >
+              <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Экспорт
-            </Button>
-            <Button>
-              <BarChart3 className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton
+              onClick={() => {
+                // Открыть генератор отчетов
+                setActiveSection('reports');
+              }}
+            >
+              <BarChart3 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Создать отчет
-            </Button>
+            </MacOSButton>
           </div>
         </div>
 
         {/* Фильтры */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" role="group" aria-label="Фильтры аналитики">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px', 
+          marginBottom: '24px' 
+        }} role="group" aria-label="Фильтры аналитики">
           <div>
-            <label htmlFor="period" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Период</label>
-            <select id="period" aria-label="Период" className="w-full px-3 py-2 rounded-lg focus:ring-2" style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-              <option>Сегодня</option>
-              <option>Неделя</option>
-              <option>Месяц</option>
-              <option>Квартал</option>
-              <option>Год</option>
-            </select>
+            <label htmlFor="period" style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '4px', 
+              color: 'var(--mac-text-primary)' 
+            }}>Период</label>
+            <MacOSSelect
+              id="period"
+              aria-label="Период"
+              value={analyticsFilters.period}
+              onChange={(value) => handleFilterChange('period', value)}
+              options={[
+                { value: 'today', label: 'Сегодня' },
+                { value: 'week', label: 'Неделя' },
+                { value: 'month', label: 'Месяц' },
+                { value: 'quarter', label: 'Квартал' },
+                { value: 'year', label: 'Год' }
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="department" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Отделение</label>
-            <select id="department" aria-label="Отделение" className="w-full px-3 py-2 rounded-lg focus:ring-2" style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-              <option>Все отделения</option>
-              <option>Кардиология</option>
-              <option>Дерматология</option>
-              <option>Стоматология</option>
-              <option>Общее</option>
-            </select>
+            <label htmlFor="department" style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '4px', 
+              color: 'var(--mac-text-primary)' 
+            }}>Отделение</label>
+            <MacOSSelect
+              id="department"
+              aria-label="Отделение"
+              value={analyticsFilters.department}
+              onChange={(value) => handleFilterChange('department', value)}
+              options={[
+                { value: 'all', label: 'Все отделения' },
+                { value: 'cardiology', label: 'Кардиология' },
+                { value: 'dermatology', label: 'Дерматология' },
+                { value: 'stomatology', label: 'Стоматология' },
+                { value: 'general', label: 'Общее' }
+              ]}
+            />
           </div>
           <div>
-            <label htmlFor="doctor" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Врач</label>
-            <select id="doctor" aria-label="Врач" className="w-full px-3 py-2 rounded-lg focus:ring-2" style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-              <option>Все врачи</option>
-              <option>Иванов И.И.</option>
-              <option>Петров П.П.</option>
-            </select>
+            <label htmlFor="doctor" style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '4px', 
+              color: 'var(--mac-text-primary)' 
+            }}>Врач</label>
+            <MacOSSelect
+              id="doctor"
+              aria-label="Врач"
+              value={analyticsFilters.doctor}
+              onChange={(value) => handleFilterChange('doctor', value)}
+              options={[
+                { value: 'all', label: 'Все врачи' },
+                { value: 'ivanov', label: 'Иванов И.И.' },
+                { value: 'petrov', label: 'Петров П.П.' }
+              ]}
+            />
           </div>
-          <div className="flex items-end">
-            <Button className="w-full" aria-label="Применить фильтры">
-              <Filter className="w-4 h-4 mr-2" />
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <MacOSButton 
+              style={{ width: '100%' }} 
+              aria-label="Применить фильтры"
+              onClick={applyFilters}
+            >
+              <Filter style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Применить
-            </Button>
+            </MacOSButton>
           </div>
         </div>
 
         {/* Ключевые метрики */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Всего записей</p>
-                <p className="text-2xl font-bold text-blue-900">1,247</p>
-              </div>
-              <Calendar className="w-8 h-8 text-blue-500" />
-            </div>
-            <p className="text-xs text-blue-600 mt-1">+12% за месяц</p>
-          </div>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px', 
+          marginBottom: '24px' 
+        }}>
+          <MacOSStatCard
+            title="Всего записей"
+            value="1,247"
+            icon={Calendar}
+            color="var(--mac-accent-blue)"
+            trend="+12% за месяц"
+            trendColor="var(--mac-accent-blue)"
+          />
           
-          <div className="bg-green-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Доходы</p>
-                <p className="text-2xl font-bold text-green-900">₽2.4M</p>
-              </div>
-              <CreditCard className="w-8 h-8 text-green-500" />
-            </div>
-            <p className="text-xs text-green-600 mt-1">+8% за месяц</p>
-          </div>
+          <MacOSStatCard
+            title="Доходы"
+            value="₽2.4M"
+            icon={CreditCard}
+            color="var(--mac-success)"
+            trend="+8% за месяц"
+            trendColor="var(--mac-success)"
+          />
           
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Пациенты</p>
-                <p className="text-2xl font-bold text-purple-900">892</p>
-              </div>
-              <Users className="w-8 h-8 text-purple-500" />
-            </div>
-            <p className="text-xs text-purple-600 mt-1">+15% за месяц</p>
-          </div>
+          <MacOSStatCard
+            title="Пациенты"
+            value="892"
+            icon={Users}
+            color="var(--mac-info)"
+            trend="+15% за месяц"
+            trendColor="var(--mac-info)"
+          />
           
-          <div className="bg-orange-50 p-4 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600">Средний чек</p>
-                <p className="text-2xl font-bold text-orange-900">₽1,925</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-orange-500" />
-            </div>
-            <p className="text-xs text-orange-600 mt-1">+5% за месяц</p>
-          </div>
+          <MacOSStatCard
+            title="Средний чек"
+            value="₽1,925"
+            icon={TrendingUp}
+            color="var(--mac-warning)"
+            trend="+5% за месяц"
+            trendColor="var(--mac-warning)"
+          />
         </div>
 
         {/* Графики */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Динамика записей</h3>
-            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <p className="text-gray-500">График записей по дням</p>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+          gap: '24px' 
+        }}>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '16px',
+              margin: 0
+            }}>Динамика записей</h3>
+            {isLoading ? (
+              <MacOSLoadingSkeleton height="256px" />
+            ) : (
+            <div style={{ 
+              height: '256px', 
+              backgroundColor: 'var(--mac-bg-tertiary)', 
+              borderRadius: 'var(--mac-radius-md)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <p style={{ color: 'var(--mac-text-secondary)' }}>График записей по дням</p>
             </div>
-          </Card>
+            )}
+          </MacOSCard>
           
-          <Card className="p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Доходы по отделениям</h3>
-            <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center">
-              <p className="text-gray-500">Круговая диаграмма доходов</p>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '16px',
+              margin: 0
+            }}>Доходы по отделениям</h3>
+            {isLoading ? (
+              <MacOSLoadingSkeleton height="256px" />
+            ) : (
+            <div style={{ 
+              height: '256px', 
+              backgroundColor: 'var(--mac-bg-tertiary)', 
+              borderRadius: 'var(--mac-radius-md)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              <p style={{ color: 'var(--mac-text-secondary)' }}>Круговая диаграмма доходов</p>
             </div>
-          </Card>
+            )}
+          </MacOSCard>
         </div>
 
         {/* Топ врачи */}
-        <Card className="p-4 mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Топ врачи по количеству приемов</h3>
-          <div className="space-y-3">
+        <MacOSCard 
+          style={{ padding: '24px', marginTop: '24px' }}
+        >
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '16px',
+            margin: 0
+          }}>Топ врачи по количеству приемов</h3>
+          
+          {isLoading ? (
+            <MacOSLoadingSkeleton height="200px" />
+          ) : !hasData ? (
+            <MacOSEmptyState
+              icon={Users}
+              title="Нет данных о врачах"
+              description="Загрузите данные для отображения статистики по врачам"
+            />
+          ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
               { name: 'Иванов И.И.', department: 'Кардиология', patients: 156, revenue: '₽312,000' },
               { name: 'Петров П.П.', department: 'Дерматология', patients: 134, revenue: '₽268,000' },
               { name: 'Сидоров С.С.', department: 'Стоматология', patients: 98, revenue: '₽196,000' },
               { name: 'Козлов К.К.', department: 'Общее', patients: 87, revenue: '₽174,000' }
             ].map((doctor, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">{index + 1}</span>
+              <div key={index} style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                padding: '12px', 
+                backgroundColor: 'var(--mac-bg-tertiary)', 
+                borderRadius: 'var(--mac-radius-md)' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    backgroundColor: 'var(--mac-accent)', 
+                    borderRadius: '50%', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                  }}>
+                    <span style={{ 
+                      color: 'white', 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                        fontWeight: 'var(--mac-font-weight-medium)' 
+                    }}>{index + 1}</span>
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{doctor.name}</p>
-                    <p className="text-sm text-gray-600">{doctor.department}</p>
+                    <p style={{ 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)',
+                      margin: 0
+                    }}>{doctor.name}</p>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)',
+                      margin: 0
+                    }}>{doctor.department}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-gray-900">{doctor.patients} пациентов</p>
-                  <p className="text-sm text-gray-600">{doctor.revenue}</p>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    margin: 0
+                  }}>{doctor.patients} пациентов</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>{doctor.revenue}</p>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
-      </Card>
+          )}
+        </MacOSCard>
+      </MacOSCard>
     </div>
   );
+  };
 
   const renderContent = () => {
     switch (current) {
@@ -1730,93 +2219,120 @@ const AdminPanel = () => {
         return renderSecurity();
       default:
         return (
-          <Card className="p-12">
-            <div className="text-center">
-              <h2 className="text-2xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+          <MacOSCard style={{ padding: '48px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <h2 style={{ 
+                fontSize: '24px', 
+                fontWeight: '600', 
+                marginBottom: '16px',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
                 {tabs.find(tab => tab.id === current)?.label || 'Неизвестный раздел'}
               </h2>
-              <p style={{ color: 'var(--text-secondary)' }}>Этот раздел находится в разработке</p>
+              <p style={{ color: 'var(--mac-text-secondary)' }}>Этот раздел находится в разработке</p>
             </div>
-          </Card>
+          </MacOSCard>
         );
     }
   };
 
   // Заглушки для остальных разделов
   const renderDoctors = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление врачами</h2>
-          <Button onClick={handleCreateDoctor}>
-            <Plus className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard 
+        variant="default"
+        style={{ padding: '24px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>Управление врачами</h2>
+          <MacOSButton onClick={handleCreateDoctor}>
+            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Добавить врача
-          </Button>
+          </MacOSButton>
         </div>
         
         {/* Поиск и фильтры */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-            <input
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <div style={{ flex: '1' }}>
+            <MacOSInput
               type="text"
               placeholder="Поиск врачей..."
               value={doctorsSearchTerm}
               onChange={(e) => setDoctorsSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              icon={Search}
+              iconPosition="left"
             />
           </div>
-          <input
+          <MacOSInput
             type="text"
             placeholder="Специализация..."
             value={filterSpecialization}
             onChange={(e) => setFilterSpecialization(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
           />
-          <select
+          <MacOSSelect
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все отделения</option>
-            <option value="cardiology">Кардиология</option>
-            <option value="dermatology">Дерматология</option>
-            <option value="dentistry">Стоматология</option>
-            <option value="general">Общее</option>
-            <option value="surgery">Хирургия</option>
-            <option value="pediatrics">Педиатрия</option>
-            <option value="neurology">Неврология</option>
-          </select>
-          <select
+            options={[
+              { value: '', label: 'Все отделения' },
+              { value: 'cardiology', label: 'Кардиология' },
+              { value: 'dermatology', label: 'Дерматология' },
+              { value: 'dentistry', label: 'Стоматология' },
+              { value: 'general', label: 'Общее' },
+              { value: 'surgery', label: 'Хирургия' },
+              { value: 'pediatrics', label: 'Педиатрия' },
+              { value: 'neurology', label: 'Неврология' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
+          <MacOSSelect
             value={doctorsFilterStatus}
             onChange={(e) => setDoctorsFilterStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все статусы</option>
-            <option value="active">Активен</option>
-            <option value="inactive">Неактивен</option>
-            <option value="on_leave">В отпуске</option>
-          </select>
+            options={[
+              { value: '', label: 'Все статусы' },
+              { value: 'active', label: 'Активен' },
+              { value: 'inactive', label: 'Неактивен' },
+              { value: 'on_leave', label: 'В отпуске' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
         </div>
 
         {/* Таблица врачей */}
-        <div className="overflow-x-auto">
+        <div style={{ overflowX: 'auto' }}>
           {doctorsLoading ? (
-            <LoadingSkeleton type="table" count={5} />
+            <MacOSLoadingSkeleton type="table" count={5} />
           ) : doctorsError ? (
             <EmptyState
               type="error"
               title="Ошибка загрузки врачей"
               description="Не удалось загрузить список врачей"
               action={
-                <Button onClick={() => window.location.reload()}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                <MacOSButton onClick={() => window.location.reload()}>
+                  <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Обновить
-                </Button>
+                </MacOSButton>
               }
             />
           ) : doctors.length === 0 ? (
@@ -1828,84 +2344,185 @@ const AdminPanel = () => {
                 : 'В системе пока нет врачей'
               }
               action={
-                <Button onClick={handleCreateDoctor}>
-                  <Plus className="w-4 h-4 mr-2" />
+                <MacOSButton onClick={handleCreateDoctor}>
+                  <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Добавить первого врача
-                </Button>
+                </MacOSButton>
               }
             />
           ) : (
-            <table className="w-full" role="table" aria-label="Таблица врачей">
+            <table style={{ width: '100%' }} role="table" aria-label="Таблица врачей">
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Врач</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Специализация</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Отделение</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Опыт</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пациенты</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                <tr style={{ 
+                  backgroundColor: 'var(--mac-bg-tertiary)', 
+                  borderBottom: '1px solid var(--mac-border)' 
+                }}>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Врач</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Специализация</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Отделение</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Опыт</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Статус</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Пациенты</th>
+                  <th scope="col" style={{ 
+                    textAlign: 'left', 
+                    padding: '12px 16px', 
+                    color: 'var(--mac-text-primary)', 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {doctors.map((doctor) => (
-                  <tr key={doctor.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
-                          <span className="text-white text-sm font-medium">
+                  <tr key={doctor.id} style={{ 
+                    borderBottom: '1px solid var(--mac-border)', 
+                    transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--mac-accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: 'var(--mac-font-size-sm)',
+                          fontWeight: '500'
+                        }}>
+                          <span>
                             {doctor.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{doctor.name}</p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{doctor.email}</p>
+                          <p style={{ 
+                            fontWeight: 'var(--mac-font-weight-medium)', 
+                            color: 'var(--mac-text-primary)',
+                            fontSize: 'var(--mac-font-size-sm)',
+                            margin: 0
+                          }}>{doctor.name}</p>
+                          <p style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>{doctor.email}</p>
                           {doctor.phone && (
-                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{doctor.phone}</p>
+                            <p style={{ 
+                              fontSize: '11px', 
+                              color: 'var(--mac-text-tertiary)',
+                              margin: '2px 0 0 0'
+                            }}>{doctor.phone}</p>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="info">
+                    <td style={{ padding: '12px 16px' }}>
+                      <MacOSBadge variant="info">
                         {doctor.specialization}
-                      </Badge>
+                      </MacOSBadge>
                     </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="success">
+                    <td style={{ padding: '12px 16px' }}>
+                      <MacOSBadge variant="success">
                         {getDepartmentLabel(doctor.department)}
-                      </Badge>
+                      </MacOSBadge>
                     </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <td style={{ 
+                      padding: '12px 16px', 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)' 
+                    }}>
                       {doctor.experience} лет
                     </td>
-                    <td className="py-3 px-4">
-                      <Badge 
+                    <td style={{ padding: '12px 16px' }}>
+                      <MacOSBadge 
                         variant={doctor.status === 'active' ? 'success' : doctor.status === 'inactive' ? 'warning' : 'info'}
                       >
                         {getDoctorStatusLabel(doctor.status)}
-                      </Badge>
+                      </MacOSBadge>
                     </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <td style={{ 
+                      padding: '12px 16px', 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)' 
+                    }}>
                       {doctor.patientsCount} пациентов
                     </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button 
                           onClick={() => handleEditDoctor(doctor)}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                          style={{ color: 'var(--text-secondary)' }}
+                          style={{ 
+                            padding: '4px', 
+                            borderRadius: 'var(--mac-radius-sm)', 
+                            transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                            color: 'var(--mac-text-secondary)',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           title="Редактировать"
                         >
-                          <Edit className="w-4 h-4" />
+                          <Edit style={{ width: '16px', height: '16px' }} />
                         </button>
                         <button 
                           onClick={() => handleDeleteDoctor(doctor)}
-                          className="p-1 hover:bg-red-100 rounded transition-colors" 
-                          style={{ color: 'var(--danger-color)' }}
+                          style={{ 
+                            padding: '4px', 
+                            borderRadius: 'var(--mac-radius-sm)', 
+                            transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                            color: 'var(--mac-error)',
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           title="Удалить"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 style={{ width: '16px', height: '16px' }} />
                         </button>
                       </div>
                     </td>
@@ -1915,7 +2532,7 @@ const AdminPanel = () => {
             </table>
           )}
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно врача с универсальным хуком */}
       <DoctorModal
@@ -1929,88 +2546,133 @@ const AdminPanel = () => {
   );
 
   const renderPatients = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление пациентами</h2>
-          <Button onClick={handleCreatePatient}>
-            <Plus className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard 
+        variant="default"
+        style={{ padding: '24px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>Управление пациентами</h2>
+          <MacOSButton onClick={handleCreatePatient}>
+            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Добавить пациента
-          </Button>
+          </MacOSButton>
         </div>
         
         {/* Поиск и фильтры */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-            <input
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+          <div style={{ flex: '1' }}>
+            <MacOSInput
               type="text"
               placeholder="Поиск пациентов..."
               value={patientsSearchTerm}
               onChange={(e) => setPatientsSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              icon={Search}
+              iconPosition="left"
+              style={{
+                width: '100%',
+                paddingLeft: '40px',
+                paddingRight: '16px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                borderRadius: 'var(--mac-radius-sm)',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                outline: 'none',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
             />
           </div>
-          <select
+          <MacOSSelect
             value={filterGender}
             onChange={(e) => setFilterGender(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все полы</option>
-            <option value="male">Мужской</option>
-            <option value="female">Женский</option>
-          </select>
-          <select
+            options={[
+              { value: '', label: 'Все полы' },
+              { value: 'male', label: 'Мужской' },
+              { value: 'female', label: 'Женский' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
+          <MacOSSelect
             value={filterAgeRange}
             onChange={(e) => setFilterAgeRange(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все возрасты</option>
-            <option value="0-18">0-18 лет</option>
-            <option value="19-35">19-35 лет</option>
-            <option value="36-50">36-50 лет</option>
-            <option value="51-65">51-65 лет</option>
-            <option value="65+">65+ лет</option>
-          </select>
-          <select
+            options={[
+              { value: '', label: 'Все возрасты' },
+              { value: '0-18', label: '0-18 лет' },
+              { value: '19-35', label: '19-35 лет' },
+              { value: '36-50', label: '36-50 лет' },
+              { value: '51-65', label: '51-65 лет' },
+              { value: '65+', label: '65+ лет' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
+          <MacOSSelect
             value={filterBloodType}
             onChange={(e) => setFilterBloodType(e.target.value)}
-            className="px-3 py-2 rounded-lg border focus:ring-2"
-            style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="">Все группы крови</option>
-            <option value="A+">A+</option>
-            <option value="A-">A-</option>
-            <option value="B+">B+</option>
-            <option value="B-">B-</option>
-            <option value="AB+">AB+</option>
-            <option value="AB-">AB-</option>
-            <option value="O+">O+</option>
-            <option value="O-">O-</option>
-          </select>
+            options={[
+              { value: '', label: 'Все группы крови' },
+              { value: 'A+', label: 'A+' },
+              { value: 'A-', label: 'A-' },
+              { value: 'B+', label: 'B+' },
+              { value: 'B-', label: 'B-' },
+              { value: 'AB+', label: 'AB+' },
+              { value: 'AB-', label: 'AB-' },
+              { value: 'O+', label: 'O+' },
+              { value: 'O-', label: 'O-' }
+            ]}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--mac-radius-sm)',
+              border: '1px solid var(--mac-border)',
+              background: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              outline: 'none'
+            }}
+          />
         </div>
 
         {/* Таблица пациентов */}
-        <div className="overflow-x-auto">
+        <div style={{ overflowX: 'auto' }}>
           {patientsLoading ? (
-            <LoadingSkeleton type="table" count={5} />
+            <MacOSLoadingSkeleton type="table" count={5} />
           ) : patientsError ? (
-            <EmptyState
+            <MacOSEmptyState
               type="error"
               title="Ошибка загрузки пациентов"
               description="Не удалось загрузить список пациентов"
               action={
-                <Button onClick={() => window.location.reload()}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                <MacOSButton onClick={() => window.location.reload()}>
+                  <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Обновить
-                </Button>
+                </MacOSButton>
               }
             />
           ) : patients.length === 0 ? (
-            <EmptyState
+            <MacOSEmptyState
               type="users"
               title="Пациенты не найдены"
               description={patientsSearchTerm || filterGender || filterAgeRange || filterBloodType 
@@ -2018,104 +2680,164 @@ const AdminPanel = () => {
                 : 'В системе пока нет пациентов'
               }
               action={
-                <Button onClick={handleCreatePatient}>
-                  <Plus className="w-4 h-4 mr-2" />
+                <MacOSButton onClick={handleCreatePatient}>
+                  <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Добавить первого пациента
-                </Button>
+                </MacOSButton>
               }
             />
           ) : (
-            <table className="w-full" role="table" aria-label="Таблица пациентов">
-              <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пациент</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Возраст</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пол</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Телефон</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Группа крови</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Последний визит</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Визиты</th>
-                  <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {patients.map((patient) => (
-                  <tr key={patient.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
-                          <span className="text-white text-sm font-medium">
+            <MacOSTable
+              columns={[
+                { key: 'patient', title: 'Пациент', width: '30%' },
+                { key: 'age', title: 'Возраст', width: '8%' },
+                { key: 'gender', title: 'Пол', width: '8%' },
+                { key: 'phone', title: 'Телефон', width: '12%' },
+                { key: 'bloodType', title: 'Группа крови', width: '10%' },
+                { key: 'lastVisit', title: 'Последний визит', width: '12%' },
+                { key: 'visits', title: 'Визиты', width: '10%' },
+                { key: 'actions', title: 'Действия', width: '10%' }
+              ]}
+              data={patients.map((patient) => ({
+                id: patient.id,
+                patient: (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--mac-accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: 'var(--mac-font-size-sm)',
+                          fontWeight: '500'
+                        }}>
+                          <span>
                             {patient.firstName[0]}{patient.lastName[0]}
                           </span>
                         </div>
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                          <p style={{ 
+                            fontWeight: 'var(--mac-font-weight-medium)', 
+                            color: 'var(--mac-text-primary)',
+                            fontSize: 'var(--mac-font-size-sm)',
+                            margin: 0
+                          }}>
                             {patient.lastName} {patient.firstName} {patient.middleName}
                           </p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          <p style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>
                             {patient.email || 'Email не указан'}
                           </p>
                           {patient.address && (
-                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            <p style={{ 
+                              fontSize: '11px', 
+                              color: 'var(--mac-text-tertiary)',
+                              margin: '2px 0 0 0'
+                            }}>
                               {patient.address}
                             </p>
                           )}
                         </div>
                       </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                ),
+                age: (
+                  <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)' 
+                    }}>
                       {calculateAge(patient.birthDate)} лет
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant={patient.gender === 'male' ? 'info' : 'success'}>
+                  </div>
+                ),
+                gender: (
+                  <MacOSBadge variant={patient.gender === 'male' ? 'info' : 'success'}>
                         {getGenderLabel(patient.gender)}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  </MacOSBadge>
+                ),
+                phone: (
+                  <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)' 
+                    }}>
                       {patient.phone}
-                    </td>
-                    <td className="py-3 px-4">
-                      {patient.bloodType ? (
-                        <Badge variant="warning">
+                  </div>
+                ),
+                bloodType: (
+                  patient.bloodType ? (
+                    <MacOSBadge variant="warning">
                           {patient.bloodType}
-                        </Badge>
+                    </MacOSBadge>
                       ) : (
-                        <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Не указано</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        <span style={{ 
+                          fontSize: 'var(--mac-font-size-sm)', 
+                          color: 'var(--mac-text-tertiary)' 
+                        }}>Не указано</span>
+                  )
+                ),
+                lastVisit: (
+                  <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)' 
+                    }}>
                       {patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString('ru-RU') : 'Нет визитов'}
-                    </td>
-                    <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  </div>
+                ),
+                visits: (
+                  <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)' 
+                    }}>
                       {patient.visitsCount} визитов
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center space-x-2">
-                        <button 
+                  </div>
+                ),
+                actions: (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MacOSButton
+                      variant="outline"
                           onClick={() => handleEditPatient(patient)}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                          style={{ color: 'var(--text-secondary)' }}
+                          style={{ 
+                        padding: '6px',
+                        minWidth: 'auto',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
                           title="Редактировать"
                         >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
+                          <Edit style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
+                    <MacOSButton
+                      variant="outline"
                           onClick={() => handleDeletePatient(patient)}
-                          className="p-1 hover:bg-red-100 rounded transition-colors" 
-                          style={{ color: 'var(--danger-color)' }}
+                          style={{ 
+                        padding: '6px',
+                        minWidth: 'auto',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                            color: 'var(--mac-error)',
+                        borderColor: 'var(--mac-error)'
+                          }}
                           title="Удалить"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          <Trash2 style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                )
+              }))}
+            />
           )}
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Модальное окно пациента */}
       {/* ✅ УЛУЧШЕНИЕ: Модальное окно пациента с универсальным хуком */}
@@ -2135,124 +2857,194 @@ const AdminPanel = () => {
     const tomorrowAppointments = getTomorrowAppointments();
 
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика записей */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего записей</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{appointments.length}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Всего записей</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{appointments.length}</p>
               </div>
-              <Calendar className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+              <Calendar style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>На сегодня</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{todayAppointments.length}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>На сегодня</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{todayAppointments.length}</p>
               </div>
-              <Clock className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+              <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>На завтра</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{tomorrowAppointments.length}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>На завтра</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{tomorrowAppointments.length}</p>
               </div>
-              <Calendar className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+              <Calendar style={{ width: '32px', height: '32px', color: 'var(--mac-text-primary)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Ожидают</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{statusStats.pending}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Ожидают</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{statusStats.pending}</p>
               </div>
-              <Clock className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
+              <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
             </div>
-          </Card>
+          </MacOSCard>
         </div>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Управление записями</h2>
-            <Button onClick={handleCreateAppointment}>
-              <Plus className="w-4 h-4 mr-2" />
+        <MacOSCard 
+          variant="default"
+          style={{ padding: '24px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <h2 style={{ 
+              fontSize: '20px', 
+              fontWeight: '600', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>Управление записями</h2>
+            <MacOSButton onClick={handleCreateAppointment}>
+              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Создать запись
-            </Button>
+            </MacOSButton>
           </div>
           
           {/* Поиск и фильтры */}
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-              <input
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ flex: '1', position: 'relative' }}>
+              <Search style={{ 
+                position: 'absolute', 
+                left: '12px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                width: '16px', 
+                height: '16px', 
+                color: 'var(--mac-text-tertiary)',
+                zIndex: 1
+              }} />
+              <MacOSInput
                 type="text"
                 placeholder="Поиск записей..."
                 value={appointmentsSearchTerm}
                 onChange={(e) => setAppointmentsSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
-                style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '16px'
+                }}
               />
             </div>
-            <select
+            <MacOSSelect
               value={appointmentFilterStatus}
               onChange={(e) => setAppointmentFilterStatus(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все статусы</option>
-              <option value="pending">Ожидает</option>
-              <option value="confirmed">Подтверждена</option>
-              <option value="paid">Оплачена</option>
-              <option value="in_visit">На приеме</option>
-              <option value="completed">Завершена</option>
-              <option value="cancelled">Отменена</option>
-              <option value="no_show">Не явился</option>
-            </select>
-            <input
+              options={[
+                { value: '', label: 'Все статусы' },
+                { value: 'pending', label: 'Ожидает' },
+                { value: 'confirmed', label: 'Подтверждена' },
+                { value: 'paid', label: 'Оплачена' },
+                { value: 'in_visit', label: 'На приеме' },
+                { value: 'completed', label: 'Завершена' },
+                { value: 'cancelled', label: 'Отменена' },
+                { value: 'no_show', label: 'Не явился' }
+              ]}
+              style={{ minWidth: '140px' }}
+            />
+            <MacOSInput
               type="date"
               value={appointmentFilterDate}
               onChange={(e) => setAppointmentFilterDate(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+              style={{ minWidth: '140px' }}
             />
-            <select
+            <MacOSSelect
               value={appointmentFilterDoctor}
               onChange={(e) => setAppointmentFilterDoctor(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все врачи</option>
-              {doctors.map(doctor => (
-                <option key={doctor.id} value={doctor.id}>
-                  {doctor.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Все врачи' },
+                ...doctors.map(doctor => ({
+                  value: doctor.id,
+                  label: doctor.name
+                }))
+              ]}
+              style={{ minWidth: '140px' }}
+            />
           </div>
 
           {/* Таблица записей */}
-          <div className="overflow-x-auto">
+          <div style={{ overflowX: 'auto' }}>
             {appointmentsLoading ? (
-              <LoadingSkeleton type="table" count={5} />
+              <MacOSLoadingSkeleton type="table" count={5} />
             ) : appointmentsError ? (
               <EmptyState
                 type="error"
                 title="Ошибка загрузки записей"
                 description="Не удалось загрузить список записей"
                 action={
-                  <Button onClick={() => window.location.reload()}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                  <MacOSButton onClick={() => window.location.reload()}>
+                    <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                     Обновить
-                  </Button>
+                  </MacOSButton>
                 }
               />
             ) : appointments.length === 0 ? (
-              <EmptyState
+              <MacOSEmptyState
                 type="calendar"
                 title="Записи не найдены"
                 description={appointmentsSearchTerm || appointmentFilterStatus || appointmentFilterDate || appointmentFilterDoctor 
@@ -2260,98 +3052,151 @@ const AdminPanel = () => {
                   : 'В системе пока нет записей'
                 }
                 action={
-                  <Button onClick={handleCreateAppointment}>
-                    <Plus className="w-4 h-4 mr-2" />
+                  <MacOSButton onClick={handleCreateAppointment}>
+                    <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                     Создать первую запись
-                  </Button>
+                  </MacOSButton>
                 }
               />
             ) : (
-              <table className="w-full" role="table" aria-label="Таблица записей">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Пациент</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Врач</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Дата и время</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Причина</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {appointments.map((appointment) => (
-                    <tr key={appointment.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-color)' }}>
-                            <span className="text-white text-sm font-medium">
+              <MacOSTable
+                columns={[
+                  { key: 'patient', title: 'Пациент', width: '25%' },
+                  { key: 'doctor', title: 'Врач', width: '20%' },
+                  { key: 'datetime', title: 'Дата и время', width: '20%' },
+                  { key: 'status', title: 'Статус', width: '15%' },
+                  { key: 'reason', title: 'Причина', width: '15%' },
+                  { key: 'actions', title: 'Действия', width: '5%' }
+                ]}
+                data={appointments.map((appointment) => ({
+                  id: appointment.id,
+                  patient: (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            borderRadius: '50%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            background: 'var(--mac-accent-blue)' 
+                          }}>
+                            <span style={{ 
+                              color: 'white', 
+                              fontSize: 'var(--mac-font-size-sm)', 
+                              fontWeight: 'var(--mac-font-weight-medium)' 
+                            }}>
                               {appointment.patientName.split(' ').map(n => n[0]).join('').toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{appointment.patientName}</p>
+                            <p style={{ 
+                              fontWeight: 'var(--mac-font-weight-medium)', 
+                              color: 'var(--mac-text-primary)',
+                              margin: 0
+                            }}>{appointment.patientName}</p>
                             {appointment.phone && (
-                              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{appointment.phone}</p>
+                              <p style={{ 
+                                fontSize: 'var(--mac-font-size-sm)', 
+                                color: 'var(--mac-text-secondary)',
+                                margin: '4px 0 0 0'
+                              }}>{appointment.phone}</p>
                             )}
                           </div>
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
+                  ),
+                  doctor: (
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{appointment.doctorName}</p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{appointment.doctorSpecialization}</p>
+                          <p style={{ 
+                            fontWeight: 'var(--mac-font-weight-medium)', 
+                            color: 'var(--mac-text-primary)',
+                            margin: 0
+                          }}>{appointment.doctorName}</p>
+                          <p style={{ 
+                            fontSize: 'var(--mac-font-size-sm)', 
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>{appointment.doctorSpecialization}</p>
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
+                  ),
+                  datetime: (
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                          <p style={{ 
+                            fontWeight: 'var(--mac-font-weight-medium)', 
+                            color: 'var(--mac-text-primary)',
+                            margin: 0
+                          }}>
                             {new Date(appointment.appointmentDate).toLocaleDateString('ru-RU')}
                           </p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          <p style={{ 
+                            fontSize: 'var(--mac-font-size-sm)', 
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>
                             {appointment.appointmentTime} ({appointment.duration} мин)
                           </p>
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={getAppointmentStatusVariant(appointment.status)}>
+                  ),
+                  status: (
+                    <MacOSBadge variant={getAppointmentStatusVariant(appointment.status)}>
                           {getAppointmentStatusLabel(appointment.status)}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    </MacOSBadge>
+                  ),
+                  reason: (
+                        <p style={{ 
+                          fontSize: 'var(--mac-font-size-sm)', 
+                          color: 'var(--mac-text-secondary)',
+                          margin: 0
+                        }}>
                           {appointment.reason.length > 50 
                             ? `${appointment.reason.substring(0, 50)}...` 
                             : appointment.reason
                           }
                         </p>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-2">
-                          <button 
+                  ),
+                  actions: (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MacOSButton
+                        variant="outline"
                             onClick={() => handleEditAppointment(appointment)}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                            style={{ color: 'var(--text-secondary)' }}
+                            style={{ 
+                          padding: '6px',
+                          minWidth: 'auto',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
                             title="Редактировать"
                           >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
+                            <Edit style={{ width: '16px', height: '16px' }} />
+                      </MacOSButton>
+                      <MacOSButton
+                        variant="outline"
                             onClick={() => handleDeleteAppointment(appointment)}
-                            className="p-1 hover:bg-red-100 rounded transition-colors" 
-                            style={{ color: 'var(--danger-color)' }}
+                            style={{ 
+                          padding: '6px',
+                          minWidth: 'auto',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--mac-error)',
+                          borderColor: 'var(--mac-error)'
+                        }}
                             title="Удалить"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            <Trash2 style={{ width: '16px', height: '16px' }} />
+                      </MacOSButton>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  )
+                }))}
+              />
             )}
           </div>
-        </Card>
+        </MacOSCard>
 
         {/* Модальное окно записи */}
         {/* ✅ УЛУЧШЕНИЕ: Модальное окно записи с универсальным хуком */}
@@ -2374,147 +3219,252 @@ const AdminPanel = () => {
     const dailyStats = getDailyStats(7);
 
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Финансовая статистика */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Общий доход</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--success-color)' }}>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Общий доход</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-success)',
+                  margin: '4px 0 0 0'
+                }}>
                   {formatCurrency(financialStats.totalIncome)}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+              <DollarSign style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Общие расходы</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Общие расходы</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-error)',
+                  margin: '4px 0 0 0'
+                }}>
                   {formatCurrency(financialStats.totalExpense)}
                 </p>
               </div>
-              <CreditCard className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+              <CreditCard style={{ width: '32px', height: '32px', color: 'var(--mac-error)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Чистая прибыль</p>
-                <p className="text-2xl font-bold" style={{ 
-                  color: financialStats.netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)' 
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Чистая прибыль</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)',
+                  margin: '4px 0 0 0'
                 }}>
                   {formatCurrency(financialStats.netProfit)}
                 </p>
               </div>
-              <Calendar className="w-8 h-8" style={{ 
-                color: financialStats.netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)' 
+              <Calendar style={{ 
+                width: '32px', 
+                height: '32px', 
+                color: financialStats.netProfit >= 0 ? 'var(--mac-success)' : 'var(--mac-error)' 
               }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего транзакций</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Всего транзакций</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>
                   {financialStats.transactionCount}
                 </p>
               </div>
-              <Receipt className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+              <Receipt style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             </div>
-          </Card>
+          </MacOSCard>
         </div>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Финансовый учет</h2>
-            <Button onClick={handleCreateTransaction}>
-              <Plus className="w-4 h-4 mr-2" />
+        <MacOSCard 
+          variant="default"
+          style={{ padding: 0 }}
+        >
+          <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <h2 style={{ 
+              fontSize: '20px', 
+              fontWeight: '600', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>Финансовый учет</h2>
+            <MacOSButton onClick={handleCreateTransaction}>
+              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Добавить транзакцию
-            </Button>
+            </MacOSButton>
           </div>
           
           {/* Поиск и фильтры */}
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-              <input
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ flex: '1' }}>
+              <MacOSInput
                 type="text"
                 placeholder="Поиск транзакций..."
                 value={financeSearchTerm}
                 onChange={(e) => setFinanceSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
-                style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                icon={Search}
+                iconPosition="left"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '16px',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  border: '1px solid var(--mac-border)',
+                  background: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  outline: 'none',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
               />
             </div>
-            <select
+            <MacOSSelect
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все типы</option>
-              <option value="income">Доходы</option>
-              <option value="expense">Расходы</option>
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Все типы' },
+                { value: 'income', label: 'Доходы' },
+                { value: 'expense', label: 'Расходы' }
+              ]}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-sm)',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                outline: 'none'
+              }}
+            />
+            <MacOSSelect
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все категории</option>
-              <option value="Консультация врача">Консультация врача</option>
-              <option value="Диагностика">Диагностика</option>
-              <option value="Лечение">Лечение</option>
-              <option value="Анализы">Анализы</option>
-              <option value="Процедуры">Процедуры</option>
-              <option value="Зарплата персонала">Зарплата персонала</option>
-              <option value="Коммунальные услуги">Коммунальные услуги</option>
-              <option value="Медикаменты">Медикаменты</option>
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Все категории' },
+                { value: 'Консультация врача', label: 'Консультация врача' },
+                { value: 'Диагностика', label: 'Диагностика' },
+                { value: 'Лечение', label: 'Лечение' },
+                { value: 'Анализы', label: 'Анализы' },
+                { value: 'Процедуры', label: 'Процедуры' },
+                { value: 'Зарплата персонала', label: 'Зарплата персонала' },
+                { value: 'Коммунальные услуги', label: 'Коммунальные услуги' },
+                { value: 'Медикаменты', label: 'Медикаменты' }
+              ]}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-sm)',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                outline: 'none'
+              }}
+            />
+            <MacOSSelect
               value={filterDateRange}
               onChange={(e) => setFilterDateRange(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все время</option>
-              <option value="today">Сегодня</option>
-              <option value="week">Неделя</option>
-              <option value="month">Месяц</option>
-              <option value="year">Год</option>
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Все время' },
+                { value: 'today', label: 'Сегодня' },
+                { value: 'week', label: 'Неделя' },
+                { value: 'month', label: 'Месяц' },
+                { value: 'year', label: 'Год' }
+              ]}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-sm)',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                outline: 'none'
+              }}
+            />
+            <MacOSSelect
               value={financeFilterStatus}
               onChange={(e) => setFinanceFilterStatus(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все статусы</option>
-              <option value="pending">Ожидает</option>
-              <option value="completed">Завершена</option>
-              <option value="cancelled">Отменена</option>
-              <option value="refunded">Возврат</option>
-            </select>
+              options={[
+                { value: '', label: 'Все статусы' },
+                { value: 'pending', label: 'Ожидает' },
+                { value: 'completed', label: 'Завершена' },
+                { value: 'cancelled', label: 'Отменена' },
+                { value: 'refunded', label: 'Возврат' }
+              ]}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-sm)',
+                border: '1px solid var(--mac-border)',
+                background: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                outline: 'none'
+              }}
+            />
           </div>
 
           {/* Таблица транзакций */}
-          <div className="overflow-x-auto">
+          <div style={{ overflowX: 'auto' }}>
             {financeLoading ? (
-              <LoadingSkeleton type="table" count={5} />
+              <MacOSLoadingSkeleton type="table" count={5} />
             ) : financeError ? (
               <EmptyState
                 type="error"
                 title="Ошибка загрузки транзакций"
                 description="Не удалось загрузить список транзакций"
                 action={
-                  <Button onClick={() => window.location.reload()}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                  <MacOSButton onClick={() => window.location.reload()}>
+                    <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                     Обновить
-                  </Button>
+                  </MacOSButton>
                 }
               />
             ) : transactions.length === 0 ? (
@@ -2526,89 +3476,94 @@ const AdminPanel = () => {
                   : 'В системе пока нет транзакций'
                 }
                 action={
-                  <Button onClick={handleCreateTransaction}>
-                    <Plus className="w-4 h-4 mr-2" />
+                  <MacOSButton onClick={handleCreateTransaction}>
+                    <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                     Добавить первую транзакцию
-                  </Button>
+                  </MacOSButton>
                 }
               />
             ) : (
-              <table className="w-full" role="table" aria-label="Таблица транзакций">
+              <table style={{ width: '100%' }} role="table" aria-label="Таблица транзакций">
                 <thead>
-                  <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Тип</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Категория</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Сумма</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Описание</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Дата</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                  <tr style={{ borderBottom: '1px solid var(--mac-separator)' }}>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Тип</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Категория</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Сумма</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Описание</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Дата</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Статус</th>
+                    <th scope="col" style={{ textAlign: 'left', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontWeight: 'var(--mac-font-weight-medium)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((transaction) => (
-                    <tr key={transaction.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
-                      <td className="py-3 px-4">
-                        <Badge variant={transaction.type === 'income' ? 'success' : 'error'}>
+                    <tr
+                      key={transaction.id}
+                      style={{ borderBottom: '1px solid var(--mac-separator)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <MacOSBadge variant={transaction.type === 'income' ? 'success' : 'error'}>
                           {getTransactionTypeLabel(transaction.type)}
-                        </Badge>
+                        </MacOSBadge>
                       </td>
-                      <td className="py-3 px-4">
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{transaction.category}</p>
+                          <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>{transaction.category}</p>
                           {transaction.patientName && (
-                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{transaction.patientName}</p>
+                            <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>{transaction.patientName}</p>
                           )}
                         </div>
                       </td>
-                      <td className="py-3 px-4">
-                        <p className="font-medium" style={{ 
-                          color: transaction.type === 'income' ? 'var(--success-color)' : 'var(--danger-color)' 
-                        }}>
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: transaction.type === 'income' ? 'var(--mac-success)' : 'var(--mac-danger)', margin: 0 }}>
                           {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                         </p>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>
                           {getPaymentMethodLabel(transaction.paymentMethod)}
                         </p>
                       </td>
-                      <td className="py-3 px-4">
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: 0 }}>
                           {transaction.description.length > 50 
                             ? `${transaction.description.substring(0, 50)}...` 
                             : transaction.description
                           }
                         </p>
                         {transaction.reference && (
-                          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          <p style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', margin: '4px 0 0 0' }}>
                             {transaction.reference}
                           </p>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                         {new Date(transaction.transactionDate).toLocaleDateString('ru-RU')}
                       </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={getTransactionStatusVariant(transaction.status)}>
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <MacOSBadge variant={getTransactionStatusVariant(transaction.status)}>
                           {getTransactionStatusLabel(transaction.status)}
-                        </Badge>
+                        </MacOSBadge>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-2">
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                           <button 
                             onClick={() => handleEditTransaction(transaction)}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                            style={{ color: 'var(--text-secondary)' }}
+                            style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-text-secondary)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                             title="Редактировать"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit style={{ width: '16px', height: '16px' }} />
                           </button>
                           <button 
                             onClick={() => handleDeleteTransaction(transaction)}
-                            className="p-1 hover:bg-red-100 rounded transition-colors" 
-                            style={{ color: 'var(--danger-color)' }}
+                            style={{ padding: 'var(--mac-spacing-2)', borderRadius: 'var(--mac-radius-sm)', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--mac-danger)', transition: 'all var(--mac-duration-normal) var(--mac-ease)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                             title="Удалить"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 style={{ width: '16px', height: '16px' }} />
                           </button>
                         </div>
                       </td>
@@ -2618,7 +3573,7 @@ const AdminPanel = () => {
               </table>
             )}
           </div>
-        </Card>
+        </MacOSCard>
 
         {/* Модальное окно транзакции */}
         {/* ✅ УЛУЧШЕНИЕ: Модальное окно финансов с универсальным хуком */}
@@ -2640,73 +3595,68 @@ const AdminPanel = () => {
     const reportTypes = getReportTypes();
 
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика отчетов */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего отчетов</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{reportStats.total}</p>
-              </div>
-              <FileText className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Завершено</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--success-color)' }}>{reportStats.completed}</p>
-              </div>
-              <CheckCircle className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Генерируется</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--warning-color)' }}>{reportStats.generating}</p>
-              </div>
-              <Clock className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Ошибки</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>{reportStats.failed}</p>
-              </div>
-              <AlertCircle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Скачиваний</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{reportStats.totalDownloads}</p>
-              </div>
-              <Download className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
-            </div>
-          </Card>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSStatCard
+            title="Всего отчетов"
+            value={reportStats.total}
+            icon={FileText}
+            color="blue"
+          />
+          <MacOSStatCard
+            title="Завершено"
+            value={reportStats.completed}
+            icon={CheckCircle}
+            color="green"
+          />
+          <MacOSStatCard
+            title="Генерируется"
+            value={reportStats.generating}
+            icon={Clock}
+            color="orange"
+          />
+          <MacOSStatCard
+            title="Ошибки"
+            value={reportStats.failed}
+            icon={AlertCircle}
+            color="red"
+          />
+          <MacOSStatCard
+            title="Скачиваний"
+            value={reportStats.totalDownloads}
+            icon={Download}
+            color="blue"
+          />
         </div>
 
         {/* Кнопки действий */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button onClick={handleOpenReportGenerator}>
-              <Plus className="w-4 h-4 mr-2" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <MacOSButton variant="primary" onClick={handleOpenReportGenerator}>
+              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Создать отчет
-            </Button>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              <RefreshCw className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton variant="outline" onClick={() => window.location.reload()}>
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Обновить
-            </Button>
+            </MacOSButton>
           </div>
         </div>
 
         {/* Аналитическая панель */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+           <MacOSCard style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            marginBottom: '16px',
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>
             Аналитическая панель
           </h3>
           <AnalyticsDashboard 
@@ -2714,79 +3664,128 @@ const AdminPanel = () => {
             loading={false}
             dateRange={reportDateRange}
           />
-        </Card>
+        </MacOSCard>
 
         {/* Список отчетов */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Отчеты</h2>
+           <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>Отчеты</h2>
           </div>
           
           {/* Поиск и фильтры */}
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-              <input
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search style={{ 
+                position: 'absolute', 
+                left: '12px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                width: '16px', 
+                height: '16px', 
+                color: 'var(--mac-text-tertiary)' 
+              }} />
+              <MacOSInput
                 type="text"
                 placeholder="Поиск отчетов..."
                 value={reportsSearchTerm}
                 onChange={(e) => setReportsSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg focus:ring-2"
-                style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                icon={Search}
+                iconPosition="left"
+                style={{ 
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '16px',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  borderRadius: 'var(--mac-radius-md)',
+                  border: '1px solid var(--mac-border)', 
+                  background: 'var(--mac-bg-primary)', 
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
               />
             </div>
-            <select
+            <MacOSSelect
               value={reportFilterType}
               onChange={(e) => setReportFilterType(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все типы</option>
-              {reportTypes.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Все типы' },
+                ...reportTypes.map(type => ({
+                  value: type.value,
+                  label: type.label
+                }))
+              ]}
+              style={{ 
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
+            />
+            <MacOSSelect
               value={reportFilterStatus}
               onChange={(e) => setReportFilterStatus(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все статусы</option>
-              <option value="completed">Завершен</option>
-              <option value="generating">Генерируется</option>
-              <option value="failed">Ошибка</option>
-              <option value="pending">Ожидает</option>
-            </select>
-            <select
+              options={[
+                { value: '', label: 'Все статусы' },
+                { value: 'completed', label: 'Завершен' },
+                { value: 'generating', label: 'Генерируется' },
+                { value: 'failed', label: 'Ошибка' },
+                { value: 'pending', label: 'Ожидает' }
+              ]}
+              style={{ 
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
+            />
+            <MacOSSelect
               value={reportFilterDateRange}
               onChange={(e) => setReportFilterDateRange(e.target.value)}
-              className="px-3 py-2 rounded-lg border focus:ring-2"
-              style={{ border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="">Все время</option>
-              <option value="today">Сегодня</option>
-              <option value="week">Неделя</option>
-              <option value="month">Месяц</option>
-            </select>
+              options={[
+                { value: '', label: 'Все время' },
+                { value: 'today', label: 'Сегодня' },
+                { value: 'week', label: 'Неделя' },
+                { value: 'month', label: 'Месяц' }
+              ]}
+              style={{ 
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
+            />
           </div>
 
           {/* Таблица отчетов */}
-          <div className="overflow-x-auto">
+          <div style={{ overflowX: 'auto' }}>
             {reportsLoading ? (
-              <LoadingSkeleton type="table" count={5} />
+              <MacOSLoadingSkeleton type="table" count={5} />
             ) : reportsError ? (
               <EmptyState
                 type="error"
                 title="Ошибка загрузки отчетов"
                 description="Не удалось загрузить список отчетов"
                 action={
-                  <Button onClick={() => window.location.reload()}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
+                  <MacOSButton onClick={() => window.location.reload()}>
+                    <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                     Обновить
-                  </Button>
+                  </MacOSButton>
                 }
               />
             ) : reports.length === 0 ? (
@@ -2798,82 +3797,180 @@ const AdminPanel = () => {
                   : 'В системе пока нет отчетов'
                 }
                 action={
-                  <Button onClick={handleOpenReportGenerator}>
-                    <Plus className="w-4 h-4 mr-2" />
+                  <MacOSButton onClick={handleOpenReportGenerator}>
+                    <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                     Создать первый отчет
-                  </Button>
+                  </MacOSButton>
                 }
               />
             ) : (
-              <table className="w-full" role="table" aria-label="Таблица отчетов">
+              <table style={{ width: '100%' }} role="table" aria-label="Таблица отчетов">
                 <thead>
-                  <tr className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Название</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Тип</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Статус</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Период</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Размер</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Скачиваний</th>
-                    <th scope="col" className="text-left py-3 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>Действия</th>
+                  <tr style={{ borderBottom: '1px solid var(--mac-separator)' }}>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Название</th>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Тип</th>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Статус</th>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Период</th>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Размер</th>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Скачиваний</th>
+                    <th scope="col" style={{ 
+                      textAlign: 'left', 
+                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reports.map((report) => (
-                    <tr key={report.id} className="border-b hover:bg-gray-50" style={{ borderColor: 'var(--border-color)' }}>
-                      <td className="py-3 px-4">
+                    <tr 
+                      key={report.id} 
+                      style={{ 
+                        borderBottom: '1px solid var(--mac-separator)',
+                        transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
                         <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{report.name}</p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{report.description}</p>
+                          <p style={{ 
+                            fontWeight: 'var(--mac-font-weight-medium)', 
+                            fontSize: 'var(--mac-font-size-base)',
+                            color: 'var(--mac-text-primary)',
+                            margin: 0
+                          }}>{report.name}</p>
+                          <p style={{ 
+                            fontSize: 'var(--mac-font-size-sm)', 
+                            color: 'var(--mac-text-secondary)',
+                            margin: '4px 0 0 0'
+                          }}>{report.description}</p>
                         </div>
                       </td>
-                      <td className="py-3 px-4">
-                        <Badge variant="info">
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <MacOSBadge variant="info">
                           {getReportTypeLabel(report.type)}
-                        </Badge>
+                        </MacOSBadge>
                       </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={getStatusVariant(report.status)}>
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <MacOSBadge variant={getStatusVariant(report.status)}>
                           {getStatusLabel(report.status)}
-                        </Badge>
+                        </MacOSBadge>
                       </td>
-                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <td style={{ 
+                        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        color: 'var(--mac-text-secondary)' 
+                      }}>
                         {formatDateRange(report.dateRange)}
                       </td>
-                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <td style={{ 
+                        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        color: 'var(--mac-text-secondary)' 
+                      }}>
                         {report.fileSize || '-'}
                       </td>
-                      <td className="py-3 px-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <td style={{ 
+                        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        color: 'var(--mac-text-secondary)' 
+                      }}>
                         {report.downloadCount}
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center space-x-2">
+                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
                           {report.status === 'completed' && (
                             <button 
                               onClick={() => handleDownloadReport(report.id)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                              style={{ color: 'var(--text-secondary)' }}
+                              style={{ 
+                                padding: 'var(--mac-spacing-2)',
+                                borderRadius: 'var(--mac-radius-sm)',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--mac-text-secondary)',
+                                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               title="Скачать"
                             >
-                              <Download className="w-4 h-4" />
+                              <Download style={{ width: '16px', height: '16px' }} />
                             </button>
                           )}
                           {report.status === 'failed' && (
                             <button 
                               onClick={() => handleRegenerateReport(report.id)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors" 
-                              style={{ color: 'var(--warning-color)' }}
+                              style={{ 
+                                padding: 'var(--mac-spacing-2)',
+                                borderRadius: 'var(--mac-radius-sm)',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--mac-warning)',
+                                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               title="Повторить генерацию"
                             >
-                              <RefreshCw className="w-4 h-4" />
+                              <RefreshCw style={{ width: '16px', height: '16px' }} />
                             </button>
                           )}
                           <button 
                             onClick={() => handleDeleteReport(report.id)}
-                            className="p-1 hover:bg-red-100 rounded transition-colors" 
-                            style={{ color: 'var(--danger-color)' }}
+                            style={{ 
+                              padding: 'var(--mac-spacing-2)',
+                              borderRadius: 'var(--mac-radius-sm)',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--mac-danger)',
+                              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                             title="Удалить"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 style={{ width: '16px', height: '16px' }} />
                           </button>
                         </div>
                       </td>
@@ -2883,21 +3980,40 @@ const AdminPanel = () => {
               </table>
             )}
           </div>
-        </Card>
+        </MacOSCard>
 
         {/* Генератор отчетов */}
         {showReportGenerator && (
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+           <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              marginBottom: '24px' 
+            }}>
+              <h2 style={{ 
+                fontSize: 'var(--mac-font-size-xl)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
                 Генератор отчетов
               </h2>
               <button
                 onClick={() => setShowReportGenerator(false)}
-                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                style={{ color: 'var(--text-secondary)' }}
+                style={{ 
+                  padding: 'var(--mac-spacing-2)',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--mac-text-secondary)',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <X className="w-5 h-5" />
+                <X style={{ width: '20px', height: '20px' }} />
               </button>
             </div>
             <ReportGenerator
@@ -2909,7 +4025,7 @@ const AdminPanel = () => {
               selectedReportType={selectedReportType}
               onReportTypeChange={setSelectedReportType}
             />
-          </Card>
+          </MacOSCard>
         )}
       </div>
     );
@@ -2919,92 +4035,347 @@ const AdminPanel = () => {
     const settingsStats = getSettingsStats();
 
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика настроек */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего настроек</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{settingsStats.totalSettings}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Всего настроек</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{settingsStats.totalSettings}</p>
               </div>
-              <Settings className="w-8 h-8" style={{ color: 'var(--accent-color)' }} />
+              <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Настроено</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--success-color)' }}>{settingsStats.configuredSettings}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Настроено</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-success)',
+                  margin: '4px 0 0 0'
+                }}>{settingsStats.configuredSettings}</p>
               </div>
-              <CheckCircle className="w-8 h-8" style={{ color: 'var(--success-color)' }} />
+              <CheckCircle style={{ width: '32px', height: '32px', color: 'var(--mac-success)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Завершенность</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--info-color)' }}>{settingsStats.configurationPercentage}%</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Завершенность</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-info)',
+                  margin: '4px 0 0 0'
+                }}>{settingsStats.configurationPercentage}%</p>
               </div>
-              <BarChart3 className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+              <BarChart3 style={{ width: '32px', height: '32px', color: 'var(--mac-info)' }} />
             </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          </MacOSCard>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Безопасность</p>
-                <p className="text-2xl font-bold" style={{ color: settingsStats.securityEnabled ? 'var(--success-color)' : 'var(--warning-color)' }}>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Безопасность</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: settingsStats.securityEnabled ? 'var(--mac-success)' : 'var(--mac-warning)',
+                  margin: '4px 0 0 0'
+                }}>
                   {settingsStats.securityEnabled ? 'Вкл' : 'Выкл'}
                 </p>
               </div>
-              <Shield className="w-8 h-8" style={{ color: settingsStats.securityEnabled ? 'var(--success-color)' : 'var(--warning-color)' }} />
+              <Shield style={{ 
+                width: '32px', 
+                height: '32px', 
+                color: settingsStats.securityEnabled ? 'var(--mac-success)' : 'var(--mac-warning)' 
+              }} />
             </div>
-          </Card>
+          </MacOSCard>
         </div>
 
         {/* Кнопки действий */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button onClick={() => setSettingsSubTab('general')}>
-              <Settings className="w-4 h-4 mr-2" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <MacOSButton onClick={() => setSettingsSubTab('general')}>
+              <Settings style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Общие настройки
-            </Button>
-            <Button onClick={() => setSettingsSubTab('security')}>
-              <Shield className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton onClick={() => setSettingsSubTab('security')}>
+              <Shield style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Безопасность
-            </Button>
+            </MacOSButton>
+            <MacOSButton onClick={() => setSettingsSubTab('theme')}>
+              <Palette style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              Цветовые схемы
+            </MacOSButton>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" onClick={handleExportSettings}>
-              <Download className="w-4 h-4 mr-2" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MacOSButton variant="outline" onClick={handleExportSettings}>
+              <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Экспорт
-            </Button>
+            </MacOSButton>
             <input
               type="file"
               accept=".json"
               onChange={(e) => e.target.files[0] && handleImportSettings(e.target.files[0])}
-              className="hidden"
+              style={{ display: 'none' }}
               id="import-settings"
             />
-            <Button variant="outline" onClick={() => document.getElementById('import-settings').click()}>
-              <Upload className="w-4 h-4 mr-2" />
+            <MacOSButton variant="outline" onClick={() => document.getElementById('import-settings').click()}>
+              <Upload style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Импорт
-            </Button>
-            <Button variant="outline" onClick={handleResetSettings}>
-              <RefreshCw className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton variant="outline" onClick={handleResetSettings}>
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Сбросить
-            </Button>
+            </MacOSButton>
           </div>
         </div>
 
-        {/* Настройки клиники */}
+        {/* Общие настройки */}
         {settingsSubTab === 'general' && (
-          <ClinicSettings
-            settings={settings}
-            onSave={handleSaveSettings}
-            loading={settingsLoading}
-          />
+           <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '20px',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Общие настройки системы
+            </h3>
+            <div style={{ display: 'grid', gap: '16px' }}>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Название клиники
+                </label>
+                <MacOSInput
+                  value={settings?.clinicName || ''}
+                  onChange={(e) => handleSaveSettings({ ...settings, clinicName: e.target.value })}
+                  placeholder="Введите название клиники"
+                />
+              </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Адрес клиники
+                </label>
+                <MacOSTextarea
+                  value={settings?.clinicAddress || ''}
+                  onChange={(e) => handleSaveSettings({ ...settings, clinicAddress: e.target.value })}
+                  placeholder="Введите адрес клиники"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Телефон клиники
+                </label>
+                <MacOSInput
+                  value={settings?.clinicPhone || ''}
+                  onChange={(e) => handleSaveSettings({ ...settings, clinicPhone: e.target.value })}
+                  placeholder="Введите телефон клиники"
+                />
+              </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Email клиники
+                </label>
+                <MacOSInput
+                  type="email"
+                  value={settings?.clinicEmail || ''}
+                  onChange={(e) => handleSaveSettings({ ...settings, clinicEmail: e.target.value })}
+                  placeholder="Введите email клиники"
+                />
+              </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Часовой пояс
+                </label>
+                <MacOSSelect
+                  value={settings?.timezone || 'Europe/Moscow'}
+                  onChange={(e) => handleSaveSettings({ ...settings, timezone: e.target.value })}
+                  options={[
+                    { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
+                    { value: 'Asia/Tashkent', label: 'Ташкент (UTC+5)' },
+                    { value: 'Asia/Almaty', label: 'Алматы (UTC+6)' },
+                    { value: 'Asia/Dubai', label: 'Дубай (UTC+4)' },
+                    { value: 'UTC', label: 'UTC (UTC+0)' }
+                  ]}
+                  placeholder="Выберите часовой пояс"
+                />
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-tertiary)',
+                  marginTop: '4px',
+                  marginBottom: 0
+                }}>
+                  Используется для расписания и онлайн-очереди
+                </p>
+              </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Логотип клиники
+                </label>
+                
+                {/* Текущий логотип */}
+                {(settings?.logoUrl || logoPreview) && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ 
+                      width: '128px', 
+                      height: '80px', 
+                      border: '2px dashed var(--mac-border)', 
+                      borderRadius: 'var(--mac-radius-md)',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      backgroundColor: 'var(--mac-bg-secondary)',
+                      overflow: 'hidden'
+                    }}>
+                      <img
+                        src={logoPreview || settings.logoUrl}
+                        alt="Логотип клиники"
+                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                      />
+                    </div>
+                    {logoPreview && (
+                      <MacOSButton 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={resetLogo}
+                        style={{ marginTop: '8px' }}
+                      >
+                        Отменить
+                      </MacOSButton>
+                    )}
+                  </div>
+                )}
+                
+                {/* Загрузка логотипа */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoSelect}
+                    style={{ display: 'none' }}
+                    id="logo-upload"
+                  />
+                  <MacOSButton 
+                    variant="outline"
+                    onClick={() => document.getElementById('logo-upload').click()}
+                  >
+                    <Upload style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                    Выбрать файл
+                  </MacOSButton>
+                </div>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-tertiary)',
+                  marginTop: '4px',
+                  marginBottom: 0
+                }}>
+                  Поддерживаются форматы: JPG, PNG, GIF. Максимальный размер: 5MB
+                </p>
+              </div>
+            </div>
+            <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+              <MacOSButton 
+                onClick={() => handleSaveSettings(settings)}
+                loading={settingsLoading}
+              >
+                Сохранить настройки
+              </MacOSButton>
+              <MacOSButton 
+                variant="outline" 
+                onClick={() => setSettings(prev => ({ ...prev, ...defaultSettings }))}
+              >
+                Сбросить к умолчанию
+              </MacOSButton>
+              <MacOSButton 
+                variant="outline" 
+                onClick={() => window.location.reload()}
+              >
+                <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                Обновить
+              </MacOSButton>
+            </div>
+          </MacOSCard>
         )}
 
         {/* Настройки безопасности */}
@@ -3015,6 +4386,11 @@ const AdminPanel = () => {
             loading={settingsLoading}
           />
         )}
+
+        {/* Настройки цветовых схем */}
+        {settingsSubTab === 'theme' && (
+          <ColorSchemeSelector />
+        )}
       </div>
     );
   };
@@ -3024,97 +4400,158 @@ const AdminPanel = () => {
     const securityTrends = getSecurityTrends();
 
     return (
-      <div className="space-y-6">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Статистика безопасности */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего угроз</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{securityStats.totalThreats}</p>
-                <div className="flex items-center mt-1">
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Всего угроз</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{securityStats.totalThreats}</p>
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                   {securityTrends.threats.change > 0 ? (
-                    <TrendingUp className="w-3 h-3 mr-1" style={{ color: 'var(--danger-color)' }} />
+                    <TrendingUp style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-error)' }} />
                   ) : (
-                    <TrendingDown className="w-3 h-3 mr-1" style={{ color: 'var(--success-color)' }} />
+                    <TrendingDown style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-success)' }} />
                   )}
-                  <span className="text-xs" style={{ color: securityTrends.threats.change > 0 ? 'var(--danger-color)' : 'var(--success-color)' }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: securityTrends.threats.change > 0 ? 'var(--mac-error)' : 'var(--mac-success)' 
+                  }}>
                     {Math.abs(securityTrends.threats.change).toFixed(1)}%
                   </span>
                 </div>
               </div>
-              <AlertTriangle className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
+              <AlertTriangle style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
             </div>
-          </Card>
+          </MacOSCard>
 
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Критические</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>{securityStats.criticalThreats}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Критические</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-error)',
+                  margin: '4px 0 0 0'
+                }}>{securityStats.criticalThreats}</p>
               </div>
-              <XCircle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+              <XCircle style={{ width: '32px', height: '32px', color: 'var(--mac-error)' }} />
             </div>
-          </Card>
+          </MacOSCard>
 
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Заблокированные IP</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{securityStats.blockedIPs}</p>
-                <div className="flex items-center mt-1">
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Заблокированные IP</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>{securityStats.blockedIPs}</p>
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                   {securityTrends.blockedIPs.change > 0 ? (
-                    <TrendingUp className="w-3 h-3 mr-1" style={{ color: 'var(--danger-color)' }} />
+                    <TrendingUp style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-error)' }} />
                   ) : (
-                    <TrendingDown className="w-3 h-3 mr-1" style={{ color: 'var(--success-color)' }} />
+                    <TrendingDown style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-success)' }} />
                   )}
-                  <span className="text-xs" style={{ color: securityTrends.blockedIPs.change > 0 ? 'var(--danger-color)' : 'var(--success-color)' }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: securityTrends.blockedIPs.change > 0 ? 'var(--mac-error)' : 'var(--mac-success)' 
+                  }}>
                     {Math.abs(securityTrends.blockedIPs.change).toFixed(1)}%
                   </span>
                 </div>
               </div>
-              <Globe className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+              <Globe style={{ width: '32px', height: '32px', color: 'var(--mac-info)' }} />
             </div>
-          </Card>
+          </MacOSCard>
 
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
+          <MacOSCard 
+            style={{ padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Оценка безопасности</p>
-                <p className="text-2xl font-bold" style={{ color: securityStats.securityScore >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }}>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>Оценка безопасности</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: securityStats.securityScore >= 80 ? 'var(--mac-success)' : 'var(--mac-warning)',
+                  margin: '4px 0 0 0'
+                }}>
                   {securityStats.securityScore}%
                 </p>
-                <div className="flex items-center mt-1">
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '4px' }}>
                   {securityTrends.securityScore.change > 0 ? (
-                    <TrendingUp className="w-3 h-3 mr-1" style={{ color: 'var(--success-color)' }} />
+                    <TrendingUp style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-success)' }} />
                   ) : (
-                    <TrendingDown className="w-3 h-3 mr-1" style={{ color: 'var(--danger-color)' }} />
+                    <TrendingDown style={{ width: '12px', height: '12px', marginRight: '4px', color: 'var(--mac-error)' }} />
                   )}
-                  <span className="text-xs" style={{ color: securityTrends.securityScore.change > 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: securityTrends.securityScore.change > 0 ? 'var(--mac-success)' : 'var(--mac-error)' 
+                  }}>
                     {Math.abs(securityTrends.securityScore.change).toFixed(1)}%
                   </span>
                 </div>
               </div>
-              <Shield className="w-8 h-8" style={{ color: securityStats.securityScore >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }} />
+              <Shield style={{ width: '32px', height: '32px', color: securityStats.securityScore >= 80 ? 'var(--mac-success)' : 'var(--mac-warning)' }} />
             </div>
-          </Card>
+          </MacOSCard>
         </div>
 
         {/* Кнопки действий */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button onClick={() => loadSecurityData()}>
-              <RefreshCw className="w-4 h-4 mr-2" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <MacOSButton onClick={() => loadSecurityData()}>
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Обновить данные
-            </Button>
-            <Button variant="outline" onClick={() => handleExportSecurityLogs('json')}>
-              <Download className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton variant="outline" onClick={() => handleExportSecurityLogs('json')}>
+              <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Экспорт JSON
-            </Button>
-            <Button variant="outline" onClick={() => handleExportSecurityLogs('csv')}>
-              <Download className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton variant="outline" onClick={() => handleExportSecurityLogs('csv')}>
+              <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Экспорт CSV
-            </Button>
+            </MacOSButton>
           </div>
         </div>
 
@@ -3130,17 +4567,35 @@ const AdminPanel = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div style={{ 
+        minHeight: '100vh', 
+        backgroundColor: 'var(--mac-bg-primary)', 
+        padding: '24px' 
+      }}>
+        <div style={{ 
+          maxWidth: '1280px', 
+          margin: '0 auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '24px' 
+        }}>
+          <MacOSLoadingSkeleton style={{ height: '32px', width: '256px' }} />
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+            gap: '16px' 
+          }}>
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-24" />
+              <MacOSLoadingSkeleton key={i} style={{ height: '96px' }} />
             ))}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-80" />
-            <Skeleton className="h-80" />
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '24px' 
+          }}>
+            <MacOSLoadingSkeleton style={{ height: '320px' }} />
+            <MacOSLoadingSkeleton style={{ height: '320px' }} />
           </div>
         </div>
       </div>
@@ -3148,47 +4603,32 @@ const AdminPanel = () => {
   }
 
   const pageStyle = {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+    background: 'var(--mac-bg-sidebar)',
+    borderRight: '1px solid var(--mac-separator)',
+    borderLeft: '1px solid var(--mac-separator)',
+    borderTop: '1px solid var(--mac-separator)',
+    borderBottom: '1px solid var(--mac-separator)',
+    borderRadius: 'var(--mac-radius-lg)',
+    boxShadow: 'var(--mac-shadow-md)',
+    backdropFilter: 'var(--mac-blur-light)',
+    WebkitBackdropFilter: 'var(--mac-blur-light)',
     padding: 0,
     margin: 0,
-    fontFamily: 'system-ui, -apple-system, sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+    color: 'var(--mac-text-primary)',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
   };
 
   const containerStyle = {
     maxWidth: '1400px',
-    margin: '0 auto',
-    padding: `${getSpacing('xl')} ${getSpacing('lg')}`
+    margin: '0 auto'
   };
 
   return (
     <div style={pageStyle}>
       <div style={containerStyle}>
-        {/* Заголовок страницы (внутри контента) */}
-        <div style={{ marginBottom: getSpacing('xl') }}>
-          <h1 style={{ 
-            fontSize: getFontSize('3xl'),
-            fontWeight: '700',
-            color: 'var(--color-text-primary)',
-            marginBottom: getSpacing('xs'),
-            background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}>
-            🏥 Панель администратора
-          </h1>
-          <p style={{ 
-            fontSize: getFontSize('lg'),
-            color: 'var(--color-text-secondary)',
-            fontWeight: '400'
-          }}>
-            Управление системой клиники
-          </p>
-        </div>
         
-        {/* Навигация */}
-        <AdminNavigation sections={navigationSections} />
+        {/* Навигация теперь через глобальный сайдбар в App.jsx */}
 
         {/* Мобильная навигация */}
         <MobileNavigation 
@@ -3203,7 +4643,11 @@ const AdminPanel = () => {
           transform: animationsStarted ? 'translateY(0)' : 'translateY(20px)',
           transition: 'opacity 0.3s ease, transform 0.4s ease'
         }}>
+          <div style={{ 
+            padding: current === 'analytics' || current === 'payment-providers' || current === 'clinic-management' || current === 'clinic-settings' || current === 'queue-settings' || current === 'queue-limits' || current === 'ai-imaging' || current === 'treatment-recommendations' ? '0' : '12px'
+        }}>
           {renderContent()}
+          </div>
         </div>
         
         {/* Модальное окно горячих клавиш */}

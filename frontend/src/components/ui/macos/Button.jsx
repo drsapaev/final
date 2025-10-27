@@ -26,11 +26,11 @@ const Button = React.forwardRef(({
       alignItems: 'center',
       justifyContent: 'center',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
-      fontWeight: '500',
-      borderRadius: '6px',
+      fontWeight: '400', // Стандартный вес macOS
+      borderRadius: 'var(--mac-radius-md)', // Стандартный радиус macOS
       border: 'none',
       cursor: disabled || loading ? 'not-allowed' : 'pointer',
-      transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+      transition: 'all var(--mac-duration-normal) var(--mac-ease)',
       position: 'relative',
       overflow: 'hidden',
       outline: 'none',
@@ -44,19 +44,19 @@ const Button = React.forwardRef(({
     const sizeStyles = {
       small: {
         padding: '6px 12px',
-        fontSize: '11px',
-        minHeight: '24px',
+        fontSize: 'var(--mac-font-size-xs)',
+        minHeight: '28px',
         gap: '4px'
       },
       default: {
         padding: '8px 16px',
-        fontSize: '13px',
+        fontSize: 'var(--mac-font-size-base)',
         minHeight: '32px',
         gap: '6px'
       },
       large: {
-        padding: '12px 24px',
-        fontSize: '15px',
+        padding: '12px 20px',
+        fontSize: 'var(--mac-font-size-lg)',
         minHeight: '40px',
         gap: '8px'
       }
@@ -64,47 +64,60 @@ const Button = React.forwardRef(({
 
     const variantStyles = {
       default: {
-        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : 'rgba(0, 0, 0, 0.05)',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
-        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : 'rgba(0, 0, 0, 0.1)'}`
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        color: 'var(--mac-text-primary)',
+        border: '1px solid rgba(0, 0, 0, 0.1)'
       },
       primary: {
-        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#007aff',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
-        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#007aff'}`,
-        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: '#007aff',
+        color: 'white',
+        border: '1px solid #007aff',
+        boxShadow: '0 2px 8px rgba(0, 122, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.12)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
       },
       secondary: {
-        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : 'rgba(0, 0, 0, 0.05)',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
-        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : 'rgba(0, 0, 0, 0.1)'}`
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        color: 'var(--mac-text-primary)',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
       },
       success: {
-        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#34c759',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
-        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#34c759'}`,
-        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: '#34c759',
+        color: 'white',
+        border: '1px solid #34c759',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       warning: {
-        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#ff9500',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
-        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#ff9500'}`,
-        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: '#ff9500',
+        color: 'white',
+        border: '1px solid #ff9500',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       danger: {
-        backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : '#ff3b30',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'white',
-        border: `1px solid ${disabled ? 'var(--mac-disabled-border, rgba(0, 0, 0, 0.1))' : '#ff3b30'}`,
-        boxShadow: disabled ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
+        backgroundColor: '#ff3b30',
+        color: 'white',
+        border: '1px solid #ff3b30',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)'
       },
       ghost: {
-        backgroundColor: disabled ? 'transparent' : 'transparent',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
-        border: '1px solid transparent'
+        backgroundColor: 'transparent',
+        color: 'var(--mac-text-primary)',
+        border: '1px solid transparent',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
+      },
+      outline: {
+        backgroundColor: 'transparent',
+        color: 'var(--mac-text-primary)',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)'
       },
       link: {
         backgroundColor: 'transparent',
-        color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : '#007aff',
+        color: '#007aff',
         border: 'none',
         padding: '4px 8px',
         textDecoration: 'none'
@@ -116,6 +129,10 @@ const Button = React.forwardRef(({
       ...sizeStyles[size],
       ...variantStyles[variant],
       ...(fullWidth && { width: '100%' }),
+      ...(disabled && {
+        opacity: 0.5,
+        pointerEvents: 'none'
+      }),
       ...style
     };
   };
@@ -193,7 +210,7 @@ const Button = React.forwardRef(({
         />
       )}
 
-      <style jsx>{`
+      <style>{`
         @keyframes mac-spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
@@ -209,9 +226,8 @@ const Button = React.forwardRef(({
 
         /* Focus ring for accessibility */
         button:focus-visible {
-          outline: var(--mac-focus-outline-width) solid var(--mac-focus-color);
+          outline: 2px solid #007aff;
           outline-offset: 2px;
-          box-shadow: var(--mac-focus-ring);
         }
 
         /* Dark mode adjustments */
