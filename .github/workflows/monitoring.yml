@@ -194,7 +194,7 @@ jobs:
         echo '*Отчёт создан автоматически GitHub Actions*' >> monitoring-report.md
         
     - name: 📤 Загрузка отчёта мониторинга
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: monitoring-report
         path: monitoring-report.md
