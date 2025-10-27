@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, CardContent, Typography, Box, IconButton } from '@mui/material';
-import { GetApp, Close, Smartphone, Computer } from '@mui/icons-material';
+import { Button, Card, CardContent, Typography, Box } from './ui/macos';
+import { Download, X, Smartphone, Monitor } from 'lucide-react';
 
 const PWAInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -70,43 +70,49 @@ const PWAInstallPrompt = () => {
 
   return (
     <Card 
-      sx={{ 
+      style={{ 
         position: 'fixed', 
         bottom: 16, 
         right: 16, 
         zIndex: 1000,
         maxWidth: 350,
-        boxShadow: 3
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
       }}
     >
       <CardContent>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-          <Box display="flex" alignItems="center" gap={1}>
-            <Smartphone color="primary" />
+        <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <Box style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Smartphone size={20} color="#007aff" />
             <Typography variant="h6" component="h3">
               Установить приложение
             </Typography>
           </Box>
-          <IconButton size="small" onClick={handleDismiss}>
-            <Close />
-          </IconButton>
+          <Button
+            variant="ghost"
+            size="small"
+            onClick={handleDismiss}
+            style={{ padding: '4px', minWidth: 'auto' }}
+          >
+            <X size={16} />
+          </Button>
         </Box>
         
-        <Typography variant="body2" color="text.secondary" mb={2}>
+        <Typography variant="body2" color="secondary" style={{ marginBottom: 16 }}>
           Установите наше приложение для быстрого доступа и лучшего опыта работы
         </Typography>
         
-        <Box display="flex" gap={1} flexWrap="wrap">
+        <Box style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Button
-            variant="contained"
-            startIcon={<GetApp />}
+            variant="primary"
             onClick={handleInstallClick}
             size="small"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
+            <Download size={16} />
             Установить
           </Button>
           <Button
-            variant="outlined"
+            variant="outline"
             onClick={handleDismiss}
             size="small"
           >
@@ -114,9 +120,9 @@ const PWAInstallPrompt = () => {
           </Button>
         </Box>
         
-        <Box mt={2} display="flex" alignItems="center" gap={1}>
-          <Computer fontSize="small" color="action" />
-          <Typography variant="caption" color="text.secondary">
+        <Box style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Monitor size={14} color="#666" />
+          <Typography variant="caption" color="secondary">
             Доступно для установки на мобильных устройствах
           </Typography>
         </Box>

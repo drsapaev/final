@@ -1,17 +1,10 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import auth from '../../stores/auth.js';
-
-const item = {
-  display: 'block',
-  padding: '8px 10px',
-  borderRadius: 8,
-  color: 'var(--text-secondary)',
-  textDecoration: 'none',
-  transition: 'all 0.2s ease',
-};
+import { useTheme } from '../../contexts/ThemeContext.jsx';
 
 export default function Sidebar() {
+  const { getColor, getSpacing } = useTheme();
   const st = auth.getState();
   const profile = st.profile || st.user || {};
   const role = String(profile?.role || profile?.role_name || '').toLowerCase();
@@ -113,16 +106,33 @@ export default function Sidebar() {
   const items = [...byRole, ...common];
 
   return (
-    <aside style={{ width: 240, borderRight: '1px solid var(--border-color)', padding: 12, background: 'var(--bg-primary)' }}>
-      <div style={{ display: 'grid', gap: 6 }}>
+    <aside style={{
+      width: 240,
+      borderRight: `1px solid ${getColor('border')}`,
+      padding: getSpacing('md'),
+      background: getColor('surface')
+    }}>
+      <div style={{ display: 'grid', gap: getSpacing('sm') }}>
         {items.map(x => (
           <NavLink
             key={x.to}
             to={x.to}
             style={({ isActive }) => ({
-              ...item,
-              background: isActive ? 'var(--text-primary)' : 'transparent',
-              color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
+              display: 'block',
+              padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+              borderRadius: '8px',
+              color: isActive ? getColor('surface') : getColor('textSecondary'),
+              background: isActive ? getColor('primary', 500) : 'transparent',
+              textDecoration: 'none',
+              transition: 'all 0.2s ease',
+              fontSize: getSpacing('base'),
+              fontWeight: '500',
+              border: isActive ? 'none' : `1px solid ${getColor('border')}`,
+              ':hover': {
+                background: isActive ? getColor('primary', 600) : getColor('primary', 50),
+                color: isActive ? getColor('surface') : getColor('primary', 600),
+                transform: 'translateX(4px)'
+              }
             })}
           >
             {x.label}

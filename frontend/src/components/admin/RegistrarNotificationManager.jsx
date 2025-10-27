@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Badge, Input, Label, Select, Textarea } from '../ui/native';
+import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTextarea } from '../ui/macos';
 import { 
   Bell, 
   Users, 
@@ -17,12 +17,10 @@ import {
   Calendar,
   Activity
 } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const RegistrarNotificationManager = () => {
-  const { theme, getColor, getSpacing } = useTheme();
   const [activeTab, setActiveTab] = useState('send');
   const [loading, setLoading] = useState(false);
   const [registrars, setRegistrars] = useState([]);
@@ -142,65 +140,105 @@ const RegistrarNotificationManager = () => {
   };
 
   const renderSendTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Форма отправки уведомления */}
-      <Card style={{ padding: getSpacing('lg') }}>
+      <Card style={{ padding: '24px' }}>
         <h3 style={{ 
-          margin: `0 0 ${getSpacing('md')} 0`,
-          color: getColor('text', 900),
+          margin: '0 0 16px 0',
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)'
         }}>
-          <Send size={20} />
+          <Send style={{ width: '20px', height: '20px' }} />
           Отправить уведомление
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: getSpacing('md'), marginBottom: getSpacing('md') }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
           <div>
-            <Label>Тип уведомления</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Тип уведомления
+            </label>
+            <MacOSSelect
               value={notificationForm.alert_type}
               onChange={(e) => setNotificationForm({...notificationForm, alert_type: e.target.value})}
-            >
-              <option value="system_error">Системная ошибка</option>
-              <option value="payment_issue">Проблема с оплатой</option>
-              <option value="queue_overflow">Переполнение очереди</option>
-              <option value="equipment_failure">Неисправность оборудования</option>
-              <option value="security_alert">Безопасность</option>
-              <option value="maintenance">Техническое обслуживание</option>
-            </Select>
+              options={[
+                { value: 'system_error', label: 'Системная ошибка' },
+                { value: 'payment_issue', label: 'Проблема с оплатой' },
+                { value: 'queue_overflow', label: 'Переполнение очереди' },
+                { value: 'equipment_failure', label: 'Неисправность оборудования' },
+                { value: 'security_alert', label: 'Безопасность' },
+                { value: 'maintenance', label: 'Техническое обслуживание' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <Label>Приоритет</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Приоритет
+            </label>
+            <MacOSSelect
               value={notificationForm.priority}
               onChange={(e) => setNotificationForm({...notificationForm, priority: e.target.value})}
-            >
-              <option value="normal">Обычный</option>
-              <option value="warning">Предупреждение</option>
-              <option value="critical">Критический</option>
-            </Select>
+              options={[
+                { value: 'normal', label: 'Обычный' },
+                { value: 'warning', label: 'Предупреждение' },
+                { value: 'critical', label: 'Критический' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
         </div>
 
-        <div style={{ marginBottom: getSpacing('md') }}>
-          <Label>Отделение (опционально)</Label>
-          <Input
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px' 
+          }}>
+            Отделение (опционально)
+          </label>
+          <MacOSInput
             placeholder="Например: Кардиология, Стоматология"
             value={notificationForm.department}
             onChange={(e) => setNotificationForm({...notificationForm, department: e.target.value})}
+            style={{ width: '100%' }}
           />
         </div>
 
-        <div style={{ marginBottom: getSpacing('md') }}>
-          <Label>Текст уведомления</Label>
-          <Textarea
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px' 
+          }}>
+            Текст уведомления
+          </label>
+          <MacOSTextarea
             placeholder="Введите текст уведомления для регистраторов..."
             value={notificationForm.message}
             onChange={(e) => setNotificationForm({...notificationForm, message: e.target.value})}
             rows={4}
+            style={{ width: '100%' }}
           />
         </div>
 
@@ -210,47 +248,45 @@ const RegistrarNotificationManager = () => {
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm'),
-            backgroundColor: getColor('primary', 600),
-            color: 'white'
+            gap: '8px'
           }}
         >
-          {loading ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+          {loading ? <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} /> : <Send style={{ width: '16px', height: '16px' }} />}
           Отправить уведомление
         </Button>
       </Card>
 
       {/* Быстрые действия */}
-      <Card style={{ padding: getSpacing('lg') }}>
+      <Card style={{ padding: '24px' }}>
         <h3 style={{ 
-          margin: `0 0 ${getSpacing('md')} 0`,
-          color: getColor('text', 900),
+          margin: '0 0 16px 0',
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)'
         }}>
-          <Activity size={20} />
+          <Activity style={{ width: '20px', height: '20px' }} />
           Быстрые действия
         </h3>
 
-        <div style={{ display: 'flex', gap: getSpacing('md'), flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <Button 
             onClick={handleSendDailySummary}
             disabled={loading}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: getSpacing('sm'),
-              backgroundColor: getColor('blue', 600),
-              color: 'white'
+              gap: '8px'
             }}
           >
-            <Calendar size={16} />
+            <Calendar style={{ width: '16px', height: '16px' }} />
             Отправить ежедневную сводку
           </Button>
 
-          <div style={{ display: 'flex', gap: getSpacing('sm'), alignItems: 'center' }}>
-            <Input
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <MacOSInput
               placeholder="Текст тестового уведомления"
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
@@ -262,12 +298,10 @@ const RegistrarNotificationManager = () => {
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: getSpacing('sm'),
-                backgroundColor: getColor('green', 600),
-                color: 'white'
+                gap: '8px'
               }}
             >
-              <MessageSquare size={16} />
+              <MessageSquare style={{ width: '16px', height: '16px' }} />
               Тест
             </Button>
           </div>
@@ -277,21 +311,23 @@ const RegistrarNotificationManager = () => {
   );
 
   const renderRegistrarsTab = () => (
-    <Card style={{ padding: getSpacing('lg') }}>
+    <Card style={{ padding: '24px' }}>
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: getSpacing('lg')
+        marginBottom: '24px'
       }}>
         <h3 style={{ 
           margin: 0,
-          color: getColor('text', 900),
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)'
         }}>
-          <Users size={20} />
+          <Users style={{ width: '20px', height: '20px' }} />
           Активные регистраторы ({registrars.length})
         </h3>
         <Button 
@@ -299,22 +335,22 @@ const RegistrarNotificationManager = () => {
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          <RefreshCw size={16} />
+          <RefreshCw style={{ width: '16px', height: '16px' }} />
           Обновить
         </Button>
       </div>
 
-      <div style={{ display: 'grid', gap: getSpacing('md') }}>
+      <div style={{ display: 'grid', gap: '16px' }}>
         {registrars.map((registrar) => (
           <div
             key={registrar.id}
             style={{
-              padding: getSpacing('md'),
-              border: `1px solid ${getColor('gray', 200)}`,
-              borderRadius: '8px',
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-md)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
@@ -322,44 +358,42 @@ const RegistrarNotificationManager = () => {
           >
             <div>
               <div style={{ 
-                fontWeight: 'bold',
-                color: getColor('text', 900),
-                marginBottom: getSpacing('xs')
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '4px',
+                fontSize: 'var(--mac-font-size-sm)'
               }}>
                 {registrar.full_name || registrar.username}
               </div>
               <div style={{ 
-                fontSize: '14px',
-                color: getColor('text', 600),
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: getSpacing('md')
+                gap: '16px'
               }}>
                 {registrar.email && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                    <Mail size={14} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Mail style={{ width: '14px', height: '14px' }} />
                     {registrar.email}
                   </span>
                 )}
                 {registrar.phone && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                    <Phone size={18} style={{ color: '#3b82f6', fontWeight: 'bold' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Phone style={{ width: '16px', height: '16px', color: 'var(--mac-accent-blue)' }} />
                     {registrar.phone}
                   </span>
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {registrar.telegram_id && (
-                <Badge style={{ backgroundColor: getColor('blue', 100), color: getColor('blue', 800) }}>
+                <Badge variant="info">
                   Telegram
                 </Badge>
               )}
               <Badge 
-                style={{ 
-                  backgroundColor: registrar.is_active ? getColor('green', 100) : getColor('red', 100),
-                  color: registrar.is_active ? getColor('green', 800) : getColor('red', 800)
-                }}
+                variant={registrar.is_active ? 'success' : 'error'}
               >
                 {registrar.is_active ? 'Активен' : 'Неактивен'}
               </Badge>
@@ -371,8 +405,9 @@ const RegistrarNotificationManager = () => {
       {registrars.length === 0 && (
         <div style={{ 
           textAlign: 'center', 
-          padding: getSpacing('xl'),
-          color: getColor('text', 500)
+          padding: '32px',
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
         }}>
           Нет активных регистраторов
         </div>
@@ -381,21 +416,23 @@ const RegistrarNotificationManager = () => {
   );
 
   const renderStatsTab = () => (
-    <Card style={{ padding: getSpacing('lg') }}>
+    <Card style={{ padding: '24px' }}>
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: getSpacing('lg')
+        marginBottom: '24px'
       }}>
         <h3 style={{ 
           margin: 0,
-          color: getColor('text', 900),
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)'
         }}>
-          <BarChart3 size={20} />
+          <BarChart3 style={{ width: '20px', height: '20px' }} />
           Статистика уведомлений
         </h3>
         <Button 
@@ -403,105 +440,111 @@ const RegistrarNotificationManager = () => {
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          <RefreshCw size={16} />
+          <RefreshCw style={{ width: '16px', height: '16px' }} />
           Обновить
         </Button>
       </div>
 
       {stats ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md') }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <div style={{ 
-            padding: getSpacing('md'),
-            backgroundColor: getColor('blue', 50),
-            borderRadius: '8px',
-            textAlign: 'center'
+            padding: '16px',
+            backgroundColor: 'var(--mac-info-bg)',
+            borderRadius: 'var(--mac-radius-md)',
+            textAlign: 'center',
+            border: '1px solid var(--mac-info-border)'
           }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+            <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-blue)' }}>
               {stats.total_sent}
             </div>
-            <div style={{ color: getColor('text', 600) }}>Всего отправлено</div>
+            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Всего отправлено</div>
           </div>
 
           <div style={{ 
-            padding: getSpacing('md'),
-            backgroundColor: getColor('green', 50),
-            borderRadius: '8px',
-            textAlign: 'center'
+            padding: '16px',
+            backgroundColor: 'var(--mac-success-bg)',
+            borderRadius: 'var(--mac-radius-md)',
+            textAlign: 'center',
+            border: '1px solid var(--mac-success-border)'
           }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('green', 600) }}>
+            <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
               {stats.successful_deliveries}
             </div>
-            <div style={{ color: getColor('text', 600) }}>Успешно доставлено</div>
+            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Успешно доставлено</div>
           </div>
 
           <div style={{ 
-            padding: getSpacing('md'),
-            backgroundColor: getColor('red', 50),
-            borderRadius: '8px',
-            textAlign: 'center'
+            padding: '16px',
+            backgroundColor: 'var(--mac-error-bg)',
+            borderRadius: 'var(--mac-radius-md)',
+            textAlign: 'center',
+            border: '1px solid var(--mac-error-border)'
           }}>
-            <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('red', 600) }}>
+            <div style={{ fontSize: 'var(--mac-font-size-2xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-error)' }}>
               {stats.failed_deliveries}
             </div>
-            <div style={{ color: getColor('text', 600) }}>Ошибки доставки</div>
+            <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Ошибки доставки</div>
           </div>
         </div>
       ) : (
         <div style={{ 
           textAlign: 'center', 
-          padding: getSpacing('xl'),
-          color: getColor('text', 500)
+          padding: '32px',
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
         }}>
           Загрузка статистики...
         </div>
       )}
 
       {stats && stats.channels_stats && (
-        <div style={{ marginTop: getSpacing('lg') }}>
+        <div style={{ marginTop: '24px' }}>
           <h4 style={{ 
-            margin: `0 0 ${getSpacing('md')} 0`,
-            color: getColor('text', 900)
+            margin: '0 0 16px 0',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-base)',
+            fontWeight: 'var(--mac-font-weight-medium)'
           }}>
             Статистика по каналам
           </h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: getSpacing('md') }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
             <div style={{ 
-              padding: getSpacing('sm'),
-              border: `1px solid ${getColor('gray', 200)}`,
-              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-sm)',
               textAlign: 'center'
             }}>
-              <div style={{ fontWeight: 'bold', color: getColor('blue', 600) }}>
+              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-accent-blue)', fontSize: 'var(--mac-font-size-lg)' }}>
                 {stats.channels_stats.telegram}
               </div>
-              <div style={{ fontSize: '14px', color: getColor('text', 600) }}>Telegram</div>
+              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Telegram</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('sm'),
-              border: `1px solid ${getColor('gray', 200)}`,
-              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-sm)',
               textAlign: 'center'
             }}>
-              <div style={{ fontWeight: 'bold', color: getColor('green', 600) }}>
+              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)', fontSize: 'var(--mac-font-size-lg)' }}>
                 {stats.channels_stats.email}
               </div>
-              <div style={{ fontSize: '14px', color: getColor('text', 600) }}>Email</div>
+              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>Email</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('sm'),
-              border: `1px solid ${getColor('gray', 200)}`,
-              borderRadius: '6px',
+              padding: '12px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-sm)',
               textAlign: 'center'
             }}>
-              <div style={{ fontWeight: 'bold', color: getColor('orange', 600) }}>
+              <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-warning)', fontSize: 'var(--mac-font-size-lg)' }}>
                 {stats.channels_stats.sms}
               </div>
-              <div style={{ fontSize: '14px', color: getColor('text', 600) }}>SMS</div>
+              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>SMS</div>
             </div>
           </div>
         </div>
@@ -516,19 +559,19 @@ const RegistrarNotificationManager = () => {
   ];
 
   return (
-    <div style={{ padding: getSpacing('lg') }}>
+    <div style={{ padding: '24px' }}>
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: getSpacing('md'),
-        marginBottom: getSpacing('lg')
+        gap: '16px',
+        marginBottom: '24px'
       }}>
-        <Bell size={24} color={getColor('primary', 600)} />
+        <Bell style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
         <h2 style={{ 
           margin: 0, 
-          color: getColor('text', 900),
-          fontSize: '24px',
-          fontWeight: 'bold'
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-2xl)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
         }}>
           Уведомления регистратуры
         </h2>
@@ -537,34 +580,69 @@ const RegistrarNotificationManager = () => {
       {/* Вкладки */}
       <div style={{ 
         display: 'flex', 
-        borderBottom: `1px solid ${getColor('gray', 200)}`,
-        marginBottom: getSpacing('lg')
+        marginBottom: '24px'
       }}>
         {tabs.map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: `${getSpacing('md')} ${getSpacing('lg')}`,
+                padding: '12px 20px',
                 border: 'none',
-                background: 'none',
+                background: 'transparent',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: getSpacing('sm'),
-                borderBottom: activeTab === tab.id ? `2px solid ${getColor('primary', 600)}` : '2px solid transparent',
-                color: activeTab === tab.id ? getColor('primary', 600) : getColor('text', 600),
-                fontWeight: activeTab === tab.id ? 'bold' : 'normal'
+                gap: '8px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                position: 'relative',
+                marginBottom: '-1px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                }
               }}
             >
-              <Icon size={16} />
+              <Icon style={{ 
+                width: '16px', 
+                height: '16px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+              }} />
               {tab.label}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '3px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  borderRadius: '2px 2px 0 0'
+                }} />
+              )}
             </button>
           );
         })}
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Содержимое вкладок */}
       {activeTab === 'send' && renderSendTab()}

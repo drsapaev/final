@@ -14,7 +14,14 @@ import {
   Heart
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSInput, 
+  MacOSSelect, 
+  MacOSTextarea 
+} from '../ui/macos';
 
 const MedicalImageAnalyzer = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -33,12 +40,12 @@ const MedicalImageAnalyzer = () => {
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const imageTypes = [
-    { value: 'xray', label: 'Рентген', icon: <Image className="w-4 h-4" />, endpoint: 'analyze-xray' },
-    { value: 'ultrasound', label: 'УЗИ', icon: <Heart className="w-4 h-4" />, endpoint: 'analyze-ultrasound' },
-    { value: 'dermatoscopy', label: 'Дерматоскопия', icon: <Eye className="w-4 h-4" />, endpoint: 'analyze-dermatoscopy' },
-    { value: 'ct', label: 'КТ', icon: <Brain className="w-4 h-4" />, endpoint: 'analyze-medical-image' },
-    { value: 'mri', label: 'МРТ', icon: <Brain className="w-4 h-4" />, endpoint: 'analyze-medical-image' },
-    { value: 'endoscopy', label: 'Эндоскопия', icon: <Stethoscope className="w-4 h-4" />, endpoint: 'analyze-medical-image' }
+    { value: 'xray', label: 'Рентген', icon: <Image style={{ width: '16px', height: '16px' }} />, endpoint: 'analyze-xray' },
+    { value: 'ultrasound', label: 'УЗИ', icon: <Heart style={{ width: '16px', height: '16px' }} />, endpoint: 'analyze-ultrasound' },
+    { value: 'dermatoscopy', label: 'Дерматоскопия', icon: <Eye style={{ width: '16px', height: '16px' }} />, endpoint: 'analyze-dermatoscopy' },
+    { value: 'ct', label: 'КТ', icon: <Brain style={{ width: '16px', height: '16px' }} />, endpoint: 'analyze-medical-image' },
+    { value: 'mri', label: 'МРТ', icon: <Brain style={{ width: '16px', height: '16px' }} />, endpoint: 'analyze-medical-image' },
+    { value: 'endoscopy', label: 'Эндоскопия', icon: <Stethoscope style={{ width: '16px', height: '16px' }} />, endpoint: 'analyze-medical-image' }
   ];
 
   const handleFileSelect = useCallback((event) => {
@@ -143,66 +150,86 @@ const MedicalImageAnalyzer = () => {
     switch (imageType) {
       case 'xray':
         return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Область исследования
-              </label>
-              <input
-                type="text"
-                value={metadata.body_part}
-                onChange={(e) => handleMetadataChange('body_part', e.target.value)}
-                placeholder="Например: грудная клетка, позвоночник"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Область исследования
+            </label>
+            <MacOSInput
+              type="text"
+              value={metadata.body_part}
+              onChange={(e) => handleMetadataChange('body_part', e.target.value)}
+              placeholder="Например: грудная клетка, позвоночник"
+              style={{ width: '100%' }}
+            />
+          </div>
         );
       case 'ultrasound':
         return (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Исследуемый орган
-              </label>
-              <input
-                type="text"
-                value={metadata.organ}
-                onChange={(e) => handleMetadataChange('organ', e.target.value)}
-                placeholder="Например: печень, почки, сердце"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Исследуемый орган
+            </label>
+            <MacOSInput
+              type="text"
+              value={metadata.organ}
+              onChange={(e) => handleMetadataChange('organ', e.target.value)}
+              placeholder="Например: печень, почки, сердце"
+              style={{ width: '100%' }}
+            />
+          </div>
         );
       case 'dermatoscopy':
         return (
-          <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
                 Локализация образования
               </label>
-              <input
+              <MacOSInput
                 type="text"
                 value={metadata.lesion_location}
                 onChange={(e) => handleMetadataChange('lesion_location', e.target.value)}
                 placeholder="Например: спина, лицо, рука"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ width: '100%' }}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
                 Анамнез образования
               </label>
-              <textarea
+              <MacOSTextarea
                 value={metadata.lesion_history}
                 onChange={(e) => handleMetadataChange('lesion_history', e.target.value)}
                 placeholder="История появления и изменения образования"
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ width: '100%' }}
               />
             </div>
-          </>
+          </div>
         );
       default:
         return null;
@@ -214,46 +241,98 @@ const MedicalImageAnalyzer = () => {
 
     if (result.error) {
       return (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-            <h3 className="text-sm font-medium text-red-800">Ошибка анализа</h3>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-bg-primary)', 
+          border: '1px solid var(--mac-border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-danger)',
+              margin: 0
+            }}>
+              Ошибка анализа
+            </h3>
           </div>
-          <p className="mt-2 text-sm text-red-700">{result.error}</p>
-        </div>
+          <p style={{ 
+            marginTop: '8px',
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-danger)',
+            margin: '8px 0 0 0'
+          }}>
+            {result.error}
+          </p>
+        </MacOSCard>
       );
     }
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
           </h3>
-          <div className="flex space-x-2">
-            <button
-              onClick={exportResult}
-              className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Экспорт
-            </button>
-          </div>
+          <MacOSButton
+            onClick={exportResult}
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <Download style={{ width: '16px', height: '16px' }} />
+            Экспорт
+          </MacOSButton>
         </div>
 
         {/* Заключение */}
         {result.conclusion && (
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">Заключение</h4>
-            <p className="text-blue-800">{result.conclusion}</p>
-          </div>
+          <MacOSCard style={{ 
+            padding: '16px', 
+            backgroundColor: 'var(--mac-bg-primary)', 
+            border: '1px solid var(--mac-border)',
+            marginBottom: '16px'
+          }}>
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Заключение
+            </h4>
+            <p style={{ 
+              color: 'var(--mac-text-primary)', 
+              margin: 0,
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
+              {result.conclusion}
+            </p>
+          </MacOSCard>
         )}
 
         {/* Уровень уверенности */}
         {result.confidence_level && (
-          <div className="mb-4">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <div style={{ marginBottom: '16px' }}>
+            <span style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              padding: '4px 8px', 
+              borderRadius: 'var(--mac-radius-full)', 
+              fontSize: 'var(--mac-font-size-xs)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              backgroundColor: 'var(--mac-bg-secondary)', 
+              color: 'var(--mac-text-primary)',
+              border: '1px solid var(--mac-border)'
+            }}>
               Уверенность: {result.confidence_level}
             </span>
           </div>
@@ -261,19 +340,47 @@ const MedicalImageAnalyzer = () => {
 
         {/* Патологические находки */}
         {result.pathological_findings && result.pathological_findings.length > 0 && (
-          <div className="mb-4">
-            <h4 className="font-medium text-gray-900 mb-2">Патологические находки</h4>
-            <div className="space-y-2">
+          <div style={{ marginBottom: '16px' }}>
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Патологические находки
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {result.pathological_findings.map((finding, index) => (
-                <div key={index} className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <div className="font-medium text-yellow-800">{finding.finding}</div>
+                <MacOSCard key={index} style={{ 
+                  padding: '12px', 
+                  backgroundColor: 'var(--mac-bg-primary)', 
+                  border: '1px solid var(--mac-border)' 
+                }}>
+                  <div style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-warning)',
+                    marginBottom: '4px'
+                  }}>
+                    {finding.finding}
+                  </div>
                   {finding.location && (
-                    <div className="text-sm text-yellow-700">Локализация: {finding.location}</div>
+                    <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-warning)',
+                      marginBottom: '4px'
+                    }}>
+                      Локализация: {finding.location}
+                    </div>
                   )}
                   {finding.description && (
-                    <div className="text-sm text-yellow-700 mt-1">{finding.description}</div>
+                    <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-warning)',
+                      margin: 0
+                    }}>
+                      {finding.description}
+                    </div>
                   )}
-                </div>
+                </MacOSCard>
               ))}
             </div>
           </div>
@@ -281,9 +388,24 @@ const MedicalImageAnalyzer = () => {
 
         {/* Нормальные находки */}
         {result.normal_findings && result.normal_findings.length > 0 && (
-          <div className="mb-4">
-            <h4 className="font-medium text-gray-900 mb-2">Нормальные структуры</h4>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+          <div style={{ marginBottom: '16px' }}>
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Нормальные структуры
+            </h4>
+            <ul style={{ 
+              listStyleType: 'disc', 
+              paddingLeft: '20px', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)',
+              margin: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
               {result.normal_findings.map((finding, index) => (
                 <li key={index}>{finding}</li>
               ))}
@@ -293,13 +415,32 @@ const MedicalImageAnalyzer = () => {
 
         {/* Рекомендации */}
         {result.recommendations && (
-          <div className="mb-4">
-            <h4 className="font-medium text-gray-900 mb-2">Рекомендации</h4>
-            <div className="space-y-2 text-sm text-gray-600">
+          <div style={{ marginBottom: '16px' }}>
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Рекомендации
+            </h4>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '8px', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
               {result.recommendations.additional_studies && result.recommendations.additional_studies.length > 0 && (
                 <div>
-                  <strong>Дополнительные исследования:</strong>
-                  <ul className="list-disc list-inside ml-4">
+                  <strong style={{ color: 'var(--mac-text-primary)' }}>Дополнительные исследования:</strong>
+                  <ul style={{ 
+                    listStyleType: 'disc', 
+                    paddingLeft: '20px', 
+                    marginTop: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}>
                     {result.recommendations.additional_studies.map((study, index) => (
                       <li key={index}>{study}</li>
                     ))}
@@ -308,12 +449,12 @@ const MedicalImageAnalyzer = () => {
               )}
               {result.recommendations.follow_up && (
                 <div>
-                  <strong>Наблюдение:</strong> {result.recommendations.follow_up}
+                  <strong style={{ color: 'var(--mac-text-primary)' }}>Наблюдение:</strong> {result.recommendations.follow_up}
                 </div>
               )}
               {result.recommendations.specialist_consultation && (
                 <div>
-                  <strong>Консультация специалиста:</strong> {result.recommendations.specialist_consultation}
+                  <strong style={{ color: 'var(--mac-text-primary)' }}>Консультация специалиста:</strong> {result.recommendations.specialist_consultation}
                 </div>
               )}
             </div>
@@ -322,123 +463,248 @@ const MedicalImageAnalyzer = () => {
 
         {/* Срочные находки */}
         {result.urgent_findings && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-              <h4 className="font-medium text-red-800">Требует срочного внимания</h4>
+          <MacOSCard style={{ 
+            padding: '16px', 
+            backgroundColor: 'var(--mac-bg-primary)', 
+            border: '1px solid var(--mac-border)' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+              <h4 style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-danger)',
+                margin: 0
+              }}>
+                Требует срочного внимания
+              </h4>
             </div>
-          </div>
+          </MacOSCard>
         )}
-      </div>
+      </MacOSCard>
     );
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-            <Brain className="h-6 w-6 text-blue-600 mr-2" />
+    <div style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        {/* Заголовок */}
+        <div style={{ 
+          paddingBottom: '24px', 
+          borderBottom: '1px solid var(--mac-border)',
+          marginBottom: '24px'
+        }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 8px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Brain style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
             AI Анализ Медицинских Изображений
           </h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p style={{ 
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            margin: 0
+          }}>
             Загрузите медицинское изображение для автоматического анализа с помощью искусственного интеллекта
           </p>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Левая панель - загрузка и настройки */}
-            <div className="space-y-6">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+          gap: '24px' 
+        }}>
+          {/* Левая панель - загрузка и настройки */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Выбор типа изображения */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+              <MacOSCard style={{ padding: '24px' }}>
+                <h3 style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '12px' 
+                }}>
                   Тип медицинского изображения
-                </label>
-                <div className="grid grid-cols-2 gap-2">
+                </h3>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+                  gap: '12px' 
+                }}>
                   {imageTypes.map((type) => (
-                    <button
+                    <MacOSButton
                       key={type.value}
                       onClick={() => setImageType(type.value)}
-                      className={`flex items-center justify-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
-                        imageType === type.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
+                      variant={imageType === type.value ? "primary" : "outline"}
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '8px',
+                        padding: '12px 16px',
+                        fontSize: 'var(--mac-font-size-sm)',
+                        minHeight: '48px',
+                        backgroundColor: imageType === type.value ? 'var(--mac-accent-blue)' : 'transparent',
+                        border: imageType === type.value ? 'none' : '1px solid var(--mac-border)',
+                        color: imageType === type.value ? 'white' : 'var(--mac-text-primary)',
+                        borderRadius: 'var(--mac-radius-md)',
+                        transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                      }}
                     >
-                      {type.icon}
-                      <span className="ml-2">{type.label}</span>
-                    </button>
+                      <div style={{ 
+                        width: '16px', 
+                        height: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {type.icon}
+                      </div>
+                      <span style={{ 
+                        whiteSpace: 'nowrap',
+                        fontWeight: 'var(--mac-font-weight-medium)'
+                      }}>
+                        {type.label}
+                      </span>
+                    </MacOSButton>
                   ))}
                 </div>
-              </div>
+              </MacOSCard>
 
               {/* Загрузка файла */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <MacOSCard style={{ padding: '24px' }}>
+                <h3 style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '12px' 
+                }}>
                   Загрузить изображение
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
-                  <div className="space-y-1 text-center">
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="flex text-sm text-gray-600">
+                </h3>
+                <div style={{ 
+                  border: '2px dashed var(--mac-border)', 
+                  borderRadius: 'var(--mac-radius-md)', 
+                  padding: 0, 
+                  textAlign: 'center',
+                  backgroundColor: 'var(--mac-bg-secondary)',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.borderColor = 'var(--mac-accent-blue)';
+                  e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.borderColor = 'var(--mac-border)';
+                  e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <Upload style={{ width: '48px', height: '48px', color: 'var(--mac-text-secondary)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                       <label
                         htmlFor="file-upload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                        style={{ 
+                          cursor: 'pointer', 
+                          fontWeight: 'var(--mac-font-weight-medium)', 
+                          color: 'var(--mac-accent-blue)',
+                          textDecoration: 'underline'
+                        }}
                       >
                         <span>Выберите файл</span>
                         <input
                           id="file-upload"
                           name="file-upload"
                           type="file"
-                          className="sr-only"
+                          style={{ display: 'none' }}
                           accept="image/*"
                           onChange={handleFileSelect}
                         />
                       </label>
-                      <p className="pl-1">или перетащите сюда</p>
+                      <span>или перетащите сюда</span>
                     </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, JPEG до 10MB</p>
+                    <p style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', margin: 0 }}>
+                      PNG, JPG, JPEG до 10MB
+                    </p>
                   </div>
                 </div>
                 {selectedFile && (
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p style={{ 
+                    marginTop: '8px', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: '8px 0 0 0'
+                  }}>
                     Выбран файл: {selectedFile.name}
                   </p>
                 )}
-              </div>
+              </MacOSCard>
 
               {/* Метаданные */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700">Дополнительная информация</h3>
+              <MacOSCard style={{ padding: '24px' }}>
+                <h3 style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '16px' 
+                }}>
+                  Дополнительная информация
+                </h3>
                 
                 {/* Общие поля */}
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                  gap: '16px',
+                  marginBottom: '16px'
+                }}>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label style={{ 
+                      display: 'block', 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)', 
+                      marginBottom: '4px' 
+                    }}>
                       Возраст пациента
                     </label>
-                    <input
+                    <MacOSInput
                       type="text"
                       value={metadata.patient_age}
                       onChange={(e) => handleMetadataChange('patient_age', e.target.value)}
                       placeholder="Например: 45 лет"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      style={{ width: '100%' }}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label style={{ 
+                      display: 'block', 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)', 
+                      marginBottom: '4px' 
+                    }}>
                       Пол
                     </label>
-                    <select
+                    <MacOSSelect
                       value={metadata.patient_gender}
                       onChange={(e) => handleMetadataChange('patient_gender', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Не указан</option>
-                      <option value="мужской">Мужской</option>
-                      <option value="женский">Женский</option>
-                    </select>
+                      options={[
+                        { value: '', label: 'Не указан' },
+                        { value: 'мужской', label: 'Мужской' },
+                        { value: 'женский', label: 'Женский' }
+                      ]}
+                      style={{ width: '100%' }}
+                    />
                   </div>
                 </div>
 
@@ -447,63 +713,100 @@ const MedicalImageAnalyzer = () => {
 
                 {/* Клиническая информация */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '4px' 
+                  }}>
                     Клиническая информация
                   </label>
-                  <textarea
+                  <MacOSTextarea
                     value={metadata.clinical_info}
                     onChange={(e) => handleMetadataChange('clinical_info', e.target.value)}
                     placeholder="Жалобы, анамнез, предварительный диагноз"
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ width: '100%' }}
                   />
                 </div>
-              </div>
+              </MacOSCard>
 
               {/* Кнопка анализа */}
-              <button
+              <MacOSButton
                 onClick={analyzeImage}
                 disabled={!selectedFile || analyzing}
-                className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '8px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  border: 'none',
+                  width: '100%',
+                  padding: '12px 24px'
+                }}
               >
                 {analyzing ? (
                   <>
-                    <Loader className="animate-spin -ml-1 mr-3 h-5 w-5" />
+                    <Loader style={{ 
+                      width: '20px', 
+                      height: '20px',
+                      animation: 'spin 1s linear infinite'
+                    }} />
                     Анализируем...
                   </>
                 ) : (
                   <>
-                    <Brain className="h-5 w-5 mr-2" />
+                    <Brain style={{ width: '20px', height: '20px' }} />
                     Анализировать изображение
                   </>
                 )}
-              </button>
+              </MacOSButton>
             </div>
 
             {/* Правая панель - превью и результат */}
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Превью изображения */}
               {previewUrl && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Превью изображения</h3>
-                  <div className="border border-gray-200 rounded-lg p-4">
+                <MacOSCard style={{ padding: '24px' }}>
+                  <h3 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '12px' 
+                  }}>
+                    Превью изображения
+                  </h3>
+                  <div style={{ 
+                    border: '1px solid var(--mac-border)', 
+                    borderRadius: 'var(--mac-radius-md)', 
+                    padding: '16px',
+                    backgroundColor: 'var(--mac-bg-secondary)',
+                    textAlign: 'center'
+                  }}>
                     <img
                       src={previewUrl}
                       alt="Preview"
-                      className="max-w-full h-auto max-h-64 mx-auto rounded"
+                      style={{ 
+                        maxWidth: '100%', 
+                        height: 'auto', 
+                        maxHeight: '256px', 
+                        margin: '0 auto', 
+                        borderRadius: 'var(--mac-radius-sm)'
+                      }}
                     />
                   </div>
-                </div>
+                </MacOSCard>
               )}
 
               {/* Результат анализа */}
               {renderResult()}
             </div>
           </div>
-        </div>
+        </MacOSCard>
       </div>
-    </div>
-  );
+    );
 };
 
 export default MedicalImageAnalyzer;

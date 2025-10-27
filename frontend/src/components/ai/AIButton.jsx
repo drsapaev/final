@@ -1,25 +1,11 @@
-import React, { useState } from 'react';
-import {
-  Button,
-  IconButton,
-  Tooltip,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  CircularProgress
-} from '@mui/material';
-import {
-  Psychology,
-  AutoAwesome,
-  SmartToy,
-  PsychologyOutlined
-} from '@mui/icons-material';
+import React, { useState, useRef, useEffect } from 'react';
+import { Button } from '../../components/ui/macos';
+import { Brain, Sparkles, Bot } from 'lucide-react';
 
 const AIButton = ({ 
   onClick, 
   loading = false, 
-  variant = 'contained',
+  variant = 'default',
   size = 'medium',
   fullWidth = false,
   tooltip = 'AI анализ',
@@ -30,46 +16,50 @@ const AIButton = ({
   onProviderSelect = null,
   disabled = false
 }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (anchorRef.current && !anchorRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleClick = (event) => {
     if (providers && providers.length > 0) {
-      setAnchorEl(event.currentTarget);
+      setOpen((v) => !v);
     } else {
       onClick();
     }
   };
 
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
   const handleProviderClick = (provider) => {
-    handleClose();
-    if (onProviderSelect) {
-      onProviderSelect(provider);
-    }
+    setOpen(false);
+    if (onProviderSelect) onProviderSelect(provider);
     onClick(provider);
   };
 
   const getProviderIcon = (provider) => {
     switch (provider) {
       case 'openai':
-        return <SmartToy />;
+        return <Bot style={{ width: 16, height: 16 }} />;
       case 'gemini':
-        return <AutoAwesome />;
+        return <Sparkles style={{ width: 16, height: 16 }} />;
       case 'deepseek':
-        return <Psychology />;
+        return <Brain style={{ width: 16, height: 16 }} />;
       default:
-        return <Psychology />;
+        return <Brain style={{ width: 16, height: 16 }} />;
     }
   };
 
   const getProviderName = (provider) => {
     switch (provider) {
       case 'openai':
-        return 'OpenAI GPT-4';
+        return 'OpenAI';
       case 'gemini':
         return 'Google Gemini';
       case 'deepseek':
@@ -79,94 +69,48 @@ const AIButton = ({
     }
   };
 
-  if (variant === 'icon') {
-    return (
-      <>
-        <Tooltip title={tooltip}>
-          <span>
-            <IconButton
-              onClick={handleClick}
-              color={color}
-              disabled={loading || disabled}
-              size={size}
-            >
-              {loading ? (
-                <CircularProgress size={24} />
-              ) : (
-                <Psychology />
-              )}
-            </IconButton>
-          </span>
-        </Tooltip>
-        
-        {providers && (
-          <Menu
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleClose}
-          >
-            {providers.map((provider) => (
-              <MenuItem
-                key={provider}
-                onClick={() => handleProviderClick(provider)}
-              >
-                <ListItemIcon>
-                  {getProviderIcon(provider)}
-                </ListItemIcon>
-                <ListItemText>
-                  {getProviderName(provider)}
-                </ListItemText>
-              </MenuItem>
-            ))}
-          </Menu>
-        )}
-      </>
-    );
-  }
-
   return (
-    <>
+    <div style={{ position: 'relative', display: fullWidth ? 'block' : 'inline-block' }} ref={anchorRef} title={tooltip}>
       <Button
-        variant={variant}
-        color={color}
-        size={size}
+        variant={variant === 'contained' ? 'primary' : variant === 'outlined' ? 'outline' : 'default'}
+        size={size === 'small' ? 'small' : size === 'large' ? 'large' : 'default'}
         fullWidth={fullWidth}
         onClick={handleClick}
         disabled={loading || disabled}
-        startIcon={icon && !loading && <Psychology />}
+        style={{ minWidth: fullWidth ? '100%' : undefined }}
       >
         {loading ? (
-          <>
-            <CircularProgress size={20} sx={{ mr: 1 }} />
-            Анализ...
-          </>
+          'Анализ...'
         ) : (
-          text
+          <>
+            {icon && <Brain style={{ width: 16, height: 16, marginRight: 8 }} />}
+            {text}
+          </>
         )}
       </Button>
 
-      {providers && (
-        <Menu
-          anchorEl={anchorEl}
-          open={open}
-          onClose={handleClose}
-        >
+      {providers && open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, marginTop: 6, minWidth: 220,
+          background: 'var(--mac-bg-primary)', border: '1px solid var(--mac-border)', borderRadius: 8,
+          boxShadow: 'var(--mac-shadow-lg)', zIndex: 20
+        }}>
           {providers.map((provider) => (
-            <MenuItem
+            <button
               key={provider}
               onClick={() => handleProviderClick(provider)}
+              style={{
+                display: 'flex', alignItems: 'center', width: '100%', padding: '8px 12px',
+                background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left'
+              }}
             >
-              <ListItemIcon>
-                {getProviderIcon(provider)}
-              </ListItemIcon>
-              <ListItemText>
-                {getProviderName(provider)}
-              </ListItemText>
-            </MenuItem>
+              <span style={{ marginRight: 8 }}>{getProviderIcon(provider)}</span>
+              <span>{getProviderName(provider)}</span>
+            </button>
           ))}
-        </Menu>
+        </div>
       )}
-    </>
+    </div>
   );
 };
 

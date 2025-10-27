@@ -10,38 +10,30 @@ import {
   CardContent,
   Typography,
   Button,
-  Grid,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Alert,
-  Chip,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
-  Paper,
-} from '@mui/material';
+  Badge,
+  Progress,
+} from '../ui/macos';
 import {
   CloudUpload,
-  Visibility,
+  Eye,
   Download,
-  Delete,
-  Analytics,
-  FavoriteBorder,
-  Timeline,
-  Assessment,
+  Trash2,
+  BarChart3,
+  Heart,
+  Clock,
+  Activity,
   ZoomIn,
   ZoomOut,
-  Fullscreen,
-  Close,
-  Warning,
+  Maximize,
+  X,
+  AlertTriangle,
   CheckCircle,
-} from '@mui/icons-material';
+} from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { api } from '../../api/client';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
@@ -233,8 +225,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       {/* Зона загрузки */}
       <Card sx={{ mb: 2 }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>
-            <Timeline sx={{ mr: 1, verticalAlign: 'middle' }} />
+          <Typography variant="h6" style={{ marginBottom: 16 }}>
+            <Clock style={{ marginRight: 8, verticalAlign: 'middle' }} />
             ЭКГ исследования
           </Typography>
           
@@ -266,7 +258,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
           
           {uploadProgress > 0 && uploadProgress < 100 && (
             <Box sx={{ mt: 2 }}>
-              <LinearProgress variant="determinate" value={uploadProgress} />
+              {/* <LinearProgress variant="determinate" value={uploadProgress} /> */}
+              <Progress variant="determinate" value={uploadProgress} />
               <Typography variant="caption" color="text.secondary">
                 Загрузка: {uploadProgress}%
               </Typography>
@@ -305,12 +298,16 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                               {file.name}
                             </Typography>
                             {criticalParams.length > 0 && (
-                              <Chip
-                                size="small"
-                                label="Внимание"
-                                color="warning"
-                                icon={<Warning />}
-                              />
+                              // <Chip
+                              //   size="small"
+                              //   label="Внимание"
+                              //   color="warning"
+                              //   icon={<Warning />}
+                              // />
+                              <Badge variant="warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <AlertTriangle style={{ width: 14, height: 14 }} />
+                                Внимание
+                              </Badge>
                             )}
                           </Box>
                         }
@@ -324,25 +321,22 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                               <Box sx={{ mt: 1 }}>
                                 <Grid container spacing={2}>
                                   <Grid item>
-                                    <Chip
-                                      size="small"
-                                      label={`ЧСС: ${file.parameters.heartRate} уд/мин`}
-                                      color={file.parameters.heartRate > 100 || file.parameters.heartRate < 60 ? 'warning' : 'default'}
-                                    />
+                                    {/* <Chip size="small" label={`ЧСС: ${file.parameters.heartRate} уд/мин`} /> */}
+                                    <Badge variant={file.parameters.heartRate > 100 || file.parameters.heartRate < 60 ? 'warning' : 'info'}>
+                                      ЧСС: {file.parameters.heartRate} уд/мин
+                                    </Badge>
                                   </Grid>
                                   <Grid item>
-                                    <Chip
-                                      size="small"
-                                      label={`QT: ${file.parameters.qtInterval} мс`}
-                                      color={file.parameters.qtInterval > 450 ? 'warning' : 'default'}
-                                    />
+                                    {/* <Chip size="small" label={`QT: ${file.parameters.qtInterval} мс`} /> */}
+                                    <Badge variant={file.parameters.qtInterval > 450 ? 'warning' : 'info'}>
+                                      QT: {file.parameters.qtInterval} мс
+                                    </Badge>
                                   </Grid>
                                   <Grid item>
-                                    <Chip
-                                      size="small"
-                                      label={`PR: ${file.parameters.prInterval} мс`}
-                                      color={file.parameters.prInterval > 200 ? 'warning' : 'default'}
-                                    />
+                                    {/* <Chip size="small" label={`PR: ${file.parameters.prInterval} мс`} /> */}
+                                    <Badge variant={file.parameters.prInterval > 200 ? 'warning' : 'info'}>
+                                      PR: {file.parameters.prInterval} мс
+                                    </Badge>
                                   </Grid>
                                 </Grid>
                                 
@@ -414,7 +408,8 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         <Card sx={{ mt: 2 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <LinearProgress sx={{ flex: 1 }} />
+              {/* <LinearProgress sx={{ flex: 1 }} /> */}
+              <Progress />
               <Typography variant="body2">
                 Анализ ЭКГ с помощью AI...
               </Typography>
@@ -438,13 +433,19 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
                     Основные находки:
                   </Typography>
                   {analysisResult.findings.map((finding, i) => (
-                    <Chip
+                    // <Chip key={i} label={finding} />
+                    <Badge
                       key={i}
-                      label={finding}
-                      sx={{ mr: 1, mb: 1 }}
-                      color={finding.includes('норма') ? 'success' : 'warning'}
-                      icon={finding.includes('норма') ? <CheckCircle /> : <Warning />}
-                    />
+                      variant={finding.includes('норма') ? 'success' : 'warning'}
+                      style={{ marginRight: 8, marginBottom: 8, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {finding.includes('норма') ? (
+                        <CheckCircleIcon style={{ width: 14, height: 14 }} />
+                      ) : (
+                        <AlertTriangle style={{ width: 14, height: 14 }} />
+                      )}
+                      {finding}
+                    </Badge>
                   ))}
                 </Box>
               )}
@@ -494,9 +495,13 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             <Typography variant="h6">
               {selectedFile?.name}
             </Typography>
-            <IconButton onClick={() => setViewerOpen(false)}>
-              <Close />
-            </IconButton>
+            <Button 
+              variant="outline" 
+              onClick={() => setViewerOpen(false)}
+              style={{ padding: '8px' }}
+            >
+              <X style={{ width: 16, height: 16 }} />
+            </Button>
           </Box>
         </DialogTitle>
         

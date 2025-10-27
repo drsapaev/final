@@ -1,55 +1,175 @@
 import React from 'react';
-import { cn } from '../../../utils/cn';
+import { useTheme } from '../../../contexts/ThemeContext';
 
-const Button = React.forwardRef(({ 
-  children, 
-  className = '', 
+const Button = React.forwardRef(({
+  children,
+  className = '',
   variant = 'default',
   size = 'md',
   disabled = false,
   loading = false,
-  ...props 
+  style = {},
+  ...props
 }, ref) => {
-  const baseClasses = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
-  
+  const { getColor, getSpacing, getFontSize } = useTheme();
+
+  const baseStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '6px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    border: 'none',
+    cursor: 'pointer',
+    outline: 'none',
+    fontFamily: 'inherit'
+  };
+
   const variants = {
-    default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    ghost: 'hover:bg-accent hover:text-accent-foreground',
-    link: 'text-primary underline-offset-4 hover:underline',
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
-    warning: 'bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500'
+    default: {
+      backgroundColor: getColor('primary', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('primary', 600)
+      }
+    },
+    destructive: {
+      backgroundColor: getColor('danger', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('danger', 600)
+      }
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      color: getColor('text'),
+      border: `1px solid ${getColor('border')}`,
+      ':hover': {
+        backgroundColor: getColor('surface')
+      }
+    },
+    secondary: {
+      backgroundColor: getColor('secondary', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('secondary', 600)
+      }
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+      color: getColor('text'),
+      ':hover': {
+        backgroundColor: getColor('surface')
+      }
+    },
+    link: {
+      backgroundColor: 'transparent',
+      color: getColor('primary', 500),
+      textDecoration: 'none',
+      ':hover': {
+        textDecoration: 'underline'
+      }
+    },
+    primary: {
+      backgroundColor: getColor('primary', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('primary', 600)
+      }
+    },
+    success: {
+      backgroundColor: getColor('success', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('success', 600)
+      }
+    },
+    warning: {
+      backgroundColor: getColor('warning', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('warning', 600)
+      }
+    },
+    danger: {
+      backgroundColor: getColor('danger', 500),
+      color: 'white',
+      ':hover': {
+        backgroundColor: getColor('danger', 600)
+      }
+    }
   };
-  
+
   const sizes = {
-    sm: 'h-9 rounded-md px-3 text-sm',
-    md: 'h-10 px-4 py-2',
-    lg: 'h-11 rounded-md px-8',
-    icon: 'h-10 w-10'
+    sm: {
+      height: '36px',
+      padding: `${getSpacing('xs')} ${getSpacing('md')}`,
+      fontSize: getFontSize('sm')
+    },
+    md: {
+      height: '40px',
+      padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
+      fontSize: getFontSize('base')
+    },
+    lg: {
+      height: '44px',
+      padding: `${getSpacing('sm')} ${getSpacing('xl')}`,
+      fontSize: getFontSize('lg')
+    },
+    icon: {
+      height: '40px',
+      width: '40px',
+      padding: getSpacing('sm')
+    }
   };
-  
+
+  const combinedStyle = {
+    ...baseStyle,
+    ...sizes[size],
+    ...(disabled || loading ? {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+      pointerEvents: 'none'
+    } : {}),
+    ...style
+  };
+
   return (
     <button
       ref={ref}
-      className={cn(
-        baseClasses,
-        variants[variant],
-        sizes[size],
-        disabled && 'opacity-50 cursor-not-allowed',
-        loading && 'opacity-75 cursor-wait',
-        className
-      )}
+      className={className}
+      style={combinedStyle}
       disabled={disabled || loading}
       {...props}
     >
       {loading && (
-        <svg className="animate-spin -ml-1 mr-3 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <svg
+          className="animate-spin mr-2"
+          style={{
+            width: '16px',
+            height: '16px',
+            marginRight: getSpacing('sm')
+          }}
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+            style={{ opacity: 0.25 }}
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            style={{ opacity: 0.75 }}
+          />
         </svg>
       )}
       {children}

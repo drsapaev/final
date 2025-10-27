@@ -119,34 +119,6 @@ const Progress = React.forwardRef(({
           </span>
         )}
       </div>
-
-      <style jsx>{`
-        /* Dark mode adjustments */
-        @media (prefers-color-scheme: dark) {
-          .mac-progress {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-          }
-        }
-
-        /* High contrast mode */
-        @media (prefers-contrast: high) {
-          .mac-progress {
-            border-width: 2px !important;
-          }
-
-          .mac-progress-fill {
-            background-color: var(--mac-accent-blue) !important;
-          }
-        }
-
-        /* Reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .mac-progress-fill {
-            transition: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 });
@@ -280,7 +252,7 @@ export const CircularProgress = React.forwardRef(({
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         /* Dark mode adjustments */
         @media (prefers-color-scheme: dark) {
           .mac-circular-progress circle:first-child {
@@ -302,3 +274,4 @@ export const CircularProgress = React.forwardRef(({
 CircularProgress.displayName = 'macOS Circular Progress';
 
 export default Progress;
+

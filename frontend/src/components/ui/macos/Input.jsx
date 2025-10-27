@@ -32,9 +32,9 @@ const Input = React.forwardRef(({
       fontSize: '13px',
       fontWeight: '400',
       borderRadius: '6px',
-      border: `1px solid ${error ? '#ff3b30' : isFocused ? 'var(--mac-focus-color)' : 'var(--mac-border)'}`,
-      backgroundColor: disabled ? 'var(--mac-disabled-bg, rgba(0, 0, 0, 0.05))' : 'rgba(255, 255, 255, 0.8)',
-      color: disabled ? 'var(--mac-disabled-text, var(--mac-text-tertiary))' : 'var(--mac-text-primary)',
+      border: `1px solid ${error ? '#ff3b30' : isFocused ? '#007aff' : 'var(--mac-border)'}`,
+      backgroundColor: disabled ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)',
+      color: 'var(--mac-text-primary)',
       padding: '8px 12px',
       transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
       outline: 'none',
@@ -47,13 +47,13 @@ const Input = React.forwardRef(({
 
     // Focus ring effect
     if (isFocused && !error) {
-      baseStyles.boxShadow = 'var(--mac-focus-ring)';
+      baseStyles.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
     }
 
     // Error state
     if (error) {
       baseStyles.borderColor = '#ff3b30';
-      baseStyles.boxShadow = '0 0 0 3px rgba(255, 59, 48, 0.12)';
+      baseStyles.boxShadow = '0 0 0 3px rgba(255, 59, 48, 0.1)';
     }
 
     // Disabled state
@@ -162,47 +162,6 @@ const Input = React.forwardRef(({
           }}
         />
       )}
-
-      <style jsx>{`
-        /* Dark mode adjustments */
-        @media (prefers-color-scheme: dark) {
-          .mac-input {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-            color: #f5f5f7 !important;
-          }
-
-          .mac-input::placeholder {
-            color: var(--mac-placeholder-text, rgba(255, 255, 255, 0.3)) !important;
-          }
-
-          .mac-input:focus {
-            border-color: var(--mac-focus-color) !important;
-            box-shadow: var(--mac-focus-ring) !important;
-          }
-        }
-
-        /* High contrast mode */
-        @media (prefers-contrast: high) {
-          .mac-input {
-            border-width: 2px !important;
-          }
-        }
-
-        /* Reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .mac-input {
-            transition: none !important;
-          }
-        }
-
-        /* Touch device optimizations */
-        @media (hover: none) and (pointer: coarse) {
-          .mac-input {
-            font-size: 16px !important; /* Prevent zoom on iOS */
-          }
-        }
-      `}</style>
     </div>
   );
 });

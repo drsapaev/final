@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBreakpoint } from '../hooks/useMediaQuery';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button, Badge } from './ui';
 
 const ResponsiveTable = ({

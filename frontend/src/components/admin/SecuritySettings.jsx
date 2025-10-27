@@ -16,7 +16,15 @@ import {
   Edit,
   Ban
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSButton,
+  MacOSCheckbox,
+  MacOSBadge,
+  MacOSTab,
+  MacOSCard
+} from '../ui/macos';
 
 const SecuritySettings = ({ 
   settings = {},
@@ -221,11 +229,11 @@ const SecuritySettings = ({
 
   const getStatusColor = (status) => {
     const colorMap = {
-      success: 'var(--success-color)',
-      failed: 'var(--danger-color)',
-      blocked: 'var(--warning-color)'
+      success: 'var(--mac-success)',
+      failed: 'var(--mac-danger)',
+      blocked: 'var(--mac-warning)'
     };
-    return colorMap[status] || 'var(--text-secondary)';
+    return colorMap[status] || 'var(--mac-text-secondary)';
   };
 
   const getStatusLabel = (status) => {
@@ -250,501 +258,600 @@ const SecuritySettings = ({
   ];
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Вкладки */}
-      <div className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-        <nav className="flex space-x-8">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-                style={{
-                  borderBottomColor: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)'
-                }}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      <MacOSTab
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Смена пароля */}
         {activeTab === 'password' && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-                Смена пароля
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Текущий пароль *
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type={showPasswords.current ? 'text' : 'password'}
-                      value={formData.currentPassword}
-                      onChange={(e) => handleChange('currentPassword', e.target.value)}
-                      className={`w-full pl-10 pr-10 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.currentPassword ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.currentPassword ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="Введите текущий пароль"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisibility('current')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                      style={{ color: 'var(--text-tertiary)' }}
-                    >
-                      {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {errors.currentPassword && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.currentPassword}
-                    </p>
-                  )}
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '20px',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Смена пароля
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Текущий пароль *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <MacOSInput
+                    type={showPasswords.current ? 'text' : 'password'}
+                    value={formData.currentPassword}
+                    onChange={(e) => handleChange('currentPassword', e.target.value)}
+                    placeholder="Введите текущий пароль"
+                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
+                  />
+                  <Lock style={{ 
+                    position: 'absolute', 
+                    left: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)',
+                    width: '16px', 
+                    height: '16px', 
+                    color: 'var(--mac-text-tertiary)' 
+                  }} />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('current')}
+                    style={{ 
+                      position: 'absolute', 
+                      right: '12px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--mac-text-tertiary)'
+                    }}
+                  >
+                    {showPasswords.current ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Новый пароль *
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                         style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type={showPasswords.new ? 'text' : 'password'}
-                      value={formData.newPassword}
-                      onChange={(e) => handleChange('newPassword', e.target.value)}
-                      className={`w-full pl-10 pr-10 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.newPassword ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.newPassword ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="Введите новый пароль"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisibility('new')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                      style={{ color: 'var(--text-tertiary)' }}
-                    >
-                      {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {errors.newPassword && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.newPassword}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Подтвердите новый пароль *
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                         style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type={showPasswords.confirm ? 'text' : 'password'}
-                      value={formData.confirmPassword}
-                      onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                      className={`w-full pl-10 pr-10 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.confirmPassword ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="Подтвердите новый пароль"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisibility('confirm')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                      style={{ color: 'var(--text-tertiary)' }}
-                    >
-                      {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.confirmPassword}
-                    </p>
-                  )}
-                </div>
+                {errors.currentPassword && (
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-danger)', 
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <AlertCircle style={{ width: '16px', height: '16px' }} />
+                    {errors.currentPassword}
+                  </p>
+                )}
               </div>
-            </Card>
-          </div>
+
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Новый пароль *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <MacOSInput
+                    type={showPasswords.new ? 'text' : 'password'}
+                    value={formData.newPassword}
+                    onChange={(e) => handleChange('newPassword', e.target.value)}
+                    placeholder="Введите новый пароль"
+                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
+                  />
+                  <Key style={{ 
+                    position: 'absolute', 
+                    left: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)',
+                    width: '16px', 
+                    height: '16px', 
+                    color: 'var(--mac-text-tertiary)' 
+                  }} />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('new')}
+                    style={{ 
+                      position: 'absolute', 
+                      right: '12px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--mac-text-tertiary)'
+                    }}
+                  >
+                    {showPasswords.new ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+                  </button>
+                </div>
+                {errors.newPassword && (
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-danger)', 
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <AlertCircle style={{ width: '16px', height: '16px' }} />
+                    {errors.newPassword}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Подтвердите новый пароль *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <MacOSInput
+                    type={showPasswords.confirm ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                    placeholder="Подтвердите новый пароль"
+                    style={{ paddingLeft: '40px', paddingRight: '40px' }}
+                  />
+                  <Key style={{ 
+                    position: 'absolute', 
+                    left: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)',
+                    width: '16px', 
+                    height: '16px', 
+                    color: 'var(--mac-text-tertiary)' 
+                  }} />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('confirm')}
+                    style={{ 
+                      position: 'absolute', 
+                      right: '12px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--mac-text-tertiary)'
+                    }}
+                  >
+                    {showPasswords.confirm ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-danger)', 
+                    marginTop: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <AlertCircle style={{ width: '16px', height: '16px' }} />
+                    {errors.confirmPassword}
+                  </p>
+                )}
+              </div>
+            </div>
+          </MacOSCard>
         )}
 
         {/* Двухфакторная аутентификация */}
         {activeTab === 'two-factor' && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-                Двухфакторная аутентификация
-              </h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border" 
-                     style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                  <div>
-                    <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                      Включить 2FA
-                    </h4>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      Дополнительная защита вашего аккаунта
-                    </p>
-                  </div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.twoFactorEnabled}
-                      onChange={(e) => handleChange('twoFactorEnabled', e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                  </label>
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '20px',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Двухфакторная аутентификация
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                padding: '16px', 
+                borderRadius: 'var(--mac-radius-md)', 
+                border: '1px solid var(--mac-border)', 
+                backgroundColor: 'var(--mac-bg-secondary)' 
+              }}>
+                <div>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-base)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '4px'
+                  }}>
+                    Включить 2FA
+                  </h4>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    Дополнительная защита вашего аккаунта
+                  </p>
                 </div>
-
-                {formData.twoFactorEnabled && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                      Метод аутентификации
-                    </label>
-                    <select
-                      value={formData.twoFactorMethod}
-                      onChange={(e) => handleChange('twoFactorMethod', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                    >
-                      <option value="sms">SMS</option>
-                      <option value="email">Email</option>
-                      <option value="app">Приложение-аутентификатор</option>
-                    </select>
-                  </div>
-                )}
+                <MacOSCheckbox
+                  checked={formData.twoFactorEnabled}
+                  onChange={(checked) => handleChange('twoFactorEnabled', checked)}
+                />
               </div>
-            </Card>
-          </div>
+
+              {formData.twoFactorEnabled && (
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    marginBottom: '8px',
+                    color: 'var(--mac-text-primary)'
+                  }}>
+                    Метод аутентификации
+                  </label>
+                  <MacOSSelect
+                    value={formData.twoFactorMethod}
+                    onChange={(e) => handleChange('twoFactorMethod', e.target.value)}
+                    options={[
+                      { value: 'sms', label: 'SMS' },
+                      { value: 'email', label: 'Email' },
+                      { value: 'app', label: 'Приложение-аутентификатор' }
+                    ]}
+                    placeholder="Выберите метод"
+                  />
+                </div>
+              )}
+            </div>
+          </MacOSCard>
         )}
 
         {/* Активные сессии */}
         {activeTab === 'sessions' && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Активные сессии
-                </h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={terminateAllOtherSessions}
-                  className="text-sm"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Завершить все остальные
-                </Button>
-              </div>
-              
-              <div className="space-y-3">
-                {activeSessions.map((session) => (
-                  <div key={session.id} className="flex items-center justify-between p-4 rounded-lg border" 
-                       style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center" 
-                           style={{ background: 'var(--accent-color)' }}>
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                          {session.device}
-                          {session.current && (
-                            <Badge variant="success" className="ml-2">Текущая</Badge>
-                          )}
-                        </p>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                          {session.location} • {session.ip}
-                        </p>
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          Последняя активность: {formatDateTime(session.lastActive)}
-                        </p>
-                      </div>
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                Активные сессии
+              </h3>
+              <MacOSButton
+                variant="outline"
+                onClick={terminateAllOtherSessions}
+                size="sm"
+              >
+                <Trash2 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                Завершить все остальные
+              </MacOSButton>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {activeSessions.map((session) => (
+                <div key={session.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  padding: '16px', 
+                  borderRadius: 'var(--mac-radius-md)', 
+                  border: '1px solid var(--mac-border)', 
+                  backgroundColor: 'var(--mac-bg-secondary)' 
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '50%', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      backgroundColor: 'var(--mac-accent-blue)' 
+                    }}>
+                      <User style={{ width: '20px', height: '20px', color: 'white' }} />
                     </div>
-                    
-                    {!session.current && (
-                      <button
-                        onClick={() => terminateSession(session.id)}
-                        className="p-2 hover:bg-red-100 rounded-lg transition-colors"
-                        style={{ color: 'var(--danger-color)' }}
-                        title="Завершить сессию"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div>
+                      <p style={{ 
+                        fontSize: 'var(--mac-font-size-base)', 
+                        fontWeight: 'var(--mac-font-weight-medium)', 
+                        color: 'var(--mac-text-primary)',
+                        margin: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        {session.device}
+                        {session.current && (
+                          <MacOSBadge variant="success" size="sm">Текущая</MacOSBadge>
+                        )}
+                      </p>
+                      <p style={{ 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        color: 'var(--mac-text-secondary)',
+                        margin: '4px 0 0 0'
+                      }}>
+                        {session.location} • {session.ip}
+                      </p>
+                      <p style={{ 
+                        fontSize: 'var(--mac-font-size-xs)', 
+                        color: 'var(--mac-text-tertiary)',
+                        margin: '4px 0 0 0'
+                      }}>
+                        Последняя активность: {formatDateTime(session.lastActive)}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+                  
+                  {!session.current && (
+                    <MacOSButton
+                      variant="outline"
+                      size="sm"
+                      onClick={() => terminateSession(session.id)}
+                      style={{ color: 'var(--mac-danger)', borderColor: 'var(--mac-danger)' }}
+                    >
+                      <Trash2 style={{ width: '16px', height: '16px' }} />
+                    </MacOSButton>
+                  )}
+                </div>
+              ))}
+            </div>
+          </MacOSCard>
         )}
 
         {/* Настройки безопасности */}
         {activeTab === 'security' && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-                Настройки безопасности
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Минимальная длина пароля
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.passwordMinLength}
-                    onChange={(e) => handleChange('passwordMinLength', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    min="6"
-                    max="32"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Срок действия пароля (дни)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.passwordExpiryDays}
-                    onChange={(e) => handleChange('passwordExpiryDays', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    min="30"
-                    max="365"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Максимум попыток входа
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.maxLoginAttempts}
-                    onChange={(e) => handleChange('maxLoginAttempts', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    min="3"
-                    max="10"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
-                    Время блокировки (минуты)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.lockoutDuration}
-                    onChange={(e) => handleChange('lockoutDuration', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    min="5"
-                    max="60"
-                  />
-                </div>
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '20px',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Настройки безопасности
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Минимальная длина пароля
+                </label>
+                <MacOSInput
+                  type="number"
+                  value={formData.passwordMinLength}
+                  onChange={(e) => handleChange('passwordMinLength', parseInt(e.target.value))}
+                  min="6"
+                  max="32"
+                />
               </div>
 
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="passwordRequireUppercase"
-                    checked={formData.passwordRequireUppercase}
-                    onChange={(e) => handleChange('passwordRequireUppercase', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="passwordRequireUppercase" className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Требовать заглавные буквы в пароле
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="passwordRequireNumbers"
-                    checked={formData.passwordRequireNumbers}
-                    onChange={(e) => handleChange('passwordRequireNumbers', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="passwordRequireNumbers" className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Требовать цифры в пароле
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="passwordRequireSymbols"
-                    checked={formData.passwordRequireSymbols}
-                    onChange={(e) => handleChange('passwordRequireSymbols', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="passwordRequireSymbols" className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Требовать специальные символы в пароле
-                  </label>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="blockSuspiciousIPs"
-                    checked={formData.blockSuspiciousIPs}
-                    onChange={(e) => handleChange('blockSuspiciousIPs', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="blockSuspiciousIPs" className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Блокировать подозрительные IP адреса
-                  </label>
-                </div>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Срок действия пароля (дни)
+                </label>
+                <MacOSInput
+                  type="number"
+                  value={formData.passwordExpiryDays}
+                  onChange={(e) => handleChange('passwordExpiryDays', parseInt(e.target.value))}
+                  min="30"
+                  max="365"
+                />
               </div>
-            </Card>
-          </div>
+
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Максимум попыток входа
+                </label>
+                <MacOSInput
+                  type="number"
+                  value={formData.maxLoginAttempts}
+                  onChange={(e) => handleChange('maxLoginAttempts', parseInt(e.target.value))}
+                  min="3"
+                  max="10"
+                />
+              </div>
+
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Время блокировки (минуты)
+                </label>
+                <MacOSInput
+                  type="number"
+                  value={formData.lockoutDuration}
+                  onChange={(e) => handleChange('lockoutDuration', parseInt(e.target.value))}
+                  min="5"
+                  max="60"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <MacOSCheckbox
+                checked={formData.passwordRequireUppercase}
+                onChange={(checked) => handleChange('passwordRequireUppercase', checked)}
+                label="Требовать заглавные буквы в пароле"
+              />
+
+              <MacOSCheckbox
+                checked={formData.passwordRequireNumbers}
+                onChange={(checked) => handleChange('passwordRequireNumbers', checked)}
+                label="Требовать цифры в пароле"
+              />
+
+              <MacOSCheckbox
+                checked={formData.passwordRequireSymbols}
+                onChange={(checked) => handleChange('passwordRequireSymbols', checked)}
+                label="Требовать специальные символы в пароле"
+              />
+
+              <MacOSCheckbox
+                checked={formData.blockSuspiciousIPs}
+                onChange={(checked) => handleChange('blockSuspiciousIPs', checked)}
+                label="Блокировать подозрительные IP адреса"
+              />
+            </div>
+          </MacOSCard>
         )}
 
         {/* Логи безопасности */}
         {activeTab === 'audit' && (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-                Логи безопасности
-              </h3>
-              
-              <div className="space-y-3">
-                {securityLogs.map((log) => {
-                  const StatusIcon = getStatusIcon(log.status);
-                  return (
-                    <div key={log.id} className="flex items-center justify-between p-4 rounded-lg border" 
-                         style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                      <div className="flex items-center space-x-4">
-                        <StatusIcon className="w-5 h-5" style={{ color: getStatusColor(log.status) }} />
-                        <div>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                            {log.action}
-                          </p>
-                          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            {log.user} • {log.ip}
-                          </p>
-                          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                            {formatDateTime(log.timestamp)}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}>
-                          {getStatusLabel(log.status)}
-                        </Badge>
-                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          {log.details}
-                        </span>
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '20px',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Логи безопасности
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {securityLogs.map((log) => {
+                const StatusIcon = getStatusIcon(log.status);
+                return (
+                  <div key={log.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '16px', 
+                    borderRadius: 'var(--mac-radius-md)', 
+                    border: '1px solid var(--mac-border)', 
+                    backgroundColor: 'var(--mac-bg-secondary)' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <StatusIcon style={{ width: '20px', height: '20px', color: getStatusColor(log.status) }} />
+                      <div>
+                        <p style={{ 
+                          fontSize: 'var(--mac-font-size-base)', 
+                          fontWeight: 'var(--mac-font-weight-medium)', 
+                          color: 'var(--mac-text-primary)',
+                          margin: 0
+                        }}>
+                          {log.action}
+                        </p>
+                        <p style={{ 
+                          fontSize: 'var(--mac-font-size-sm)', 
+                          color: 'var(--mac-text-secondary)',
+                          margin: '4px 0 0 0'
+                        }}>
+                          {log.user} • {log.ip}
+                        </p>
+                        <p style={{ 
+                          fontSize: 'var(--mac-font-size-xs)', 
+                          color: 'var(--mac-text-tertiary)',
+                          margin: '4px 0 0 0'
+                        }}>
+                          {formatDateTime(log.timestamp)}
+                        </p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MacOSBadge 
+                        variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}
+                        size="sm"
+                      >
+                        {getStatusLabel(log.status)}
+                      </MacOSBadge>
+                      <span style={{ 
+                        fontSize: 'var(--mac-font-size-xs)', 
+                        color: 'var(--mac-text-tertiary)' 
+                      }}>
+                        {log.details}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </MacOSCard>
         )}
 
         {/* Кнопки действий */}
-        <div className="flex items-center justify-between pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
-          <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          paddingTop: '24px', 
+          borderTop: '1px solid var(--mac-border)' 
+        }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
             Настройки безопасности сохраняются автоматически
           </div>
           
-          <div className="flex items-center space-x-3">
-            <Button
-              type="button"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <MacOSButton
               variant="outline"
               onClick={() => window.location.reload()}
               disabled={isSubmitting}
             >
-              <RefreshCw className="w-4 h-4 mr-2" />
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Сбросить
-            </Button>
+            </MacOSButton>
             
-            <Button
+            <MacOSButton
               type="submit"
               disabled={isSubmitting || loading}
-              className="flex items-center space-x-2"
-              style={{ 
-                background: 'var(--accent-color)',
-                color: 'white'
-              }}
+              loading={isSubmitting}
             >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Сохранение...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Сохранить настройки</span>
-                </>
-              )}
-            </Button>
+              <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+              Сохранить настройки
+            </MacOSButton>
           </div>
         </div>
       </form>
@@ -753,4 +860,3 @@ const SecuritySettings = ({
 };
 
 export default SecuritySettings;
-

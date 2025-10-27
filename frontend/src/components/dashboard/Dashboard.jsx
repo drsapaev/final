@@ -1,43 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   Typography,
   Button,
-  Chip,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  IconButton,
-  Paper,
-  Divider,
-  LinearProgress,
+  Badge,
   Alert,
-  CircularProgress
-} from '@mui/material';
+  CircularProgress,
+  Progress,
+} from '../ui/macos';
 import {
-  People,
-  Event,
-  AttachMoney,
+  Users,
+  Calendar,
+  DollarSign,
   TrendingUp,
-  Notifications,
-  Security,
-  FileUpload,
-  Telegram,
-  Email,
+  Bell,
+  Shield,
+  Upload,
+  MessageSquare,
+  Mail,
   Phone,
-  Dashboard as DashboardIcon,
-  Refresh,
-  MoreVert,
+  LayoutDashboard,
+  RefreshCw,
+  MoreVertical,
   CheckCircle,
-  Warning,
-  Error
-} from '@mui/icons-material';
+  AlertTriangle,
+  XCircle,
+} from 'lucide-react';
 // import AdvancedCharts from './AdvancedCharts';
 
 const Dashboard = ({ user }) => {
@@ -111,24 +101,24 @@ const Dashboard = ({ user }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'active': return <CheckCircle />;
-      case 'warning': return <Warning />;
-      case 'error': return <Error />;
-      default: return <Notifications />;
+      case 'warning': return <AlertTriangle />;
+      case 'error': return <XCircle />;
+      default: return <Bell />;
     }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
         <CircularProgress />
-      </Box>
+      </div>
     );
   }
 
   if (error) {
     return (
       <Alert severity="error" action={
-        <Button color="inherit" onClick={loadDashboardData}>
+        <Button variant="outline" onClick={loadDashboardData}>
           Повторить
         </Button>
       }>
@@ -138,26 +128,26 @@ const Dashboard = ({ user }) => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <div style={{ padding: 24 }}>
       {/* Заголовок */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <Typography variant="h4" style={{ marginBottom: 8 }}>
             {getGreeting()}, {user?.full_name || user?.username || 'Пользователь'}!
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="textSecondary">
             Последнее обновление: {lastUpdate.toLocaleTimeString()}
           </Typography>
-        </Box>
+        </div>
         <Button
-          variant="outlined"
-          startIcon={<Refresh />}
+          variant="outline"
           onClick={loadDashboardData}
           disabled={loading}
         >
+          <RefreshCw style={{ width: 16, height: 16, marginRight: 8 }} />
           Обновить
         </Button>
-      </Box>
+      </div>
 
       {/* Основные метрики */}
       <Grid container spacing={3} mb={3}>

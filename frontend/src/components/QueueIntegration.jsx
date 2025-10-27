@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, UserCheck, AlertCircle, CheckCircle } from 'lucide-react';
-import { Card, Button, Badge } from './ui/native';
+import { MacOSCard, MacOSButton, MacOSBadge, MacOSLoadingSkeleton, MacOSEmptyState } from './ui/macos';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../constants/appointmentStatus';
 
-const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect }) => {
+const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect, onStartVisit, department }) => {
   // Проверяем демо-режим в самом начале
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
   
@@ -61,7 +61,9 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
               patient_name: entry.patient_name,
               number: entry.number,
               status: entry.status,
-              created_at: entry.created_at
+              created_at: entry.created_at,
+              appointment_id: entry.appointment_id,
+              patient_id: entry.patient_id
             }));
           }
         }
@@ -107,14 +109,21 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
 
   const startVisit = async (patient) => {
     try {
-      // Создаем запись на прием
+      // Используем переданную функцию onStartVisit, если она есть
+      if (onStartVisit) {
+        onStartVisit(patient);
+        setCurrentCall(null);
+        return;
+      }
+
+      // Иначе создаем запись на прием через API
       const appointmentData = {
         patient_id: patient.id,
         patient_name: patient.patient_name,
         specialist: specialist,
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-        status: APPOINTMENT_STATUS.PAID, // Предполагаем, что оплата уже прошла
+        status: APPOINTMENT_STATUS.PAID,
         services: [],
         total_cost: 0
       };
@@ -130,7 +139,9 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
 
       if (response.ok) {
         const appointment = await response.json();
-        onPatientSelect(appointment);
+        if (onPatientSelect) {
+          onPatientSelect(appointment);
+        }
         setCurrentCall(null);
       }
     } catch (error) {
@@ -154,135 +165,231 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
   };
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Текущий вызов */}
       {currentCall && (
-        <Card className="p-6 border-2 border-blue-500 bg-blue-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
+        <MacOSCard style={{
+          padding: '24px',
+          border: '2px solid var(--mac-blue-500)',
+          backgroundColor: 'var(--mac-blue-50)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                backgroundColor: 'var(--mac-blue-500)',
+                color: 'white',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                fontWeight: '700'
+              }}>
                 {currentCall.number}
               </div>
               <div>
-                <div className="text-xl font-semibold">{currentCall.patient_name}</div>
-                <div className="text-blue-600">Вызван в кабинет</div>
+                <div style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+                  marginBottom: '4px'
+                }}>{currentCall.patient_name}</div>
+                <div style={{
+                  color: 'var(--mac-blue-600)',
+                  fontSize: '14px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                }}>Вызван в кабинет</div>
               </div>
             </div>
             
-            <div className="flex gap-2">
-              <Button
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <MacOSButton
                 variant="success"
                 onClick={() => startVisit(currentCall)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                <UserCheck className="w-4 h-4 mr-2" />
+                <UserCheck size={16} />
                 Начать прием
-              </Button>
-              <Button
+              </MacOSButton>
+              <MacOSButton
                 variant="outline"
                 onClick={() => setCurrentCall(null)}
               >
                 Отменить
-              </Button>
+              </MacOSButton>
             </div>
           </div>
-        </Card>
+        </MacOSCard>
       )}
 
       {/* Очередь */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Users className="w-6 h-6 text-blue-600" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Users size={24} style={{ color: 'var(--mac-blue-500)' }} />
             <div>
-              <h3 className="text-lg font-semibold">Очередь: {specialist}</h3>
-              <p className="text-sm text-gray-600">
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: 'var(--mac-text-primary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+                margin: 0,
+                marginBottom: '4px'
+              }}>Очередь: {specialist}</h3>
+              <p style={{
+                fontSize: '13px',
+                color: 'var(--mac-text-secondary)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+                margin: 0
+              }}>
                 {loading ? 'Загрузка...' : `${queue.length} пациентов в очереди`}
               </p>
             </div>
           </div>
           
-          <Button
-            size="sm"
+          <MacOSButton
             variant="outline"
             onClick={loadQueue}
             disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '6px 12px' }}
           >
-            <Clock className="w-4 h-4 mr-2" />
+            <Clock size={16} />
             Обновить
-          </Button>
+          </MacOSButton>
         </div>
 
         {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-500">Загрузка очереди...</p>
-          </div>
+          <MacOSLoadingSkeleton type="list" count={5} />
         ) : queue.length === 0 ? (
-          <div className="text-center py-8">
-            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">Очередь пуста</p>
-          </div>
+          <MacOSEmptyState
+            type="users"
+            title="Очередь пуста"
+            description="В очереди пока нет пациентов"
+          />
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {queue.map((patient, index) => (
               <div
                 key={patient.id}
-                className={`flex items-center justify-between p-4 rounded-lg border ${
-                  index === 0 ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                }`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  border: index === 0 ? '2px solid var(--mac-blue-500)' : '1px solid var(--mac-border)',
+                  backgroundColor: index === 0 ? 'var(--mac-blue-50)' : 'var(--mac-bg-primary)'
+                }}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                    index === 0 ? 'bg-blue-500' : 'bg-gray-400'
-                  }`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: '700',
+                    backgroundColor: index === 0 ? 'var(--mac-blue-500)' : 'var(--mac-gray-500)'
+                  }}>
                     {patient.number}
                   </div>
                   <div>
-                    <div className="font-medium">{patient.patient_name}</div>
-                    <div className="text-sm text-gray-500">
+                    <div style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: 'var(--mac-text-primary)',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+                      marginBottom: '4px'
+                    }}>{patient.patient_name}</div>
+                    <div style={{
+                      fontSize: '13px',
+                      color: 'var(--mac-text-secondary)',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+                    }}>
                       {patient.type} • {patient.phone}
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <Badge variant={patient.source === 'online' ? 'success' : 'info'}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MacOSBadge variant={patient.source === 'online' ? 'success' : 'info'}>
                     {patient.source === 'online' ? 'Онлайн' : 'Регистратура'}
-                  </Badge>
+                  </MacOSBadge>
                   
-                  <Button
-                    size="sm"
+                  <MacOSButton
                     onClick={() => callPatient(patient)}
                     disabled={!!currentCall}
+                    style={{ fontSize: '13px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
-                    <UserCheck className="w-4 h-4 mr-2" />
+                    <UserCheck size={16} />
                     Вызвать
-                  </Button>
+                  </MacOSButton>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </MacOSCard>
 
       {/* Статистика */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Статистика дня</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{queue.length}</div>
-            <div className="text-sm text-gray-500">В очереди</div>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{
+          fontSize: '18px',
+          fontWeight: '600',
+          marginBottom: '20px',
+          color: 'var(--mac-text-primary)',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif'
+        }}>Статистика дня</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '700',
+              color: 'var(--mac-blue-500)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+              marginBottom: '8px'
+            }}>{queue.length}</div>
+            <div style={{
+              fontSize: '13px',
+              color: 'var(--mac-text-secondary)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+            }}>В очереди</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">0</div>
-            <div className="text-sm text-gray-500">Обслужено</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '700',
+              color: 'var(--mac-green-500)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+              marginBottom: '8px'
+            }}>0</div>
+            <div style={{
+              fontSize: '13px',
+              color: 'var(--mac-text-secondary)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+            }}>Обслужено</div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">0</div>
-            <div className="text-sm text-gray-500">Среднее время</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontSize: '32px',
+              fontWeight: '700',
+              color: 'var(--mac-orange-500)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
+              marginBottom: '8px'
+            }}>0</div>
+            <div style={{
+              fontSize: '13px',
+              color: 'var(--mac-text-secondary)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+            }}>Среднее время</div>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
     </div>
   );
 };

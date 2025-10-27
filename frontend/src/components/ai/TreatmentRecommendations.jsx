@@ -17,8 +17,18 @@ import {
   Target,
   Clock
 } from 'lucide-react';
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea,
+  MacOSCheckbox,
+  MacOSBadge,
+  MacOSLoadingSkeleton
+} from '../ui/macos';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const TreatmentRecommendations = () => {
   const [activeTab, setActiveTab] = useState('treatment-plan');
@@ -112,357 +122,666 @@ const TreatmentRecommendations = () => {
   };
 
   const renderTreatmentPlanForm = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Возраст пациента</label>
-          <input
-            type="number"
-            value={treatmentPlanData.patient_data.age}
-            onChange={(e) => setTreatmentPlanData(prev => ({
-              ...prev,
-              patient_data: { ...prev.patient_data, age: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Например: 45"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Пол</label>
-          <select
-            value={treatmentPlanData.patient_data.gender}
-            onChange={(e) => setTreatmentPlanData(prev => ({
-              ...prev,
-              patient_data: { ...prev.patient_data, gender: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Выберите пол</option>
-            <option value="мужской">Мужской</option>
-            <option value="женский">Женский</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Вес (кг)</label>
-          <input
-            type="number"
-            value={treatmentPlanData.patient_data.weight}
-            onChange={(e) => setTreatmentPlanData(prev => ({
-              ...prev,
-              patient_data: { ...prev.patient_data, weight: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Например: 70"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Диагноз</label>
-          <input
+    <MacOSCard style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-bg-primary)', 
+          border: '1px solid var(--mac-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <User style={{ width: '16px', height: '16px' }} />
+            Основные данные пациента
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Возраст пациента
+              </label>
+              <MacOSInput
+                type="number"
+                value={treatmentPlanData.patient_data.age}
+                onChange={(e) => setTreatmentPlanData(prev => ({
+                  ...prev,
+                  patient_data: { ...prev.patient_data, age: e.target.value }
+                }))}
+                placeholder="Например: 45"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Пол
+              </label>
+              <MacOSSelect
+                value={treatmentPlanData.patient_data.gender}
+                onChange={(e) => setTreatmentPlanData(prev => ({
+                  ...prev,
+                  patient_data: { ...prev.patient_data, gender: e.target.value }
+                }))}
+                options={[
+                  { value: '', label: 'Выберите пол' },
+                  { value: 'мужской', label: 'Мужской' },
+                  { value: 'женский', label: 'Женский' }
+                ]}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Вес (кг)
+              </label>
+              <MacOSInput
+                type="number"
+                value={treatmentPlanData.patient_data.weight}
+                onChange={(e) => setTreatmentPlanData(prev => ({
+                  ...prev,
+                  patient_data: { ...prev.patient_data, weight: e.target.value }
+                }))}
+                placeholder="Например: 70"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Диагноз
+              </label>
+              <MacOSInput
+                type="text"
+                value={treatmentPlanData.diagnosis}
+                onChange={(e) => setTreatmentPlanData(prev => ({
+                  ...prev,
+                  diagnosis: e.target.value
+                }))}
+                placeholder="Основной диагноз"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        </MacOSCard>
+
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-warning-bg)', 
+          border: '1px solid var(--mac-warning-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-warning)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <AlertCircle style={{ width: '16px', height: '16px' }} />
+            Аллергии
+          </h4>
+          <MacOSInput
             type="text"
-            value={treatmentPlanData.diagnosis}
+            value={treatmentPlanData.patient_data.allergies.join(', ')}
             onChange={(e) => setTreatmentPlanData(prev => ({
               ...prev,
-              diagnosis: e.target.value
+              patient_data: { 
+                ...prev.patient_data, 
+                allergies: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
+              }
             }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Основной диагноз"
+            placeholder="Например: пенициллин, аспирин"
+            style={{ width: '100%' }}
           />
+        </MacOSCard>
+
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-error-bg)', 
+          border: '1px solid var(--mac-error-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-error)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <FileText style={{ width: '16px', height: '16px' }} />
+            Сопутствующие заболевания
+          </h4>
+          <MacOSInput
+            type="text"
+            value={treatmentPlanData.patient_data.comorbidities.join(', ')}
+            onChange={(e) => setTreatmentPlanData(prev => ({
+              ...prev,
+              patient_data: { 
+                ...prev.patient_data, 
+                comorbidities: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
+              }
+            }))}
+            placeholder="Например: гипертония, диабет"
+            style={{ width: '100%' }}
+          />
+        </MacOSCard>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <MacOSButton
+            onClick={() => handleSubmit('generate-treatment-plan', treatmentPlanData)}
+            disabled={loading || !treatmentPlanData.diagnosis}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              border: 'none'
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader style={{ 
+                  width: '20px', 
+                  height: '20px',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Генерируем план...
+              </>
+            ) : (
+              <>
+                <Target style={{ width: '20px', height: '20px' }} />
+                Создать план лечения
+              </>
+            )}
+          </MacOSButton>
         </div>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Аллергии</label>
-        <input
-          type="text"
-          value={treatmentPlanData.patient_data.allergies.join(', ')}
-          onChange={(e) => setTreatmentPlanData(prev => ({
-            ...prev,
-            patient_data: { 
-              ...prev.patient_data, 
-              allergies: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
-            }
-          }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Например: пенициллин, аспирин"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Сопутствующие заболевания</label>
-        <input
-          type="text"
-          value={treatmentPlanData.patient_data.comorbidities.join(', ')}
-          onChange={(e) => setTreatmentPlanData(prev => ({
-            ...prev,
-            patient_data: { 
-              ...prev.patient_data, 
-              comorbidities: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
-            }
-          }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Например: гипертония, диабет"
-        />
-      </div>
-
-      <button
-        onClick={() => handleSubmit('generate-treatment-plan', treatmentPlanData)}
-        disabled={loading || !treatmentPlanData.diagnosis}
-        className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <>
-            <Loader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-            Генерируем план...
-          </>
-        ) : (
-          <>
-            <Target className="h-5 w-5 mr-2" />
-            Создать план лечения
-          </>
-        )}
-      </button>
-    </div>
+    </MacOSCard>
   );
 
   const renderMedicationForm = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Возраст</label>
-          <input
-            type="number"
-            value={medicationData.patient_profile.age}
-            onChange={(e) => setMedicationData(prev => ({
-              ...prev,
-              patient_profile: { ...prev.patient_profile, age: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <MacOSCard style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-success-bg)', 
+          border: '1px solid var(--mac-success-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-success)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Pill style={{ width: '16px', height: '16px' }} />
+            Информация о пациенте
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Возраст
+              </label>
+              <MacOSInput
+                type="number"
+                value={medicationData.patient_profile.age}
+                onChange={(e) => setMedicationData(prev => ({
+                  ...prev,
+                  patient_profile: { ...prev.patient_profile, age: e.target.value }
+                }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Состояние
+              </label>
+              <MacOSInput
+                type="text"
+                value={medicationData.condition}
+                onChange={(e) => setMedicationData(prev => ({
+                  ...prev,
+                  condition: e.target.value
+                }))}
+                placeholder="Диагноз или состояние"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        </MacOSCard>
+
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-bg-primary)', 
+          border: '1px solid var(--mac-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <FileText style={{ width: '16px', height: '16px' }} />
+            Текущие препараты
+          </h4>
+          <MacOSTextarea
+            value={medicationData.current_medications.map(med => `${med.name} ${med.dosage} ${med.frequency}`).join('\n')}
+            onChange={(e) => {
+              const lines = e.target.value.split('\n').filter(Boolean);
+              const medications = lines.map(line => {
+                const parts = line.split(' ');
+                return {
+                  name: parts[0] || '',
+                  dosage: parts[1] || '',
+                  frequency: parts.slice(2).join(' ') || ''
+                };
+              });
+              setMedicationData(prev => ({
+                ...prev,
+                current_medications: medications
+              }));
+            }}
+            rows={4}
+            placeholder="Например:&#10;Лизиноприл 10мг 1 раз в день&#10;Метформин 500мг 2 раза в день"
+            style={{ width: '100%' }}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Состояние</label>
-          <input
-            type="text"
-            value={medicationData.condition}
-            onChange={(e) => setMedicationData(prev => ({
-              ...prev,
-              condition: e.target.value
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Диагноз или состояние"
-          />
+        </MacOSCard>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <MacOSButton
+            onClick={() => handleSubmit('optimize-medication', medicationData)}
+            disabled={loading || !medicationData.condition}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: 'var(--mac-success)',
+              border: 'none'
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader style={{ 
+                  width: '20px', 
+                  height: '20px',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Оптимизируем...
+              </>
+            ) : (
+              <>
+                <Pill style={{ width: '20px', height: '20px' }} />
+                Оптимизировать терапию
+              </>
+            )}
+          </MacOSButton>
         </div>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Текущие препараты</label>
-        <textarea
-          value={medicationData.current_medications.map(med => `${med.name} ${med.dosage} ${med.frequency}`).join('\n')}
-          onChange={(e) => {
-            const lines = e.target.value.split('\n').filter(Boolean);
-            const medications = lines.map(line => {
-              const parts = line.split(' ');
-              return {
-                name: parts[0] || '',
-                dosage: parts[1] || '',
-                frequency: parts.slice(2).join(' ') || ''
-              };
-            });
-            setMedicationData(prev => ({
-              ...prev,
-              current_medications: medications
-            }));
-          }}
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Например:&#10;Лизиноприл 10мг 1 раз в день&#10;Метформин 500мг 2 раза в день"
-        />
-      </div>
-
-      <button
-        onClick={() => handleSubmit('optimize-medication', medicationData)}
-        disabled={loading || !medicationData.condition}
-        className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <>
-            <Loader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-            Оптимизируем...
-          </>
-        ) : (
-          <>
-            <Pill className="h-5 w-5 mr-2" />
-            Оптимизировать терапию
-          </>
-        )}
-      </button>
-    </div>
+    </MacOSCard>
   );
 
   const renderEffectivenessForm = () => (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Текущие симптомы</label>
-        <input
-          type="text"
-          value={effectivenessData.patient_response.symptoms.join(', ')}
-          onChange={(e) => setEffectivenessData(prev => ({
-            ...prev,
-            patient_response: { 
-              ...prev.patient_response, 
-              symptoms: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
-            }
-          }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Например: головная боль, слабость"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Качество жизни (1-10)</label>
-          <input
-            type="number"
-            min="1"
-            max="10"
-            value={effectivenessData.patient_response.quality_of_life_score}
+    <MacOSCard style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-accent-bg)', 
+          border: '1px solid var(--mac-accent-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-accent-blue)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <TrendingUp style={{ width: '16px', height: '16px' }} />
+            Текущие симптомы
+          </h4>
+          <MacOSInput
+            type="text"
+            value={effectivenessData.patient_response.symptoms.join(', ')}
             onChange={(e) => setEffectivenessData(prev => ({
               ...prev,
-              patient_response: { ...prev.patient_response, quality_of_life_score: e.target.value }
+              patient_response: { 
+                ...prev.patient_response, 
+                symptoms: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
+              }
             }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Например: головная боль, слабость"
+            style={{ width: '100%' }}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Приверженность лечению (%)</label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            value={effectivenessData.patient_response.adherence_rate}
-            onChange={(e) => setEffectivenessData(prev => ({
-              ...prev,
-              patient_response: { ...prev.patient_response, adherence_rate: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        </MacOSCard>
+
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-bg-primary)', 
+          border: '1px solid var(--mac-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <User style={{ width: '16px', height: '16px' }} />
+            Оценка состояния пациента
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Качество жизни (1-10)
+              </label>
+              <MacOSInput
+                type="number"
+                min="1"
+                max="10"
+                value={effectivenessData.patient_response.quality_of_life_score}
+                onChange={(e) => setEffectivenessData(prev => ({
+                  ...prev,
+                  patient_response: { ...prev.patient_response, quality_of_life_score: e.target.value }
+                }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Приверженность лечению (%)
+              </label>
+              <MacOSInput
+                type="number"
+                min="0"
+                max="100"
+                value={effectivenessData.patient_response.adherence_rate}
+                onChange={(e) => setEffectivenessData(prev => ({
+                  ...prev,
+                  patient_response: { ...prev.patient_response, adherence_rate: e.target.value }
+                }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        </MacOSCard>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <MacOSButton
+            onClick={() => handleSubmit('assess-treatment-effectiveness', effectivenessData)}
+            disabled={loading}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              border: 'none'
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader style={{ 
+                  width: '20px', 
+                  height: '20px',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Оцениваем...
+              </>
+            ) : (
+              <>
+                <TrendingUp style={{ width: '20px', height: '20px' }} />
+                Оценить эффективность
+              </>
+            )}
+          </MacOSButton>
         </div>
       </div>
-
-      <button
-        onClick={() => handleSubmit('assess-treatment-effectiveness', effectivenessData)}
-        disabled={loading}
-        className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <>
-            <Loader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-            Оцениваем...
-          </>
-        ) : (
-          <>
-            <TrendingUp className="h-5 w-5 mr-2" />
-            Оценить эффективность
-          </>
-        )}
-      </button>
-    </div>
+    </MacOSCard>
   );
 
   const renderLifestyleForm = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Возраст</label>
-          <input
-            type="number"
-            value={lifestyleData.patient_profile.age}
+    <MacOSCard style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-warning-bg)', 
+          border: '1px solid var(--mac-warning-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-warning)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Activity style={{ width: '16px', height: '16px' }} />
+            Основные параметры пациента
+          </h4>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Возраст
+              </label>
+              <MacOSInput
+                type="number"
+                value={lifestyleData.patient_profile.age}
+                onChange={(e) => setLifestyleData(prev => ({
+                  ...prev,
+                  patient_profile: { ...prev.patient_profile, age: e.target.value }
+                }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                ИМТ
+              </label>
+              <MacOSInput
+                type="number"
+                step="0.1"
+                value={lifestyleData.patient_profile.bmi}
+                onChange={(e) => setLifestyleData(prev => ({
+                  ...prev,
+                  patient_profile: { ...prev.patient_profile, bmi: e.target.value }
+                }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Уровень активности
+              </label>
+              <MacOSSelect
+                value={lifestyleData.patient_profile.activity_level}
+                onChange={(e) => setLifestyleData(prev => ({
+                  ...prev,
+                  patient_profile: { ...prev.patient_profile, activity_level: e.target.value }
+                }))}
+                options={[
+                  { value: '', label: 'Выберите уровень' },
+                  { value: 'низкий', label: 'Низкий' },
+                  { value: 'умеренный', label: 'Умеренный' },
+                  { value: 'высокий', label: 'Высокий' }
+                ]}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '4px' 
+              }}>
+                Курение
+              </label>
+              <MacOSSelect
+                value={lifestyleData.patient_profile.smoking_status}
+                onChange={(e) => setLifestyleData(prev => ({
+                  ...prev,
+                  patient_profile: { ...prev.patient_profile, smoking_status: e.target.value }
+                }))}
+                options={[
+                  { value: '', label: 'Выберите статус' },
+                  { value: 'не курит', label: 'Не курит' },
+                  { value: 'курит', label: 'Курит' },
+                  { value: 'бросил', label: 'Бросил' }
+                ]}
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        </MacOSCard>
+
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-error-bg)', 
+          border: '1px solid var(--mac-error-border)' 
+        }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-error)',
+            margin: '0 0 12px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <AlertCircle style={{ width: '16px', height: '16px' }} />
+            Заболевания
+          </h4>
+          <MacOSInput
+            type="text"
+            value={lifestyleData.conditions.join(', ')}
             onChange={(e) => setLifestyleData(prev => ({
               ...prev,
-              patient_profile: { ...prev.patient_profile, age: e.target.value }
+              conditions: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
             }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Например: гипертония, диабет"
+            style={{ width: '100%' }}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">ИМТ</label>
-          <input
-            type="number"
-            step="0.1"
-            value={lifestyleData.patient_profile.bmi}
-            onChange={(e) => setLifestyleData(prev => ({
-              ...prev,
-              patient_profile: { ...prev.patient_profile, bmi: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Уровень активности</label>
-          <select
-            value={lifestyleData.patient_profile.activity_level}
-            onChange={(e) => setLifestyleData(prev => ({
-              ...prev,
-              patient_profile: { ...prev.patient_profile, activity_level: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        </MacOSCard>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <MacOSButton
+            onClick={() => handleSubmit('suggest-lifestyle-modifications', lifestyleData)}
+            disabled={loading}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: 'var(--mac-warning)',
+              border: 'none'
+            }}
           >
-            <option value="">Выберите уровень</option>
-            <option value="низкий">Низкий</option>
-            <option value="умеренный">Умеренный</option>
-            <option value="высокий">Высокий</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Курение</label>
-          <select
-            value={lifestyleData.patient_profile.smoking_status}
-            onChange={(e) => setLifestyleData(prev => ({
-              ...prev,
-              patient_profile: { ...prev.patient_profile, smoking_status: e.target.value }
-            }))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Выберите статус</option>
-            <option value="не курит">Не курит</option>
-            <option value="курит">Курит</option>
-            <option value="бросил">Бросил</option>
-          </select>
+            {loading ? (
+              <>
+                <Loader style={{ 
+                  width: '20px', 
+                  height: '20px',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Генерируем рекомендации...
+              </>
+            ) : (
+              <>
+                <Activity style={{ width: '20px', height: '20px' }} />
+                Получить рекомендации
+              </>
+            )}
+          </MacOSButton>
         </div>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Заболевания</label>
-        <input
-          type="text"
-          value={lifestyleData.conditions.join(', ')}
-          onChange={(e) => setLifestyleData(prev => ({
-            ...prev,
-            conditions: e.target.value.split(',').map(item => item.trim()).filter(Boolean)
-          }))}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Например: гипертония, диабет"
-        />
-      </div>
-
-      <button
-        onClick={() => handleSubmit('suggest-lifestyle-modifications', lifestyleData)}
-        disabled={loading}
-        className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <>
-            <Loader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-            Генерируем рекомендации...
-          </>
-        ) : (
-          <>
-            <Activity className="h-5 w-5 mr-2" />
-            Получить рекомендации
-          </>
-        )}
-      </button>
-    </div>
+    </MacOSCard>
   );
 
   const renderResult = () => {
@@ -470,105 +789,235 @@ const TreatmentRecommendations = () => {
 
     if (result.error) {
       return (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-            <h3 className="text-sm font-medium text-red-800">Ошибка</h3>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-error-bg)', 
+          border: '1px solid var(--mac-error-border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-error)',
+              margin: 0
+            }}>
+              Ошибка
+            </h3>
           </div>
-          <p className="mt-2 text-sm text-red-700">{result.error}</p>
-        </div>
+          <p style={{ 
+            marginTop: '8px',
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-error)',
+            margin: '8px 0 0 0'
+          }}>
+            {result.error}
+          </p>
+        </MacOSCard>
       );
     }
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа
           </h3>
-          <button
+          <MacOSButton
             onClick={exportResult}
-            className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <Download className="h-4 w-4 mr-1" />
+            <Download style={{ width: '16px', height: '16px' }} />
             Экспорт
-          </button>
+          </MacOSButton>
         </div>
 
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {Object.entries(result).map(([key, value]) => (
-            <div key={key} className="border-l-4 border-blue-400 pl-4">
-              <h4 className="font-medium text-gray-900 capitalize mb-2">
+            <div key={key} style={{ 
+              borderLeft: '4px solid var(--mac-accent-blue)', 
+              paddingLeft: '16px' 
+            }}>
+              <h4 style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)',
+                margin: '0 0 8px 0',
+                fontSize: 'var(--mac-font-size-sm)',
+                textTransform: 'capitalize'
+              }}>
                 {key.replace(/_/g, ' ')}
               </h4>
-              <div className="text-sm text-gray-600">
+              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                 {typeof value === 'object' && value !== null ? (
-                  <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded text-xs">
+                  <pre style={{ 
+                    whiteSpace: 'pre-wrap', 
+                    backgroundColor: 'var(--mac-bg-secondary)', 
+                    padding: '8px', 
+                    borderRadius: 'var(--mac-radius-sm)', 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    overflowX: 'auto', 
+                    maxHeight: '256px',
+                    margin: 0,
+                    fontFamily: 'var(--mac-font-mono)'
+                  }}>
                     {JSON.stringify(value, null, 2)}
                   </pre>
                 ) : (
-                  <p>{String(value)}</p>
+                  <p style={{ margin: 0 }}>{String(value)}</p>
                 )}
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </MacOSCard>
     );
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-            <Heart className="h-6 w-6 text-red-600 mr-2" />
+    <div style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        {/* Заголовок */}
+        <div style={{ 
+          paddingBottom: '24px', 
+          borderBottom: '1px solid var(--mac-border)',
+          marginBottom: '24px'
+        }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 8px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Heart style={{ width: '32px', height: '32px', color: 'var(--mac-error)' }} />
             AI Рекомендации Лечения
           </h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p style={{ 
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            margin: 0
+          }}>
             Персонализированные планы лечения и рекомендации на основе данных пациента
           </p>
         </div>
 
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6">
-            {tabs.map((tab) => (
+        {/* Вкладки */}
+        <div style={{ 
+          display: 'flex', 
+          marginBottom: '24px'
+        }}>
+          {tabs.map(tab => {
+            const isActive = activeTab === tab.id;
+            
+            return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                style={{
+                  padding: '12px 20px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                  fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                  position: 'relative',
+                  marginBottom: '-1px'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.target.style.color = 'var(--mac-text-primary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.target.style.color = 'var(--mac-text-secondary)';
+                  }
+                }}
               >
-                {tab.icon}
-                <span>{tab.label}</span>
+                <div style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+                }}>
+                  {tab.icon}
+                </div>
+                {tab.label}
+                {isActive && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '0',
+                    right: '0',
+                    height: '3px',
+                    backgroundColor: 'var(--mac-accent-blue)',
+                    borderRadius: '2px 2px 0 0'
+                  }} />
+                )}
               </button>
-            ))}
-          </nav>
+            );
+          })}
         </div>
+        
+        {/* Разделительная линия */}
+        <div style={{ 
+          borderBottom: '1px solid var(--mac-border)',
+          marginBottom: '24px'
+        }} />
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {tabs.find(tab => tab.id === activeTab)?.label}
-              </h3>
-              {activeTab === 'treatment-plan' && renderTreatmentPlanForm()}
-              {activeTab === 'medication' && renderMedicationForm()}
-              {activeTab === 'effectiveness' && renderEffectivenessForm()}
-              {activeTab === 'lifestyle' && renderLifestyleForm()}
-            </div>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+          gap: '24px' 
+        }}>
+          <div>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 16px 0'
+            }}>
+              {tabs.find(tab => tab.id === activeTab)?.label}
+            </h3>
+            {activeTab === 'treatment-plan' && renderTreatmentPlanForm()}
+            {activeTab === 'medication' && renderMedicationForm()}
+            {activeTab === 'effectiveness' && renderEffectivenessForm()}
+            {activeTab === 'lifestyle' && renderLifestyleForm()}
+          </div>
 
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Результат</h3>
-              {renderResult()}
-            </div>
+          <div>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 16px 0'
+            }}>
+              Результат
+            </h3>
+            {renderResult()}
           </div>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 };

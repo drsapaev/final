@@ -18,7 +18,7 @@ import {
   Webhook,
   BarChart3
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
 
 const TelegramSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -204,38 +204,53 @@ const TelegramSettings = () => {
 
   if (loading) {
     return (
-      <Card className="p-8">
-        <div className="flex items-center justify-center">
-          <RefreshCw className="animate-spin mr-2" size={20} />
-          <span>Загрузка Telegram настроек...</span>
+      <Card style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <RefreshCw style={{ 
+            width: '20px', 
+            height: '20px', 
+            marginRight: '8px', 
+            animation: 'spin 1s linear infinite' 
+          }} />
+          <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка Telegram настроек...</span>
         </div>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            marginBottom: '4px'
+          }}>
             Настройки Telegram
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)',
+            margin: 0
+          }}>
             Управление Telegram ботом и уведомлениями
           </p>
         </div>
         
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw size={16} className="mr-2" />
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
           </Button>
           <Button onClick={saveSettings} disabled={saving}>
             {saving ? (
-              <RefreshCw size={16} className="animate-spin mr-2" />
+              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px', animation: 'spin 1s linear infinite' }} />
             ) : (
-              <Save size={16} className="mr-2" />
+              <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             )}
             Сохранить
           </Button>
@@ -244,113 +259,215 @@ const TelegramSettings = () => {
 
       {/* Сообщения */}
       {message.text && (
-        <div className={`flex items-center p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '16px', 
+          borderRadius: 'var(--mac-radius-md)',
+          backgroundColor: message.type === 'success' 
+            ? 'var(--mac-success-bg)' 
+            : 'var(--mac-error-bg)',
+          color: message.type === 'success' 
+            ? 'var(--mac-success)' 
+            : 'var(--mac-error)',
+          border: `1px solid ${message.type === 'success' 
+            ? 'var(--mac-success-border)' 
+            : 'var(--mac-error-border)'}`
+        }}>
           {message.type === 'success' ? (
-            <CheckCircle size={20} className="mr-2" />
+            <CheckCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           ) : (
-            <AlertCircle size={20} className="mr-2" />
+            <AlertCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           )}
           {message.text}
         </div>
       )}
 
       {/* Статистика */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.total_users || 0}</div>
-          <div className="text-sm text-gray-600">Всего пользователей</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-accent-blue)',
+            marginBottom: '8px'
+          }}>
+            {stats.total_users || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Всего пользователей
+          </div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.messages_sent || 0}</div>
-          <div className="text-sm text-gray-600">Сообщений отправлено</div>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-success)',
+            marginBottom: '8px'
+          }}>
+            {stats.messages_sent || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Сообщений отправлено
+          </div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-orange-600">{stats.messages_delivered || 0}</div>
-          <div className="text-sm text-gray-600">Доставлено</div>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-warning)',
+            marginBottom: '8px'
+          }}>
+            {stats.messages_delivered || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Доставлено
+          </div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{stats.messages_failed || 0}</div>
-          <div className="text-sm text-gray-600">Ошибок</div>
+        <Card style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-bold)', 
+            color: 'var(--mac-error)',
+            marginBottom: '8px'
+          }}>
+            {stats.messages_failed || 0}
+          </div>
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)' 
+          }}>
+            Ошибок
+          </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
         {/* Основные настройки */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4 flex items-center">
-            <Bot size={20} className="mr-2 text-blue-600" />
+        <Card style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            marginBottom: '16px', 
+            display: 'flex', 
+            alignItems: 'center',
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>
+            <Bot style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
             Настройки бота
           </h3>
           
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <Key size={16} className="inline mr-1" />
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                <Key style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
                 Токен бота
               </label>
-              <div className="flex">
-                <input
+              <div style={{ display: 'flex' }}>
+                <MacOSInput
                   type={showToken ? "text" : "password"}
                   value={settings.bot_token}
                   onChange={(e) => handleSettingChange('bot_token', e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                  style={{ flex: 1, borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
                 />
                 <Button
                   variant="outline"
                   onClick={() => setShowToken(!showToken)}
-                  className="border-l-0 rounded-l-none"
+                  style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
                 >
-                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showToken ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
                 </Button>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)', 
+                marginTop: '4px',
+                margin: 0
+              }}>
                 Получите токен у @BotFather в Telegram
               </p>
             </div>
 
             {/* Информация о боте */}
             {botInfo && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20">
-                <h4 className="font-medium text-green-800 dark:text-green-400 mb-2">
+              <div style={{ 
+                padding: '12px', 
+                backgroundColor: 'var(--mac-success-bg)', 
+                border: '1px solid var(--mac-success-border)', 
+                borderRadius: 'var(--mac-radius-md)' 
+              }}>
+                <h4 style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-success)', 
+                  marginBottom: '8px',
+                  margin: 0
+                }}>
                   Информация о боте:
                 </h4>
-                <div className="text-sm space-y-1">
-                  <div><strong>Username:</strong> @{botInfo.username}</div>
-                  <div><strong>Имя:</strong> {botInfo.first_name}</div>
-                  <div><strong>ID:</strong> {botInfo.id}</div>
-                  <div><strong>Группы:</strong> {botInfo.can_join_groups ? 'Да' : 'Нет'}</div>
+                <div style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '4px' 
+                }}>
+                  <div style={{ color: 'var(--mac-text-primary)' }}><strong>Username:</strong> @{botInfo.username}</div>
+                  <div style={{ color: 'var(--mac-text-primary)' }}><strong>Имя:</strong> {botInfo.first_name}</div>
+                  <div style={{ color: 'var(--mac-text-primary)' }}><strong>ID:</strong> {botInfo.id}</div>
+                  <div style={{ color: 'var(--mac-text-primary)' }}><strong>Группы:</strong> {botInfo.can_join_groups ? 'Да' : 'Нет'}</div>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
                 ID чатов администраторов
               </label>
-              <textarea
+              <MacOSInput
                 value={settings.admin_chat_ids?.join(', ') || ''}
                 onChange={(e) => handleSettingChange('admin_chat_ids', e.target.value.split(',').map(id => id.trim()).filter(id => id))}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 placeholder="123456789, 987654321"
+                style={{ width: '100%', minHeight: '60px' }}
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)', 
+                marginTop: '4px',
+                margin: 0
+              }}>
                 ID чатов для получения служебных уведомлений
               </p>
             </div>
 
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: '12px' }}>
               <Button onClick={testBot} disabled={!settings.bot_token}>
-                <TestTube size={16} className="mr-2" />
+                <TestTube style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Тест бота
               </Button>
               <Button onClick={setWebhook} disabled={!settings.bot_token}>
-                <Webhook size={16} className="mr-2" />
+                <Webhook style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Установить webhook
               </Button>
             </div>
@@ -358,89 +475,114 @@ const TelegramSettings = () => {
         </Card>
 
         {/* Настройки уведомлений */}
-        <Card className="p-6">
-          <h3 className="text-lg font-medium mb-4 flex items-center">
-            <Bell size={20} className="mr-2 text-green-600" />
+        <Card style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            marginBottom: '16px', 
+            display: 'flex', 
+            alignItems: 'center',
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>
+            <Bell style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-success)' }} />
             Уведомления
           </h3>
           
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center' }}>
+                <MacOSCheckbox
                   checked={settings.notifications_enabled}
                   onChange={(e) => handleSettingChange('notifications_enabled', e.target.checked)}
-                  className="mr-3"
+                  style={{ marginRight: '12px' }}
                 />
-                <span className="text-sm font-medium">Уведомления включены</span>
+                <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Уведомления включены</span>
               </label>
 
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
+              <label style={{ display: 'flex', alignItems: 'center' }}>
+                <MacOSCheckbox
                   checked={settings.appointment_reminders}
                   onChange={(e) => handleSettingChange('appointment_reminders', e.target.checked)}
-                  className="mr-3"
+                  style={{ marginRight: '12px' }}
                 />
-                <span className="text-sm font-medium">Напоминания о приемах</span>
+                <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Напоминания о приемах</span>
               </label>
 
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
+              <label style={{ display: 'flex', alignItems: 'center' }}>
+                <MacOSCheckbox
                   checked={settings.lab_results_notifications}
                   onChange={(e) => handleSettingChange('lab_results_notifications', e.target.checked)}
-                  className="mr-3"
+                  style={{ marginRight: '12px' }}
                 />
-                <span className="text-sm font-medium">Готовность анализов</span>
+                <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Готовность анализов</span>
               </label>
 
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
+              <label style={{ display: 'flex', alignItems: 'center' }}>
+                <MacOSCheckbox
                   checked={settings.payment_notifications}
                   onChange={(e) => handleSettingChange('payment_notifications', e.target.checked)}
-                  className="mr-3"
+                  style={{ marginRight: '12px' }}
                 />
-                <span className="text-sm font-medium">Уведомления об оплате</span>
+                <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Уведомления об оплате</span>
               </label>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <Globe size={16} className="inline mr-1" />
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                <Globe style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
                 Язык по умолчанию
               </label>
-              <select
+              <MacOSSelect
                 value={settings.default_language}
                 onChange={(e) => handleSettingChange('default_language', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-              >
-                <option value="ru">Русский</option>
-                <option value="uz">O'zbekcha</option>
-                <option value="en">English</option>
-              </select>
+                options={[
+                  { value: 'ru', label: 'Русский' },
+                  { value: 'uz', label: "O'zbekcha" },
+                  { value: 'en', label: 'English' }
+                ]}
+                style={{ width: '100%' }}
+              />
             </div>
 
             {/* Информация о webhook */}
             {webhookInfo && (
-              <div className={`p-3 rounded-lg border ${
-                webhookInfo.webhook_set 
-                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20'
-                  : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20'
-              }`}>
-                <h4 className={`font-medium mb-2 ${
-                  webhookInfo.webhook_set 
-                    ? 'text-green-800 dark:text-green-400'
-                    : 'text-yellow-800 dark:text-yellow-400'
-                }`}>
+              <div style={{ 
+                padding: '12px', 
+                borderRadius: 'var(--mac-radius-md)', 
+                border: '1px solid',
+                backgroundColor: webhookInfo.webhook_set 
+                  ? 'var(--mac-success-bg)' 
+                  : 'var(--mac-warning-bg)',
+                borderColor: webhookInfo.webhook_set 
+                  ? 'var(--mac-success-border)' 
+                  : 'var(--mac-warning-border)'
+              }}>
+                <h4 style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  marginBottom: '8px',
+                  color: webhookInfo.webhook_set 
+                    ? 'var(--mac-success)' 
+                    : 'var(--mac-warning)',
+                  margin: 0
+                }}>
                   Webhook: {webhookInfo.webhook_set ? 'Настроен' : 'Не настроен'}
                 </h4>
                 {webhookInfo.webhook_info && (
-                  <div className="text-sm space-y-1">
-                    <div><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
-                    <div><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '4px' 
+                  }}>
+                    <div style={{ color: 'var(--mac-text-primary)' }}><strong>URL:</strong> {webhookInfo.webhook_info.url || 'Не установлен'}</div>
+                    <div style={{ color: 'var(--mac-text-primary)' }}><strong>Обновления:</strong> {webhookInfo.webhook_info.pending_update_count || 0}</div>
                   </div>
                 )}
               </div>
@@ -450,65 +592,108 @@ const TelegramSettings = () => {
       </div>
 
       {/* Тестирование */}
-      <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4 flex items-center">
-          <Send size={20} className="mr-2 text-purple-600" />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          marginBottom: '16px', 
+          display: 'flex', 
+          alignItems: 'center',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          <Send style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-purple)' }} />
           Тестирование отправки сообщений
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Chat ID получателя
             </label>
-            <input
+            <MacOSInput
               type="text"
               value={testChatId}
               onChange={(e) => setTestChatId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="123456789"
+              style={{ width: '100%' }}
             />
-            <p className="text-sm text-gray-500 mt-1">
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)', 
+              marginTop: '4px',
+              margin: 0
+            }}>
               ID чата для отправки тестового сообщения
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Текст сообщения
             </label>
-            <textarea
+            <MacOSInput
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              placeholder="Введите текст сообщения..."
+              style={{ width: '100%', minHeight: '80px' }}
             />
           </div>
         </div>
 
-        <div className="flex justify-end mt-4">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
           <Button 
             onClick={sendTestMessage} 
             disabled={!settings.bot_token || !testChatId || !testMessage}
           >
-            <Send size={16} className="mr-2" />
+            <Send style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Отправить тест
           </Button>
         </div>
       </Card>
 
       {/* Инструкция */}
-      <Card className="p-6 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700">
-        <h3 className="text-lg font-medium mb-2 flex items-center text-blue-800 dark:text-blue-400">
-          <MessageSquare size={20} className="mr-2" />
+      <Card style={{ 
+        padding: '24px', 
+        backgroundColor: 'var(--mac-info-bg)', 
+        border: '1px solid var(--mac-info-border)' 
+      }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          marginBottom: '8px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          color: 'var(--mac-info)',
+          margin: 0
+        }}>
+          <MessageSquare style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           Настройка Telegram бота
         </h3>
-        <div className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
-          <p>1. Создайте бота через @BotFather в Telegram</p>
-          <p>2. Получите токен бота и вставьте его выше</p>
-          <p>3. Нажмите "Тест бота" для проверки подключения</p>
-          <p>4. Установите webhook для получения сообщений</p>
-          <p>5. Добавьте ID чатов администраторов для служебных уведомлений</p>
+        <div style={{ 
+          fontSize: 'var(--mac-font-size-sm)', 
+          color: 'var(--mac-text-secondary)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '8px' 
+        }}>
+          <p style={{ margin: 0 }}>1. Создайте бота через @BotFather в Telegram</p>
+          <p style={{ margin: 0 }}>2. Получите токен бота и вставьте его выше</p>
+          <p style={{ margin: 0 }}>3. Нажмите "Тест бота" для проверки подключения</p>
+          <p style={{ margin: 0 }}>4. Установите webhook для получения сообщений</p>
+          <p style={{ margin: 0 }}>5. Добавьте ID чатов администраторов для служебных уведомлений</p>
         </div>
       </Card>
     </div>

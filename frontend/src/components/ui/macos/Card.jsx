@@ -21,15 +21,15 @@ const Card = React.forwardRef(({
   // macOS card styles based on variant
   const getCardStyles = () => {
     const baseStyles = {
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
-      border: '1px solid rgba(0, 0, 0, 0.1)',
-      borderRadius: '12px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      border: '1px solid var(--mac-border)',
+      borderRadius: 'var(--mac-radius-lg)', // Стандартный радиус macOS для карточек
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
       position: 'relative',
       overflow: 'hidden',
-      transition: 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-      backdropFilter: 'blur(10px)',
-      WebkitBackdropFilter: 'blur(10px)'
+      transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+      backdropFilter: 'var(--mac-blur-light)',
+      WebkitBackdropFilter: 'var(--mac-blur-light)'
     };
 
     const paddingStyles = {
@@ -41,24 +41,24 @@ const Card = React.forwardRef(({
 
     const shadowStyles = {
       none: { boxShadow: 'none' },
-      small: { boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)' },
-      default: { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)' },
-      large: { boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)' }
+      small: { boxShadow: 'var(--mac-shadow-sm)' },
+      default: { boxShadow: 'var(--mac-shadow-md)' },
+      large: { boxShadow: 'var(--mac-shadow-lg)' }
     };
 
     const variantStyles = {
       default: {},
       elevated: {
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-        border: '1px solid rgba(0, 0, 0, 0.05)'
+        boxShadow: 'var(--mac-shadow-lg)',
+        border: '1px solid var(--mac-border-secondary)'
       },
       outlined: {
         backgroundColor: 'transparent',
-        border: '2px solid rgba(0, 0, 0, 0.1)'
+        border: '2px solid var(--mac-border)'
       },
       filled: {
-        backgroundColor: 'rgba(0, 122, 255, 0.05)',
-        border: '1px solid rgba(0, 122, 255, 0.2)'
+        backgroundColor: 'var(--mac-bg-tertiary)',
+        border: '1px solid var(--mac-border-secondary)'
       }
     };
 
@@ -119,7 +119,7 @@ const Card = React.forwardRef(({
         />
       )}
 
-      <style jsx>{`
+      <style>{`
         .mac-card:hover .mac-card-overlay {
           opacity: 1 !important;
         }
@@ -217,6 +217,7 @@ export const CardTitle = React.forwardRef(({
         color: 'var(--mac-text-primary)',
         margin: '0 0 4px 0',
         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+        borderRadius: 'var(--mac-radius-sm)',
         ...style
       }}
       {...props}
@@ -319,3 +320,4 @@ export const CardFooter = React.forwardRef(({
 CardFooter.displayName = 'macOS Card Footer';
 
 export default Card;
+

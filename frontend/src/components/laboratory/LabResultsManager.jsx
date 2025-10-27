@@ -10,63 +10,48 @@ import {
   CardContent,
   Typography,
   Button,
-  TextField,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  IconButton,
+  Input,
+  Alert,
+  CircularProgress,
+  Badge,
+  Select,
+  Option,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  InputAdornment,
-  Tabs,
-  Tab,
-  Badge,
-  Tooltip,
-  LinearProgress,
-} from '@mui/material';
+  Progress
+} from '../ui/macos';
 import {
-  Science,
-  Add,
+  TestTube,
+  Plus,
   Edit,
-  Delete,
-  Visibility,
+  Trash2,
+  Eye,
   Download,
   Upload,
-  Print,
+  Printer,
   Send,
-  Warning,
+  AlertTriangle,
   CheckCircle,
-  Schedule,
+  Calendar,
   TrendingUp,
   TrendingDown,
-  Remove,
-  Biotech,
-  LocalHospital,
-  Psychology,
-} from '@mui/icons-material';
+  Minus,
+  Microscope,
+  Hospital,
+  Brain,
+} from 'lucide-react';
 import { api } from '../../api/client';
 import { AIButton, AIAssistant } from '../ai';
 
 // Категории анализов
 const LAB_CATEGORIES = {
-  blood: { name: 'Анализы крови', icon: <Science color="error" /> },
-  urine: { name: 'Анализы мочи', icon: <Science color="warning" /> },
-  biochemistry: { name: 'Биохимия', icon: <Biotech color="primary" /> },
-  hormones: { name: 'Гормоны', icon: <LocalHospital color="secondary" /> },
-  other: { name: 'Другие', icon: <Science /> },
+  blood: { name: 'Анализы крови', icon: <TestTube style={{ color: 'var(--mac-accent-red)' }} /> },
+  urine: { name: 'Анализы мочи', icon: <TestTube style={{ color: 'var(--mac-accent-orange)' }} /> },
+  biochemistry: { name: 'Биохимия', icon: <Microscope style={{ color: 'var(--mac-accent-blue)' }} /> },
+  hormones: { name: 'Гормоны', icon: <Hospital style={{ color: 'var(--mac-accent-purple)' }} /> },
+  other: { name: 'Другие', icon: <TestTube /> },
 };
 
 // Статусы результатов
@@ -300,23 +285,27 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
     <Box>
       <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <Typography variant="h6">
-              <Science sx={{ mr: 1, verticalAlign: 'middle' }} />
+              <TestTube style={{ marginRight: 8, verticalAlign: 'middle' }} />
               Лабораторные исследования
             </Typography>
             
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button size="small" startIcon={<Add />} onClick={() => setDialogOpen(true)}>
+            <Box style={{ display: 'flex', gap: 8 }}>
+              <Button size="small" onClick={() => setDialogOpen(true)}>
+                <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
                 Добавить результат
               </Button>
-              <Button size="small" startIcon={<Upload />} onClick={() => setUploadDialog(true)}>
+              <Button size="small" onClick={() => setUploadDialog(true)}>
+                <Upload style={{ width: 16, height: 16, marginRight: 8 }} />
                 Загрузить файл
               </Button>
-              <Button size="small" startIcon={<Download />} onClick={exportToPDF}>
+              <Button size="small" onClick={exportToPDF}>
+                <Download style={{ width: 16, height: 16, marginRight: 8 }} />
                 Экспорт PDF
               </Button>
-              <Button size="small" startIcon={<Send />} onClick={sendToPatient}>
+              <Button size="small" onClick={sendToPatient}>
+                <Send style={{ width: 16, height: 16, marginRight: 8 }} />
                 Отправить
               </Button>
               <AIButton
@@ -334,78 +323,97 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
           </Box>
 
           {/* Табы категорий */}
-          <Tabs value={activeTab} onChange={(e, value) => setActiveTab(value)} sx={{ mb: 2 }}>
-            <Tab 
-              label="Все" 
-              value="all"
-              icon={<Badge badgeContent={results.length} color="primary" />}
-            />
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--mac-border)', marginBottom: 16 }}>
+            <button
+              style={{
+                padding: '12px 24px',
+                border: 'none',
+                background: activeTab === 'all' ? 'var(--mac-accent-blue)' : 'transparent',
+                color: activeTab === 'all' ? 'white' : 'var(--mac-text-primary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+              onClick={() => setActiveTab('all')}
+            >
+              Все
+              <Badge variant="primary">{results.length}</Badge>
+            </button>
             {Object.entries(LAB_CATEGORIES).map(([key, category]) => (
-              <Tab
+              <button
                 key={key}
-                label={category.name}
-                value={key}
-                icon={
-                  <Badge badgeContent={getCategoryCount(key)} color="primary">
-                    {category.icon}
-                  </Badge>
-                }
-              />
+                style={{
+                  padding: '12px 24px',
+                  border: 'none',
+                  background: activeTab === key ? 'var(--mac-accent-blue)' : 'transparent',
+                  color: activeTab === key ? 'white' : 'var(--mac-text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+                onClick={() => setActiveTab(key)}
+              >
+                {category.icon}
+                {category.name}
+                <Badge variant="primary">{getCategoryCount(key)}</Badge>
+              </button>
             ))}
-          </Tabs>
+          </div>
 
           {/* Таблица результатов */}
           {loading ? (
-            <LinearProgress />
+            <Progress />
           ) : filteredResults.length > 0 ? (
-            <TableContainer component={Paper}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Исследование</TableCell>
-                    <TableCell>Результат</TableCell>
-                    <TableCell>Норма</TableCell>
-                    <TableCell>Статус</TableCell>
-                    <TableCell>Дата</TableCell>
-                    <TableCell align="right">Действия</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
+            <div style={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Исследование</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Результат</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Норма</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Статус</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Дата</th>
+                    <th style={{ padding: 12, textAlign: 'right' }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredResults.map((result) => (
-                    <TableRow key={result.id}>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
+                    <tr key={result.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                      <td style={{ padding: 12 }}>
+                        <Typography variant="body2" style={{ fontWeight: 500 }}>
                           {result.test_name}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="textSecondary">
                           {LAB_CATEGORIES[result.category]?.name}
                         </Typography>
-                      </TableCell>
+                      </td>
                       
-                      <TableCell>{renderValue(result)}</TableCell>
+                      <td style={{ padding: 12 }}>{renderValue(result)}</td>
                       
-                      <TableCell>
+                      <td style={{ padding: 12 }}>
                         <Typography variant="caption">
                           {result.reference_min} - {result.reference_max} {result.unit}
                         </Typography>
-                      </TableCell>
+                      </td>
                       
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          label={RESULT_STATUS[result.status]?.label}
-                          color={RESULT_STATUS[result.status]?.color}
-                        />
-                      </TableCell>
+                      <td style={{ padding: 12 }}>
+                        <Badge
+                          variant={RESULT_STATUS[result.status]?.color}
+                        >
+                          {RESULT_STATUS[result.status]?.label}
+                        </Badge>
+                      </td>
                       
-                      <TableCell>
+                      <td style={{ padding: 12 }}>
                         <Typography variant="caption">
                           {new Date(result.performed_date).toLocaleDateString()}
                         </Typography>
-                      </TableCell>
+                      </td>
                       
-                      <TableCell align="right">
-                        <IconButton
+                      <td style={{ padding: 12, textAlign: 'right' }}>
+                        <Button
                           size="small"
                           onClick={() => {
                             setSelectedResult(result);
@@ -413,20 +421,21 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
                             setDialogOpen(true);
                           }}
                         >
-                          <Edit />
-                        </IconButton>
-                        <IconButton
+                          <Edit style={{ width: 16, height: 16 }} />
+                        </Button>
+                        <Button
                           size="small"
+                          variant="danger"
                           onClick={() => handleDeleteResult(result.id)}
                         >
-                          <Delete />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
+                          <Delete style={{ width: 16, height: 16 }} />
+                        </Button>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </tbody>
+              </table>
+            </div>
           ) : (
             <Alert severity="info">
               Нет результатов анализов. Добавьте новый результат или загрузите файл.
@@ -459,91 +468,86 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
         </DialogTitle>
         
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={8}>
-              <TextField
-                fullWidth
-                label="Название исследования"
-                value={resultForm.test_name}
-                onChange={(e) => setResultForm({ ...resultForm, test_name: e.target.value })}
-              />
-            </Grid>
-            
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Категория</InputLabel>
+          <Box style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' }}>
+            <Box style={{ display: 'flex', gap: '16px' }}>
+              <Box style={{ flex: 2 }}>
+                <Input
+                  label="Название исследования"
+                  value={resultForm.test_name}
+                  onChange={(e) => setResultForm({ ...resultForm, test_name: e.target.value })}
+                />
+              </Box>
+              
+              <Box style={{ flex: 1 }}>
                 <Select
+                  label="Категория"
                   value={resultForm.category}
                   onChange={(e) => setResultForm({ ...resultForm, category: e.target.value })}
-                  label="Категория"
                 >
                   {Object.entries(LAB_CATEGORIES).map(([key, category]) => (
-                    <MenuItem key={key} value={key}>
+                    <Option key={key} value={key}>
                       {category.name}
-                    </MenuItem>
+                    </Option>
                   ))}
                 </Select>
-              </FormControl>
-            </Grid>
+              </Box>
+            </Box>
             
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                label="Результат"
-                value={resultForm.value}
-                onChange={(e) => setResultForm({ ...resultForm, value: e.target.value })}
-              />
-            </Grid>
+            <Box style={{ display: 'flex', gap: '16px' }}>
+              <Box style={{ flex: 2 }}>
+                <Input
+                  label="Результат"
+                  value={resultForm.value}
+                  onChange={(e) => setResultForm({ ...resultForm, value: e.target.value })}
+                />
+              </Box>
+              
+              <Box style={{ flex: 1 }}>
+                <Input
+                  label="Ед."
+                  value={resultForm.unit}
+                  onChange={(e) => setResultForm({ ...resultForm, unit: e.target.value })}
+                />
+              </Box>
+              
+              <Box style={{ flex: 1 }}>
+                <Input
+                  label="Мин. норма"
+                  value={resultForm.reference_min}
+                  onChange={(e) => setResultForm({ ...resultForm, reference_min: e.target.value })}
+                />
+              </Box>
+              
+              <Box style={{ flex: 1 }}>
+                <Input
+                  label="Макс. норма"
+                  value={resultForm.reference_max}
+                  onChange={(e) => setResultForm({ ...resultForm, reference_max: e.target.value })}
+                />
+              </Box>
+            </Box>
             
-            <Grid item xs={12} md={2}>
-              <TextField
-                fullWidth
-                label="Ед."
-                value={resultForm.unit}
-                onChange={(e) => setResultForm({ ...resultForm, unit: e.target.value })}
-              />
-            </Grid>
+            <Box style={{ display: 'flex', gap: '16px' }}>
+              <Box style={{ flex: 1 }}>
+                <Input
+                  type="date"
+                  label="Дата выполнения"
+                  value={resultForm.performed_date}
+                  onChange={(e) => setResultForm({ ...resultForm, performed_date: e.target.value })}
+                />
+              </Box>
+            </Box>
             
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                label="Мин. норма"
-                value={resultForm.reference_min}
-                onChange={(e) => setResultForm({ ...resultForm, reference_min: e.target.value })}
-              />
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
-                label="Макс. норма"
-                value={resultForm.reference_max}
-                onChange={(e) => setResultForm({ ...resultForm, reference_max: e.target.value })}
-              />
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="date"
-                label="Дата выполнения"
-                value={resultForm.performed_date}
-                onChange={(e) => setResultForm({ ...resultForm, performed_date: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
+            <Box>
+              <Input
                 multiline
                 rows={2}
                 label="Примечания"
                 value={resultForm.notes}
                 onChange={(e) => setResultForm({ ...resultForm, notes: e.target.value })}
               />
-            </Grid>
-          </Grid>
+            </Box>
+          </Box>
         </DialogContent>
         
         <DialogActions>

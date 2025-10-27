@@ -9,699 +9,311 @@ import {
   Card,
   CardContent,
   Typography,
-  TextField,
-  Grid,
   Button,
   Alert,
-  Divider,
-  Paper,
-  Chip,
-  IconButton,
-  Collapse,
-  FormControlLabel,
   Checkbox,
-  InputAdornment,
-} from '@mui/material';
+  Input,
+  Textarea,
+} from '../ui/macos';
 import {
-  Favorite,
-  Analytics,
+  Heart,
+  BarChart3,
   Save,
-  ExpandMore,
-  ExpandLess,
-  CloudUpload,
-  AutoFixHigh,
-  Warning,
+  ChevronDown,
+  ChevronRight,
+  Upload,
+  Sparkles,
+  AlertTriangle,
   CheckCircle,
-} from '@mui/icons-material';
+} from 'lucide-react';
 import { api } from '../../api/client';
 
-const EchoForm = ({ visitId, patientId, onDataUpdate }) => {
-  const [expanded, setExpanded] = useState(true);
+const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
   const [echoData, setEchoData] = useState({
-    // Размеры камер
+    // Левый желудочек
     leftVentricle: {
-      edd: '', // End-diastolic dimension
-      esd: '', // End-systolic dimension
-      edv: '', // End-diastolic volume
-      esv: '', // End-systolic volume
-      ef: '', // Ejection fraction
-      fs: '', // Fractional shortening
+      edd: '', // КДР
+      esd: '', // КСР
+      ef: '',  // ФВ
+      fs: '',  // ФС
+      ivs: '', // МЖП
+      pw: '',  // ЗС
     },
-    leftAtrium: {
-      diameter: '',
-      volume: '',
-    },
+    // Правый желудочек
     rightVentricle: {
-      diameter: '',
+      rvdd: '', // КДР ПЖ
+      rvot: '', // ВТ ПЖ
     },
-    rightAtrium: {
-      diameter: '',
+    // Предсердия
+    atria: {
+      la: '', // ЛП
+      ra: '', // ПП
     },
-    
-    // Толщина стенок
-    walls: {
-      ivs: '', // Interventricular septum
-      pw: '', // Posterior wall
-    },
-    
     // Клапаны
     valves: {
       mitral: {
-        regurgitation: '',
-        stenosis: false,
-        gradient: '',
-      },
-      aortic: {
-        regurgitation: '',
-        stenosis: false,
-        gradient: '',
+        e: '',
+        a: '',
+        e_a: '',
+        decel_time: '',
       },
       tricuspid: {
-        regurgitation: '',
-        gradient: '',
+        e: '',
+        a: '',
+        e_a: '',
+      },
+      aortic: {
+        peak_velocity: '',
+        mean_gradient: '',
+        ava: '',
       },
       pulmonary: {
-        regurgitation: '',
+        peak_velocity: '',
+        mean_gradient: '',
       },
     },
-    
-    // Дополнительно
-    diastolicFunction: '',
-    pericardialEffusion: false,
+    // Дополнительные параметры
+    additional: {
+      pericardium: '',
+      aorta: '',
+      comments: '',
+    },
+    // Заключение
     conclusion: '',
-    recommendations: '',
   });
-  
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  // Загрузка существующих данных
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [expandedSections, setExpandedSections] = useState({
+    leftVentricle: true,
+    rightVentricle: false,
+    atria: false,
+    valves: false,
+    additional: false,
+  });
+
   useEffect(() => {
-    loadEchoData();
-  }, [visitId]);
-
-  const loadEchoData = async () => {
-    // В демо-режиме (visitId вроде 'demo-visit-*') не дергаем бэкенд
-    if (!visitId || (typeof visitId === 'string' && visitId.startsWith('demo-visit'))) {
-      return;
+    if (initialData) {
+      setEchoData(initialData);
     }
-    try {
-      const response = await api.get(`/visits/${visitId}/echo/params`);
-      if (response.data) {
-        setEchoData(response.data);
-      }
-    } catch (error) {
-      // Если бэкенд не реализован (404) — тихо используем значения по умолчанию
-      if (error?.response?.status === 404) {
-        console.info('Echo params endpoint not found (404). Using defaults.');
-        return;
-      }
-      console.error('Ошибка загрузки данных ЭхоКГ:', error);
-    }
-  };
+  }, [initialData]);
 
-  // Обновление данных
   const handleChange = (section, field, value) => {
-    setEchoData(prev => ({
-      ...prev,
-      [section]: typeof prev[section] === 'object'
-        ? { ...prev[section], [field]: value }
-        : value,
-    }));
-    setSaved(false);
-  };
-
-  // Обновление вложенных данных
-  const handleNestedChange = (section, subsection, field, value) => {
     setEchoData(prev => ({
       ...prev,
       [section]: {
         ...prev[section],
-        [subsection]: {
-          ...prev[section][subsection],
-          [field]: value,
-        },
-      },
-    }));
-    setSaved(false);
-  };
-
-  // Расчет фракции выброса
-  const calculateEF = () => {
-    const { edv, esv } = echoData.leftVentricle;
-    if (edv && esv) {
-      const ef = Math.round(((edv - esv) / edv) * 100);
-      handleChange('leftVentricle', 'ef', ef.toString());
-    }
-  };
-
-  // AI интерпретация
-  const analyzeWithAI = async () => {
-    setAiAnalyzing(true);
-    setAiResult(null);
-    
-    try {
-      const response = await api.post('/ai/echo-interpret', {
-        visit_id: visitId,
-        patient_id: patientId,
-        parameters: echoData,
-      });
-      
-      setAiResult(response.data);
-      
-      // Автозаполнение заключения если AI предложил
-      if (response.data.conclusion) {
-        setEchoData(prev => ({
-          ...prev,
-          conclusion: response.data.conclusion,
-          recommendations: response.data.recommendations || prev.recommendations,
-        }));
+        [field]: value
       }
-      
-    } catch (error) {
-      console.error('Ошибка AI анализа:', error);
-      setAiResult({ error: 'Не удалось проанализировать данные' });
-    } finally {
-      setAiAnalyzing(false);
-    }
+    }));
   };
 
-  // Сохранение данных
-  const saveEchoData = async () => {
-    setSaving(true);
-    
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const handleSave = async () => {
     try {
-      await api.post(`/visits/${visitId}/echo/params`, echoData);
-      setSaved(true);
-      onDataUpdate && onDataUpdate();
+      setLoading(true);
+      setError('');
       
-      setTimeout(() => setSaved(false), 3000);
-      
-    } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      const response = await api.post('/cardiology/echo-results', {
+        patient_id: patientId,
+        visit_id: visitId,
+        echo_data: echoData
+      });
+
+      if (response.status === 200) {
+        setSuccess('Результаты ЭхоКГ сохранены успешно');
+        if (onSave) {
+          onSave(response.data);
+        }
+      }
+    } catch (err) {
+      setError('Ошибка при сохранении результатов ЭхоКГ');
+      console.error('Echo form save error:', err);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  // Определение нормальности значений
-  const isNormal = (value, min, max) => {
-    const num = parseFloat(value);
-    if (!num) return null;
-    return num >= min && num <= max;
-  };
-
-  // Получение статуса фракции выброса
-  const getEFStatus = (ef) => {
-    const value = parseFloat(ef);
-    if (!value) return null;
-    
-    if (value >= 55) return { label: 'Норма', color: 'success' };
-    if (value >= 45) return { label: 'Умеренное снижение', color: 'warning' };
-    if (value >= 35) return { label: 'Снижение средней степени', color: 'warning' };
-    return { label: 'Выраженное снижение', color: 'error' };
-  };
-
-  const efStatus = getEFStatus(echoData.leftVentricle.ef);
+  const renderSection = (title, section, fields, expanded) => (
+    <div style={{ marginBottom: 24 }}>
+      <div 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          padding: '12px 16px',
+          backgroundColor: 'var(--mac-bg-secondary)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: '8px',
+          cursor: 'pointer'
+        }}
+        onClick={() => toggleSection(section)}
+      >
+        <Typography variant="subtitle1" style={{ fontWeight: 500 }}>
+          {title}
+        </Typography>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {expanded ? <ChevronDown style={{ width: 16, height: 16 }} /> : <ChevronRight style={{ width: 16, height: 16 }} />}
+        </div>
+      </div>
+      
+      {expanded && (
+        <div style={{ padding: 16, marginTop: 8, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            {fields.map(field => (
+              <div key={field.key}>
+                <Input
+                  label={field.label}
+                  value={echoData[section][field.key]}
+                  onChange={(e) => handleChange(section, field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <Box>
-      <Card>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">
-              <Favorite sx={{ mr: 1, verticalAlign: 'middle', color: 'error.main' }} />
-              Эхокардиография (ЭхоКГ)
-            </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <IconButton onClick={() => setExpanded(!expanded)}>
-                {expanded ? <ExpandLess /> : <ExpandMore />}
-              </IconButton>
-            </Box>
-          </Box>
+    <Card>
+      <CardContent>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <Typography variant="h6">
+            <Heart style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            Результаты ЭхоКГ
+          </Typography>
           
-          <Collapse in={expanded}>
-            {/* Размеры левого желудочка */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Левый желудочек
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="КДР"
-                    value={echoData.leftVentricle.edd}
-                    onChange={(e) => handleChange('leftVentricle', 'edd', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                    helperText="Норма: 35-55 мм"
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="КСР"
-                    value={echoData.leftVentricle.esd}
-                    onChange={(e) => handleChange('leftVentricle', 'esd', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                    helperText="Норма: 25-40 мм"
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="КДО"
-                    value={echoData.leftVentricle.edv}
-                    onChange={(e) => handleChange('leftVentricle', 'edv', e.target.value)}
-                    onBlur={calculateEF}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мл</InputAdornment>,
-                    }}
-                    helperText="Норма: 55-150 мл"
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="КСО"
-                    value={echoData.leftVentricle.esv}
-                    onChange={(e) => handleChange('leftVentricle', 'esv', e.target.value)}
-                    onBlur={calculateEF}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мл</InputAdornment>,
-                    }}
-                    helperText="Норма: 20-60 мл"
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Фракция выброса"
-                    value={echoData.leftVentricle.ef}
-                    onChange={(e) => handleChange('leftVentricle', 'ef', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                    }}
-                    helperText="Норма: >55%"
-                    error={efStatus?.color === 'error'}
-                    color={efStatus?.color === 'success' ? 'success' : undefined}
-                  />
-                  {efStatus && (
-                    <Chip
-                      size="small"
-                      label={efStatus.label}
-                      color={efStatus.color}
-                      icon={efStatus.color === 'success' ? <CheckCircle /> : <Warning />}
-                      sx={{ mt: 1 }}
-                    />
-                  )}
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Фракция укорочения"
-                    value={echoData.leftVentricle.fs}
-                    onChange={(e) => handleChange('leftVentricle', 'fs', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                    }}
-                    helperText="Норма: 25-45%"
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              variant="outline"
+              onClick={() => {/* AI анализ */}}
+            >
+              <Sparkles style={{ width: 16, height: 16, marginRight: 8 }} />
+              AI Анализ
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={loading}
+            >
+              <Save style={{ width: 16, height: 16, marginRight: 8 }} />
+              Сохранить
+            </Button>
+          </div>
+        </div>
 
-            {/* Толщина стенок */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Толщина стенок
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="МЖП"
-                    value={echoData.walls.ivs}
-                    onChange={(e) => handleChange('walls', 'ivs', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                    helperText="Норма: 6-11 мм"
-                  />
-                </Grid>
-                
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Задняя стенка"
-                    value={echoData.walls.pw}
-                    onChange={(e) => handleChange('walls', 'pw', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                    helperText="Норма: 6-11 мм"
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
+        {error && (
+          <Alert severity="error" style={{ marginBottom: 16 }}>
+            <AlertTriangle style={{ width: 16, height: 16, marginRight: 8 }} />
+            {error}
+          </Alert>
+        )}
 
-            {/* Предсердия */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Предсердия
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Левое предсердие"
-                    value={echoData.leftAtrium.diameter}
-                    onChange={(e) => handleChange('leftAtrium', 'diameter', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                    helperText="Норма: 20-40 мм"
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Объем ЛП"
-                    value={echoData.leftAtrium.volume}
-                    onChange={(e) => handleChange('leftAtrium', 'volume', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мл</InputAdornment>,
-                    }}
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Правое предсердие"
-                    value={echoData.rightAtrium.diameter}
-                    onChange={(e) => handleChange('rightAtrium', 'diameter', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                  />
-                </Grid>
-                
-                <Grid item xs={6} md={3}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Правый желудочек"
-                    value={echoData.rightVentricle.diameter}
-                    onChange={(e) => handleChange('rightVentricle', 'diameter', e.target.value)}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">мм</InputAdornment>,
-                    }}
-                    helperText="Норма: <30 мм"
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
+        {success && (
+          <Alert severity="success" style={{ marginBottom: 16 }}>
+            <CheckCircle style={{ width: 16, height: 16, marginRight: 8 }} />
+            {success}
+          </Alert>
+        )}
 
-            {/* Клапаны */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Клапанный аппарат
-              </Typography>
-              
-              <Grid container spacing={2}>
-                {/* Митральный клапан */}
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" gutterBottom>
-                    Митральный клапан
-                  </Typography>
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Регургитация"
-                        value={echoData.valves.mitral.regurgitation}
-                        onChange={(e) => handleNestedChange('valves', 'mitral', 'regurgitation', e.target.value)}
-                        placeholder="0-4 ст."
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Градиент"
-                        value={echoData.valves.mitral.gradient}
-                        onChange={(e) => handleNestedChange('valves', 'mitral', 'gradient', e.target.value)}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">мм рт.ст.</InputAdornment>,
-                        }}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={echoData.valves.mitral.stenosis}
-                            onChange={(e) => handleNestedChange('valves', 'mitral', 'stenosis', e.target.checked)}
-                          />
-                        }
-                        label="Стеноз"
-                      />
-                    </Grid>
-                  </Grid>
-                </Grid>
-                
-                {/* Аортальный клапан */}
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" gutterBottom>
-                    Аортальный клапан
-                  </Typography>
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Регургитация"
-                        value={echoData.valves.aortic.regurgitation}
-                        onChange={(e) => handleNestedChange('valves', 'aortic', 'regurgitation', e.target.value)}
-                        placeholder="0-4 ст."
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Градиент"
-                        value={echoData.valves.aortic.gradient}
-                        onChange={(e) => handleNestedChange('valves', 'aortic', 'gradient', e.target.value)}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">мм рт.ст.</InputAdornment>,
-                        }}
-                      />
-                    </Grid>
-                    <Grid item xs={12}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={echoData.valves.aortic.stenosis}
-                            onChange={(e) => handleNestedChange('valves', 'aortic', 'stenosis', e.target.checked)}
-                          />
-                        }
-                        label="Стеноз"
-                      />
-                    </Grid>
-                  </Grid>
-                </Grid>
-                
-                {/* Трикуспидальный клапан */}
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" gutterBottom>
-                    Трикуспидальный клапан
-                  </Typography>
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Регургитация"
-                        value={echoData.valves.tricuspid.regurgitation}
-                        onChange={(e) => handleNestedChange('valves', 'tricuspid', 'regurgitation', e.target.value)}
-                        placeholder="0-4 ст."
-                      />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Градиент"
-                        value={echoData.valves.tricuspid.gradient}
-                        onChange={(e) => handleNestedChange('valves', 'tricuspid', 'gradient', e.target.value)}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">мм рт.ст.</InputAdornment>,
-                        }}
-                      />
-                    </Grid>
-                  </Grid>
-                </Grid>
-                
-                {/* Легочный клапан */}
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" gutterBottom>
-                    Клапан легочной артерии
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Регургитация"
-                    value={echoData.valves.pulmonary.regurgitation}
-                    onChange={(e) => handleNestedChange('valves', 'pulmonary', 'regurgitation', e.target.value)}
-                    placeholder="0-4 ст."
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
+        {/* Левый желудочек */}
+        {renderSection(
+          'Левый желудочек',
+          'leftVentricle',
+          [
+            { key: 'edd', label: 'КДР', placeholder: 'Норма: 35-55 мм' },
+            { key: 'esd', label: 'КСР', placeholder: 'Норма: 20-35 мм' },
+            { key: 'ef', label: 'ФВ', placeholder: 'Норма: 55-75%' },
+            { key: 'fs', label: 'ФС', placeholder: 'Норма: 28-45%' },
+            { key: 'ivs', label: 'МЖП', placeholder: 'Норма: 6-11 мм' },
+            { key: 'pw', label: 'ЗС', placeholder: 'Норма: 6-11 мм' },
+          ],
+          expandedSections.leftVentricle
+        )}
 
-            {/* Дополнительные параметры */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Дополнительные параметры
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Диастолическая функция"
-                    value={echoData.diastolicFunction}
-                    onChange={(e) => setEchoData(prev => ({ ...prev, diastolicFunction: e.target.value }))}
-                    placeholder="Тип I, II, III"
-                  />
-                </Grid>
-                
-                <Grid item xs={12} md={6}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={echoData.pericardialEffusion}
-                        onChange={(e) => setEchoData(prev => ({ ...prev, pericardialEffusion: e.target.checked }))}
-                      />
-                    }
-                    label="Перикардиальный выпот"
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
+        {/* Правый желудочек */}
+        {renderSection(
+          'Правый желудочек',
+          'rightVentricle',
+          [
+            { key: 'rvdd', label: 'КДР ПЖ', placeholder: 'Норма: 19-28 мм' },
+            { key: 'rvot', label: 'ВТ ПЖ', placeholder: 'Норма: 19-28 мм' },
+          ],
+          expandedSections.rightVentricle
+        )}
 
-            {/* Заключение */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                Заключение
-              </Typography>
-              
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                value={echoData.conclusion}
-                onChange={(e) => setEchoData(prev => ({ ...prev, conclusion: e.target.value }))}
-                placeholder="Введите заключение по результатам ЭхоКГ..."
-                sx={{ mb: 2 }}
-              />
-              
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Рекомендации"
-                value={echoData.recommendations}
-                onChange={(e) => setEchoData(prev => ({ ...prev, recommendations: e.target.value }))}
-                placeholder="Рекомендации пациенту..."
-              />
-            </Paper>
+        {/* Предсердия */}
+        {renderSection(
+          'Предсердия',
+          'atria',
+          [
+            { key: 'la', label: 'ЛП', placeholder: 'Норма: 19-40 мм' },
+            { key: 'ra', label: 'ПП', placeholder: 'Норма: 19-40 мм' },
+          ],
+          expandedSections.atria
+        )}
 
-            {/* AI результат */}
-            {aiResult && !aiResult.error && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  AI Интерпретация:
-                </Typography>
-                <Typography variant="body2">
-                  {aiResult.interpretation}
-                </Typography>
-                {aiResult.alerts && aiResult.alerts.length > 0 && (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" display="block" gutterBottom>
-                      Важные находки:
-                    </Typography>
-                    {aiResult.alerts.map((alert, i) => (
-                      <Chip
-                        key={i}
-                        size="small"
-                        label={alert}
-                        color="warning"
-                        sx={{ mr: 1, mb: 0.5 }}
-                      />
-                    ))}
-                  </Box>
-                )}
-              </Alert>
-            )}
+        {/* Клапаны */}
+        {renderSection(
+          'Клапаны',
+          'valves',
+          [
+            { key: 'mitral.e', label: 'Митральный клапан E', placeholder: 'Норма: 0.6-1.3 м/с' },
+            { key: 'mitral.a', label: 'Митральный клапан A', placeholder: 'Норма: 0.4-0.8 м/с' },
+            { key: 'aortic.peak_velocity', label: 'Аортальный клапан', placeholder: 'Норма: 1.0-1.7 м/с' },
+            { key: 'tricuspid.e', label: 'Трехстворчатый клапан E', placeholder: 'Норма: 0.3-0.7 м/с' },
+          ],
+          expandedSections.valves
+        )}
 
-            {/* Кнопки действий */}
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                startIcon={<AutoFixHigh />}
-                onClick={analyzeWithAI}
-                disabled={aiAnalyzing}
-              >
-                {aiAnalyzing ? 'Анализ...' : 'AI Интерпретация'}
-              </Button>
-              
-              <Button
-                variant="contained"
-                startIcon={<Save />}
-                onClick={saveEchoData}
-                disabled={saving}
-              >
-                {saving ? 'Сохранение...' : saved ? 'Сохранено' : 'Сохранить'}
-              </Button>
-            </Box>
-          </Collapse>
-        </CardContent>
-      </Card>
-    </Box>
+        {/* Дополнительные параметры */}
+        {renderSection(
+          'Дополнительные параметры',
+          'additional',
+          [
+            { key: 'pericardium', label: 'Перикард', placeholder: 'Описание состояния перикарда' },
+            { key: 'aorta', label: 'Аорта', placeholder: 'Описание состояния аорты' },
+          ],
+          expandedSections.additional
+        )}
+
+        {/* Комментарии */}
+        <div style={{ marginTop: 24 }}>
+          <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
+            Комментарии
+          </Typography>
+          <Textarea
+            value={echoData.additional.comments}
+            onChange={(e) => handleChange('additional', 'comments', e.target.value)}
+            placeholder="Дополнительные замечания и наблюдения..."
+            rows={4}
+          />
+        </div>
+
+        {/* Заключение */}
+        <div style={{ marginTop: 24 }}>
+          <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
+            Заключение
+          </Typography>
+          <Textarea
+            value={echoData.conclusion}
+            onChange={(e) => setEchoData(prev => ({ ...prev, conclusion: e.target.value }))}
+            placeholder="Заключение по результатам ЭхоКГ..."
+            rows={6}
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
 export default EchoForm;
-

@@ -3,9 +3,26 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { login, me, setToken } from '../api/client';
 import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
-import { useTheme } from '../contexts/ThemeContext';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
 import ForgotPassword from '../components/auth/ForgotPassword';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSBadge
+} from '../components/ui/macos';
+import { 
+  Lock, 
+  User, 
+  Key, 
+  ArrowLeft, 
+  Sun, 
+  Moon,
+  Globe,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 
 /**
  * Логин по OAuth2 Password (FastAPI):
@@ -22,17 +39,8 @@ export default function Login() {
   const [err, setErr] = useState('');
   const [language, setLanguage] = useState('RU');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-
-  // Используем централизованную систему темизации
-  const { 
-    theme, 
-    isDark, 
-    isLight, 
-    toggleTheme, 
-    getColor, 
-    getSpacing, 
-    getFontSize 
-  } = useTheme();
+  const [showPassword, setShowPassword] = useState(false);
+  const [theme, setTheme] = useState('light');
 
   const translations = {
     RU: {
@@ -81,6 +89,10 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   function onSelectRole(k) {
     setSelectedRoleKey(k);
@@ -172,124 +184,64 @@ export default function Login() {
     }
   }
 
-  const textColor = isLight ? getColor('secondary', 700) : getColor('secondary', 200);
-
   const pageStyle = {
     minHeight: '100vh',
-    background: isLight 
-      ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
-      : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
-    padding: getSpacing('lg'),
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    color: textColor,
+    background: theme === 'light' 
+      ? 'linear-gradient(135deg, var(--mac-bg-primary) 0%, var(--mac-bg-secondary) 100%)'
+      : 'linear-gradient(135deg, var(--mac-bg-primary) 0%, var(--mac-bg-secondary) 100%)',
+    padding: 'var(--mac-spacing-lg)',
+    fontFamily: 'var(--mac-font-family)',
+    color: 'var(--mac-text-primary)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center'
   };
 
-  const cardStyle = {
-    background: theme === 'light' 
-      ? 'rgba(255, 255, 255, 0.9)' 
-      : 'rgba(15, 23, 42, 0.9)',
-    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderRadius: '20px',
-    padding: getSpacing('2xl'),
-    boxShadow: theme === 'light' 
-      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-    backdropFilter: 'blur(10px)',
-    maxWidth: '450px',
-    width: '100%'
-  };
-
-  const buttonStyle = {
-    padding: `${getSpacing('md')} ${getSpacing('lg')}`,
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    width: '100%',
-    disabled: busy
-  };
-
-  const buttonSecondaryStyle = {
-    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    background: 'transparent',
-    color: textColor,
-    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    transition: 'all 0.3s ease',
-    textDecoration: 'none',
-    display: 'inline-block',
-    textAlign: 'center'
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: `${getSpacing('md')} ${getSpacing('md')}`,
-    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-    borderRadius: '12px',
-    fontSize: '16px',
-    background: theme === 'light' ? 'white' : getColor('gray', 800),
-    color: textColor,
-    outline: 'none',
-    transition: 'all 0.3s ease',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: getSpacing('xs'),
-    fontWeight: '500',
-    fontSize: '14px',
-    color: textColor
-  };
-
-  const errorStyle = {
-    color: getColor('danger', 600),
-    background: theme === 'light' ? '#fee2e2' : 'rgba(239, 68, 68, 0.1)',
-    border: `1px solid ${getColor('danger', 500)}`,
-    borderRadius: '8px',
-    padding: getSpacing('sm'),
-    marginBottom: getSpacing('md'),
-    fontSize: '14px'
-  };
-
-  const toggleButtonStyle = {
-    padding: getSpacing('xs'),
-    background: 'transparent',
-    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-    borderRadius: '8px',
-    cursor: 'pointer',
-    color: textColor,
-    marginLeft: getSpacing('sm')
-  };
-
   const headerStyle = {
-    fontSize: '32px',
-    fontWeight: '800',
-    marginBottom: getSpacing('sm'),
-    background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 400)} 100%)`,
-    backgroundClip: 'text',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    textAlign: 'center'
+    fontSize: 'var(--mac-font-size-2xl)',
+    fontWeight: 'var(--mac-font-weight-bold)',
+    marginBottom: 'var(--mac-spacing-sm)',
+    color: 'var(--mac-text-primary)',
+    textAlign: 'center',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 'var(--mac-spacing-sm)'
   };
 
   const subtitleStyle = {
-    fontSize: '16px',
-    opacity: 0.8,
-    marginBottom: getSpacing('xl'),
+    fontSize: 'var(--mac-font-size-base)',
+    color: 'var(--mac-text-secondary)',
+    marginBottom: 'var(--mac-spacing-xl)',
     textAlign: 'center',
     lineHeight: '1.5'
+  };
+
+  const errorStyle = {
+    color: 'var(--mac-error)',
+    background: 'var(--mac-error-bg)',
+    border: '1px solid var(--mac-error-border)',
+    borderRadius: 'var(--mac-radius-sm)',
+    padding: 'var(--mac-spacing-sm)',
+    marginBottom: 'var(--mac-spacing-md)',
+    fontSize: 'var(--mac-font-size-sm)'
+  };
+
+  const toggleButtonStyle = {
+    padding: 'var(--mac-spacing-xs)',
+    background: 'var(--mac-bg-secondary)',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-sm)',
+    cursor: 'pointer',
+    color: 'var(--mac-text-primary)',
+    marginLeft: 'var(--mac-spacing-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    transition: 'all 0.2s ease'
   };
 
   // Если показываем форму восстановления пароля
@@ -297,27 +249,35 @@ export default function Login() {
     return (
       <div style={pageStyle}>
         {/* Переключатели темы и языка */}
-        <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
+        <div style={{ 
+          position: 'absolute', 
+          top: 'var(--mac-spacing-lg)', 
+          right: 'var(--mac-spacing-lg)', 
+          display: 'flex', 
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-sm)'
+        }}>
           <button 
             onClick={() => toggleTheme()}
             style={toggleButtonStyle}
             title="Переключить тему"
           >
-            {theme === 'light' ? '🌙' : '☀️'}
+            {theme === 'light' ? <Moon style={{ width: '16px', height: '16px' }} /> : <Sun style={{ width: '16px', height: '16px' }} />}
           </button>
-          <select 
-            value={language} 
+          <MacOSSelect
+            value={language}
             onChange={(e) => setLanguage(e.target.value)}
             style={{
               ...toggleButtonStyle,
-              marginLeft: getSpacing('sm'),
-              background: theme === 'light' ? 'white' : getColor('gray', 800)
+              width: '60px',
+              height: '32px',
+              padding: '0 var(--mac-spacing-xs)'
             }}
           >
             <option value="RU">RU</option>
             <option value="UZ">UZ</option>
             <option value="EN">EN</option>
-          </select>
+          </MacOSSelect>
         </div>
 
         <ForgotPassword
@@ -335,143 +295,201 @@ export default function Login() {
   return (
     <div style={pageStyle}>
       {/* Переключатели темы и языка */}
-      <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
+      <div style={{ 
+        position: 'absolute', 
+        top: 'var(--mac-spacing-lg)', 
+        right: 'var(--mac-spacing-lg)', 
+        display: 'flex', 
+        alignItems: 'center',
+        gap: 'var(--mac-spacing-sm)'
+      }}>
         <button 
           onClick={() => toggleTheme()}
           style={toggleButtonStyle}
           title="Переключить тему"
         >
-          {theme === 'light' ? '🌙' : '☀️'}
+          {theme === 'light' ? <Moon style={{ width: '16px', height: '16px' }} /> : <Sun style={{ width: '16px', height: '16px' }} />}
         </button>
-        <select 
-          value={language} 
+        <MacOSSelect
+          value={language}
           onChange={(e) => setLanguage(e.target.value)}
           style={{
             ...toggleButtonStyle,
-            marginLeft: getSpacing('sm'),
-            background: theme === 'light' ? 'white' : getColor('gray', 800)
+            width: '60px',
+            height: '32px',
+            padding: '0 var(--mac-spacing-xs)'
           }}
         >
           <option value="RU">RU</option>
           <option value="UZ">UZ</option>
           <option value="EN">EN</option>
-        </select>
+        </MacOSSelect>
       </div>
 
       {/* Кнопка "На главную" */}
-      <div style={{ position: 'absolute', top: getSpacing('lg'), left: getSpacing('lg') }}>
-        <button 
+      <div style={{ position: 'absolute', top: 'var(--mac-spacing-lg)', left: 'var(--mac-spacing-lg)' }}>
+        <MacOSButton 
           onClick={() => navigate('/')} 
-          style={buttonSecondaryStyle}
+          variant="outline"
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 'var(--mac-spacing-xs)',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}
         >
-          ← {t.backToHome}
-        </button>
+          <ArrowLeft style={{ width: '16px', height: '16px' }} />
+          {t.backToHome}
+        </MacOSButton>
       </div>
 
       {/* Форма входа */}
-      <div style={cardStyle}>
-        <div style={headerStyle}>🔐 {t.title}</div>
+      <MacOSCard style={{ 
+        maxWidth: '450px',
+        width: '100%',
+        padding: 'var(--mac-spacing-2xl)',
+        backdropFilter: 'blur(20px)',
+        background: 'var(--mac-bg-glass)',
+        border: '1px solid var(--mac-border-glass)'
+      }}>
+        <div style={headerStyle}>
+          <Lock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+          {t.title}
+        </div>
         <div style={subtitleStyle}>{t.subtitle}</div>
         
         {err && <div style={errorStyle}>{err}</div>}
         
         <form onSubmit={(e) => { e.preventDefault(); onLoginClick(); }}>
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <label style={labelStyle}>
+          <div style={{ marginBottom: 'var(--mac-spacing-lg)' }}>
+            <label style={{ 
+              display: 'block',
+              marginBottom: 'var(--mac-spacing-xs)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               {t.selectRole}
             </label>
-            <select
+            <MacOSSelect
               value={selectedRoleKey}
               onChange={(e) => onSelectRole(e.target.value)}
-              style={{
-                ...inputStyle,
-                background: theme === 'light' ? 'white' : getColor('gray', 800)
-              }}
               disabled={busy}
+              style={{ width: '100%' }}
             >
               {roleOptions.map((opt) => (
                 <option key={opt.key} value={opt.key}>{opt.label}</option>
               ))}
-            </select>
+            </MacOSSelect>
           </div>
 
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <label style={labelStyle}>
+          <div style={{ marginBottom: 'var(--mac-spacing-lg)' }}>
+            <label style={{ 
+              display: 'block',
+              marginBottom: 'var(--mac-spacing-xs)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               {t.username}
             </label>
-            <input 
+            <MacOSInput 
               value={username} 
               onChange={(e) => setUsername(e.target.value)} 
-              style={{
-                ...inputStyle,
-                opacity: 0.7,
-                cursor: 'not-allowed'
-              }}
               autoComplete="username" 
               disabled 
               readOnly 
+              style={{ 
+                opacity: 0.7,
+                cursor: 'not-allowed',
+                width: '100%'
+              }}
             />
           </div>
 
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <label style={labelStyle}>
+          <div style={{ marginBottom: 'var(--mac-spacing-lg)' }}>
+            <label style={{ 
+              display: 'block',
+              marginBottom: 'var(--mac-spacing-xs)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               {t.password}
             </label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              style={inputStyle}
-              autoComplete="current-password" 
-              disabled={busy}
-              placeholder="••••••••"
-            />
+            <div style={{ position: 'relative' }}>
+              <MacOSInput 
+                type={showPassword ? "text" : "password"}
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                autoComplete="current-password" 
+                disabled={busy}
+                placeholder="••••••••"
+                style={{ width: '100%', paddingRight: '40px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: 'var(--mac-spacing-sm)',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--mac-text-secondary)',
+                  padding: 'var(--mac-spacing-xs)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {showPassword ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
+              </button>
+            </div>
           </div>
 
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <button 
+          <div style={{ marginBottom: 'var(--mac-spacing-lg)' }}>
+            <MacOSButton 
               type="submit" 
               disabled={busy} 
-              style={{
-                ...buttonStyle,
-                opacity: busy ? 0.7 : 1,
-                cursor: busy ? 'not-allowed' : 'pointer'
-              }}
-              onMouseOver={(e) => !busy && (e.target.style.transform = 'translateY(-2px)')}
-              onMouseOut={(e) => !busy && (e.target.style.transform = 'translateY(0)')}
+              variant="primary"
+              style={{ width: '100%' }}
             >
               {busy ? t.loggingIn : t.login}
-            </button>
+            </MacOSButton>
           </div>
 
-          <div style={{ textAlign: 'center', marginBottom: getSpacing('md') }}>
-            <a 
-              href="#" 
-              style={{ 
-                color: getColor('primary', 600), 
-                textDecoration: 'none',
-                fontSize: '14px'
-              }}
+          <div style={{ textAlign: 'center', marginBottom: 'var(--mac-spacing-md)' }}>
+            <MacOSButton 
+              variant="ghost"
               onClick={(e) => { e.preventDefault(); setShowForgotPassword(true); }}
+              style={{ 
+                color: 'var(--mac-accent-blue)', 
+                fontSize: 'var(--mac-font-size-sm)',
+                padding: '0'
+              }}
             >
               {t.forgotPassword}
-            </a>
+            </MacOSButton>
           </div>
         </form>
 
-        <div style={{ 
-          fontSize: '12px', 
-          opacity: 0.7, 
+        <MacOSCard style={{ 
+          fontSize: 'var(--mac-font-size-xs)', 
+          color: 'var(--mac-text-tertiary)', 
           lineHeight: '1.4', 
           textAlign: 'center',
-          padding: getSpacing('sm'),
-          background: theme === 'light' ? getColor('gray', 50) : getColor('gray', 800),
-          borderRadius: '8px',
-          border: `1px solid ${theme === 'light' ? getColor('gray', 200) : getColor('gray', 700)}`
+          padding: 'var(--mac-spacing-sm)',
+          background: 'var(--mac-bg-secondary)',
+          border: '1px solid var(--mac-border)',
+          marginTop: 'var(--mac-spacing-md)'
         }}>
           💡 {t.note}
-        </div>
-      </div>
+        </MacOSCard>
+      </MacOSCard>
     </div>
   );
 }

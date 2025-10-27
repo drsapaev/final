@@ -89,3 +89,6 @@ export const useTouchDevice = () => {
 
   return isTouch;
 };
+
+// Default export for compatibility with modules importing the hook as default
+export default useMediaQuery;

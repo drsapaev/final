@@ -11,38 +11,28 @@ import {
   DialogActions,
   Box,
   Typography,
-  TextField,
   Button,
-  FormControl,
-  InputLabel,
+  Input,
   Select,
-  MenuItem,
-  Chip,
-  Grid,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  IconButton,
-  Divider,
+  Option,
+  Badge,
   Alert,
-  FormControlLabel,
   Checkbox,
-  InputAdornment,
-} from '@mui/material';
+  Textarea,
+} from '../ui/macos';
 import {
-  LocalHospital,
-  Add,
-  Delete,
+  Hospital,
+  Plus,
+  Trash2,
   History,
-  AttachMoney,
-  CalendarToday,
-  Note,
-  Warning,
+  DollarSign,
+  Calendar,
+  FileText,
+  AlertTriangle,
   CheckCircle,
-  Build,
-  Healing,
-} from '@mui/icons-material';
+  Wrench,
+  Heart,
+} from 'lucide-react';
 import { api } from '../../api/client';
 
 // Процедуры для зуба
@@ -212,7 +202,7 @@ const ToothModal = ({
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6">
-            <LocalHospital sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <Hospital sx={{ mr: 1, verticalAlign: 'middle' }} />
             Зуб №{toothNumber} - {getToothName(toothNumber)}
           </Typography>
           <Chip 

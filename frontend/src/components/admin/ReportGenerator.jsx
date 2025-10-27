@@ -13,7 +13,14 @@ import {
   Eye,
   Printer
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { 
+  Card as MacOSCard, 
+  Button as MacOSButton, 
+  Badge as MacOSBadge,
+  MacOSInput,
+  MacOSSelect,
+  MacOSCheckbox
+} from '../ui/macos';
 
 const ReportGenerator = ({ 
   onGenerateReport,
@@ -97,102 +104,157 @@ const ReportGenerator = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Выбор типа отчета */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+      <MacOSCard padding="large">
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
           Тип отчета
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           {reportTypes.map((type) => {
             const Icon = getReportTypeIcon(type);
             const isSelected = selectedReportType === type;
             
             return (
-              <button
+              <MacOSButton
                 key={type}
                 onClick={() => onReportTypeChange(type)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
-                  isSelected 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                variant={isSelected ? "primary" : "outline"}
                 style={{
-                  borderColor: isSelected ? 'var(--accent-color)' : 'var(--border-color)',
-                  background: isSelected ? 'var(--accent-color-10)' : 'var(--bg-primary)'
+                  padding: '16px',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start',
+                  height: 'auto',
+                  minHeight: '80px'
                 }}
               >
-                <div className="flex items-center space-x-3">
-                  <Icon className="w-6 h-6" style={{ color: 'var(--accent-color)' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Icon style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
                   <div>
-                    <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                    <h4 style={{ 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      fontSize: 'var(--mac-font-size-base)',
+                      color: 'var(--mac-text-primary)',
+                      margin: 0
+                    }}>
                       {getReportTypeLabel(type)}
                     </h4>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)',
+                      margin: '4px 0 0 0'
+                    }}>
                       {getReportTypeDescription(type)}
                     </p>
                   </div>
                 </div>
-              </button>
+              </MacOSButton>
             );
           })}
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Период отчета */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+      <MacOSCard padding="large">
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
           Период отчета
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)' 
+            }}>
               Дата начала
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                        style={{ color: 'var(--text-tertiary)' }} />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => onDateRangeChange({ ...dateRange, start: e.target.value })}
-                className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ 
-                  border: '1px solid var(--border-color)', 
-                  background: 'var(--bg-primary)', 
-                  color: 'var(--text-primary)' 
-                }}
-              />
-            </div>
+            <MacOSInput
+              type="date"
+              value={dateRange.start}
+              onChange={(e) => onDateRangeChange({ ...dateRange, start: e.target.value })}
+              icon={Calendar}
+              iconPosition="left"
+              style={{ 
+                width: '100%',
+                paddingLeft: '40px',
+                paddingRight: '12px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)' 
+            }}>
               Дата окончания
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                        style={{ color: 'var(--text-tertiary)' }} />
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => onDateRangeChange({ ...dateRange, end: e.target.value })}
-                className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ 
-                  border: '1px solid var(--border-color)', 
-                  background: 'var(--bg-primary)', 
-                  color: 'var(--text-primary)' 
-                }}
-              />
-            </div>
+            <MacOSInput
+              type="date"
+              value={dateRange.end}
+              onChange={(e) => onDateRangeChange({ ...dateRange, end: e.target.value })}
+              icon={Calendar}
+              iconPosition="left"
+              style={{ 
+                width: '100%',
+                paddingLeft: '40px',
+                paddingRight: '12px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
+            />
           </div>
         </div>
         
         {/* Быстрый выбор периода */}
-        <div className="mt-4">
-          <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+        <div style={{ marginTop: '16px' }}>
+          <p style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            marginBottom: '8px',
+            color: 'var(--mac-text-primary)' 
+          }}>
             Быстрый выбор:
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {[
               { label: 'Сегодня', days: 0 },
               { label: 'Неделя', days: 7 },
@@ -205,204 +267,293 @@ const ReportGenerator = ({
               const endDate = days === 0 ? today : today;
               
               return (
-                <button
+                <MacOSButton
                   key={label}
                   onClick={() => onDateRangeChange({
                     start: startDate.toISOString().split('T')[0],
                     end: endDate.toISOString().split('T')[0]
                   })}
-                  className="px-3 py-1 text-sm rounded-lg border hover:bg-gray-50"
+                  variant="outline"
+                  size="sm"
                   style={{ 
-                    borderColor: 'var(--border-color)', 
-                    color: 'var(--text-secondary)',
-                    background: 'var(--bg-primary)'
+                    padding: '4px 12px',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)',
+                    background: 'var(--mac-bg-primary)',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 'var(--mac-radius-md)',
+                    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                   }}
                 >
                   {label}
-                </button>
+                </MacOSButton>
               );
             })}
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Фильтры */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+      <MacOSCard padding="large">
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
           Дополнительные фильтры
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)' 
+            }}>
               Отделение
             </label>
-            <select
+            <MacOSSelect
               value={filters.department}
               onChange={(e) => handleFilterChange('department', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              options={[
+                { value: '', label: 'Все отделения' },
+                { value: 'cardiology', label: 'Кардиология' },
+                { value: 'dermatology', label: 'Дерматология' },
+                { value: 'neurology', label: 'Неврология' },
+                { value: 'pediatrics', label: 'Педиатрия' },
+                { value: 'surgery', label: 'Хирургия' }
+              ]}
               style={{ 
-                border: '1px solid var(--border-color)', 
-                background: 'var(--bg-primary)', 
-                color: 'var(--text-primary)' 
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
               }}
-            >
-              <option value="">Все отделения</option>
-              <option value="cardiology">Кардиология</option>
-              <option value="dermatology">Дерматология</option>
-              <option value="neurology">Неврология</option>
-              <option value="pediatrics">Педиатрия</option>
-              <option value="surgery">Хирургия</option>
-            </select>
+            />
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)' 
+            }}>
               Статус
             </label>
-            <select
+            <MacOSSelect
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              options={[
+                { value: '', label: 'Все статусы' },
+                { value: 'completed', label: 'Завершено' },
+                { value: 'pending', label: 'Ожидает' },
+                { value: 'cancelled', label: 'Отменено' }
+              ]}
               style={{ 
-                border: '1px solid var(--border-color)', 
-                background: 'var(--bg-primary)', 
-                color: 'var(--text-primary)' 
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
               }}
-            >
-              <option value="">Все статусы</option>
-              <option value="completed">Завершено</option>
-              <option value="pending">Ожидает</option>
-              <option value="cancelled">Отменено</option>
-            </select>
+            />
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)' 
+            }}>
               Способ оплаты
             </label>
-            <select
+            <MacOSSelect
               value={filters.paymentMethod}
               onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              options={[
+                { value: '', label: 'Все способы' },
+                { value: 'cash', label: 'Наличные' },
+                { value: 'card', label: 'Карта' },
+                { value: 'transfer', label: 'Перевод' },
+                { value: 'mobile', label: 'Мобильный' }
+              ]}
               style={{ 
-                border: '1px solid var(--border-color)', 
-                background: 'var(--bg-primary)', 
-                color: 'var(--text-primary)' 
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)', 
+                background: 'var(--mac-bg-primary)', 
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
               }}
-            >
-              <option value="">Все способы</option>
-              <option value="cash">Наличные</option>
-              <option value="card">Карта</option>
-              <option value="transfer">Перевод</option>
-              <option value="mobile">Мобильный</option>
-            </select>
+            />
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Настройки отчета */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+      <MacOSCard padding="large">
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
           Настройки отчета
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '24px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)' 
+            }}>
               Формат файла
             </label>
-            <div className="flex space-x-4">
+            <div style={{ display: 'flex', gap: '16px' }}>
               {[
                 { value: 'pdf', label: 'PDF', icon: FileText },
                 { value: 'excel', label: 'Excel', icon: BarChart3 },
                 { value: 'csv', label: 'CSV', icon: FileText }
               ].map(({ value, label, icon: Icon }) => (
-                <button
+                <MacOSButton
                   key={value}
                   onClick={() => setReportFormat(value)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-                    reportFormat === value 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  style={{
-                    borderColor: reportFormat === value ? 'var(--accent-color)' : 'var(--border-color)',
-                    background: reportFormat === value ? 'var(--accent-color-10)' : 'var(--bg-primary)'
+                  variant={reportFormat === value ? "primary" : "outline"}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    padding: '8px 16px',
+                    borderRadius: 'var(--mac-radius-md)',
+                    border: reportFormat === value ? '1px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
+                    background: reportFormat === value ? 'var(--mac-accent-blue)' : 'var(--mac-bg-primary)',
+                    color: reportFormat === value ? 'white' : 'var(--mac-text-primary)',
+                    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                   }}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span style={{ color: 'var(--text-primary)' }}>{label}</span>
-                </button>
+                  <Icon style={{ width: '16px', height: '16px' }} />
+                  {label}
+                </MacOSButton>
               ))}
             </div>
           </div>
           
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <MacOSCheckbox
                 id="includeCharts"
                 checked={includeCharts}
                 onChange={(e) => setIncludeCharts(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  accentColor: 'var(--mac-accent-blue)'
+                }}
               />
-              <label htmlFor="includeCharts" className="text-sm" style={{ color: 'var(--text-primary)' }}>
+              <label htmlFor="includeCharts" style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-primary)' 
+              }}>
                 Включить графики и диаграммы
               </label>
             </div>
             
-            <div className="flex items-center space-x-3">
-              <input
-                type="checkbox"
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <MacOSCheckbox
                 id="includeDetails"
                 checked={includeDetails}
                 onChange={(e) => setIncludeDetails(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  accentColor: 'var(--mac-accent-blue)'
+                }}
               />
-              <label htmlFor="includeDetails" className="text-sm" style={{ color: 'var(--text-primary)' }}>
+              <label htmlFor="includeDetails" style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-primary)' 
+              }}>
                 Включить детальную информацию
               </label>
             </div>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Кнопки действий */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <MacOSButton
             onClick={handleGenerate}
             disabled={!selectedReportType || loading}
-            className="flex items-center space-x-2"
+            variant="primary"
             style={{ 
-              background: 'var(--accent-color)',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              background: 'var(--mac-accent-blue)',
               color: 'white'
             }}
           >
             {loading ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
                 <span>Генерация...</span>
               </>
             ) : (
               <>
-                <Download className="w-4 h-4" />
+                <Download style={{ width: '16px', height: '16px' }} />
                 <span>Сгенерировать отчет</span>
               </>
             )}
-          </Button>
+          </MacOSButton>
           
-          <Button
+          <MacOSButton
             variant="outline"
             onClick={() => window.print()}
             disabled={loading}
-            className="flex items-center space-x-2"
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px'
+            }}
           >
-            <Printer className="w-4 h-4" />
+            <Printer style={{ width: '16px', height: '16px' }} />
             <span>Печать</span>
-          </Button>
+          </MacOSButton>
         </div>
         
-        <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <div style={{ 
+          fontSize: 'var(--mac-font-size-sm)', 
+          color: 'var(--mac-text-secondary)' 
+        }}>
           {selectedReportType && (
             <span>
               Будет сгенерирован: <strong>{getReportTypeLabel(selectedReportType)}</strong>

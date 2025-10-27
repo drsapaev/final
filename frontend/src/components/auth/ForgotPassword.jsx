@@ -19,7 +19,7 @@ import {
   Shield,
   Key
 } from 'lucide-react';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {

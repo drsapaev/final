@@ -1,42 +1,42 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
-import { useTheme } from '../contexts/ThemeContext';
 import AIAssistant from '../components/ai/AIAssistant';
 import { 
+  Button, 
+  Card, 
+  CardHeader, 
+  CardContent, 
+  Badge,
+  Icon,
+  Sidebar,
+  Skeleton
+} from '../components/ui/macos';
+import AnimatedTransition from '../components/ui/native/AnimatedTransition';
+import { useTheme } from '../contexts/ThemeContext';
+import '../styles/animations.css';
+import { 
+  Activity, 
   User, 
   Calendar, 
-  Clock, 
-  Stethoscope, 
-  FileText, 
-  Pill, 
-  Activity,
   Brain, 
-  Heart,
-  Eye,
-  Zap,
-  Search,
-  Filter,
-  Plus,
-  Edit,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Printer,
-  Download,
-  Settings,
-  Bell,
-  LogOut
+  FileText, 
+  Plus, 
+  Clock, 
+  CheckCircle, 
+  Search, 
+  Edit, 
+  Eye, 
+  Trash2, 
+  XCircle, 
+  Download, 
+  Pill, 
+  Heart 
 } from 'lucide-react';
-import '../styles/animations.css';
-
-// UI компоненты
-import { Button, Card, CardHeader, CardContent, Badge, AnimatedTransition } from '../components/ui/native';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal';
-import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
+import { useModal } from '../hooks/useModal.jsx';
+import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 
 const DoctorPanel = () => {
@@ -175,11 +175,12 @@ const DoctorPanel = () => {
   // Стили
   const pageStyle = {
     minHeight: '100vh',
-    background: `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`,
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    fontSize: isMobile ? getFontSize('sm') : getFontSize('base'),
+    background: 'var(--mac-gradient-window)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+    fontSize: isMobile ? 'var(--mac-font-size-sm)' : 'var(--mac-font-size-base)',
     lineHeight: '1.5',
-    color: getColor('secondary', 800)
+    color: 'var(--mac-text-primary)',
+    transition: 'background var(--mac-duration-normal) var(--mac-ease)'
   };
 
   const headerStyle = {
@@ -379,30 +380,6 @@ const DoctorPanel = () => {
   // Рендер
   return (
     <div style={pageStyle}>
-      {/* Заголовок */}
-      <header ref={headerRef} style={headerStyle}>
-        <div style={headerContentStyle}>
-          <div style={logoStyle}>
-            <Stethoscope size={isMobile ? 24 : 28} />
-            {!isMobile && <span>Панель врача</span>}
-          </div>
-          
-          <div style={headerActionsStyle}>
-            <Button variant="ghost" size={isMobile ? 'sm' : 'md'} style={{ color: 'white' }}>
-              <Bell size={isMobile ? 16 : 20} />
-              {!isMobile && <span>Уведомления</span>}
-            </Button>
-            <Button variant="ghost" size={isMobile ? 'sm' : 'md'} style={{ color: 'white' }}>
-              <Settings size={isMobile ? 16 : 20} />
-              {!isMobile && <span>Настройки</span>}
-            </Button>
-            <Button variant="ghost" size={isMobile ? 'sm' : 'md'} style={{ color: 'white' }}>
-              <LogOut size={isMobile ? 16 : 20} />
-              {!isMobile && <span>Выход</span>}
-            </Button>
-          </div>
-        </div>
-      </header>
 
       {/* Основной контент */}
       <main style={contentStyle}>

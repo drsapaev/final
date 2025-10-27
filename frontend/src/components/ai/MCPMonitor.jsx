@@ -1,35 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
-  Grid,
   Card,
   CardContent,
-  LinearProgress,
-  Chip,
+  Progress,
+  Badge,
   Alert,
-  IconButton,
-  Tooltip,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
   Button,
-  CircularProgress
-} from '@mui/material';
+  CircularProgress,
+} from '../ui/macos';
 import {
   CheckCircle,
-  Error,
-  Warning,
-  Refresh,
-  Speed,
-  Storage,
-  Psychology,
-  Timeline,
-  Settings
-} from '@mui/icons-material';
+  XCircle,
+  AlertTriangle,
+  RefreshCw,
+  Zap,
+  HardDrive,
+  Brain,
+  Clock,
+  Settings,
+} from 'lucide-react';
 import { mcpAPI } from '../../api/mcpClient';
 import { useSnackbar } from 'notistack';
 
