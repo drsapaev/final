@@ -35,7 +35,7 @@ requires-python = ">=3.11"
 authors = [{ name = "Clinic Team" }]
 readme = "README.md"
 dependencies = [
-  "fastapi>=0.110,<0.116",
+  "fastapi>=0.110,<0.121",
   "uvicorn[standard]>=0.29,<0.31",
   "pydantic>=2.7,<2.9",
   "SQLAlchemy>=2.0,<2.1",
