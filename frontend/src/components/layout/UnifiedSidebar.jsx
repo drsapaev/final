@@ -161,12 +161,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     fontSize: '14px',
     fontWeight: isActive ? '500' : '400',
     marginBottom: isCollapsed ? '4px' : '4px',
-    width: isCollapsed ? '48px' : 'auto',
-    minWidth: isCollapsed ? '48px' : 'auto',
-    maxWidth: isCollapsed ? '48px' : 'auto',
-    height: isCollapsed ? '48px' : 'auto',
-    minHeight: isCollapsed ? '48px' : 'auto',
-    maxHeight: isCollapsed ? '48px' : 'auto',
+    width: isCollapsed ? '40px' : 'auto',
+    minWidth: isCollapsed ? '40px' : 'auto',
+    maxWidth: isCollapsed ? '40px' : 'auto',
+    height: isCollapsed ? '40px' : 'auto',
+    minHeight: isCollapsed ? '40px' : 'auto',
+    maxHeight: isCollapsed ? '40px' : 'auto',
     flexShrink: 0,
     cursor: 'pointer',
     position: 'relative',
@@ -278,11 +278,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       <nav 
         style={{
           flex: 1,
-          padding: isCollapsed ? '0' : '16px 12px',
+          padding: isCollapsed ? '8px 0' : '16px 12px',
           overflowY: isCollapsed ? 'hidden' : 'auto',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: isCollapsed ? 'center' : 'stretch'
+          alignItems: isCollapsed ? 'center' : 'stretch',
+          gap: isCollapsed ? '4px' : '0'
         }}
       >
         {visibleMainItems.map((item) => {
@@ -293,6 +294,17 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             ? item.path.replace('/', '/medilab-demo')
             : item.path;
           
+          const inlineStyle = isCollapsed ? {
+            width: '40px',
+            height: '40px',
+            minWidth: '40px',
+            minHeight: '40px',
+            maxWidth: '40px',
+            maxHeight: '40px',
+            padding: '0',
+            margin: '0 auto'
+          } : {};
+          
           return (
             <NavLink
               key={item.id}
@@ -301,17 +313,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               style={({ isHovered }) => ({
                 ...navItemStyle(active),
                 ...(isHovered && !active ? hoverStyle : {}),
-                boxSizing: 'border-box',
-                ...(isCollapsed && {
-                  width: '48px !important',
-                  height: '48px !important',
-                  minWidth: '48px !important',
-                  minHeight: '48px !important',
-                  maxWidth: '48px !important',
-                  maxHeight: '48px !important',
-                  padding: '0 !important',
-                  margin: '0 auto 4px auto'
-                })
+                ...inlineStyle
               })}
               title={isCollapsed ? item.label : ''}
             >
@@ -334,6 +336,17 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         {visibleAdditionalItems.map((item) => {
           const active = isActive(item.path);
           
+          const inlineStyle = isCollapsed ? {
+            width: '40px',
+            height: '40px',
+            minWidth: '40px',
+            minHeight: '40px',
+            maxWidth: '40px',
+            maxHeight: '40px',
+            padding: '0',
+            margin: '0 auto'
+          } : {};
+          
           return (
             <NavLink
               key={item.id}
@@ -342,17 +355,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               style={({ isHovered }) => ({
                 ...navItemStyle(active),
                 ...(isHovered && !active ? hoverStyle : {}),
-                boxSizing: 'border-box',
-                ...(isCollapsed && {
-                  width: '48px !important',
-                  height: '48px !important',
-                  minWidth: '48px !important',
-                  minHeight: '48px !important',
-                  maxWidth: '48px !important',
-                  maxHeight: '48px !important',
-                  padding: '0 !important',
-                  margin: '0 auto 4px auto'
-                })
+                ...inlineStyle
               })}
               title={isCollapsed ? item.label : ''}
             >

@@ -478,22 +478,22 @@ ${window.location.origin}${qrData.qr_url}
             alignItems: 'end'
           }}>
             <Input
-              type="date"
+                type="date"
               label="Дата"
-              value={effectiveDate}
-              onChange={(e) => {
-                setInternalDate(e.target.value);
-                onDateChange && onDateChange(e.target.value);
-              }}
+                value={effectiveDate}
+                onChange={(e) => {
+                  setInternalDate(e.target.value);
+                  onDateChange && onDateChange(e.target.value);
+                }}
             />
 
-            <select
-              value={effectiveDoctor}
-              onChange={(e) => {
-                setInternalDoctor(e.target.value);
-                onDoctorChange && onDoctorChange(e.target.value);
-              }}
-              style={{
+              <select
+                value={effectiveDoctor}
+                onChange={(e) => {
+                  setInternalDoctor(e.target.value);
+                  onDoctorChange && onDoctorChange(e.target.value);
+                }}
+                style={{
                 fontSize: 'var(--mac-font-size-base)',
                 padding: 'var(--mac-spacing-3)',
                 backgroundColor: 'var(--mac-bg-primary)',
@@ -502,15 +502,15 @@ ${window.location.origin}${qrData.qr_url}
                 borderRadius: 'var(--mac-radius-md)',
                 minWidth: '200px',
                 fontFamily: 'inherit'
-              }}
-            >
-              <option value="">Выберите врача</option>
-              {doctors.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.full_name || d.name || d.username || `ID ${d.id}`}
-                </option>
-              ))}
-            </select>
+                }}
+              >
+                <option value="">Выберите врача</option>
+                {doctors.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.full_name || d.name || d.username || `ID ${d.id}`}
+                  </option>
+                ))}
+              </select>
 
             <Button
               variant="primary"
@@ -551,14 +551,14 @@ ${window.location.origin}${qrData.qr_url}
               margin: 0,
               marginBottom: 'var(--mac-spacing-3)'
             }}>
-              {t.currentQueue}
-              {queueData && (
+            {t.currentQueue}
+            {queueData && (
                 <Badge variant={queueData.is_open ? 'success' : 'secondary'} style={{ marginLeft: 'var(--mac-spacing-2)' }}>
                   {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time}`}
                 </Badge>
-              )}
-            </h3>
-          </div>
+            )}
+          </h3>
+        </div>
 
           {!effectiveDoctor ? (
             <div style={{
@@ -630,9 +630,9 @@ ${window.location.origin}${qrData.qr_url}
               
               <div style={{ display: 'table-row-group' }}>
                 {queueData.entries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    style={{
+                  <div 
+                    key={entry.id} 
+                    style={{ 
                       display: 'table-row',
                       backgroundColor: entry.status === 'called' ? 'var(--mac-accent-blue-50)' : 'transparent',
                       transition: 'background var(--mac-duration-normal)'
@@ -725,18 +725,18 @@ ${window.location.origin}${qrData.qr_url}
             </div>
             
             <div style={{
-              textAlign: 'center',
+              textAlign: 'center', 
               padding: 'var(--mac-spacing-5)',
               backgroundColor: 'var(--mac-bg-primary)',
               borderRadius: 'var(--mac-radius-md)',
               marginBottom: 'var(--mac-spacing-4)'
-            }}>
-              <QRCodeSVG
-                value={`${window.location.origin}${qrData.qr_url}`}
-                size={200}
-                level="M"
-                includeMargin={true}
-              />
+                  }}>
+                    <QRCodeSVG
+                      value={`${window.location.origin}${qrData.qr_url}`}
+                      size={200}
+                      level="M"
+                      includeMargin={true}
+                    />
             </div>
             
             <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>

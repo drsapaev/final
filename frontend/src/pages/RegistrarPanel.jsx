@@ -2744,7 +2744,7 @@ const RegistrarPanel = () => {
                       month: 'long', 
                       day: 'numeric' 
                     })}
-                  </div>
+        </div>
                 </AnimatedTransition>
             </CardHeader>
             
@@ -2802,7 +2802,7 @@ const RegistrarPanel = () => {
                             setShowWizard(true);
                           }}
                           aria-label="Create new appointment"
-                          style={{ 
+                      style={{
                             display: 'flex', 
                             alignItems: 'center', 
                             gap: 'var(--mac-spacing-2)',
@@ -2821,9 +2821,9 @@ const RegistrarPanel = () => {
                       size="default"
                       onClick={() => setShowPaymentManager(true)}
                       aria-label="Open payment module"
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         gap: 'var(--mac-spacing-2)'
                       }}
                     >
