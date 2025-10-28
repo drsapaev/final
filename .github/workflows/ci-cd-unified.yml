@@ -271,7 +271,7 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio httpx
+        pip install pytest pytest-asyncio httpx requests
     
     - name: 🗄️ Подготовка тестовой базы
       run: |
@@ -285,15 +285,17 @@ jobs:
         "
     
     - name: 🚀 Запуск сервера
+      env:
+        DATABASE_URL: "sqlite:///./backend/test_clinic.db"
+        CORS_DISABLE: "1"
+        WS_DEV_ALLOW: "1"
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         echo $! > server.pid
         sleep 10
     
     - name: 🧪 Интеграционные тесты
-      continue-on-error: true
       run: |
         cd backend
         # Ждем запуска сервера
@@ -310,44 +312,13 @@ jobs:
           sleep 2
         done
         
-        # Проверяем существование директории интеграционных тестов
-        if [ ! -d "tests/integration" ]; then
-          echo "⚠️ Директория tests/integration не найдена, создаем"
-          mkdir -p tests/integration
-        fi
-        
-        # Проверяем существование файла тестов
-        if [ ! -f "tests/integration/test_api_integration.py" ]; then
-          echo "⚠️ Файл интеграционных тестов не найден, создаем базовый тест"
-          echo 'import pytest' > tests/integration/test_api_integration.py
-          echo 'import requests' >> tests/integration/test_api_integration.py
-          echo 'import time' >> tests/integration/test_api_integration.py
-          echo '' >> tests/integration/test_api_integration.py
-          echo 'class TestAPIIntegration:' >> tests/integration/test_api_integration.py
-          echo '    def test_health_endpoint(self):' >> tests/integration/test_api_integration.py
-          echo '        response = requests.get("http://127.0.0.1:8000/api/v1/health", timeout=30)' >> tests/integration/test_api_integration.py
-          echo '        assert response.status_code == 200' >> tests/integration/test_api_integration.py
-          echo '    def test_status_endpoint(self):' >> tests/integration/test_api_integration.py
-          echo '        response = requests.get("http://127.0.0.1:8000/api/v1/status", timeout=30)' >> tests/integration/test_api_integration.py
-          echo '        assert response.status_code == 200' >> tests/integration/test_api_integration.py
-          echo "✅ Базовые интеграционные тесты созданы"
-        fi
-        
-        # Проверяем, что тесты создались
-        if [ -f "tests/integration/test_api_integration.py" ]; then
-          echo "✅ Файл интеграционных тестов найден"
-          echo "📊 Размер файла: $(wc -c < tests/integration/test_api_integration.py) байт"
-        else
-          echo "❌ Файл интеграционных тестов не создан"
-          exit 1
-        fi
-        
-        # Запускаем интеграционные тесты
+        # Запускаем интеграционные тесты для запущенного сервера
         echo "🧪 Запускаем интеграционные тесты..."
-        python -m pytest tests/integration/ -v --tb=short || {
-          echo "⚠️ Некоторые интеграционные тесты не прошли, но это не критично"
-          echo "📊 Создаем отчет о тестах"
-          python -m pytest tests/integration/ -v --tb=short --junitxml=integration-results.xml || true
+        python tests/integration/test_server_integration.py || {
+          echo "⚠️ Некоторые интеграционные тесты не прошли"
+          echo "📊 Логи сервера:"
+          cat server.log || true
+          exit 1
         }
     
     - name: 🛑 Остановка сервера
