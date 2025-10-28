@@ -274,10 +274,18 @@ jobs:
         pip install pytest pytest-asyncio httpx requests
     
     - name: 🗄️ Подготовка тестовой базы
+      env:
+        DATABASE_URL: "sqlite:///./backend/test_clinic.db"
+        CORS_DISABLE: "1"
+        WS_DEV_ALLOW: "1"
       run: |
         cd backend
         export DATABASE_URL="sqlite:///./test_clinic.db"
         python -c "
+        import os
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
         from app.db.base import Base
         from app.db.session import engine
         Base.metadata.create_all(bind=engine)
@@ -291,9 +299,18 @@ jobs:
         WS_DEV_ALLOW: "1"
       run: |
         cd backend
+        echo "🔍 Проверяем что приложение может импортироваться..."
+        python -c "from app.main import app; print('✅ App импортирован успешно')" || {
+          echo "❌ Не удалось импортировать app.main"
+          exit 1
+        }
+        echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         echo $! > server.pid
-        sleep 10
+        echo "⏳ Ожидаем запуска сервера..."
+        sleep 15
+        echo "📋 Логи сервера после запуска:"
+        head -50 server.log || echo "Логи не доступны"
     
     - name: 🧪 Интеграционные тесты
       run: |
@@ -351,7 +368,6 @@ jobs:
         pip install sphinx sphinx-rtd-theme
     
     - name: 📚 Генерация API документации
-      continue-on-error: true
       run: |
         cd backend
         # Проверяем существование основных файлов
@@ -370,20 +386,23 @@ jobs:
             # Добавляем текущую директорию в путь
             sys.path.insert(0, '.')
             
-            # Устанавливаем переменные окружения
-            os.environ.setdefault('DATABASE_URL', 'sqlite:///./clinic.db')
-            os.environ.setdefault('CORS_DISABLE', '1')
-            os.environ.setdefault('WS_DEV_ALLOW', '1')
+            # Устанавливаем переменные окружения ПЕРЕД импортом
+            os.environ['DATABASE_URL'] = 'sqlite:///./clinic.db'
+            os.environ['CORS_DISABLE'] = '1'
+            os.environ['WS_DEV_ALLOW'] = '1'
             
             print('🔧 Настройка окружения завершена')
+            print(f'📋 DATABASE_URL: {os.environ.get(\"DATABASE_URL\")}')
             
             # Импортируем приложение
+            print('📦 Импортируем app.main...')
             from app.main import app
             import json
             
             print('✅ Импорт app.main успешен')
             
             # Генерируем схему
+            print('📝 Генерируем OpenAPI схему...')
             openapi_schema = app.openapi()
             
             # Сохраняем схему
@@ -393,33 +412,24 @@ jobs:
             print('✅ OpenAPI схема создана успешно')
             print(f'📊 Размер файла: {os.path.getsize(\"openapi.json\")} байт')
             
-        except ImportError as e:
-            print(f'❌ Ошибка импорта: {e}')
+        except Exception as e:
+            print(f'❌ Ошибка генерации документации: {e}')
             print('📋 Детали ошибки:')
             traceback.print_exc()
             
-            # Создаем базовую схему
-            basic_schema = {
+            # Создаем минимальную схему в случае ошибки
+            print('⚠️ Создаем минимальную схему...')
+            minimal_schema = {
                 'openapi': '3.0.0',
-                'info': {'title': 'Clinic API', 'version': '1.0.0'},
+                'info': {
+                    'title': 'Clinic API', 
+                    'version': '1.0.0',
+                    'description': 'API documentation - generation failed'
+                },
                 'paths': {},
                 'components': {'schemas': {}}
             }
-            with open('openapi.json', 'w', encoding='utf-8') as f:
-                json.dump(basic_schema, f, indent=2, ensure_ascii=False)
-            print('✅ Базовая OpenAPI схема создана')
-            
-        except Exception as e:
-            print(f'❌ Критическая ошибка генерации схемы: {e}')
-            print('📋 Детали ошибки:')
-            traceback.print_exc()
-            
-            # Создаем минимальную схему
-            minimal_schema = {
-                'openapi': '3.0.0',
-                'info': {'title': 'Clinic API', 'version': '1.0.0'},
-                'paths': {}
-            }
+            import json
             with open('openapi.json', 'w', encoding='utf-8') as f:
                 json.dump(minimal_schema, f, indent=2, ensure_ascii=False)
             print('✅ Минимальная OpenAPI схема создана')
