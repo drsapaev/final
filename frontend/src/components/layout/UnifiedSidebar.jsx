@@ -149,8 +149,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     alignItems: 'center',
     justifyContent: isCollapsed ? 'center' : 'flex-start',
     gap: isCollapsed ? '0' : '12px',
-    padding: isCollapsed ? '8px' : '12px 16px',
-    borderRadius: '12px',
+    padding: isCollapsed ? '0' : '12px 16px',
+    borderRadius: isCollapsed ? '8px' : '12px',
     color: isActive ? '#ffffff' : (isDark ? '#cbd5e1' : '#64748b'),
     background: isActive ? 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' : 'transparent',
     textShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.6)' : 'none',
@@ -160,9 +160,14 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontSize: '14px',
     fontWeight: isActive ? '500' : '400',
-    marginBottom: isCollapsed ? '2px' : '4px',
+    marginBottom: isCollapsed ? '4px' : '4px',
     width: isCollapsed ? '48px' : 'auto',
-    height: isCollapsed ? '36px' : 'auto',
+    minWidth: isCollapsed ? '48px' : 'auto',
+    maxWidth: isCollapsed ? '48px' : 'auto',
+    height: isCollapsed ? '48px' : 'auto',
+    minHeight: isCollapsed ? '48px' : 'auto',
+    maxHeight: isCollapsed ? '48px' : 'auto',
+    flexShrink: 0,
     cursor: 'pointer',
     position: 'relative',
     overflow: 'hidden'
@@ -273,8 +278,8 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       <nav 
         style={{
           flex: 1,
-          padding: isCollapsed ? '8px 4px' : '16px 12px',
-          overflowY: 'auto',
+          padding: isCollapsed ? '0' : '16px 12px',
+          overflowY: isCollapsed ? 'hidden' : 'auto',
           display: 'flex',
           flexDirection: 'column',
           alignItems: isCollapsed ? 'center' : 'stretch'
@@ -295,11 +300,22 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
               style={({ isHovered }) => ({
                 ...navItemStyle(active),
-                ...(isHovered && !active ? hoverStyle : {})
+                ...(isHovered && !active ? hoverStyle : {}),
+                boxSizing: 'border-box',
+                ...(isCollapsed && {
+                  width: '48px !important',
+                  height: '48px !important',
+                  minWidth: '48px !important',
+                  minHeight: '48px !important',
+                  maxWidth: '48px !important',
+                  maxHeight: '48px !important',
+                  padding: '0 !important',
+                  margin: '0 auto 4px auto'
+                })
               })}
               title={isCollapsed ? item.label : ''}
             >
-              <Icon name={item.iconName} size={16} />
+              <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
               {!isCollapsed && <span>{item.label}</span>}
             </NavLink>
           );
@@ -325,11 +341,22 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
               style={({ isHovered }) => ({
                 ...navItemStyle(active),
-                ...(isHovered && !active ? hoverStyle : {})
+                ...(isHovered && !active ? hoverStyle : {}),
+                boxSizing: 'border-box',
+                ...(isCollapsed && {
+                  width: '48px !important',
+                  height: '48px !important',
+                  minWidth: '48px !important',
+                  minHeight: '48px !important',
+                  maxWidth: '48px !important',
+                  maxHeight: '48px !important',
+                  padding: '0 !important',
+                  margin: '0 auto 4px auto'
+                })
               })}
               title={isCollapsed ? item.label : ''}
             >
-              <Icon name={item.iconName} size={16} />
+              <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
               {!isCollapsed && <span>{item.label}</span>}
             </NavLink>
           );

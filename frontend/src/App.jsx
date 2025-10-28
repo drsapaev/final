@@ -109,30 +109,30 @@ function getSidebarItems(path) {
   if (path.startsWith('/admin')) {
     return [
       { id: 'dashboard', label: 'Dashboard', icon: 'chart.bar' },
-      { id: 'analytics', label: 'Analytics', icon: 'chart.line.uptrend.xyaxis' },
+      { id: 'analytics', label: 'Analytics', icon: 'chart.bar' }, // ✅ Заменено chart.line.uptrend.xyaxis → chart.bar
       { id: 'wait-time-analytics', label: 'Wait Time Analytics', icon: 'clock' },
       { id: 'ai-analytics', label: 'AI Analytics', icon: 'brain' },
       { id: 'webhooks', label: 'Webhooks', icon: 'globe' },
-      { id: 'reports', label: 'Reports', icon: 'doc.text' },
-      { id: 'system', label: 'System', icon: 'server.rack' },
+      { id: 'reports', label: 'Reports', icon: 'file-text' }, // ✅ Заменено doc.text → file-text
+      { id: 'system', label: 'System', icon: 'gear' }, // ✅ Заменено server.rack → gear
       { id: 'cloud-printing', label: 'Cloud Printing', icon: 'printer' },
       { id: 'medical-equipment', label: 'Medical Equipment', icon: 'stethoscope' },
       { id: 'dynamic-pricing', label: 'Dynamic Pricing', icon: 'tag' },
       { id: 'billing', label: 'Billing', icon: 'receipt' },
       { id: 'discount-benefits', label: 'Discount Benefits', icon: 'percent' },
       { id: 'graphql-explorer', label: 'GraphQL API', icon: 'database' },
-      { id: 'users', label: 'Users', icon: 'person.2' },
-      { id: 'doctors', label: 'Doctors', icon: 'person.badge.plus' },
-      { id: 'services', label: 'Services', icon: 'list.bullet' },
-      { id: 'patients', label: 'Patients', icon: 'person.2' },
+      { id: 'users', label: 'Users', icon: 'users' }, // ✅ Заменено person.2 → users
+      { id: 'doctors', label: 'Doctors', icon: 'user-plus' }, // ✅ Заменено person.badge.plus → user-plus
+      { id: 'services', label: 'Services', icon: 'list' }, // ✅ Заменено list.bullet → list
+      { id: 'patients', label: 'Patients', icon: 'users' }, // ✅ Заменено person.2 → users
       { id: 'appointments', label: 'Appointments', icon: 'calendar' },
       { id: 'all-free', label: 'All Free', icon: 'exclamationmark.triangle' },
       { id: 'benefit-settings', label: 'Benefit Settings', icon: 'gear' },
-      { id: 'wizard-settings', label: 'Wizard Settings', icon: 'desktopcomputer' },
+      { id: 'wizard-settings', label: 'Wizard Settings', icon: 'monitor' }, // ✅ Заменено desktopcomputer → monitor
       { id: 'payment-providers', label: 'Payment Providers', icon: 'creditcard' },
-      { id: 'clinic-management', label: 'Clinic Management', icon: 'building.2' },
+      { id: 'clinic-management', label: 'Clinic Management', icon: 'building' }, // ✅ Заменено building.2 → building
       { id: 'clinic-settings', label: 'Clinic Settings', icon: 'gear' },
-      { id: 'queue-settings', label: 'Queue Settings', icon: 'list.number' },
+      { id: 'queue-settings', label: 'Queue Settings', icon: 'list' }, // ✅ Заменено list.number → list
       { id: 'queue-limits', label: 'Queue Limits', icon: 'shield' },
       { id: 'ai-imaging', label: 'AI Imaging', icon: 'camera' },
       { id: 'treatment-recommendations', label: 'Treatment Recommendations', icon: 'heart' },
@@ -189,8 +189,8 @@ function getSidebarItems(path) {
       { id: 'derma', label: 'Dermatology', icon: 'face.smiling' },
       { id: 'dental', label: 'Dentistry', icon: 'smile' },
       { id: 'lab', label: 'Laboratory', icon: 'testtube.2' },
-      { id: 'procedures', label: 'Procedures', icon: 'list.bullet' },
-      { id: 'queue', label: 'Online Queue', icon: 'list.number' }
+      { id: 'procedures', label: 'Procedures', icon: 'list' },
+      { id: 'queue', label: 'Online Queue', icon: 'list' }
     ];
   }
   
@@ -207,7 +207,7 @@ function getSidebarItems(path) {
       { id: 'templates', label: 'Templates', icon: 'doc' },
       { id: 'reports', label: 'Reports', icon: 'chart.bar' },
       { id: 'dental-chart', label: 'Dental Chart', icon: 'smile' },
-      { id: 'treatment-plans', label: 'Treatment Plans', icon: 'list.bullet' },
+      { id: 'treatment-plans', label: 'Treatment Plans', icon: 'list' },
       { id: 'prosthetics', label: 'Prosthetics', icon: 'smile' },
       { id: 'ai-assistant', label: 'AI Assistant', icon: 'brain' }
     ];
