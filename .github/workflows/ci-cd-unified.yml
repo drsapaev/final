@@ -271,7 +271,8 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio httpx requests
+        # Extra deps required for imports during server startup in CI
+        pip install pytest pytest-asyncio httpx requests pandas packaging google-generativeai
     
     - name: 🗄️ Подготовка тестовой базы
       env:

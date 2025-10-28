@@ -45,8 +45,8 @@ jobs:
       run: |
         cd backend
         pip install -r requirements.txt
-        pip install requests
-        pip install argon2-cffi
+        # Extra deps required by import paths in app.main
+        pip install requests argon2-cffi pandas packaging google-generativeai
     
     - name: Validate import & environment
       run: |
