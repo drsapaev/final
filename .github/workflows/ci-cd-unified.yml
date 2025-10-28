@@ -272,7 +272,8 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
         # Extra deps required for imports during server startup in CI
-        pip install pytest pytest-asyncio httpx requests pandas packaging google-generativeai
+        pip install pytest pytest-asyncio httpx requests pandas packaging google-generativeai \
+          google-api-core google-auth grpcio proto-plus protobuf
     
     - name: 🗄️ Подготовка тестовой базы
       env:
