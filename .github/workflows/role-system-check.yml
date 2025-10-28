@@ -47,7 +47,7 @@ jobs:
         pip install -r requirements.txt
         # Extra deps required by import paths in app.main
         pip install requests argon2-cffi pandas packaging google-generativeai \
-          google-api-core google-auth grpcio proto-plus protobuf
+          google-api-core google-auth grpcio proto-plus protobuf psutil
     
     - name: Validate import & environment
       run: |
