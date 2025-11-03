@@ -1,7 +1,7 @@
 # =======================
 # Frontend image (Vite)
 # =======================
-FROM node:20.18.0-slim AS base
+FROM node:20.19.5-slim AS base
 
 ENV NODE_ENV=development \
     CI=true
