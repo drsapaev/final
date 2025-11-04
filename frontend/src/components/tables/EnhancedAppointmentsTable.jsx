@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { 
   Search, 
   Filter, 
@@ -44,6 +44,7 @@ const EnhancedAppointmentsTable = ({
   showCheckboxes = true,  // ✅ Новый проп для отключения чекбоксов
   view = 'registrar'      // 'registrar' | 'doctor' — режим отображения
 }) => {
+  const containerRef = useRef(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [filterConfig, setFilterConfig] = useState({
     search: '',
@@ -62,6 +63,34 @@ const EnhancedAppointmentsTable = ({
   const isDark = theme === 'dark';
   const isDoctorView = String(view).toLowerCase() === 'doctor';
   
+  // Локально дублируем активную схему на контейнер таблицы, чтобы CSS [data-color-scheme]
+  // сработал даже при временной потере атрибута на <html>
+  useEffect(() => {
+    const applyLocalScheme = () => {
+      try {
+        const customScheme = localStorage.getItem('customColorScheme');
+        const schemeId = localStorage.getItem('activeColorSchemeId');
+        const el = containerRef.current;
+        if (!el) return;
+        if (customScheme === 'true' && schemeId) {
+          el.setAttribute('data-color-scheme', schemeId);
+        } else {
+          el.removeAttribute('data-color-scheme');
+        }
+      } catch (_) {
+        // ignore
+      }
+    };
+    applyLocalScheme();
+    const handler = () => applyLocalScheme();
+    window.addEventListener('colorSchemeChanged', handler);
+    window.addEventListener('storage', handler);
+    return () => {
+      window.removeEventListener('colorSchemeChanged', handler);
+      window.removeEventListener('storage', handler);
+    };
+  }, []);
+  
   // Цвета для темы - используем macOS CSS переменные
   const themeColors = {
     bg: 'var(--mac-bg-primary)',
@@ -69,10 +98,17 @@ const EnhancedAppointmentsTable = ({
     border: 'var(--mac-border)',
     text: 'var(--mac-text-primary)',
     textSecondary: 'var(--mac-text-secondary)',
-    accent: 'var(--mac-accent)',
-    success: 'var(--mac-success)',
-    warning: 'var(--mac-warning)',
-    error: 'var(--mac-error)'
+    accent: 'var(--mac-accent-blue, var(--mac-accent, #007aff))',
+    success: 'var(--mac-success, #34c759)',
+    warning: 'var(--mac-warning, #ff9500)',
+    error: 'var(--mac-error, #ff3b30)',
+    info: 'var(--mac-info, var(--mac-accent-blue, #007aff))'
+  };
+
+  // Вспомогательная функция для добавления прозрачности к CSS переменной
+  const withOpacity = (cssVar, opacity) => {
+    // Используем color-mix если доступен, иначе fallback
+    return `color-mix(in srgb, ${cssVar} ${opacity * 100}%, transparent)`;
   };
 
   // Переводы
@@ -225,15 +261,15 @@ const EnhancedAppointmentsTable = ({
     const statusConfig = {
       // Статусы записи
       scheduled: { 
-        color: themeColors.accent, 
-        bg: `${themeColors.accent}20`, 
+        color: 'var(--mac-accent-blue)', 
+        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
         icon: Calendar, 
         text: 'Запланирован',
         emoji: '📅'
       },
       confirmed: { 
-        color: themeColors.success, 
-        bg: `${themeColors.success}20`, 
+        color: 'var(--mac-success)', 
+        bg: withOpacity('var(--mac-success)', 0.12), 
         icon: CheckCircle, 
         text: 'Подтверждён',
         emoji: '✅'
@@ -241,43 +277,43 @@ const EnhancedAppointmentsTable = ({
       
       // Статусы очереди
       waiting: {
-        color: themeColors.warning,
-        bg: `${themeColors.warning}20`,
+        color: 'var(--mac-warning)',
+        bg: withOpacity('var(--mac-warning)', 0.12),
         icon: Clock,
         text: 'В очереди',
         emoji: '⏳'
       },
       queued: { 
-        color: themeColors.warning, 
-        bg: `${themeColors.warning}20`, 
+        color: 'var(--mac-warning)', 
+        bg: withOpacity('var(--mac-warning)', 0.12), 
         icon: Clock, 
         text: 'В очереди',
         emoji: '⏳'
       },
       called: {
-        color: themeColors.accent,
-        bg: `${themeColors.accent}20`,
+        color: 'var(--mac-accent-blue)',
+        bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: User,
         text: 'Вызван',
         emoji: '📢'
       },
       in_progress: {
-        color: themeColors.accent,
-        bg: `${themeColors.accent}20`,
+        color: 'var(--mac-accent-blue)',
+        bg: withOpacity('var(--mac-accent-blue)', 0.12),
         icon: User,
         text: 'На приёме',
         emoji: '👨‍⚕️'
       },
       in_cabinet: { 
-        color: themeColors.accent, 
-        bg: `${themeColors.accent}20`, 
+        color: 'var(--mac-accent-blue)', 
+        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
         icon: User, 
         text: 'В кабинете',
         emoji: '👤'
       },
       in_visit: { 
-        color: themeColors.accent, 
-        bg: `${themeColors.accent}20`, 
+        color: 'var(--mac-accent-blue)', 
+        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
         icon: User, 
         text: 'На приёме',
         emoji: '👨‍⚕️'
@@ -285,15 +321,15 @@ const EnhancedAppointmentsTable = ({
       
       // Завершённые статусы
       served: {
-        color: themeColors.success,
-        bg: `${themeColors.success}20`,
+        color: 'var(--mac-success)',
+        bg: withOpacity('var(--mac-success)', 0.12),
         icon: CheckCircle,
         text: 'Обслужен',
         emoji: '✅'
       },
       done: { 
-        color: themeColors.success, 
-        bg: `${themeColors.success}20`, 
+        color: 'var(--mac-success)', 
+        bg: withOpacity('var(--mac-success)', 0.12), 
         icon: CheckCircle, 
         text: 'Обслужен',
         emoji: '✅'
@@ -301,22 +337,22 @@ const EnhancedAppointmentsTable = ({
       
       // Статусы оплаты
       paid_pending: { 
-        color: themeColors.warning, 
-        bg: `${themeColors.warning}20`, 
+        color: 'var(--mac-warning)', 
+        bg: withOpacity('var(--mac-warning)', 0.12), 
         icon: CreditCard, 
         text: 'Ожидает оплаты',
         emoji: '⏳'
       },
       payment_paid: { 
-        color: themeColors.success, 
-        bg: `${themeColors.success}20`, 
+        color: 'var(--mac-success)', 
+        bg: withOpacity('var(--mac-success)', 0.12), 
         icon: CheckCircle, 
         text: 'Оплачен',
         emoji: '✅'
       },
       paid: { 
-        color: themeColors.success, 
-        bg: `${themeColors.success}20`, 
+        color: 'var(--mac-success)', 
+        bg: withOpacity('var(--mac-success)', 0.12), 
         icon: CheckCircle, 
         text: 'Оплачен',
         emoji: '✅'
@@ -324,15 +360,15 @@ const EnhancedAppointmentsTable = ({
       
       // Отрицательные статусы
       cancelled: { 
-        color: themeColors.error, 
-        bg: `${themeColors.error}20`, 
+        color: 'var(--mac-error)', 
+        bg: withOpacity('var(--mac-error)', 0.12), 
         icon: XCircle, 
         text: 'Отменён',
         emoji: '❌'
       },
       no_show: { 
-        color: themeColors.textSecondary, 
-        bg: `${themeColors.textSecondary}20`, 
+        color: 'var(--mac-text-secondary)', 
+        bg: withOpacity('var(--mac-text-secondary)', 0.12), 
         icon: AlertCircle, 
         text: 'Не явился',
         emoji: '👻'
@@ -340,8 +376,8 @@ const EnhancedAppointmentsTable = ({
       
       // Старые статусы (для совместимости)
       plan: { 
-        color: themeColors.accent, 
-        bg: `${themeColors.accent}20`, 
+        color: 'var(--mac-accent-blue)', 
+        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
         icon: Calendar, 
         text: 'Запланирован',
         emoji: '📅'
@@ -366,13 +402,13 @@ const EnhancedAppointmentsTable = ({
           fontSize: '12px',
           fontWeight: '500',
           cursor: 'help',
-          border: `1px solid ${config.color}30`
+          border: `1px solid ${withOpacity(config.color, 0.2)}`
         }}>
         <span style={{ fontSize: '14px' }}>{config.emoji}</span>
         <span>{config.text}</span>
       </div>
     );
-  }, [colors]);
+  }, [withOpacity]);
 
   // ✅ УНИВЕРСАЛЬНЫЙ МАППИНГ УСЛУГ (работает с любыми данными из админ панели)
   const createServiceMapping = useCallback(() => {
@@ -464,14 +500,25 @@ const EnhancedAppointmentsTable = ({
       return '—';
     }
     
+    // ✅ Функция проверки, является ли строка кодом (а не названием)
+    const isServiceCode = (str) => {
+      if (!str || typeof str !== 'string') return false;
+      // Коды обычно короткие (до 20 символов), без пробелов, могут содержать подчеркивания, дефисы, буквы и цифры
+      // Названия обычно длинные (более 20 символов), содержат пробелы и русские буквы
+      if (str.length > 30) return false; // Длинные строки - скорее названия
+      if (/\s/.test(str)) return false; // Содержит пробелы - скорее название
+      // Паттерны кодов: K01, D02, D_PROC03, ECG-001, C01 и т.д.
+      return /^[A-Z][A-Z0-9_-]*\d+$/i.test(str) || /^[A-Z]\d{2}$/.test(str);
+    };
+    
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
     const compactCodes = servicesList.map((serviceName, index) => {
-      // Сначала проверяем, может это уже код (K01, D02, etc)
-      if (/^[A-Z]\d{2}$/.test(serviceName)) {
+      // Если это уже код (K01, D02, D_PROC03, etc), возвращаем как есть
+      if (isServiceCode(serviceName)) {
         return serviceName;
       }
       
-      // Найти услугу по названию и получить её код
+      // Если это название, ищем услугу и получаем её код
       for (const group of Object.values(services)) {
         if (Array.isArray(group)) {
           const foundService = group.find(s => s.name === serviceName);
@@ -488,32 +535,117 @@ const EnhancedAppointmentsTable = ({
         }
       }
       
-      // Если ничего не найдено, возвращаем само название услуги
+      // Если ничего не найдено и это не код, возвращаем как есть (название)
       return serviceName;
+    });
+    
+    // ✅ Преобразуем коды обратно в названия для tooltip
+    const serviceNamesForTooltip = compactCodes.map(code => {
+      // Если это код, ищем полное название
+      if (isServiceCode(code)) {
+        // Ищем по service_code (точное совпадение)
+        for (const group of Object.values(services)) {
+          if (Array.isArray(group)) {
+            const foundService = group.find(s => s.service_code === code);
+            if (foundService) {
+              return foundService.name;
+            }
+          }
+        }
+        
+        // Ищем по старому полю code
+        for (const group of Object.values(services)) {
+          if (Array.isArray(group)) {
+            const foundService = group.find(s => s.code === code);
+            if (foundService) {
+              return foundService.name;
+            }
+          }
+        }
+        
+        // Если не нашли по service_code, пытаемся найти по category_code + id (только для формата K01, D02)
+        if (/^[A-Z]\d{2}$/.test(code)) {
+          const categoryCode = code[0];
+          const serviceId = parseInt(code.slice(1));
+          for (const group of Object.values(services)) {
+            if (Array.isArray(group)) {
+              const foundService = group.find(s => 
+                s.category_code === categoryCode && s.id === serviceId
+              );
+              if (foundService) {
+                return foundService.name;
+              }
+            }
+          }
+        }
+        
+        // Если не нашли название для кода, возвращаем код как есть
+        return code;
+      }
+      
+      // Если это не код (уже название), возвращаем как есть
+      return code;
     });
     
     // Создаем tooltip с полным списком услуг пациента
     let tooltipText = '';
-    
+
     if (allPatientServices && allPatientServices.length > 0) {
+      // ✅ Преобразуем коды всех услуг в названия
+      const allPatientServiceNames = allPatientServices.map(service => {
+        // Если это уже название (длинное, с пробелами), возвращаем как есть
+        if (typeof service === 'string' && service.length > 20 && /\s/.test(service)) {
+          return service;
+        }
+
+        // Если это код, ищем название
+        if (isServiceCode(service)) {
+          // Ищем по service_code
+          for (const group of Object.values(services)) {
+            if (Array.isArray(group)) {
+              const foundService = group.find(s => s.service_code === service);
+              if (foundService) {
+                return foundService.name;
+              }
+            }
+          }
+
+          // Ищем по старому полю code
+          for (const group of Object.values(services)) {
+            if (Array.isArray(group)) {
+              const foundService = group.find(s => s.code === service);
+              if (foundService) {
+                return foundService.name;
+              }
+            }
+          }
+
+          // Если не нашли, возвращаем код
+          return service;
+        }
+
+        // Иначе возвращаем как есть
+        return service;
+      });
+
       // Показываем все услуги пациента из всех отделений
-      tooltipText = `🏥 Все услуги пациента (${allPatientServices.length}):\n\n`;
-      allPatientServices.forEach((service, idx) => {
+      tooltipText = `🏥 Все услуги пациента (${allPatientServiceNames.length}):\n\n`;
+      allPatientServiceNames.forEach((service, idx) => {
         tooltipText += `${idx + 1}. ${service}\n`;
       });
-      
-      // Добавляем информацию о текущих услугах
-      if (servicesList.length > 0) {
-        tooltipText += `\n📋 Текущие услуги (${servicesList.length}):\n`;
-        servicesList.forEach((service, idx) => {
-          tooltipText += `• ${service}\n`;
+
+      // Добавляем информацию о текущих услугах с полными названиями
+      if (serviceNamesForTooltip.length > 0) {
+        tooltipText += `\n📋 Текущие услуги (${serviceNamesForTooltip.length}):\n`;
+        serviceNamesForTooltip.forEach((serviceName, idx) => {
+          tooltipText += `• ${serviceName}\n`;
         });
       }
     } else {
-      // Fallback: показываем только текущие услуги
-      tooltipText = servicesList.length > 1 
-        ? `Услуги:\n${servicesList.map((service, idx) => `${idx + 1}. ${service}`).join('\n')}`
-        : servicesList[0] || '';
+      // Fallback: показываем только текущие услуги с полными названиями
+      tooltipText = serviceNamesForTooltip.length > 1
+        ? `Услуги:\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}`
+        : serviceNamesForTooltip[0] || '';
     }
     
     return (
@@ -529,9 +661,9 @@ const EnhancedAppointmentsTable = ({
               borderRadius: '4px',
               fontSize: '11px',
               fontWeight: 'bold',
-              backgroundColor: themeColors.accent + '20',
-              color: themeColors.accent,
-              border: `1px solid ${themeColors.accent}40`
+              backgroundColor: withOpacity('var(--mac-accent-blue)', 0.12),
+              color: 'var(--mac-accent-blue)',
+              border: `1px solid ${withOpacity('var(--mac-accent-blue)', 0.25)}`
             }}
           >
             {code}
@@ -539,18 +671,18 @@ const EnhancedAppointmentsTable = ({
         ))}
       </div>
     );
-  }, [colors, createServiceMapping, services]);
+  }, [withOpacity, createServiceMapping, services]);
 
   // Рендер типа обращения
   const renderVisitType = useCallback((visitType) => {
     const typeColors = {
-      paid: themeColors.accent,
-      repeat: themeColors.success,
-      free: themeColors.warning
+      paid: 'var(--mac-accent-blue)',
+      repeat: 'var(--mac-success)',
+      free: 'var(--mac-warning)'
     };
 
     const typeText = t[visitType] || visitType;
-    const color = typeColors[visitType] || themeColors.textSecondary;
+    const color = typeColors[visitType] || 'var(--mac-text-secondary)';
 
     return (
       <span style={{
@@ -558,14 +690,14 @@ const EnhancedAppointmentsTable = ({
         borderRadius: '8px',
         fontSize: '11px',
         fontWeight: '600',
-        backgroundColor: `${color}15`,
-        color: color,
-        border: `1px solid ${color}30`
+          backgroundColor: withOpacity(color, 0.08),
+          color: color,
+          border: `1px solid ${withOpacity(color, 0.2)}`
       }}>
         {typeText}
       </span>
     );
-  }, [colors, t]);
+  }, [themeColors, withOpacity, t]);
 
   // Рендер вида оплаты
   const renderPaymentType = useCallback((paymentType, paymentStatus) => {
@@ -576,21 +708,21 @@ const EnhancedAppointmentsTable = ({
     };
 
     const paymentColors = {
-      cash: themeColors.success,
-      card: themeColors.accent,
-      online: '#8b5cf6'
+      cash: 'var(--mac-success)',
+      card: 'var(--mac-accent-blue)',
+      online: 'var(--mac-accent-blue)' // Используем accent вместо хардкоженного цвета
     };
 
     const statusColors = {
-      paid: themeColors.success,
-      pending: themeColors.warning,
-      failed: themeColors.error
+      paid: 'var(--mac-success)',
+      pending: 'var(--mac-warning)',
+      failed: 'var(--mac-error)'
     };
 
     const typeText = t[paymentType] || paymentType;
     const icon = paymentIcons[paymentType] || '💰';
-    const color = paymentColors[paymentType] || themeColors.textSecondary;
-    const statusColor = statusColors[paymentStatus] || themeColors.textSecondary;
+    const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';
+    const statusColor = statusColors[paymentStatus] || 'var(--mac-text-secondary)';
 
     // ✅ Упрощённый вид: вид оплаты + иконка статуса
     return (
@@ -608,9 +740,9 @@ const EnhancedAppointmentsTable = ({
           borderRadius: '6px',
           fontSize: '12px',
           fontWeight: '500',
-          backgroundColor: `${color}15`,
+          backgroundColor: withOpacity(color, 0.08),
           color: color,
-          border: `1px solid ${color}30`
+          border: `1px solid ${withOpacity(color, 0.2)}`
         }}>
           <span>{icon}</span>
           <span>{typeText}</span>
@@ -627,7 +759,7 @@ const EnhancedAppointmentsTable = ({
         )}
       </div>
     );
-    }, [colors, t]);
+    }, [withOpacity, t]);
 
   // Функция для форматирования номера телефона
   const formatPhoneNumber = useCallback((phone) => {
@@ -775,25 +907,25 @@ const EnhancedAppointmentsTable = ({
               // Определяем цвета и иконки для статусов
               const statusConfig = {
                 waiting: {
-                  bg: themeColors.warning,
+                  bg: 'var(--mac-warning, #ff9500)',
                   icon: '⏳',
                   text: 'Ожидает',
                   pulse: true
                 },
                 called: {
-                  bg: themeColors.accent,
+                  bg: 'var(--mac-accent-blue, #007aff)',
                   icon: '📢',
                   text: 'Вызван',
                   pulse: true
                 },
                 served: {
-                  bg: themeColors.success,
+                  bg: 'var(--mac-success, #34c759)',
                   icon: '✅',
                   text: 'Обслужен',
                   pulse: false
                 },
                 no_show: {
-                  bg: themeColors.error,
+                  bg: 'var(--mac-error, #ff3b30)',
                   icon: '❌',
                   text: 'Не явился',
                   pulse: false
@@ -809,14 +941,14 @@ const EnhancedAppointmentsTable = ({
                   style={{
                     padding: '4px 8px',
                     backgroundColor: config.bg,
-                    color: 'white',
+                    color: 'var(--mac-text-primary)',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '700',
                     minWidth: '32px',
                     textAlign: 'center',
                     display: 'inline-block',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
                   }}
                   title={`${queue.queue_name}: №${queue.number}`}
                 >
@@ -838,15 +970,15 @@ const EnhancedAppointmentsTable = ({
       return (
         <span style={{
           padding: '4px 8px',
-          backgroundColor: themeColors.accent,
-          color: 'white',
+          backgroundColor: 'var(--mac-accent-blue)',
+          color: 'var(--mac-text-primary)',
           borderRadius: '6px',
           fontSize: '14px',
           fontWeight: '700',
           minWidth: '32px',
           textAlign: 'center',
           display: 'inline-block',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
         }}>
           {todayIndex}
         </span>
@@ -857,16 +989,16 @@ const EnhancedAppointmentsTable = ({
     const fallbackIndex = data.findIndex(item => item.id === row.id) + 1;
     return (
       <span style={{
-        color: themeColors.textSecondary,
+        color: 'var(--mac-text-secondary)',
         fontSize: '12px',
         padding: '2px 6px',
-        backgroundColor: themeColors.textSecondary + '10',
+        backgroundColor: withOpacity('var(--mac-text-secondary)', 0.06),
         borderRadius: '4px'
       }}>
         #{fallbackIndex}
       </span>
     );
-  }, [data, colors]);
+  }, [data, withOpacity]);
 
 
   // Инлайновый лоадер без раннего возврата
@@ -876,7 +1008,7 @@ const EnhancedAppointmentsTable = ({
       alignItems: 'center',
       justifyContent: 'center',
       padding: '60px',
-      color: themeColors.textSecondary
+      color: 'var(--mac-text-secondary)'
     }}>
       <div style={{ textAlign: 'center' }}>
         <div 
@@ -884,8 +1016,8 @@ const EnhancedAppointmentsTable = ({
           style={{
             width: '40px',
             height: '40px',
-            border: `3px solid ${themeColors.border}`,
-            borderTop: `3px solid ${themeColors.accent}`,
+            border: '3px solid var(--mac-border)',
+            borderTop: '3px solid var(--mac-accent-blue)',
             borderRadius: '50%',
             margin: '0 auto 16px'
           }} />
@@ -896,9 +1028,9 @@ const EnhancedAppointmentsTable = ({
 
   return (
     <div 
+      ref={containerRef}
       className={`enhanced-table ${isDark ? 'dark-theme' : ''}`}
       style={{
-        backgroundColor: 'var(--mac-bg-primary)',
         overflow: 'hidden',
         border: outerBorder ? '1px solid var(--mac-border)' : 'none',
         borderRadius: outerBorder ? 'var(--mac-radius-lg)' : '0'
@@ -907,7 +1039,6 @@ const EnhancedAppointmentsTable = ({
       <div style={{
         padding: '16px',
         borderBottom: '1px solid var(--mac-border)',
-        backgroundColor: 'var(--mac-bg-secondary)',
         overflowX: 'auto',
         minWidth: '600px'
       }}>
@@ -995,14 +1126,15 @@ const EnhancedAppointmentsTable = ({
           boxSizing: 'border-box'
         }}>
           <thead>
-            <tr style={{ backgroundColor: themeColors.bgSecondary }}>
+            <tr>
               {/* Чекбокс для выбора всех */}
               {showCheckboxes && (
                 <th style={{
                   padding: '12px 8px',
                   textAlign: 'left',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  width: '40px'
+                  borderBottom: '1px solid var(--mac-border)',
+                  width: '40px',
+                  color: 'var(--mac-text-primary)'
                 }}>
                   <input
                     type="checkbox"
@@ -1019,13 +1151,13 @@ const EnhancedAppointmentsTable = ({
                 style={{
                   padding: '12px 8px',
                   textAlign: 'center',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
                   width: '60px',
-                  cursor: 'pointer',  // ✅ Указатель при наведении
-                  userSelect: 'none'  // ✅ Запрет выделения текста
+                  cursor: 'pointer',
+                  userSelect: 'none'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
@@ -1042,8 +1174,8 @@ const EnhancedAppointmentsTable = ({
                 style={{
                   padding: '12px 8px',
                   textAlign: 'left',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
@@ -1064,13 +1196,13 @@ const EnhancedAppointmentsTable = ({
                 <th style={{
                   padding: '12px 8px',
                   textAlign: 'left',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
-                    minWidth: '170px'
-                  }}>
-                    {t.phone}
+                  minWidth: '170px'
+                }}>
+                  {t.phone}
                 </th>
               )}
 
@@ -1080,8 +1212,8 @@ const EnhancedAppointmentsTable = ({
                 style={{
                   padding: '12px 8px',
                   textAlign: 'center',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
@@ -1102,12 +1234,12 @@ const EnhancedAppointmentsTable = ({
                 <th style={{
                   padding: '12px 8px',
                   textAlign: 'left',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
-                    minWidth: '140px'
-                  }}
+                  minWidth: '140px'
+                }}
                   className="hide-on-mobile"
                 >
                   {t.address}
@@ -1118,42 +1250,42 @@ const EnhancedAppointmentsTable = ({
               <th style={{
                 padding: '12px 8px',
                 textAlign: 'center',
-                borderBottom: `1px solid ${themeColors.border}`,
-                color: themeColors.text,
+                borderBottom: '1px solid var(--mac-border)',
+                color: 'var(--mac-text-primary)',
                 fontWeight: '600',
                 fontSize: '14px',
                 minWidth: isDoctorView ? '70px' : '80px',
                 width: isDoctorView ? '70px' : 'auto'
               }}>
-                  {t.visitType}
+                {t.visitType}
               </th>
 
               {/* Услуги */}
               <th style={{
                 padding: '12px 8px',
                 textAlign: 'left',
-                borderBottom: `1px solid ${themeColors.border}`,
-                color: themeColors.text,
+                borderBottom: '1px solid var(--mac-border)',
+                color: 'var(--mac-text-primary)',
                 fontWeight: '600',
                 fontSize: '14px',
-                  minWidth: isDoctorView ? '12%' : '180px',
-                  width: isDoctorView ? '12%' : 'auto'
+                minWidth: isDoctorView ? '12%' : '180px',
+                width: isDoctorView ? '12%' : 'auto'
               }}>
-                  {t.services}
+                {t.services}
               </th>
 
               {/* Вид оплаты */}
               <th style={{
                 padding: '12px 8px',
                 textAlign: 'center',
-                borderBottom: `1px solid ${themeColors.border}`,
-                color: themeColors.text,
+                borderBottom: '1px solid var(--mac-border)',
+                color: 'var(--mac-text-primary)',
                 fontWeight: '600',
                 fontSize: '14px',
-                  minWidth: isDoctorView ? '8%' : '100px',
-                  width: isDoctorView ? '8%' : 'auto'
+                minWidth: isDoctorView ? '8%' : '100px',
+                width: isDoctorView ? '8%' : 'auto'
               }}>
-                  {t.paymentType}
+                {t.paymentType}
               </th>
 
               {/* Дата и время */}
@@ -1162,8 +1294,8 @@ const EnhancedAppointmentsTable = ({
                 style={{
                   padding: '12px 8px',
                   textAlign: 'center',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
@@ -1185,8 +1317,8 @@ const EnhancedAppointmentsTable = ({
                 style={{
                   padding: '12px 8px',
                   textAlign: 'center',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
@@ -1209,8 +1341,8 @@ const EnhancedAppointmentsTable = ({
                 style={{
                   padding: '12px 8px',
                   textAlign: 'right',
-                  borderBottom: `1px solid ${themeColors.border}`,
-                  color: themeColors.text,
+                  borderBottom: '1px solid var(--mac-border)',
+                  color: 'var(--mac-text-primary)',
                   fontWeight: '600',
                   fontSize: '14px',
                   cursor: 'pointer',
@@ -1230,14 +1362,14 @@ const EnhancedAppointmentsTable = ({
               <th style={{
                 padding: '12px 8px',
                 textAlign: 'center',
-                borderBottom: `1px solid ${themeColors.border}`,
-                color: themeColors.text,
+                borderBottom: '1px solid var(--mac-border)',
+                color: 'var(--mac-text-primary)',
                 fontWeight: '600',
                 fontSize: '14px',
                 width: isDoctorView ? '15%' : 'auto',
-                  minWidth: isDoctorView ? '15%' : '200px'
+                minWidth: isDoctorView ? '15%' : '200px'
               }}>
-                  {t.actions}
+                {t.actions}
               </th>
             </tr>
           </thead>
@@ -1249,7 +1381,7 @@ const EnhancedAppointmentsTable = ({
                   style={{
                     padding: '40px',
                     textAlign: 'center',
-                    color: themeColors.textSecondary,
+                    color: 'var(--mac-text-secondary)',
                     fontSize: '16px'
                   }}
                 >
@@ -1262,18 +1394,24 @@ const EnhancedAppointmentsTable = ({
                   key={row.id}
                   className="enhanced-table-row"
                   style={{
-                    backgroundColor: selectedRows.has(row.id) ? themeColors.accent + '10' : 'transparent',
-                    borderBottom: `1px solid ${themeColors.border}`,
+                    backgroundColor: selectedRows.has(row.id) 
+                      ? withOpacity('var(--mac-accent-blue)', 0.06) 
+                      : (index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)'),
+                    borderBottom: '1px solid var(--mac-border)',
                     cursor: 'pointer'
                   }}
                   onMouseEnter={(e) => {
                     if (!selectedRows.has(row.id)) {
-                      e.target.closest('tr').style.backgroundColor = themeColors.bgSecondary;
+                      e.target.closest('tr').style.backgroundColor = 'var(--mac-bg-secondary)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!selectedRows.has(row.id)) {
-                      e.target.closest('tr').style.backgroundColor = 'transparent';
+                      // Восстанавливаем фон на основе индекса (для полосатой таблицы)
+                      const tr = e.target.closest('tr');
+                      if (tr) {
+                        tr.style.backgroundColor = index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)';
+                      }
                     }
                   }}
                   onClick={() => onRowClick?.(row)}
@@ -1297,7 +1435,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    color: themeColors.textSecondary,
+                    color: 'var(--mac-text-secondary)',
                     fontSize: '14px'
                   }}>
                     {renderQueueNumbers(row)}
@@ -1306,7 +1444,7 @@ const EnhancedAppointmentsTable = ({
                   {/* Пациент */}
                   <td style={{
                     padding: '12px 8px',
-                    color: themeColors.text,
+                    color: 'var(--mac-text-primary)',
                     fontSize: '14px',
                     fontWeight: '500',
                     minWidth: isDoctorView ? '15%' : '200px',
@@ -1322,7 +1460,7 @@ const EnhancedAppointmentsTable = ({
                       {row.patient_birth_year && (
                         <div style={{
                           fontSize: '12px',
-                          color: themeColors.textSecondary,
+                          color: 'var(--mac-text-secondary)',
                           marginTop: '2px'
                         }}>
                           {new Date().getFullYear() - row.patient_birth_year} лет
@@ -1335,7 +1473,7 @@ const EnhancedAppointmentsTable = ({
                   {!isDoctorView && (
                     <td style={{
                       padding: '12px 8px',
-                      color: themeColors.text,
+                      color: 'var(--mac-text-primary)',
                       fontSize: '14px',
                       minWidth: '170px',
                       overflow: 'hidden',
@@ -1347,7 +1485,7 @@ const EnhancedAppointmentsTable = ({
                         alignItems: 'center',
                         gap: '8px'
                       }}>
-                        <Phone size={18} style={{ color: themeColors.accent, fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
+                        <Phone size={18} style={{ color: 'var(--mac-accent-blue)', fontWeight: 'bold', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }} />
                         {formatPhoneNumber(row.patient_phone)}
                       </div>
                     </td>
@@ -1357,7 +1495,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    color: themeColors.text,
+                    color: 'var(--mac-text-primary)',
                     fontSize: '14px',
                     width: isDoctorView ? '50px' : '60px',
                     minWidth: isDoctorView ? '50px' : '60px',
@@ -1370,7 +1508,7 @@ const EnhancedAppointmentsTable = ({
                   {!isDoctorView && (
                     <td style={{
                       padding: '12px 8px',
-                      color: themeColors.text,
+                      color: 'var(--mac-text-primary)',
                       fontSize: '14px',
                       minWidth: '140px',
                       overflow: 'hidden',
@@ -1388,10 +1526,10 @@ const EnhancedAppointmentsTable = ({
                           gap: '8px'
                         }}>
                           <Home size={18} style={{ 
-                            color: themeColors.accent, 
+                            color: 'var(--mac-accent-blue)', 
                             fontWeight: 'bold', 
                             filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
-                            flexShrink: 0  // ✅ Иконка не сжимается
+                            flexShrink: 0
                           }} />
                           <span style={{ 
                             overflow: 'hidden', 
@@ -1443,7 +1581,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'center',
-                    color: themeColors.text,
+                    color: 'var(--mac-text-primary)',
                     fontSize: '14px',
                     minWidth: '100px'
                   }}>
@@ -1452,7 +1590,7 @@ const EnhancedAppointmentsTable = ({
                       {row.created_at ? (
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                            <Calendar size={12} style={{ color: themeColors.textSecondary }} />
+                            <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
                             {new Date(row.created_at).toLocaleDateString('ru-RU')}
                           </div>
                           <div style={{
@@ -1462,7 +1600,7 @@ const EnhancedAppointmentsTable = ({
                             justifyContent: 'center',
                             marginTop: '2px',
                             fontSize: '12px',
-                            color: themeColors.textSecondary
+                            color: 'var(--mac-text-secondary)'
                           }}>
                             <Clock size={10} />
                             {new Date(row.created_at).toLocaleTimeString('ru-RU', { 
@@ -1476,7 +1614,7 @@ const EnhancedAppointmentsTable = ({
                         /* Fallback для старых записей без created_at */
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                            <Calendar size={12} style={{ color: themeColors.textSecondary }} />
+                            <Calendar size={12} style={{ color: 'var(--mac-text-secondary)' }} />
                             {row.appointment_date || '—'}
                           </div>
                           {row.appointment_time && (
@@ -1487,7 +1625,7 @@ const EnhancedAppointmentsTable = ({
                               justifyContent: 'center',
                               marginTop: '2px',
                               fontSize: '12px',
-                              color: themeColors.textSecondary
+                              color: 'var(--mac-text-secondary)'
                             }}>
                               <Clock size={10} />
                               {row.appointment_time}
@@ -1515,7 +1653,7 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'right',
-                    color: themeColors.success,
+                    color: 'var(--mac-success, #34c759)',
                     fontSize: '14px',
                     fontWeight: '600',
                     minWidth: '90px'
@@ -1527,20 +1665,44 @@ const EnhancedAppointmentsTable = ({
                   </td>
 
                   {/* Действия */}
-                  <td style={{
-                    padding: '12px 8px',
-                    textAlign: 'center',
-                    width: '200px',
-                    minWidth: '200px',
-                    maxWidth: '200px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                      flexWrap: 'wrap'
-                    }}>
+                  <td 
+                    style={{
+                      padding: '12px 8px',
+                      textAlign: 'center',
+                      width: '200px',
+                      minWidth: '200px',
+                      maxWidth: '200px',
+                      position: 'relative',
+                      zIndex: 100
+                    }}
+                    onClick={(e) => {
+                      // Блокируем клик на строку при клике в ячейке действий
+                      e.stopPropagation();
+                    }}
+                    onMouseDown={(e) => {
+                      // Блокируем mousedown на строку при клике в ячейке действий
+                      e.stopPropagation();
+                    }}
+                  >
+                    <div 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        flexWrap: 'wrap',
+                        position: 'relative',
+                        zIndex: 100
+                      }}
+                      onClick={(e) => {
+                        // Блокируем клик на строку при клике в контейнере действий
+                        e.stopPropagation();
+                      }}
+                      onMouseDown={(e) => {
+                        // Блокируем mousedown на строку при клике в контейнере действий
+                        e.stopPropagation();
+                      }}
+                    >
                       {/* В режиме панели врача кнопки оплаты не показываем */}
                       {!isDoctorView && (() => {
                         const status = (row.status || '').toLowerCase();
@@ -1550,7 +1712,9 @@ const EnhancedAppointmentsTable = ({
                           paymentStatus === 'pending' || 
                           (status === 'scheduled' && paymentStatus !== 'paid') ||
                           (status === 'confirmed' && paymentStatus !== 'paid') ||
-                          (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'cancelled')
+                          (status === 'waiting' && paymentStatus !== 'paid') ||
+                          (status === 'queued' && paymentStatus !== 'paid') ||
+                          (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled')
                         );
                       })() && (
                         <button
@@ -1564,8 +1728,8 @@ const EnhancedAppointmentsTable = ({
                             padding: '4px 8px',
                             border: 'none',
                             borderRadius: '4px',
-                            backgroundColor: themeColors.success,
-                            color: 'white',
+                            backgroundColor: 'var(--mac-success, #34c759)',
+                            color: 'var(--mac-text-primary)',
                             cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: '500'
@@ -1577,7 +1741,7 @@ const EnhancedAppointmentsTable = ({
                       )}
                       
                       {/* Вызвать */}
-                      {(isDoctorView ? (row.status === 'queued' || row.payment_status === 'paid') : row.status === 'queued') && (
+                      {(isDoctorView ? (row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid') : (row.status === 'queued' || row.status === 'waiting')) && (
                         <button
                           className="action-button"
                           onMouseDown={(e) => {
@@ -1589,8 +1753,8 @@ const EnhancedAppointmentsTable = ({
                             padding: '4px 8px',
                             border: 'none',
                             borderRadius: '4px',
-                            backgroundColor: themeColors.success,
-                            color: 'white',
+                            backgroundColor: 'var(--mac-success, #34c759)',
+                            color: 'var(--mac-text-primary)',
                             cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: '500'
@@ -1602,7 +1766,7 @@ const EnhancedAppointmentsTable = ({
                       )}
                       
                       {/* Печать */}
-                      {(row.payment_status === 'paid' || row.status === 'queued') && (
+                      {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') && (
                         <button
                           className="action-button"
                           onMouseDown={(e) => {
@@ -1615,7 +1779,7 @@ const EnhancedAppointmentsTable = ({
                           border: 'none',
                           borderRadius: '4px',
                           backgroundColor: 'transparent',
-                            color: themeColors.primary,
+                            color: 'var(--mac-accent-blue)',
                             cursor: 'pointer',
                             pointerEvents: 'auto'
                         }}
@@ -1626,7 +1790,7 @@ const EnhancedAppointmentsTable = ({
                       )}
                       
                       {/* Завершить */}
-                      {row.status === 'in_cabinet' && (
+                      {(row.status === 'in_cabinet' || row.status === 'called') && (
                       <button
                         className="action-button"
                           onMouseDown={(e) => {
@@ -1638,8 +1802,8 @@ const EnhancedAppointmentsTable = ({
                             padding: '4px 8px',
                             border: 'none',
                             borderRadius: '4px',
-                            backgroundColor: themeColors.success,
-                            color: 'white',
+                            backgroundColor: 'var(--mac-success, #34c759)',
+                            color: 'var(--mac-text-primary)',
                             cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: '500'
@@ -1656,21 +1820,94 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          onActionClick?.('view', row, e);
+                          console.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
+                          if (onActionClick) {
+                            onActionClick('view', row, e);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Дублируем обработчик для надежности
+                          if (onActionClick) {
+                            onActionClick('view', row, e);
+                          }
                         }}
                         style={{
                           padding: '4px',
                           border: 'none',
                           borderRadius: '4px',
                           backgroundColor: 'transparent',
-                          color: themeColors.textSecondary,
+                          color: 'var(--mac-text-secondary)',
                           cursor: 'pointer',
-                          pointerEvents: 'auto'
+                          pointerEvents: 'auto',
+                          position: 'relative',
+                          zIndex: 101
                         }}
                         title="Просмотр"
                       >
                         <Eye size={14} />
                       </button>
+                      
+                      {/* Редактировать */}
+                      <button
+                        className="action-button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
+                          if (onActionClick) {
+                            onActionClick('edit', row, e);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Дублируем обработчик для надежности
+                          if (onActionClick) {
+                            onActionClick('edit', row, e);
+                          }
+                        }}
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          color: 'var(--mac-text-secondary)',
+                          cursor: 'pointer',
+                          pointerEvents: 'auto',
+                          position: 'relative',
+                          zIndex: 101
+                        }}
+                        title="Редактировать"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      
+                      {/* Просмотр EMR (только для завершённых записей) */}
+                      {(row.status === 'served' || row.status === 'completed' || row.status === 'done' || 
+                        (row.status === 'in_visit' && row.payment_status === 'paid')) && (
+                        <button
+                          className="action-button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onActionClick?.('view_emr', row, e);
+                          }}
+                          style={{
+                            padding: '4px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            backgroundColor: 'transparent',
+                            color: 'var(--mac-accent-blue, #007aff)',
+                            cursor: 'pointer',
+                            pointerEvents: 'auto'
+                          }}
+                          title="Просмотр EMR"
+                        >
+                          <FileText size={14} />
+                        </button>
+                      )}
                       
                       {/* Еще */}
                       <button
@@ -1685,7 +1922,7 @@ const EnhancedAppointmentsTable = ({
                           border: 'none',
                           borderRadius: '4px',
                           backgroundColor: 'transparent',
-                          color: themeColors.textSecondary,
+                          color: 'var(--mac-text-secondary)',
                           cursor: 'pointer',
                           pointerEvents: 'auto'
                         }}
@@ -1707,8 +1944,8 @@ const EnhancedAppointmentsTable = ({
                             padding: '4px 8px',
                             border: 'none',
                             borderRadius: '4px',
-                            backgroundColor: themeColors.info,
-                            color: 'white',
+                            backgroundColor: 'var(--mac-accent-blue, #007aff)',
+                            color: 'var(--mac-text-primary)',
                             cursor: 'pointer',
                             fontSize: '12px',
                             fontWeight: '500'
@@ -1731,8 +1968,7 @@ const EnhancedAppointmentsTable = ({
       {totalPages > 1 && (
         <div style={{
           padding: '16px',
-          borderTop: `1px solid ${themeColors.border}`,
-          backgroundColor: themeColors.bgSecondary,
+          borderTop: '1px solid var(--mac-border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'between',
@@ -1743,7 +1979,7 @@ const EnhancedAppointmentsTable = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            color: themeColors.textSecondary,
+            color: 'var(--mac-text-secondary)',
             fontSize: '14px'
           }}>
             <span>{t.page}</span>
@@ -1752,10 +1988,10 @@ const EnhancedAppointmentsTable = ({
               onChange={(e) => setCurrentPage(parseInt(e.target.value))}
               style={{
                 padding: '4px 8px',
-                border: `1px solid ${themeColors.border}`,
+                border: '1px solid var(--mac-border)',
                 borderRadius: '4px',
-                backgroundColor: themeColors.bg,
-                color: themeColors.text,
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
                 fontSize: '14px'
               }}
             >
@@ -1772,7 +2008,7 @@ const EnhancedAppointmentsTable = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            color: themeColors.textSecondary,
+            color: 'var(--mac-text-secondary)',
             fontSize: '14px'
           }}>
             <span>Показано: {paginatedData.length} из {filteredData.length}</span>
@@ -1789,10 +2025,10 @@ const EnhancedAppointmentsTable = ({
               disabled={currentPage === 1}
               style={{
                 padding: '6px 12px',
-                border: `1px solid ${themeColors.border}`,
+                border: '1px solid var(--mac-border)',
                 borderRadius: '6px',
-                backgroundColor: themeColors.bg,
-                color: currentPage === 1 ? themeColors.textSecondary : themeColors.text,
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: currentPage === 1 ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
                 fontSize: '14px',
                 cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
               }}
@@ -1805,10 +2041,10 @@ const EnhancedAppointmentsTable = ({
               disabled={currentPage === totalPages}
               style={{
                 padding: '6px 12px',
-                border: `1px solid ${themeColors.border}`,
+                border: '1px solid var(--mac-border)',
                 borderRadius: '6px',
-                backgroundColor: themeColors.bg,
-                color: currentPage === totalPages ? themeColors.textSecondary : themeColors.text,
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: currentPage === totalPages ? 'var(--mac-text-secondary)' : 'var(--mac-text-primary)',
                 fontSize: '14px',
                 cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
               }}

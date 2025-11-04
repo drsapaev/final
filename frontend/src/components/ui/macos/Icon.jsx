@@ -207,7 +207,37 @@ const ICONS = {
     <path d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4"/>
   ),
   'sparkles': (
-    <path d="M5 3v2M3 5h2M6 12v2M4 14h2M13 3v2M11 5h2M14 12v2M12 14h2M21 12v2M19 14h2M18 8h2M16 6v2"/>
+    <g>
+      <path d="M12 3v2M10 5h2M6 12v2M4 14h2M18 12v2M16 14h2M12 19v2M10 21h2M19 8v2M17 10h2M5 8v2M3 10h2"/>
+    </g>
+  ),
+  'rainbow': (
+    <g>
+      <path d="M22 17c0 5.523-4.477 10-10 10S2 22.523 2 17"/>
+      <path d="M6 17c0 3.314 2.686 6 6 6s6-2.686 6-6"/>
+      <path d="M10 17c0 1.105.895 2 2 2s2-.895 2-2"/>
+    </g>
+  ),
+  'Layers': (
+    <g>
+      <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+      <polyline points="2 17 12 22 22 17"/>
+      <polyline points="2 12 12 17 22 12"/>
+    </g>
+  ),
+  'layers': (
+    <g>
+      <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+      <polyline points="2 17 12 22 22 17"/>
+      <polyline points="2 12 12 17 22 12"/>
+    </g>
+  ),
+  'Rainbow': (
+    <g>
+      <path d="M22 17a10 10 0 0 0-20 0"/>
+      <path d="M6 17a6 6 0 0 0 12 0"/>
+      <path d="M10 17a2 2 0 0 0 4 0"/>
+    </g>
   ),
   'scissors': (
     <path d="M6 9l6 6 6-6M6 9L12 15M6 9L12 15"/>
@@ -387,6 +417,7 @@ const Icon = React.forwardRef(({
   name,
   size = 'default',
   color = 'default',
+  variant = 'multicolor', // 'multicolor' | 'monochrome'
   className = '',
   style = {},
   ...props
@@ -415,7 +446,7 @@ const Icon = React.forwardRef(({
     black: 'black'
   };
 
-  const iconColor = colorMap[color] || colorMap.default;
+  const iconColor = color === 'accent' ? 'var(--accent)' : (colorMap[color] || colorMap.default);
 
   // Get the icon SVG
   const iconPath = ICONS[name] || ICONS['questionmark'];
@@ -429,12 +460,32 @@ const Icon = React.forwardRef(({
     ...style
   };
 
+  const baseProps = {
+    ref,
+    className: `mac-icon ${className}`,
+    style: iconStyles,
+    viewBox: '0 0 24 24'
+  };
+
+  if (variant === 'monochrome') {
+    return (
+      <svg
+        {...baseProps}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {iconPath}
+      </svg>
+    );
+  }
+
+  // multicolor: apply accent to primary path and subtle secondary tone
   return (
     <svg
-      ref={ref}
-      className={`mac-icon ${className}`}
-      style={iconStyles}
-      viewBox="0 0 24 24"
+      {...baseProps}
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
@@ -442,7 +493,9 @@ const Icon = React.forwardRef(({
       strokeLinejoin="round"
       {...props}
     >
-      {iconPath}
+      <g style={{ color: iconColor }}>
+        {iconPath}
+      </g>
     </svg>
   );
 });

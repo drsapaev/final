@@ -39,8 +39,8 @@ import SkinAnalysis from '../components/dermatology/SkinAnalysis';
 import PriceOverrideManager from '../components/dermatology/PriceOverrideManager';
 import PrescriptionSystem from '../components/PrescriptionSystem';
 import VisitTimeline from '../components/VisitTimeline';
-import QueueIntegration from '../components/QueueIntegration';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
+import { queueService } from '../services/queue';
 
 /**
  * Унифицированная панель дерматолога
@@ -55,7 +55,7 @@ const DermatologistPanelUnified = () => {
   // Синхронизация активной вкладки с URL
   const getActiveTabFromURL = () => {
     const params = new URLSearchParams(location.search);
-    return params.get('tab') || 'queue';
+    return params.get('tab') || 'appointments';
   };
   
   const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
@@ -89,6 +89,7 @@ const DermatologistPanelUnified = () => {
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
+  const [services, setServices] = useState({});
 
   // Специализированные данные дерматолога
   const [skinExamination, setSkinExamination] = useState({
@@ -168,7 +169,28 @@ const DermatologistPanelUnified = () => {
     loadPatients();
     loadSkinExaminations();
     loadCosmeticProcedures();
+    loadServices();
   }, []);
+
+  // Загрузка услуг для правильного отображения в tooltips
+  const loadServices = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const servicesData = data.services_by_group || {};
+        setServices(servicesData);
+        console.log('[Dermatology] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+      }
+    } catch (error) {
+      console.error('[Dermatology] Ошибка загрузки услуг:', error);
+    }
+  };
 
   useEffect(() => {
     if (selectedPatient) {
@@ -204,26 +226,30 @@ const DermatologistPanelUnified = () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.log('Нет токена аутентификации');
+        console.log('[Dermatology] Нет токена аутентификации');
         setAppointmentsLoading(false);
         return;
       }
-      
-      // Загружаем ВСЕ очереди для получения полной картины услуг пациентов
-      const response = await fetch('http://localhost:8000/api/v1/registrar/queues/today', {
+
+      // Используем комбинированный подход: получаем данные из queues для услуг и из БД для payment_status
+      const today = new Date().toISOString().split('T')[0];
+      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+
+      // 1. Получаем очереди для информации об услугах
+      const queuesResponse = await fetch(`${API_BASE}/api/v1/registrar/queues/today`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
-        let allAppointments = [];
-        if (data && data.queues && Array.isArray(data.queues)) {
-          data.queues.forEach(queue => {
+
+      let allAppointments = [];
+      if (queuesResponse.ok) {
+        const queuesData = await queuesResponse.json();
+
+        // Собираем записи из очередей
+        if (queuesData && queuesData.queues && Array.isArray(queuesData.queues)) {
+          queuesData.queues.forEach(queue => {
             if (queue.entries) {
               queue.entries.forEach(entry => {
                 allAppointments.push({
@@ -238,39 +264,87 @@ const DermatologistPanelUnified = () => {
                   services: entry.services || [],
                   service_codes: entry.service_codes || [],
                   payment_type: entry.payment_status || 'Не оплачено',
-                  payment_status: entry.payment_status || 'pending',
+                  payment_status: entry.payment_status || (entry.discount_mode === 'paid' ? 'paid' : 'pending'), // ✅ ИСПРАВЛЕНО: берем из entry
                   doctor: entry.doctor_name || 'Врач',
                   specialty: queue.specialty,
                   created_at: entry.created_at,
-                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                  appointment_date: entry.created_at ? entry.created_at.split('T')[0] : today,
                   appointment_time: entry.visit_time || '09:00',
                   status: entry.status || 'waiting',
-                  cost: entry.cost || 0
+                  cost: entry.cost || 0,
+                  visit_id: entry.visit_id || entry.id
                 });
               });
             }
           });
         }
-
-        // Фильтруем только дерматологические записи для отображения
-        const appointmentsData = allAppointments.filter(apt => 
-          apt.specialty === 'derma' || apt.specialty === 'dermatology'
-        );
-
-        // Добавляем информацию о всех услугах пациента в каждую запись
-        const enrichedAppointmentsData = appointmentsData.map(apt => {
-          const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
-          return {
-            ...apt,
-            all_patient_services: allPatientServices.services,
-            all_patient_service_codes: allPatientServices.service_codes
-          };
-        });
-        
-        setAppointments(enrichedAppointmentsData);
       }
+
+      // 2. Получаем актуальный payment_status из БД через all-appointments
+      try {
+        const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (appointmentsResponse.ok) {
+          const appointmentsDBResponse = await appointmentsResponse.json();
+          const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+          console.log('[Dermatology] Получены appointments из БД:', appointmentsDBData.length);
+
+          // Создаем карту id -> payment_status
+          const paymentStatusMap = new Map();
+          appointmentsDBData.forEach(apt => {
+            if (apt.id) {
+              paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
+            }
+            if (apt.patient_id && apt.appointment_date) {
+              const key = `${apt.patient_id}_${apt.appointment_date}`;
+              paymentStatusMap.set(key, apt.payment_status || 'pending');
+            }
+          });
+
+          // Обновляем payment_status в наших записях
+          allAppointments = allAppointments.map(apt => {
+            let paymentStatus = paymentStatusMap.get(apt.id);
+            if (!paymentStatus && apt.patient_id && apt.appointment_date) {
+              const key = `${apt.patient_id}_${apt.appointment_date}`;
+              paymentStatus = paymentStatusMap.get(key);
+            }
+            return {
+              ...apt,
+              payment_status: paymentStatus || apt.payment_status || 'pending',
+              payment_type: paymentStatus || apt.payment_type
+            };
+          });
+
+          console.log('[Dermatology] Обновлены payment_status для', allAppointments.length, 'записей');
+        }
+      } catch (err) {
+        console.warn('[Dermatology] Не удалось загрузить payment_status из БД:', err);
+      }
+
+      // Фильтруем только дерматологические записи
+      const appointmentsData = allAppointments.filter(apt =>
+        apt.specialty === 'derma' || apt.specialty === 'dermatology'
+      );
+
+      // Добавляем информацию о всех услугах пациента
+      const enrichedAppointmentsData = appointmentsData.map(apt => {
+        const allPatientServices = getAllPatientServices(apt.patient_id, allAppointments);
+        return {
+          ...apt,
+          all_patient_services: allPatientServices.services,
+          all_patient_service_codes: allPatientServices.service_codes
+        };
+      });
+
+      setAppointments(enrichedAppointmentsData);
+      console.log('[Dermatology] Загружено записей:', enrichedAppointmentsData.length);
     } catch (error) {
-      console.error('Ошибка загрузки записей дерматолога:', error);
+      console.error('[Dermatology] Ошибка загрузки записей:', error);
     } finally {
       setAppointmentsLoading(false);
     }
@@ -281,6 +355,19 @@ const DermatologistPanelUnified = () => {
     if (activeTab === 'appointments') {
       loadDermatologyAppointments();
     }
+    
+    // Слушаем глобальные события обновления очереди
+    const handleQueueUpdate = (event) => {
+      console.log('[Dermatology] Получено событие обновления очереди:', event.detail);
+      if (activeTab === 'appointments') {
+        loadDermatologyAppointments();
+      }
+    };
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    
+    return () => {
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+    };
   }, [activeTab]);
 
   // Обработчики для таблицы записей
@@ -301,13 +388,63 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = (action, row, event) => {
-    console.log('Действие с записью:', action, row);
+  const handleAppointmentActionClick = async (action, row, event) => {
+    console.log('[Dermatology] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
-    
+
     switch (action) {
       case 'view':
         handleAppointmentRowClick(row);
+        break;
+      case 'call':
+        // Вызвать пациента
+        try {
+          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
+          const token = localStorage.getItem('auth_token');
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            console.log('[Dermatology] Пациент вызван:', row.patient_fio);
+            setAppointments(prev => prev.map(a =>
+              a.id === row.id ? { ...a, status: 'called' } : a
+            ));
+            await loadDermatologyAppointments();
+          }
+        } catch (error) {
+          console.error('[Dermatology] Ошибка вызова пациента:', error);
+        }
+        break;
+      case 'payment':
+        console.log('[Dermatology] Открытие окна оплаты для:', row.patient_fio);
+        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        break;
+      case 'print':
+        console.log('[Dermatology] Печать талона для:', row.patient_fio);
+        window.print();
+        break;
+      case 'complete':
+        // Завершить приём
+        try {
+          const patient = {
+            id: row.id,
+            patient_name: row.patient_fio,
+            phone: row.patient_phone,
+            number: row.id,
+            source: 'appointments',
+            status: 'in_cabinet'
+          };
+          console.log('[Dermatology] Завершение приёма для:', patient.patient_name);
+          setSelectedPatient(patient);
+          handleTabChange('visit');
+        } catch (error) {
+          console.error('[Dermatology] Ошибка при завершении приёма:', error);
+        }
         break;
       case 'edit':
         // Логика редактирования записи
@@ -482,33 +619,7 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  const completeVisit = async () => {
-    try {
-      const response = await fetch(`/api/v1/appointments/${currentAppointment.id}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        const completedAppointment = await response.json();
-        setCurrentAppointment(completedAppointment);
-        setMessage({ type: 'success', text: 'Прием завершен успешно!' });
-        // Сброс состояния
-        setCurrentAppointment(null);
-        setEmr(null);
-        setPrescription(null);
-      } else {
-        const error = await response.json();
-        setMessage({ type: 'error', text: error.detail || 'Ошибка при завершении приема' });
-      }
-    } catch (error) {
-      console.error('DermatologistPanel: Complete visit error:', error);
-      setMessage({ type: 'error', text: 'Ошибка при завершении приема' });
-    }
-  };
+  // УДАЛЕНО: старая функция completeVisit заменена на унифицированную handleSaveVisit
 
   // Обработка выбора пациента из очереди
   const handlePatientSelect = (patient) => {
@@ -528,48 +639,68 @@ const DermatologistPanelUnified = () => {
     }
   };
 
-  // Обработка сохранения визита
+  // Унифицированная обработка сохранения визита
   const handleSaveVisit = async () => {
-    if (!selectedPatient) return;
+    // Определяем ID записи: приоритет selectedPatient, потом currentAppointment
+    const entryId = selectedPatient?.id || currentAppointment?.id;
+    if (!entryId) {
+      console.error('[Dermatology] handleSaveVisit: нет entryId');
+      setMessage({ type: 'error', text: 'Не выбран пациент для завершения приема' });
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('[Dermatology] handleSaveVisit: start', { entryId, selectedPatient, currentAppointment });
+      
+      // Определяем patient_id из доступных источников
+      const patientId = selectedPatient?.patient?.id 
+        || selectedPatient?.patient_id 
+        || currentAppointment?.patient_id
+        || selectedPatient?.id
+        || entryId;
       
       const visitPayload = {
-        patient_id: selectedPatient.patient?.id,
+        patient_id: patientId,
         complaint: visitData.complaint,
         diagnosis: visitData.diagnosis,
         icd10: visitData.icd10,
         services: selectedServices,
         notes: visitData.notes
       };
-
-      const response = await fetch(`http://localhost:8000/api/v1/doctor/queue/${selectedPatient.id}/complete`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(visitPayload)
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Прием завершен успешно' });
-        
-        // Очищаем форму
-        setSelectedPatient(null);
-        setSelectedServices([]);
-        setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-        handleTabChange('queue');
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
+      
+      console.log('[Dermatology] handleSaveVisit: payload', visitPayload);
+      await queueService.completeVisit(entryId, visitPayload);
+      console.log('[Dermatology] handleSaveVisit: completeVisit OK');
+      
+      setMessage({ type: 'success', text: 'Прием завершен успешно' });
+      
+      // Очищаем форму и состояние
+      setSelectedPatient(null);
+      setCurrentAppointment(null);
+      setSelectedServices([]);
+      setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
+      setEmr(null);
+      setPrescription(null);
+      handleTabChange('queue');
+      
+      // Автоматически вызвать следующего пациента по дерматологии
+      try {
+        console.log('[Dermatology] callNextWaiting(derma): start');
+        const next = await queueService.callNextWaiting('derma');
+        console.log('[Dermatology] callNextWaiting(derma): result', next);
+        if (next?.success) {
+          setMessage({ type: 'success', text: `Вызван следующий пациент №${next.entry.number}` });
+        }
+      } catch (err) {
+        console.warn('[Dermatology] callNextWaiting(derma): failed', err);
       }
 
     } catch (error) {
-      console.error('Ошибка сохранения визита:', error);
-      setMessage({ type: 'error', text: error.message });
+      console.error('[Dermatology] handleSaveVisit: error', error);
+      setMessage({ type: 'error', text: error.message || 'Ошибка при завершении приема' });
     } finally {
+      console.log('[Dermatology] handleSaveVisit: finish');
       setLoading(false);
     }
   };
@@ -707,62 +838,6 @@ const DermatologistPanelUnified = () => {
 
       {/* Контент вкладок */}
       <div>
-        {/* Очередь пациентов */}
-        {activeTab === 'queue' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <MacOSCard style={{ padding: '24px' }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                marginBottom: '20px',
-                color: 'var(--mac-text-primary)',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif',
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                <Users size={20} style={{ marginRight: '8px', color: 'var(--mac-blue-500)' }} />
-                Очередь пациентов
-              </h3>
-              <QueueIntegration
-                specialist="Дерматолог"
-                onPatientSelect={(patient) => {
-                  const appointment = {
-                    id: patient.id,
-                    patient_id: patient.id,
-                    patient_name: patient.patient_name,
-                    status: patient.status || 'in_cabinet'
-                  };
-                  setCurrentAppointment(appointment);
-                  handleTabChange('visit');
-                }}
-                onStartVisit={(patient) => {
-                  // Если есть appointment_id, используем его; иначе создаем объект appointment
-                  if (patient.appointment_id) {
-                    const appointment = {
-                      id: patient.appointment_id,
-                      patient_id: patient.patient_id || patient.id,
-                      patient_name: patient.patient_name,
-                      status: patient.status || 'in_cabinet'
-                    };
-                    startVisit(appointment);
-                  } else {
-                    // Если нет appointment_id, просто показываем пациента
-                    setSelectedPatient({
-                      id: patient.id,
-                      patient_name: patient.patient_name,
-                      patient_id: patient.patient_id || patient.id,
-                      status: patient.status,
-                      source: 'queue'
-                    });
-                    setCurrentAppointment(null);
-                    handleTabChange('visit');
-                  }
-                }}
-              />
-            </MacOSCard>
-          </div>
-        )}
-
         {/* Записи дерматолога */}
         {activeTab === 'appointments' && (
           <div style={{ 
@@ -794,10 +869,17 @@ const DermatologistPanelUnified = () => {
                   Записи к дерматологу
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MacOSBadge variant="info">
-                    Всего: {appointments.length}
+                  <MacOSBadge variant="info">Всего: {appointments.length}</MacOSBadge>
+                  <MacOSBadge variant="warning">
+                    Ожидают: {appointments.filter(a => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
                   </MacOSBadge>
-                  <MacOSButton 
+                  <MacOSBadge variant="primary">
+                    Вызваны: {appointments.filter(a => a.status === 'called' || a.status === 'in_progress').length}
+                  </MacOSBadge>
+                  <MacOSBadge variant="success">
+                    Приняты: {appointments.filter(a => a.status === 'completed' || a.status === 'done').length}
+                  </MacOSBadge>
+                  <MacOSButton
                     variant="outline"
                     onClick={loadDermatologyAppointments}
                     disabled={appointmentsLoading}
@@ -816,7 +898,7 @@ const DermatologistPanelUnified = () => {
                 language="ru"
                 selectedRows={new Set()}
                 outerBorder={false}
-                services={{}}
+                services={services}
                 showCheckboxes={false}
                 view="doctor"
                 onRowSelect={() => {}}
@@ -1019,7 +1101,8 @@ const DermatologistPanelUnified = () => {
               {emr && !emr.is_draft && (
                 <div style={{ marginTop: '24px', textAlign: 'center' }}>
                   <MacOSButton
-                    onClick={completeVisit}
+                    onClick={handleSaveVisit}
+                    disabled={loading}
                     style={{ 
                       backgroundColor: 'var(--mac-green-500)',
                       color: 'white',
@@ -1031,8 +1114,12 @@ const DermatologistPanelUnified = () => {
                       margin: '0 auto'
                     }}
                   >
-                    <CheckCircle size={20} />
-                    Завершить прием
+                    {loading ? (
+                      <RefreshCw size={20} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={20} />
+                    )}
+                    {loading ? 'Завершение...' : 'Завершить прием'}
                   </MacOSButton>
                 </div>
               )}
@@ -1254,27 +1341,17 @@ const DermatologistPanelUnified = () => {
                 >
                   Отменить
                 </MacOSButton>
-                {currentAppointment && emr && !emr.is_draft ? (
-                  <MacOSButton
-                    onClick={completeVisit}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle size={16} className="mr-2" />
-                    Завершить прием
-                  </MacOSButton>
-                ) : (
-                  <MacOSButton
-                    onClick={handleSaveVisit}
-                    disabled={loading || !visitData.complaint}
-                  >
-                    {loading ? (
-                      <RefreshCw size={16} className="animate-spin mr-2" />
-                    ) : (
-                      <Save size={16} className="mr-2" />
-                    )}
-                    Завершить прием
-                  </MacOSButton>
-                )}
+                <MacOSButton
+                  onClick={handleSaveVisit}
+                  disabled={loading || (!visitData.complaint && !emr)}
+                >
+                  {loading ? (
+                    <RefreshCw size={16} className="animate-spin mr-2" />
+                  ) : (
+                    <Save size={16} className="mr-2" />
+                  )}
+                  {loading ? 'Завершение...' : 'Завершить прием'}
+                </MacOSButton>
               </div>
             </MacOSCard>
           </div>

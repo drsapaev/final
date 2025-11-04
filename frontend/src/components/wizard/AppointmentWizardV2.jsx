@@ -21,6 +21,7 @@ import {
 import { toast } from 'react-toastify';
 import ModernDialog from '../dialogs/ModernDialog';
 import { MacOSInput, MacOSButton, MacOSSelect, MacOSCheckbox } from '../ui/macos';
+import { useRoleAccess } from '../common/RoleGuard';
 
 const API_BASE = '/api/v1';
 
@@ -53,6 +54,10 @@ const AppointmentWizardV2 = ({
   isProcessing = false,
   setIsProcessing = () => {} // Дефолтная функция-заглушка
 }) => {
+  // Проверка прав доступа
+  const { hasRole } = useRoleAccess();
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
+  
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(1);
   
@@ -220,8 +225,23 @@ const AppointmentWizardV2 = ({
       if (response.ok) {
         const data = await response.json();
         
+        // ✅ Формируем fio из отдельных полей, если его нет
+        const patientsWithFio = data.map(patient => {
+          if (!patient.fio && (patient.last_name || patient.first_name)) {
+            const parts = [
+              patient.last_name || '',
+              patient.first_name || '',
+              patient.middle_name || ''
+            ].filter(p => p);
+            patient.fio = parts.join(' ').trim() || 'Без имени';
+          } else if (!patient.fio) {
+            patient.fio = 'Без имени';
+          }
+          return patient;
+        });
+        
         // Сортировка по приоритету: телефон > точное ФИО > частичное ФИО
-        const sorted = data.sort((a, b) => {
+        const sorted = patientsWithFio.sort((a, b) => {
           const queryLower = (query || '').toLowerCase();
           const aPhone = a?.phone || '';
           const bPhone = b?.phone || '';
@@ -267,17 +287,30 @@ const AppointmentWizardV2 = ({
   };
   
   const selectPatient = (patient) => {
-    // Парсинг ФИО
-    const nameParts = patient.fio.trim().split(' ');
-    const lastName = nameParts[0] || '';
-    const firstName = nameParts[1] || '';
-    const middleName = nameParts.slice(2).join(' ') || '';
+    // ✅ БЕЗОПАСНО: Формируем fio из отдельных полей, если его нет
+    let patientFio = patient.fio;
+    if (!patientFio && (patient.last_name || patient.first_name)) {
+      const parts = [
+        patient.last_name || '',
+        patient.first_name || '',
+        patient.middle_name || ''
+      ].filter(p => p);
+      patientFio = parts.join(' ').trim() || 'Без имени';
+    } else if (!patientFio) {
+      patientFio = 'Без имени';
+    }
+    
+    // Парсинг ФИО (безопасно)
+    const nameParts = (patientFio || '').trim().split(/\s+/).filter(p => p.length > 0);
+    const lastName = nameParts[0] || patient.last_name || '';
+    const firstName = nameParts[1] || patient.first_name || '';
+    const middleName = nameParts.slice(2).join(' ') || patient.middle_name || '';
     
     setWizardData(prev => ({
       ...prev,
       patient: {
         id: patient.id,
-        fio: patient.fio,
+        fio: patientFio,
         birth_date: patient.birth_date || '',
         phone: patient.phone || '',
         address: patient.address || '',
@@ -617,15 +650,55 @@ const AppointmentWizardV2 = ({
       // Если пациент новый, сначала создаём его
       if (!wizardData.patient.id) {
         // Разбиваем ФИО на отдельные поля
-        const fioParts = wizardData.patient.fio.trim().split(' ');
-        const lastName = fioParts[0] || '';
-        const firstName = fioParts[1] || '';
-        const middleName = fioParts.slice(2).join(' ') || null;
+        const fioParts = wizardData.patient.fio.trim().split(/\s+/).filter(part => part.length > 0);
+        
+        // ✅ УЛУЧШЕНО: Правильное разделение ФИО
+        // Если только одно слово - это фамилия, имя будет пустым (но мы используем фамилию как имя)
+        // Если два слова - фамилия и имя
+        // Если три и более - фамилия, имя, отчество
+        let lastName = '';
+        let firstName = '';
+        let middleName = null;
+        
+        if (fioParts.length === 1) {
+          // Только фамилия или одно слово - используем как фамилию и имя
+          lastName = fioParts[0];
+          firstName = fioParts[0]; // Дублируем для обязательного поля
+        } else if (fioParts.length >= 2) {
+          lastName = fioParts[0];
+          firstName = fioParts[1];
+          if (fioParts.length > 2) {
+            middleName = fioParts.slice(2).join(' ');
+          }
+        } else {
+          // Пустое ФИО - это ошибка валидации
+          throw new Error('ФИО пациента обязательно для заполнения');
+        }
+        
+        // Валидация обязательных полей
+        if (!lastName || !firstName) {
+          throw new Error('ФИО пациента должно содержать минимум фамилию и имя');
+        }
         
         const token = localStorage.getItem('auth_token');
         console.log('🔑 Токен для создания пациента:', token ? `${token.substring(0, 20)}...` : 'НЕТ ТОКЕНА');
-        console.log('🔍 Полный токен:', token);
         console.log('📊 Длина токена:', token ? token.length : 0);
+        
+        // Подготовка данных пациента
+        const patientData = {
+          last_name: lastName,
+          first_name: firstName,
+          middle_name: middleName,
+          phone: wizardData.patient.phone || null,
+          address: wizardData.patient.address || null
+        };
+        
+        // Добавляем дату рождения только если она есть
+        if (wizardData.patient.birth_date) {
+          patientData.birth_date = wizardData.patient.birth_date;
+        }
+        
+        console.log('📋 Данные для создания пациента:', patientData);
         
         const patientResponse = await fetch(`${API_BASE}/patients/`, {
           method: 'POST',
@@ -633,39 +706,51 @@ const AppointmentWizardV2 = ({
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json' 
           },
-          body: JSON.stringify({
-            last_name: lastName,
-            first_name: firstName,
-            middle_name: middleName,
-            birth_date: wizardData.patient.birth_date || null,  // ✅ Отправляем null вместо пустой строки
-            phone: wizardData.patient.phone,
-            address: wizardData.patient.address
-          })
+          body: JSON.stringify(patientData)
         });
         
         if (patientResponse.ok) {
           const patient = await patientResponse.json();
           cartData.patient_id = patient.id;
+          console.log('✅ Пациент создан успешно:', patient.id);
         } else if (patientResponse.status === 400) {
-          // Пациент уже существует, попробуем найти его по номеру телефона
-          console.log('⚠️ Пациент уже существует, ищем по номеру телефона...');
-          const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
-            headers: { 
-              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-              'Content-Type': 'application/json' 
-            }
-          });
+          // Получаем детальную информацию об ошибке
+          let errorDetail = 'Пациент с таким номером телефона уже существует';
+          try {
+            const errorData = await patientResponse.json();
+            errorDetail = errorData.detail || errorDetail;
+            console.log('⚠️ Ошибка 400 при создании пациента:', errorDetail);
+          } catch (e) {
+            const errorText = await patientResponse.text();
+            console.log('⚠️ Текст ошибки создания пациента:', errorText);
+            errorDetail = errorText || errorDetail;
+          }
           
-          if (searchResponse.ok) {
-            const patients = await searchResponse.json();
-            if (patients.length > 0) {
-              cartData.patient_id = patients[0].id;
-              console.log('✅ Найден существующий пациент:', patients[0].id);
+          // Пациент уже существует или другая ошибка валидации - ищем по номеру телефона
+          if (wizardData.patient.phone) {
+            console.log('⚠️ Ищем существующего пациента по номеру телефона...');
+            const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
+              headers: { 
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                'Content-Type': 'application/json' 
+              }
+            });
+            
+            if (searchResponse.ok) {
+              const patients = await searchResponse.json();
+              if (patients.length > 0) {
+                cartData.patient_id = patients[0].id;
+                console.log('✅ Найден существующий пациент:', patients[0].id);
+              } else {
+                // Пациент не найден - возможно, ошибка валидации данных
+                throw new Error(`Ошибка создания пациента: ${errorDetail}`);
+              }
             } else {
-              throw new Error('Пациент не найден по номеру телефона');
+              throw new Error('Ошибка поиска пациента');
             }
           } else {
-            throw new Error('Ошибка поиска пациента');
+            // Нет телефона и ошибка создания - это проблема валидации
+            throw new Error(`Ошибка валидации данных пациента: ${errorDetail}`);
           }
         } else {
           const errorText = await patientResponse.text();
@@ -697,20 +782,44 @@ const AppointmentWizardV2 = ({
       } else {
         // Получаем детальную информацию об ошибке
         let errorMessage = `Ошибка создания записи (${cartResponse.status})`;
+        let isPermissionError = false;
 
         try {
           const errorData = await cartResponse.json();
           console.error('❌ Детали ошибки создания корзины:', errorData);
           errorMessage = errorData.detail || errorMessage;
+          
+          // Проверяем, является ли это ошибкой прав доступа
+          if (cartResponse.status === 403) {
+            isPermissionError = true;
+            if (errorMessage.includes('Not enough permissions')) {
+              errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
+            }
+          }
         } catch (parseError) {
           const errorText = await cartResponse.text();
           console.error('❌ Текст ошибки создания корзины:', errorText);
           errorMessage = errorText || errorMessage;
+          
+          if (cartResponse.status === 403) {
+            isPermissionError = true;
+            errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
+          }
         }
 
         console.error('❌ Ошибка создания корзины:', cartResponse.status, errorMessage);
-        toast.error(`Ошибка создания записи: ${errorMessage}`);
-        return; // ❌ НЕ закрываем мастер при ошибке создания
+        
+        if (isPermissionError) {
+          toast.error(errorMessage, { 
+            duration: 5000,
+            style: { backgroundColor: '#fee', border: '1px solid #fcc' }
+          });
+          // Закрываем мастер при ошибке прав доступа
+          onClose();
+        } else {
+          toast.error(`Ошибка создания записи: ${errorMessage}`);
+        }
+        return; // ❌ НЕ закрываем мастер при других ошибках
       }
     } catch (error) {
       console.error('Ошибка завершения мастера:', error);
@@ -819,6 +928,54 @@ const AppointmentWizardV2 = ({
   ].filter(Boolean);
   
   // ===================== ОБРАБОТЧИКИ ОНЛАЙН ОПЛАТЫ УБРАНЫ =====================
+
+  // Проверка прав доступа перед рендерингом
+  if (!hasRegistrarAccess) {
+    return (
+      <ModernDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Доступ запрещен"
+        maxWidth="40rem"
+      >
+        <div style={{
+          padding: 'var(--mac-spacing-6)',
+          textAlign: 'center'
+        }}>
+          <AlertCircle 
+            size={48} 
+            style={{ 
+              color: 'var(--mac-danger)', 
+              marginBottom: 'var(--mac-spacing-4)' 
+            }} 
+          />
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            marginBottom: 'var(--mac-spacing-3)',
+            color: 'var(--mac-text-primary)'
+          }}>
+            Недостаточно прав доступа
+          </h3>
+          <p style={{
+            fontSize: 'var(--mac-font-size-md)',
+            color: 'var(--mac-text-secondary)',
+            marginBottom: 'var(--mac-spacing-4)',
+            lineHeight: 1.6
+          }}>
+            Для создания записей пациентов необходима роль Регистратора или Администратора.
+          </p>
+          <MacOSButton
+            onClick={onClose}
+            variant="primary"
+            style={{ marginTop: 'var(--mac-spacing-4)' }}
+          >
+            Закрыть
+          </MacOSButton>
+        </div>
+      </ModernDialog>
+    );
+  }
 
   return (
     <>

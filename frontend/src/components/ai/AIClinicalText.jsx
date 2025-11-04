@@ -4,7 +4,9 @@ import {
   Typography,
   Badge,
   Alert,
+  Paper,
 } from '../ui/macos';
+import { Divider } from '../ui/macos/List';
 import {
   Hospital,
   Info,
@@ -88,19 +90,21 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
           <Alert 
             key={idx} 
             severity="success" 
-            icon={<Hospital />}
-            sx={{ my: 1 }}
+            style={{ marginTop: '8px', marginBottom: '8px' }}
           >
-            <Typography variant="body1" fontWeight="bold">
-              {item.content}
-            </Typography>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Hospital size={18} />
+              <Typography variant="body1" style={{ fontWeight: 'bold' }}>
+                {item.content}
+              </Typography>
+            </div>
           </Alert>
         );
 
       case 'subheading':
         return (
-          <Box key={idx} sx={{ mt: 2, mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold" color="primary">
+          <Box key={idx} mt={2} mb={1}>
+            <Typography variant="subtitle1" style={{ fontWeight: 'bold', color: 'var(--mac-accent-blue)' }}>
               {item.content}
             </Typography>
           </Box>
@@ -108,8 +112,8 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
 
       case 'list':
         return (
-          <Box key={idx} display="flex" alignItems="flex-start" gap={1} ml={2} my={0.5}>
-            <CheckCircle fontSize="small" color="success" sx={{ mt: 0.5 }} />
+          <Box key={idx} display="flex" alignItems="flex-start" gap={1} style={{ marginLeft: '16px', marginTop: '4px', marginBottom: '4px' }}>
+            <CheckCircle size={16} style={{ marginTop: '4px', color: 'var(--mac-success)' }} />
             <Typography variant="body2">{item.content}</Typography>
           </Box>
         );
@@ -130,9 +134,9 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
         // Обнаруживаем "Когда использовать:"
         if (item.content.startsWith('Когда использовать:')) {
           return (
-            <Box key={idx} sx={{ ml: 2, mb: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                <Info fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+            <Box key={idx} style={{ marginLeft: '16px', marginBottom: '8px' }}>
+              <Typography variant="body2" style={{ color: 'var(--mac-text-secondary)' }}>
+                <Info size={16} style={{ verticalAlign: 'middle', marginRight: '4px', display: 'inline-block' }} />
                 {item.content}
               </Typography>
             </Box>
@@ -142,8 +146,8 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
         // Обнаруживаем "Формулировка:"
         if (item.content.startsWith('Формулировка:')) {
           return (
-            <Paper key={idx} variant="outlined" sx={{ p: 1.5, ml: 2, mb: 1, bgcolor: 'action.hover' }}>
-              <Typography variant="body2" fontStyle="italic">
+            <Paper key={idx} variant="outlined" style={{ padding: '12px', marginLeft: '16px', marginBottom: '8px', backgroundColor: 'var(--mac-bg-secondary)' }}>
+              <Typography variant="body2" style={{ fontStyle: 'italic' }}>
                 {item.content.replace('Формулировка:', '').trim()}
               </Typography>
             </Paper>
@@ -157,30 +161,29 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
         );
 
       case 'break':
-        return <Divider key={idx} sx={{ my: 2 }} />;
+        return <Divider key={idx} style={{ marginTop: '16px', marginBottom: '16px' }} />;
 
       default:
         return null;
     }
   };
 
-  const getVariantColor = () => {
-    switch (variant) {
-      case 'success': return 'success.light';
-      case 'warning': return 'warning.light';
-      case 'error': return 'error.light';
-      default: return 'info.light';
-    }
-  };
+
+  const variantBgColor = {
+    'success': 'var(--mac-success)',
+    'warning': 'var(--mac-warning)', 
+    'error': 'var(--mac-error)',
+    'info': 'var(--mac-info)'
+  }[variant] || 'var(--mac-bg-primary)';
 
   return (
     <Paper 
       elevation={0} 
-      sx={{ 
-        p: 3, 
-        bgcolor: getVariantColor(),
-        border: 1,
-        borderColor: 'divider'
+      style={{ 
+        padding: '24px', 
+        backgroundColor: variantBgColor,
+        border: '1px solid var(--mac-border)',
+        borderRadius: '8px'
       }}
     >
       {sections.map((section, sectionIdx) => (
@@ -188,7 +191,7 @@ const AIClinicalText = ({ content, variant = 'info' }) => {
           {/* Заголовок секции */}
           {section.type === 'heading' && (
             <Box mb={2}>
-              <Typography variant="h6" fontWeight="bold" gutterBottom>
+              <Typography variant="h6" style={{ fontWeight: 'bold', marginBottom: '8px' }}>
                 {section.content}
               </Typography>
               <Divider />

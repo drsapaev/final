@@ -309,8 +309,11 @@ def require_roles(*roles: str) -> Callable[..., Any]:
         roles_lower = [str(r).lower() for r in roles]
 
         if role_lower not in roles_lower:
+            # Логирование для диагностики
+            print(f"[require_roles] Access denied - User: {current_user.username}, Role: '{role}' (lower: '{role_lower}'), Required: {roles} (lower: {roles_lower})")
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail=f"Not enough permissions. User role: '{role}', Required roles: {roles}"
             )
         return current_user
 

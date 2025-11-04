@@ -19,61 +19,137 @@ const QueueIntegration = ({ specialist = 'Дерматолог', onPatientSelect
 
   useEffect(() => {
     loadQueue();
-    // Обновляем очередь каждые 30 секунд
-    const interval = setInterval(loadQueue, 30000);
-    return () => clearInterval(interval);
+    // Обновляем очередь каждые 15 секунд для лучшей синхронизации
+    const interval = setInterval(loadQueue, 15000);
+    
+    // Слушаем глобальные события обновления очереди
+    const handleQueueUpdate = (event) => {
+      console.log('[QueueIntegration] Получено событие обновления очереди:', event.detail);
+      const { action } = event.detail || {};
+      
+      // Для завершения приёма добавляем задержку для гарантии синхронизации с бэкендом
+      if (action === 'visitCompleted') {
+        console.log('[QueueIntegration] Обновление очереди после завершения приёма с задержкой');
+        setTimeout(() => {
+          loadQueue();
+        }, 800); // Увеличиваем задержку для гарантии синхронизации
+      } else {
+        // Для других действий обновляем немедленно
+        loadQueue();
+      }
+    };
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+    };
   }, [specialist]);
 
   const loadQueue = async () => {
     setLoading(true);
     try {
+      console.log('[QueueIntegration] loadQueue: start', { specialist });
       // Используем новый API endpoint для получения всех очередей
       const apiUrl = 'http://localhost:8000/api/v1/registrar/queues/today';
+      const token = localStorage.getItem('auth_token');
+
+      if (!token) {
+        console.warn('[QueueIntegration] loadQueue: нет токена авторизации');
+        setLoading(false);
+        return;
+      }
 
       const response = await fetch(apiUrl, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[QueueIntegration] loadQueue: HTTP error', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Ошибка загрузки очереди: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('[QueueIntegration] loadQueue: данные получены', { queuesCount: data?.queues?.length || 0 });
+      
+      // Обрабатываем новую структуру API с массивами очередей
+      let queueEntries = [];
+      if (data && data.queues && Array.isArray(data.queues)) {
+        // Находим очередь для текущего специалиста
+        const specialistQueue = data.queues.find(queue => {
+          const queueSpecialty = queue.specialty;
+          if (specialist === 'Дерматолог') {
+            return queueSpecialty === 'derma' || queueSpecialty === 'dermatology';
+          } else if (specialist === 'Кардиолог') {
+            return queueSpecialty === 'cardio' || queueSpecialty === 'cardiology';
+          } else if (specialist === 'Стоматолог') {
+            return queueSpecialty === 'dental' || queueSpecialty === 'dentist' || queueSpecialty === 'dentistry';
+          } else if (specialist === 'Лаборатория') {
+            return queueSpecialty === 'lab' || queueSpecialty === 'laboratory';
+          }
+          return false;
+        });
         
-        // Обрабатываем новую структуру API с массивами очередей
-        let queueEntries = [];
-        if (data && data.queues && Array.isArray(data.queues)) {
-          // Находим очередь для текущего специалиста
-          const specialistQueue = data.queues.find(queue => {
-            const queueSpecialty = queue.specialty;
-            if (specialist === 'Дерматолог') {
-              return queueSpecialty === 'derma' || queueSpecialty === 'dermatology';
-            } else if (specialist === 'Кардиолог') {
-              return queueSpecialty === 'cardio' || queueSpecialty === 'cardiology';
-            } else if (specialist === 'Стоматолог') {
-              return queueSpecialty === 'dental' || queueSpecialty === 'dentist' || queueSpecialty === 'dentistry';
-            }
-            return false;
+        if (specialistQueue && specialistQueue.entries) {
+          // Дедупликация записей: один пациент может иметь несколько визитов в день,
+          // но один и тот же appointment_id/record_id должен показываться только один раз
+          const seenKeys = new Set();
+          const uniqueEntries = [];
+          
+          // Сортируем записи по времени создания (самые ранние первыми)
+          const sortedEntries = [...specialistQueue.entries].sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+            const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+            return dateA - dateB;
           });
           
-          if (specialistQueue && specialistQueue.entries) {
-            queueEntries = specialistQueue.entries.map(entry => ({
+          for (const entry of sortedEntries) {
+            // Создаем уникальный ключ: patient_id + appointment_id/id + created_at (дата без времени)
+            // Это позволяет показывать несколько визитов одного пациента в день, но исключает точные дубликаты
+            const recordId = entry.appointment_id || entry.id;
+            const entryDate = entry.created_at ? entry.created_at.split('T')[0] : 'unknown';
+            const uniqueKey = `${entry.patient_id}_${recordId}_${entryDate}`;
+            
+            if (seenKeys.has(uniqueKey)) {
+              console.log('[QueueIntegration] Пропущен дубликат записи:', uniqueKey, entry.patient_name);
+              continue;
+            }
+            
+            seenKeys.add(uniqueKey);
+            uniqueEntries.push({
               id: entry.id,
               patient_name: entry.patient_name,
-              number: entry.number,
+              number: uniqueEntries.length + 1, // Переназначаем номера после дедупликации
               status: entry.status,
               created_at: entry.created_at,
-              appointment_id: entry.appointment_id,
-              patient_id: entry.patient_id
-            }));
+              appointment_id: entry.appointment_id || entry.id,
+              patient_id: entry.patient_id,
+              payment_status: entry.payment_status || (entry.discount_mode === 'paid' ? 'paid' : 'pending'),
+              discount_mode: entry.discount_mode || 'none'
+            });
           }
+          
+          queueEntries = uniqueEntries;
+          console.log('[QueueIntegration] После дедупликации:', queueEntries.length, 'уникальных записей из', sortedEntries.length, 'всего');
         }
-        
-        setQueue(queueEntries);
       }
+      
+      console.log('[QueueIntegration] loadQueue: успешно загружено', queueEntries.length, 'записей');
+      setQueue(queueEntries);
     } catch (error) {
-      console.error('QueueIntegration: Load queue error:', error);
+      console.error('[QueueIntegration] loadQueue: ошибка', error);
+      // Не показываем ошибку пользователю, так как это может быть временная проблема
     } finally {
       setLoading(false);
+      console.log('[QueueIntegration] loadQueue: finish');
     }
   };
 

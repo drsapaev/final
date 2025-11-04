@@ -387,7 +387,20 @@ const AdminPanel = () => {
   } = useSettings();
   
   // Состояние для настроек
-  const [settingsSubTab, setSettingsSubTab] = useState('general');
+  const [settingsSubTab, setSettingsSubTab] = useState(() => {
+    // Восстанавливаем вкладку из URL или localStorage
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('settingsTab');
+    if (tabFromUrl) {
+      return tabFromUrl;
+    }
+    return localStorage.getItem('settingsSubTab') || 'general';
+  });
+  
+  // Сохраняем выбранную вкладку
+  useEffect(() => {
+    localStorage.setItem('settingsSubTab', settingsSubTab);
+  }, [settingsSubTab]);
   
   // Состояние для логотипа
   const [logoFile, setLogoFile] = useState(null);
@@ -1778,7 +1791,7 @@ const AdminPanel = () => {
     </div>
   );
 
-  const renderAnalytics = () => {
+  const AnalyticsSection = () => {
     const [analyticsFilters, setAnalyticsFilters] = useState({
       period: 'week',
       department: 'all',
@@ -2124,7 +2137,7 @@ const AdminPanel = () => {
       case 'dashboard':
         return renderDashboard();
       case 'analytics':
-        return renderAnalytics();
+        return <AnalyticsSection />;
       case 'users':
         return renderUsers();
       case 'doctors':

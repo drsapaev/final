@@ -52,7 +52,8 @@
 
 .enhanced-table-row:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--mac-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.1));
+  background-color: var(--mac-bg-secondary) !important;
 }
 
 .enhanced-table-cell {
@@ -64,7 +65,7 @@
 }
 
 .enhanced-table-header:hover {
-  background-color: rgba(59, 130, 246, 0.05);
+  background-color: color-mix(in oklab, var(--mac-accent-blue), transparent 90%);
 }
 
 /* Стили для загрузчика */
@@ -84,7 +85,7 @@
 
 .action-button:hover {
   transform: scale(1.1);
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: color-mix(in oklab, var(--mac-accent-blue), transparent 85%);
 }
 
 /* Стили для статусных бейджей */
@@ -103,7 +104,7 @@
 
 .pagination-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--mac-shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.15));
 }
 
 .pagination-button:disabled {
@@ -147,13 +148,80 @@
 
 /* Стили для темной темы */
 .dark-theme .enhanced-table-row:hover {
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  box-shadow: var(--mac-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.4));
+  background-color: var(--mac-bg-secondary) !important;
+}
+
+/* Общие стили для контейнера таблицы */
+.enhanced-table {
+  background-color: var(--mac-bg-primary) !important;
+  color: var(--mac-text-primary) !important;
+}
+
+/* Общие стили для всех div внутри таблицы */
+.enhanced-table div {
+  color: var(--mac-text-primary) !important;
+}
+
+/* Панель инструментов (первый div) */
+.enhanced-table > div:first-of-type {
+  background-color: var(--mac-bg-secondary) !important;
+}
+
+/* Контейнер для прокрутки таблицы */
+.enhanced-table > div > div {
+  background-color: var(--mac-bg-primary) !important;
+}
+
+/* Пагинация */
+.enhanced-table > div:last-of-type {
+  background-color: var(--mac-bg-secondary) !important;
+}
+
+/* Общие стили для ячеек таблицы - усиленная специфичность */
+.enhanced-table table {
+  background-color: var(--mac-bg-primary) !important;
+}
+
+.enhanced-table thead {
+  background-color: var(--mac-bg-secondary) !important;
+}
+
+.enhanced-table thead tr {
+  background-color: var(--mac-bg-secondary) !important;
+}
+
+.enhanced-table thead th {
+  background-color: var(--mac-bg-secondary) !important;
+  color: var(--mac-text-primary) !important;
+}
+
+.enhanced-table tbody {
+  background-color: var(--mac-bg-primary) !important;
+}
+
+.enhanced-table tbody tr {
+  background-color: var(--mac-bg-primary) !important;
+}
+
+.enhanced-table tbody tr:nth-child(even) {
+  background-color: var(--mac-bg-secondary) !important;
+}
+
+.enhanced-table tbody td {
+  background-color: inherit !important;
+  color: var(--mac-text-primary) !important;
+}
+
+/* Контейнер для прокрутки таблицы */
+.enhanced-table > div > div[style*="overflowX"] {
+  background-color: var(--mac-bg-primary) !important;
 }
 
 .dark-theme .enhanced-table-header:hover {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: color-mix(in oklab, var(--mac-accent-blue), transparent 80%);
 }
 
 .dark-theme .action-button:hover {
-  background-color: rgba(59, 130, 246, 0.2);
+  background-color: color-mix(in oklab, var(--mac-accent-blue), transparent 70%);
 }
