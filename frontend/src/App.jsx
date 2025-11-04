@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AppProviders } from './providers/AppProviders';
 import { PWAInstallPrompt } from './components/pwa';
 import { usePWA } from './hooks/usePWA.js';
@@ -8,6 +8,90 @@ import './styles/theme.css';
 import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
+import './styles/macos.css';
+import { MacOSThemeProvider } from './theme/macosTheme';
+
+// Global color scheme initializer - синхронизировано с ColorSchemeSelector
+function initializeColorScheme() {
+  const customScheme = localStorage.getItem('customColorScheme');
+  const schemeId = localStorage.getItem('activeColorSchemeId');
+  
+  if (customScheme === 'true' && schemeId) {
+    const root = document.documentElement;
+    // Полная нормализация: убираем светлую/тёмную тему и их атрибуты
+    document.body.classList.remove('light-theme', 'dark-theme');
+    document.documentElement.removeAttribute('data-theme');
+    
+    if (schemeId === 'vibrant') {
+      // Матовые приглушённые цвета
+      root.style.setProperty('--mac-bg-primary', '#6b8db3'); /* Приглушённый синий */
+      root.style.setProperty('--mac-bg-secondary', '#7fa899'); /* Приглушённый бирюзовый */
+      root.style.setProperty('--mac-accent-blue', '#d4a063'); /* Приглушённый оранжевый */
+      root.style.setProperty('--mac-text-primary', '#ffffff');
+      root.style.setProperty('--mac-text-secondary', 'rgba(255,255,255,0.92)');
+      root.style.setProperty('--mac-gradient-window', 'linear-gradient(135deg, rgba(107, 141, 179, 0.75) 0%, rgba(127, 168, 153, 0.7) 40%, rgba(212, 160, 99, 0.65) 80%), linear-gradient(135deg, rgba(120, 130, 145, 0.3) 0%, rgba(130, 140, 150, 0.25) 100%)');
+      root.style.setProperty('--mac-gradient-sidebar', 'linear-gradient(135deg, rgba(100, 130, 165, 0.7) 0%, rgba(115, 155, 140, 0.65) 45%, rgba(200, 150, 90, 0.6) 100%), linear-gradient(135deg, rgba(130, 140, 150, 0.25) 0%, rgba(140, 150, 160, 0.2) 100%)');
+      root.style.setProperty('--bg', '#6b8db3');
+      root.style.setProperty('--mac-bg-toolbar', 'rgba(30, 35, 45, 0.4)');
+      root.style.setProperty('--mac-separator', 'rgba(255,255,255,0.22)');
+      root.style.setProperty('--mac-border', 'rgba(255,255,255,0.22)');
+      root.style.setProperty('--mac-border-secondary', 'rgba(255,255,255,0.18)');
+      root.setAttribute('data-color-scheme', 'vibrant');
+    } else if (schemeId === 'glass') {
+      // Синхронизировано с macos.css [data-color-scheme="glass"]
+      // Улучшенные значения для лучшей видимости карточек
+      root.style.setProperty('--mac-bg-primary', 'rgba(50, 55, 65, 0.75)');
+      root.style.setProperty('--mac-bg-secondary', 'rgba(60, 65, 75, 0.65)');
+      root.style.setProperty('--mac-bg-toolbar', 'rgba(50, 55, 65, 0.85)'); /* Увеличенная непрозрачность для хедера */
+      root.style.setProperty('--mac-bg-tertiary', 'rgba(70, 75, 85, 0.55)');
+      root.style.setProperty('--mac-accent-blue', 'rgba(0,122,255,0.8)');
+      root.style.setProperty('--mac-text-primary', '#f0f1f5');
+      root.style.setProperty('--mac-text-secondary', 'rgba(240,240,245,0.9)');
+      root.style.setProperty('--mac-border', 'rgba(255, 255, 255, 0.2)');
+      root.style.setProperty('--mac-border-secondary', 'rgba(255, 255, 255, 0.15)');
+      root.style.setProperty('--mac-blur-light', 'saturate(180%) blur(22px)');
+      root.style.setProperty('--surface', 'rgba(255,255,255,0.25)');
+      root.style.setProperty('--bg', '#f6f7f9');
+      // Очищаем градиент из предыдущих тем
+      root.style.setProperty('--mac-gradient-window', 'none');
+      // Для стеклянной темы задаём фон и фильтр на html и body
+      document.documentElement.style.background = 'rgba(20, 20, 25, 0.3)';
+      document.documentElement.style.backdropFilter = 'blur(22px) saturate(160%)';
+      document.documentElement.style.webkitBackdropFilter = 'blur(22px) saturate(160%)';
+      document.body.style.background = 'rgba(20, 20, 25, 0.3)';
+      document.body.style.backdropFilter = 'blur(22px) saturate(160%)';
+      document.body.style.webkitBackdropFilter = 'blur(22px) saturate(160%)';
+      root.setAttribute('data-color-scheme', 'glass');
+    } else if (schemeId === 'gradient') {
+      // Синхронизация с предпросмотром в Settings → Gradient
+      root.style.setProperty('--mac-bg-primary', '#667eea');
+      root.style.setProperty('--mac-bg-secondary', '#764ba2');
+      root.style.setProperty('--mac-bg-tertiary', '#8e7cc3');
+      root.style.setProperty('--mac-accent-blue', '#f093fb');
+      root.style.setProperty('--mac-text-primary', '#ffffff');
+      root.style.setProperty('--mac-text-secondary', 'rgba(255,255,255,0.9)');
+      root.style.setProperty('--mac-border', 'rgba(255, 255, 255, 0.18)');
+      root.style.setProperty('--mac-border-secondary', 'rgba(255, 255, 255, 0.14)');
+      root.style.setProperty('--mac-separator', 'rgba(255, 255, 255, 0.16)');
+      root.style.setProperty('--mac-gradient-window', 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)');
+      root.style.setProperty('--bg', 'transparent');
+      // Прозрачные слои для бесшовного градиента
+      root.style.setProperty('--mac-bg-toolbar', 'transparent');
+      root.style.setProperty('--mac-gradient-sidebar', 'transparent');
+      // Сброс эффектов стекла
+      document.documentElement.style.background = '';
+      document.documentElement.style.backdropFilter = '';
+      document.documentElement.style.webkitBackdropFilter = '';
+      document.body.style.background = '';
+      document.body.style.backdropFilter = '';
+      document.body.style.webkitBackdropFilter = '';
+      root.setAttribute('data-color-scheme', 'gradient');
+    }
+  }
+}
+
+// Initialize on load
+initializeColorScheme();
 
 // macOS UI компоненты
 import { Sidebar } from './components/ui/macos';
@@ -850,8 +934,39 @@ function getHeaderActions(path) {
 /** Каркас: macOS Header и Sidebar для всех панелей */
 function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const path = location.pathname;
   const { theme } = useTheme(); // Добавляем доступ к теме
+  
+  // Переприменяем кастомную схему при навигации между страницами
+  useEffect(() => {
+    const reapplyCustomScheme = () => {
+      const customScheme = localStorage.getItem('customColorScheme');
+      const schemeId = localStorage.getItem('activeColorSchemeId');
+      if (customScheme === 'true' && schemeId) {
+        initializeColorScheme();
+      }
+    };
+    
+    // Применить сразу при монтировании и при изменении location
+    reapplyCustomScheme();
+    
+    // Слушать события изменения цветовой схемы
+    const handleSchemeChange = () => reapplyCustomScheme();
+    window.addEventListener('colorSchemeChanged', handleSchemeChange);
+    // Восстановление после блокировки/фонового режима/перезагрузки из BFCache
+    const handleVisibilityOrFocus = () => reapplyCustomScheme();
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    window.addEventListener('pageshow', handleVisibilityOrFocus);
+    
+    return () => {
+      window.removeEventListener('colorSchemeChanged', handleSchemeChange);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      window.removeEventListener('pageshow', handleVisibilityOrFocus);
+    };
+  }, [location.pathname]);
   
   const hideSidebar = path === '/registrar-panel' || 
                      path === '/doctor-panel' || 
@@ -899,50 +1014,41 @@ function AppShell() {
               onItemClick={(item) => {
                 // Special handling for different panels
                 if (path.startsWith('/admin')) {
-                  const url = new URL(window.location);
-                  url.searchParams.set('section', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('section', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/doctor-panel') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/patient-panel') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/registrar-panel') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/dentist') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/dermatologist') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/cardiologist') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/cashier-panel') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 } else if (path === '/lab-panel') {
-                  const url = new URL(window.location);
-                  url.searchParams.set('tab', item.id);
-                  window.history.pushState({}, '', url);
-                  window.location.reload();
+                  const params = new URLSearchParams(location.search);
+                  params.set('tab', item.id);
+                  navigate({ pathname: location.pathname, search: `?${params.toString()}` });
                 }
                 // Other navigation logic will be handled by router
               }}
@@ -1084,11 +1190,13 @@ function AppContent() {
 // Основной компонент App
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppProviders>
-        <AppContent />
-      </AppProviders>
-    </ThemeProvider>
+    <MacOSThemeProvider>
+      <ThemeProvider>
+        <AppProviders>
+          <AppContent />
+        </AppProviders>
+      </ThemeProvider>
+    </MacOSThemeProvider>
   );
 }
 

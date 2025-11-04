@@ -17,7 +17,12 @@ if (!rootEl) {
   document.body.appendChild(el);
   createRoot(el).render(
     <React.StrictMode>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
         <App />
       </BrowserRouter>
     </React.StrictMode>
@@ -25,7 +30,12 @@ if (!rootEl) {
 } else {
   createRoot(rootEl).render(
     <React.StrictMode>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
         <App />
       </BrowserRouter>
     </React.StrictMode>

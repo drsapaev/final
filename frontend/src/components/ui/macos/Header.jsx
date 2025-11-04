@@ -25,14 +25,14 @@ const Header = React.forwardRef(({
 
   const headerStyles = {
     height: '44px',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'var(--mac-bg-toolbar)',
     borderBottom: '1px solid var(--mac-separator)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '0 16px',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    backdropFilter: 'var(--mac-blur-light)',
+    WebkitBackdropFilter: 'var(--mac-blur-light)',
     position: 'sticky',
     top: 0,
     zIndex: 100,
@@ -140,7 +140,7 @@ const Header = React.forwardRef(({
               justifyContent: 'center'
             }}
           >
-            <Icon name="gear" size="small" />
+          <Icon name="gear" size="small" color="accent" />
           </Button>
         )}
 

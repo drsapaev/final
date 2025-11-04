@@ -24,6 +24,7 @@ import {
   Toast,
   ToastContainer
 } from '../ui/macos';
+import AccentPicker from '../ui/macos/AccentPicker.jsx';
 
 /**
  * macOS UI Demo Component
@@ -206,13 +207,14 @@ const MacOSDemo = () => {
                 </Button>
               </div>
 
-              {/* Right section - Theme toggle & User */}
+              {/* Right section - Accent & Theme */}
               <div style={{ 
                 display: 'flex', 
-                gap: '6px',
+                gap: '8px',
                 alignItems: 'center',
                 marginLeft: '12px'
               }}>
+                <AccentPicker />
                 <Button 
                   variant="ghost" 
                   size="small" 

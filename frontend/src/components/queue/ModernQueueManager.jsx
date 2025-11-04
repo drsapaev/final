@@ -340,20 +340,24 @@ ${window.location.origin}${qrData.qr_url}
             alignItems: 'center',
             gap: 'var(--mac-spacing-4)',
             padding: 'var(--mac-spacing-4)',
-            backgroundColor: 'var(--mac-bg-toolbar)',
-            border: '1px solid var(--mac-separator)'
+            background: 'var(--surface)',
+            backdropFilter: 'var(--mac-blur-light)',
+            WebkitBackdropFilter: 'var(--mac-blur-light)',
+            border: '1px solid var(--mac-separator)',
+            boxShadow: 'var(--shadow)',
+            borderRadius: 'var(--mac-radius-lg)'
           }}>
             <div style={{
               width: '48px',
               height: '48px',
               borderRadius: 'var(--mac-radius-md)',
-              backgroundColor: 'var(--mac-accent-blue)',
+              backgroundColor: 'var(--accent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              <Icon name="person" size="large" style={{ color: 'white' }} />
+              <Icon name="person" size="large" color="white" />
             </div>
             <div>
               <div style={{
@@ -378,8 +382,12 @@ ${window.location.origin}${qrData.qr_url}
             alignItems: 'center',
             gap: 'var(--mac-spacing-4)',
             padding: 'var(--mac-spacing-4)',
-            backgroundColor: 'var(--mac-bg-toolbar)',
-            border: '1px solid var(--mac-separator)'
+            background: 'var(--surface)',
+            backdropFilter: 'var(--mac-blur-light)',
+            WebkitBackdropFilter: 'var(--mac-blur-light)',
+            border: '1px solid var(--mac-separator)',
+            boxShadow: 'var(--shadow)',
+            borderRadius: 'var(--mac-radius-lg)'
           }}>
             <div style={{
               width: '48px',
@@ -416,8 +424,12 @@ ${window.location.origin}${qrData.qr_url}
             alignItems: 'center',
             gap: 'var(--mac-spacing-4)',
             padding: 'var(--mac-spacing-4)',
-            backgroundColor: 'var(--mac-bg-toolbar)',
-            border: '1px solid var(--mac-separator)'
+            background: 'var(--surface)',
+            backdropFilter: 'var(--mac-blur-light)',
+            WebkitBackdropFilter: 'var(--mac-blur-light)',
+            border: '1px solid var(--mac-separator)',
+            boxShadow: 'var(--shadow)',
+            borderRadius: 'var(--mac-radius-lg)'
           }}>
             <div style={{
               width: '48px',
@@ -454,8 +466,12 @@ ${window.location.origin}${qrData.qr_url}
       {/* Панель управления */}
       <Card style={{
         padding: 'var(--mac-spacing-5)',
-        backgroundColor: 'var(--mac-bg-toolbar)',
-        border: '1px solid var(--mac-separator)'
+        background: 'var(--surface)',
+        backdropFilter: 'var(--mac-blur-light)',
+        WebkitBackdropFilter: 'var(--mac-blur-light)',
+        border: '1px solid var(--mac-separator)',
+        boxShadow: 'var(--shadow)',
+        borderRadius: 'var(--mac-radius-lg)'
       }}>
         <div style={{
           display: 'flex',
@@ -539,8 +555,12 @@ ${window.location.origin}${qrData.qr_url}
 
       {/* Текущая очередь */}
       <Card style={{
-        backgroundColor: 'var(--mac-bg-toolbar)',
-        border: '1px solid var(--mac-separator)'
+        background: 'var(--surface)',
+        backdropFilter: 'var(--mac-blur-light)',
+        WebkitBackdropFilter: 'var(--mac-blur-light)',
+        border: '1px solid var(--mac-separator)',
+        boxShadow: 'var(--shadow)',
+        borderRadius: 'var(--mac-radius-lg)'
       }}>
         <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
           <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>

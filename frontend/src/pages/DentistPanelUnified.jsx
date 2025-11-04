@@ -17,8 +17,9 @@ import PhotoArchive from '../components/dental/PhotoArchive';
 import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
-import QueueIntegration from '../components/QueueIntegration';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import { queueService } from '../services/queue';
+import EMRSystem from '../components/medical/EMRSystem';
 import { 
   User, 
   Calendar, 
@@ -113,11 +114,13 @@ const DentistPanelUnified = () => {
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  const [emr, setEmr] = useState(null);
   
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
+  const [services, setServices] = useState({});
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -223,7 +226,28 @@ const DentistPanelUnified = () => {
 
   useEffect(() => {
     loadData();
+    loadServices();
   }, []);
+
+  // Загрузка услуг для правильного отображения в tooltips
+  const loadServices = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const servicesData = data.services_by_group || {};
+        setServices(servicesData);
+        console.log('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+      }
+    } catch (error) {
+      console.error('[Dentist] Ошибка загрузки услуг:', error);
+    }
+  };
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
@@ -277,6 +301,7 @@ const DentistPanelUnified = () => {
               queue.entries.forEach(entry => {
                 allAppointments.push({
                   id: entry.id,
+                  visit_id: entry.id, // Добавляем visit_id для сопоставления с БД
                   patient_id: entry.patient_id,
                   patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
                   patient_phone: entry.phone || '',
@@ -287,7 +312,7 @@ const DentistPanelUnified = () => {
                   services: entry.services || [],
                   service_codes: entry.service_codes || [],
                   payment_type: entry.payment_status || 'Не оплачено',
-                  payment_status: entry.payment_status || 'pending',
+                  payment_status: entry.payment_status || (entry.discount_mode === 'paid' ? 'paid' : 'pending'), // ✅ ИСПРАВЛЕНО: берем из entry
                   doctor: entry.doctor_name || 'Врач',
                   specialty: queue.specialty,
                   created_at: entry.created_at,
@@ -302,9 +327,57 @@ const DentistPanelUnified = () => {
         }
 
         // Фильтруем только стоматологические записи для отображения
-        const appointmentsData = allAppointments.filter(apt => 
+        const appointmentsData = allAppointments.filter(apt =>
           apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
         );
+
+        // 2. Получаем актуальный payment_status из БД через all-appointments
+        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const today = new Date().toISOString().split('T')[0];
+        try {
+          const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (appointmentsResponse.ok) {
+            const appointmentsDBResponse = await appointmentsResponse.json();
+            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+            console.log('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
+
+            // Создаем карту id -> payment_status
+            const paymentStatusMap = new Map();
+            appointmentsDBData.forEach(apt => {
+              if (apt.id) {
+                paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
+              }
+              if (apt.patient_id && apt.appointment_date) {
+                const key = `${apt.patient_id}_${apt.appointment_date}`;
+                paymentStatusMap.set(key, apt.payment_status || 'pending');
+              }
+            });
+
+            // Обновляем payment_status в наших записях
+            allAppointments = allAppointments.map(apt => {
+              let paymentStatus = paymentStatusMap.get(apt.id);
+              if (!paymentStatus && apt.patient_id && apt.appointment_date) {
+                const key = `${apt.patient_id}_${apt.appointment_date}`;
+                paymentStatus = paymentStatusMap.get(key);
+              }
+              return {
+                ...apt,
+                payment_status: paymentStatus || apt.payment_status || 'pending',
+                payment_type: paymentStatus || apt.payment_type
+              };
+            });
+
+            console.log('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
+          }
+        } catch (err) {
+          console.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
+        }
 
         // Добавляем информацию о всех услугах пациента в каждую запись
         const enrichedAppointmentsData = appointmentsData.map(apt => {
@@ -315,7 +388,7 @@ const DentistPanelUnified = () => {
             all_patient_service_codes: allPatientServices.service_codes
           };
         });
-        
+
         setAppointmentsTableData(enrichedAppointmentsData);
       }
     } catch (error) {
@@ -330,6 +403,19 @@ const DentistPanelUnified = () => {
     if (activeTab === 'appointments') {
       loadDentistryAppointments();
     }
+    
+    // Слушаем глобальные события обновления очереди
+    const handleQueueUpdate = (event) => {
+      console.log('[Dentist] Получено событие обновления очереди:', event.detail);
+      if (activeTab === 'appointments') {
+        loadDentistryAppointments();
+      }
+    };
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    
+    return () => {
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+    };
   }, [activeTab]);
 
   // Обработчики для таблицы записей
@@ -350,38 +436,61 @@ const DentistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = (action, row, event) => {
-    console.log('Действие с записью:', action, row);
+  const handleAppointmentActionClick = async (action, row, event) => {
+    console.log('[Dentist] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
-    
+
     switch (action) {
       case 'view':
         handleAppointmentRowClick(row);
         break;
-      case 'call': {
-        // Завершение приема аналогично кардио/дерма
-        (async () => {
-          try {
-            const token = localStorage.getItem('auth_token') || '';
-            if (!token) throw new Error('Нет токена');
-            const payload = { notes: 'Dentist: завершение приема' };
-            const res = await fetch(`http://localhost:8000/api/v1/doctor/queue/${row.id}/complete`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(payload)
-            });
-            if (!res.ok) throw new Error(await res.text());
-            // Обновляем список
-            loadDentistryAppointments();
-          } catch (e) {
-            console.error('Ошибка завершения приема стоматолога:', e);
+      case 'call':
+        // Вызвать пациента
+        try {
+          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
+          const token = localStorage.getItem('auth_token');
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            console.log('[Dentist] Пациент вызван:', row.patient_fio);
+            await loadDentistryAppointments();
           }
-        })();
+        } catch (error) {
+          console.error('[Dentist] Ошибка вызова пациента:', error);
+        }
         break;
-      }
+      case 'payment':
+        console.log('[Dentist] Открытие окна оплаты для:', row.patient_fio);
+        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        break;
+      case 'print':
+        console.log('[Dentist] Печать талона для:', row.patient_fio);
+        window.print();
+        break;
+      case 'complete':
+        // Завершить приём
+        try {
+          const patient = {
+            id: row.id,
+            patient_name: row.patient_fio,
+            phone: row.patient_phone,
+            number: row.id,
+            source: 'appointments',
+            status: 'in_cabinet'
+          };
+          console.log('[Dentist] Завершение приёма для:', patient.patient_name);
+          setSelectedPatient(patient);
+          handleTabChange('examinations');
+        } catch (error) {
+          console.error('[Dentist] Ошибка при завершении приёма:', error);
+        }
+        break;
       case 'edit':
         // Логика редактирования записи
         break;
@@ -466,7 +575,74 @@ const DentistPanelUnified = () => {
   // Обработчики
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
-    setShowPatientCard(true);
+    // Переключаемся на вкладку визита для работы с EMR
+    handleTabChange('visits');
+  };
+
+  // Сохранение EMR
+  const saveEMR = async (emrData) => {
+    try {
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
+      if (!selectedPatient?.id) {
+        console.warn('[Dentist] saveEMR: нет selectedPatient.id');
+        return;
+      }
+      
+      const appointmentForEMR = {
+        id: selectedPatient.id,
+        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+        patient_name: selectedPatient.patient_name || selectedPatient.name
+      };
+      
+      const response = await fetch(`/api/v1/appointments/${appointmentForEMR.id}/emr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(emrData)
+      });
+
+      if (response.ok) {
+        const savedEMR = await response.json();
+        setEmr(savedEMR);
+        console.log('[Dentist] saveEMR: успешно', savedEMR);
+      } else {
+        const error = await response.json();
+        console.error('[Dentist] saveEMR: ошибка', error);
+        throw new Error(error.detail || 'Ошибка при сохранении EMR');
+      }
+    } catch (error) {
+      console.error('DentistPanel: Save EMR error:', error);
+      throw error;
+    }
+  };
+
+  // Завершение визита
+  const handleCompleteVisit = async () => {
+    if (!selectedPatient) return;
+    
+    try {
+      const visitPayload = {
+        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+        notes: 'Стоматологический прием завершен'
+      };
+      
+      await queueService.completeVisit(selectedPatient.id, visitPayload);
+      
+      // Автоматически вызвать следующего пациента
+      try {
+        await queueService.callNextWaiting('dentist');
+      } catch (err) {
+        console.warn('[Dentist] callNextWaiting failed:', err);
+      }
+      
+      setSelectedPatient(null);
+      setEmr(null);
+      handleTabChange('queue');
+    } catch (error) {
+      console.error('[Dentist] handleCompleteVisit: error', error);
+    }
   };
 
   const handleExamination = (patient) => {
@@ -1344,11 +1520,18 @@ const DentistPanelUnified = () => {
             alignItems: 'center',
             gap: '8px'
           }}>
-            <Badge variant="info">
-              Всего: {appointmentsTableData.length}
+            <Badge variant="info">Всего: {appointmentsTableData.length}</Badge>
+            <Badge variant="warning">
+              Ожидают: {appointmentsTableData.filter(a => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
             </Badge>
-            <Button 
-              variant="secondary" 
+            <Badge variant="primary">
+              Вызваны: {appointmentsTableData.filter(a => a.status === 'called' || a.status === 'in_progress').length}
+            </Badge>
+            <Badge variant="success">
+              Приняты: {appointmentsTableData.filter(a => a.status === 'completed' || a.status === 'done').length}
+            </Badge>
+            <Button
+              variant="secondary"
               size="sm"
               onClick={loadDentistryAppointments}
               disabled={appointmentsLoading}
@@ -1367,7 +1550,7 @@ const DentistPanelUnified = () => {
           view="doctor"
           selectedRows={new Set()}
           outerBorder={false}
-          services={{}}
+          services={services}
           showCheckboxes={false}
           onRowSelect={() => {}}
           onRowClick={handleAppointmentRowClick}
@@ -1534,82 +1717,131 @@ const DentistPanelUnified = () => {
   );
 
   // Рендер протоколов визитов
-  const renderVisits = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <Card padding="lg">
-        <h3 style={{
-          fontSize: 'var(--mac-font-size-lg)',
-          fontWeight: 'var(--mac-font-weight-semibold)',
-          marginBottom: '16px',
-          color: 'var(--mac-text-primary)'
-        }}>Протоколы визитов</h3>
-        <p style={{
-          color: 'var(--mac-text-secondary)',
-          marginBottom: '16px',
-          fontSize: 'var(--mac-font-size-base)'
-        }}>
-          Выберите пациента для создания или просмотра протокола визита
-        </p>
-        
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '16px'
-        }}>
-          {patients.map(patient => (
-            <div
-              key={patient.id}
-              style={{
-                padding: '24px',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-lg)',
-                cursor: 'pointer',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+  const renderVisits = () => {
+    // Если выбран пациент из очереди - показываем EMR
+    if (selectedPatient) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <Card padding="lg">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Stethoscope size={20} />
+                Прием пациента: {selectedPatient.patient_name || selectedPatient.name || `№${selectedPatient.number}`}
+              </h3>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedPatient(null);
+                  handleTabChange('queue');
+                }}
+              >
+                Вернуться в очередь
+              </Button>
+            </div>
+            
+            {/* EMR System */}
+            <EMRSystem
+              appointment={{
+                id: selectedPatient.id,
+                patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+                patient_name: selectedPatient.patient_name || selectedPatient.name,
+                specialty: 'dentist',
+                status: selectedPatient.status || 'in_visit'
               }}
-              onClick={() => handleVisitProtocol(patient)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  background: 'var(--mac-accent-purple)',
-                  borderRadius: 'var(--mac-radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <span style={{
-                    color: 'white',
-                    fontSize: 'var(--mac-font-size-sm)',
-                    fontWeight: 'var(--mac-font-weight-medium)'
+              emr={emr}
+              onSave={saveEMR}
+              onComplete={handleCompleteVisit}
+            />
+          </Card>
+        </div>
+      );
+    }
+    
+    // Иначе показываем список пациентов для выбора протокола
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <Card padding="lg">
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            marginBottom: '16px',
+            color: 'var(--mac-text-primary)'
+          }}>Протоколы визитов</h3>
+          <p style={{
+            color: 'var(--mac-text-secondary)',
+            marginBottom: '16px',
+            fontSize: 'var(--mac-font-size-base)'
+          }}>
+            Выберите пациента из очереди или выберите из списка для создания протокола визита
+          </p>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '16px'
+          }}>
+            {patients.map(patient => (
+              <div
+                key={patient.id}
+                style={{
+                  padding: '24px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  cursor: 'pointer',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
+                onClick={() => handleVisitProtocol(patient)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    background: 'var(--mac-accent-purple)',
+                    borderRadius: 'var(--mac-radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}>
-                    {patient.name?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p style={{
-                    fontWeight: 'var(--mac-font-weight-medium)',
-                    color: 'var(--mac-text-primary)',
-                    fontSize: 'var(--mac-font-size-base)'
-                  }}>{patient.name}</p>
-                  <p style={{
-                    fontSize: 'var(--mac-font-size-sm)',
-                    color: 'var(--mac-text-secondary)'
-                  }}>Создать протокол</p>
+                    <span style={{
+                      color: 'white',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: 'var(--mac-font-weight-medium)'
+                    }}>
+                      {patient.name?.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <p style={{
+                      fontWeight: 'var(--mac-font-weight-medium)',
+                      color: 'var(--mac-text-primary)',
+                      fontSize: 'var(--mac-font-size-base)'
+                    }}>{patient.name}</p>
+                    <p style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Создать протокол</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  };
 
   // Рендер фото архива
   const renderPhotos = () => (

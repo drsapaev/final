@@ -106,8 +106,19 @@ async def mcp_analyze_complaint(
 ) -> Dict[str, Any]:
     """Анализ жалоб через MCP"""
     try:
-        if current_user.role not in ["doctor", "admin", "Admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
+        # Расширенный список разрешенных ролей
+        allowed_roles = [
+            "doctor", "Doctor", "admin", "Admin", "Registrar",
+            "cardio", "cardiology", "Cardiologist", "Cardio",
+            "derma", "Dermatologist",
+            "dentist", "Dentist",
+            "Lab", "Laboratory"
+        ]
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Недостаточно прав. Роль: {current_user.role}, Требуется: {allowed_roles}"
+            )
         
         mcp_manager = await get_mcp_manager()
         
@@ -197,28 +208,94 @@ async def mcp_suggest_icd10(
 ) -> Dict[str, Any]:
     """Подсказки МКБ-10 через MCP"""
     try:
-        if current_user.role not in ["doctor", "admin", "Admin"]:
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
+        # Расширенный список разрешенных ролей
+        allowed_roles = [
+            "doctor", "Doctor", "admin", "Admin", "Registrar",
+            "cardio", "cardiology", "Cardiologist", "Cardio",
+            "derma", "Dermatologist",
+            "dentist", "Dentist",
+            "Lab", "Laboratory"
+        ]
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Недостаточно прав. Роль: {current_user.role}, Требуется: {allowed_roles}"
+            )
+        
+        # Проверка на пустой или слишком короткий запрос
+        if not request.symptoms or len(request.symptoms) == 0:
+            # Если нет симптомов и нет диагноза, возвращаем пустой результат
+            if not request.diagnosis or len(request.diagnosis.strip()) < 2:
+                return {
+                    "suggestions": [],
+                    "message": "Укажите симптомы или диагноз для подбора кодов МКБ-10",
+                    "success": False
+                }
+        
+        # Фильтруем пустые симптомы
+        symptoms = [s.strip() for s in request.symptoms if s and s.strip()]
+        
+        # Если после фильтрации симптомы пусты и диагноз короткий
+        if len(symptoms) == 0 and (not request.diagnosis or len(request.diagnosis.strip()) < 2):
+            return {
+                "suggestions": [],
+                "message": "Укажите симптомы или диагноз для подбора кодов МКБ-10",
+                "success": False
+            }
+        
+        # Проверяем, что есть хотя бы один значимый входной параметр
+        diagnosis_text = (request.diagnosis or "").strip()
+        if len(symptoms) == 0 and len(diagnosis_text) < 2:
+            return {
+                "suggestions": [],
+                "message": "Недостаточно данных для подбора кодов МКБ-10",
+                "success": False
+            }
         
         mcp_manager = await get_mcp_manager()
         
-        result = await mcp_manager.execute_request(
-            server="icd10",
-            method="tool/suggest_icd10",
-            params={
-                "symptoms": request.symptoms,
-                "diagnosis": request.diagnosis,
-                "specialty": request.specialty,
-                "provider": request.provider,
-                "max_suggestions": request.max_suggestions
+        try:
+            result = await mcp_manager.execute_request(
+                server="icd10",
+                method="tool/suggest_icd10",
+                params={
+                    "symptoms": symptoms if len(symptoms) > 0 else [diagnosis_text] if diagnosis_text else [],
+                    "diagnosis": diagnosis_text if diagnosis_text else None,
+                    "specialty": request.specialty,
+                    "provider": request.provider,
+                    "max_suggestions": request.max_suggestions
+                }
+            )
+            
+            # Если результат пустой или содержит ошибку, возвращаем корректный ответ
+            if not result or result.get("error"):
+                return {
+                    "suggestions": [],
+                    "message": result.get("error", "Не удалось получить подсказки МКБ-10"),
+                    "success": False
+                }
+            
+            return result
+            
+        except Exception as mcp_error:
+            # Если ошибка при обращении к MCP, возвращаем корректный ответ вместо 500
+            logger.warning(f"MCP ICD-10 service error: {str(mcp_error)}")
+            return {
+                "suggestions": [],
+                "message": f"Сервис подбора МКБ-10 временно недоступен: {str(mcp_error)}",
+                "success": False
             }
-        )
         
-        return result
-        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in MCP ICD-10 suggestions: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Возвращаем корректный ответ вместо 500
+        return {
+            "suggestions": [],
+            "message": f"Ошибка при подборе кодов МКБ-10: {str(e)}",
+            "success": False
+        }
 
 
 @router.post("/icd10/validate")

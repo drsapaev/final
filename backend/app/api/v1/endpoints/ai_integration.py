@@ -18,7 +18,7 @@ router = APIRouter()
 async def analyze_patient_complaints(
     request: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist"))
 ):
     """
     Анализ жалоб пациента с помощью AI
@@ -59,7 +59,7 @@ async def analyze_patient_complaints(
 async def suggest_icd10_codes(
     request: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist"))
 ):
     """
     Автоподбор кодов МКБ-10 по диагнозу
@@ -316,7 +316,7 @@ def get_ai_usage_stats(
 async def quick_diagnosis_help(
     request: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Doctor", "cardio", "cardiology", "derma", "dentist"))
 ):
     """
     Быстрая помощь с диагнозом

@@ -11,7 +11,7 @@ import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointments
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
 import ResponsiveNavigation from '../components/layout/ResponsiveNavigation';
-import { Button, Card, CardHeader, CardContent, Badge, Skeleton, Icon } from '../components/ui/macos';
+import { Button, Card, CardHeader, CardContent, Badge, Skeleton, Icon, Input } from '../components/ui/macos';
 import { AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1083,7 +1083,13 @@ const RegistrarPanel = () => {
           const overrides = JSON.parse(overridesRaw);
           const ov = overrides[String(enrichedApt.id)];
           if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-            enrichedApt = { ...enrichedApt, ...ov };
+            // ✅ ИСПРАВЛЕНО: Применяем только определенные поля из оверрайда, сохраняя queue_numbers
+            enrichedApt = {
+              ...enrichedApt,
+              status: ov.status !== undefined ? ov.status : enrichedApt.status,
+              payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status
+              // queue_numbers остается из enrichedApt (из API)
+            };
           }
         }
       } catch(_) {
@@ -1096,8 +1102,8 @@ const RegistrarPanel = () => {
         // Если поля уже есть в API, используем их, иначе значения по умолчанию
         visit_type: enrichedApt.visit_type || 'paid', // Платный по умолчанию
         payment_type: enrichedApt.payment_type || (enrichedApt.payment_provider === 'online' ? 'online' : 'cash'), // Определяем по провайдеру
-        // Если пришел payment_status от API — уважаем его; иначе — выводим из payment_processed_at
-        payment_status: enrichedApt.payment_status || (enrichedApt.payment_processed_at ? 'paid' : (enrichedApt.payment_amount > 0 ? 'pending' : 'pending')),
+        // ✅ Если пришел payment_status от API — уважаем его; иначе — выводим из discount_mode или payment_processed_at
+        payment_status: enrichedApt.payment_status || (enrichedApt.discount_mode === 'paid' ? 'paid' : (enrichedApt.payment_processed_at ? 'paid' : (enrichedApt.payment_amount > 0 ? 'pending' : 'pending'))),
         services: enrichedApt.services || [], // ✅ ИСПРАВЛЕНО: оставляем пустым если нет услуг
         // Добавляем поле cost для совместимости с таблицей (используем payment_amount если cost отсутствует)
         cost: enrichedApt.cost || enrichedApt.payment_amount || 0,
@@ -1176,6 +1182,7 @@ const RegistrarPanel = () => {
             // Объединяем все очереди
             console.log('📊 Объединяем все очереди');
             data.queues.forEach(queue => {
+              console.log(`📋 Обработка очереди: ${queue.specialty}, записей: ${queue.entries?.length || 0}`);
               if (queue.entries && Array.isArray(queue.entries)) {
                 queue.entries.forEach((entry, index) => {
                   try {
@@ -1185,6 +1192,18 @@ const RegistrarPanel = () => {
                     const address = fullEntry.address || '';
                     const services = Array.isArray(fullEntry.services) ? fullEntry.services : [];
                     const serviceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
+
+                    // ✅ ОТЛАДКА: Логируем каждую запись с её service_codes
+                    if (queue.specialty === 'echokg' || serviceCodes.includes('K10')) {
+                      console.log('🔍 ЭКГ запись найдена:', {
+                        id: fullEntry.id,
+                        patient: fullEntry.patient_name,
+                        specialty: queue.specialty,
+                        services,
+                        serviceCodes,
+                        fullEntry
+                      });
+                    }
                     const cost = fullEntry.cost || 0;
                     const paymentStatus = fullEntry.payment_status || 'pending';
                     const source = fullEntry.source || 'desk';
@@ -1203,7 +1222,9 @@ const RegistrarPanel = () => {
                     {
                       number: fullEntry.number || index + 1,
                       status: status,
-                      specialty: queue.specialty || null
+                      specialty: queue.specialty || null,
+                      queue_name: queue.specialist_name || queue.specialty || 'Очередь',  // ✅ ДОБАВЛЕНО: название очереди для tooltip
+                      queue_tag: queue.specialty || null
                     }
                   ],
                       // даты для корректного отображения номера и индикаторов вкладок
@@ -1228,6 +1249,9 @@ const RegistrarPanel = () => {
                   specialty: queue.specialty || null,
                   department: queue.specialty || null
                 });
+
+                // ✅ Отладка: проверяем queue_numbers
+                console.log(`✅ Добавлена запись ${fullEntry.id} с queue_numbers:`, appointmentsData[appointmentsData.length - 1].queue_numbers);
                   } catch (err) {
                     console.error('❌ Ошибка обработки записи очереди:', err, entry);
                   }
@@ -1298,7 +1322,12 @@ const RegistrarPanel = () => {
                 const override = overrides[String(apt.id)];
                 let merged = localVersion ? { ...apt, ...localVersion } : apt;
                 if (override && (!override.expiresAt || override.expiresAt > Date.now())) {
-                  merged = { ...merged, ...override };
+                  // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                  merged = {
+                    ...merged,
+                    status: override.status !== undefined ? override.status : merged.status,
+                    payment_status: override.payment_status !== undefined ? override.payment_status : merged.payment_status
+                  };
                 }
                 return merged;
               });
@@ -1327,7 +1356,12 @@ const RegistrarPanel = () => {
             demo = DEMO_APPOINTMENTS.map(apt => {
               const ov = overrides[String(apt.id)];
               if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-                return { ...apt, ...ov };
+                // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                return {
+                  ...apt,
+                  status: ov.status !== undefined ? ov.status : apt.status,
+                  payment_status: ov.payment_status !== undefined ? ov.payment_status : apt.payment_status
+                };
               }
               return apt;
             });
@@ -1362,7 +1396,12 @@ const RegistrarPanel = () => {
             demo = DEMO_APPOINTMENTS.map(apt => {
               const ov = overrides[String(apt.id)];
               if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-                return { ...apt, ...ov };
+                // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                return {
+                  ...apt,
+                  status: ov.status !== undefined ? ov.status : apt.status,
+                  payment_status: ov.payment_status !== undefined ? ov.payment_status : apt.payment_status
+                };
               }
               return apt;
             });
@@ -1432,6 +1471,34 @@ const RegistrarPanel = () => {
     loadIntegratedData();
     setIsInitialLoad(false);
   }, [loadAppointments, loadIntegratedData]);
+
+  // Слушаем глобальные события обновления очереди для синхронизации статусов
+  useEffect(() => {
+    const handleQueueUpdate = (event) => {
+      const { action, specialty } = event.detail || {};
+      console.log('[RegistrarPanel] Получено событие обновления очереди:', { action, specialty, detail: event.detail });
+      
+      // Для критических действий обновляем немедленно без silent режима
+      const criticalActions = ['patientCalled', 'visitStarted', 'visitCompleted', 'nextPatientCalled'];
+      const shouldUpdateImmediately = criticalActions.includes(action);
+      
+      if (shouldUpdateImmediately) {
+        console.log('[RegistrarPanel] Немедленное обновление после действия:', action);
+        // Небольшая задержка для гарантии обновления на бэкенде
+        setTimeout(() => {
+          loadAppointments({ source: `queue_update_${action}`, silent: false });
+        }, 300);
+      } else {
+        // Для других событий тихое обновление
+        loadAppointments({ source: 'queue_update_event', silent: true });
+      }
+    };
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    
+    return () => {
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+    };
+  }, [loadAppointments]);
 
   // Перезагружаем данные при изменении фильтров
   useEffect(() => {
@@ -1520,29 +1587,38 @@ const RegistrarPanel = () => {
                 (activeTab === 'derma' && queue.specialty === 'dermatology') ||
                 (activeTab === 'dental' && queue.specialty === 'stomatology') ||
                 (activeTab === 'lab' && queue.specialty === 'laboratory') ||
-                (activeTab === 'procedures' && queue.specialty === 'procedures')
+                (activeTab === 'procedures' && queue.specialty === 'procedures') ||
+                (activeTab === 'echokg' && (queue.specialty === 'echokg' || queue.specialty === 'ecg' || queue.specialty === 'ЭКГ'))
               );
 
               if (targetQueue && targetQueue.entries) {
                 newAppointments = targetQueue.entries.map(entry => ({
                   id: entry.id,
-                  patient_id: null,
+                  patient_id: entry.patient_id || null,
                   patient_fio: entry.patient_name,
                   patient_phone: entry.phone,
+                  patient_birth_year: entry.patient_birth_year || null,
+                  address: entry.address || '',
                   doctor_id: null,
                   department: targetQueue.specialty,
                   appointment_date: data.date,
                   appointment_time: null,
                   status: entry.status,
-                  services: [],
-                  service_codes: [],
+                  services: entry.services || [],  // ✅ ИСПРАВЛЕНО: Берем services из entry
+                  service_codes: entry.service_codes || [],  // ✅ ИСПРАВЛЕНО: Берем service_codes из entry
+                  cost: entry.cost || 0,  // ✅ ДОБАВЛЕНО: Стоимость
+                  payment_status: entry.payment_status || 'pending',  // ✅ ДОБАВЛЕНО: Статус оплаты
+                  discount_mode: entry.discount_mode || 'none',  // ✅ ДОБАВЛЕНО: Режим скидки
                   source: entry.source,
                   created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
+                  visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
+                  record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
                   queue_numbers: [{
                     queue_tag: targetQueue.specialty,
-                    queue_name: targetQueue.specialist_name,
+                    queue_name: targetQueue.specialist_name || targetQueue.specialty || 'Очередь',
                     number: entry.number,
                     status: entry.status,
+                    specialty: targetQueue.specialty,
                     source: entry.source,
                     created_at: entry.created_at
                   }],
@@ -1559,23 +1635,31 @@ const RegistrarPanel = () => {
                 if (queue.entries && Array.isArray(queue.entries)) {
                   const queueAppointments = queue.entries.map(entry => ({
                     id: entry.id,
-                    patient_id: null,
+                    patient_id: entry.patient_id || null,
                     patient_fio: entry.patient_name,
                     patient_phone: entry.phone,
+                    patient_birth_year: entry.patient_birth_year || null,
+                    address: entry.address || '',
                     doctor_id: queue.specialist_id,
                     department: queue.specialty,
                     appointment_date: data.date,
                     appointment_time: null,
                     status: entry.status,
-                    services: [],
-                    service_codes: [],
+                    services: entry.services || [],  // ✅ ИСПРАВЛЕНО: Берем services из entry
+                    service_codes: entry.service_codes || [],  // ✅ ИСПРАВЛЕНО: Берем service_codes из entry
+                    cost: entry.cost || 0,  // ✅ ДОБАВЛЕНО: Стоимость
+                    payment_status: entry.payment_status || 'pending',  // ✅ ДОБАВЛЕНО: Статус оплаты
+                    discount_mode: entry.discount_mode || 'none',  // ✅ ДОБАВЛЕНО: Режим скидки
                     source: entry.source,
                     created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
+                    visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
+                    record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
                     queue_numbers: [{
                       queue_tag: queue.specialty,
-                      queue_name: queue.specialist_name,
+                      queue_name: queue.specialist_name || queue.specialty || 'Очередь',
                       number: entry.number,
                       status: entry.status,
+                      specialty: queue.specialty,
                       source: entry.source,
                       created_at: entry.created_at
                     }],
@@ -1743,42 +1827,54 @@ const RegistrarPanel = () => {
       const realId = appointment.id;
       
       console.log('Попытка оплатить записи:', recordsToUpdate.map(r => r.id), 'Тип записи:', recordType);
-      
+
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-      
-      // Используем первую запись для создания платежа (она содержит правильный record_type и ID)
-      const paymentRecord = recordsToUpdate[0];
-      const paymentRecordType = paymentRecord.record_type || (paymentRecord.id >= 20000 ? 'visit' : 'appointment');
-      const paymentRecordId = paymentRecord.id;
 
-      console.log('🔍 Создаем платеж для записи:', paymentRecordId, 'типа:', paymentRecordType);
+      // ✅ ИСПРАВЛЕНИЕ: Оплачиваем ВСЕ записи пациента, а не только первую
+      console.log('🔍 Оплачиваем ВСЕ записи пациента:', recordsToUpdate.length);
 
-      // Используем правильный API в зависимости от типа записи
-      let url;
-      if (paymentRecordType === 'visit') {
-        // Для записей из visits используем API visits
-        url = `${API_BASE}/api/v1/registrar/visits/${paymentRecordId}/mark-paid`;
-      } else {
-        // Для записей из appointments используем старый API
-        url = `${API_BASE}/api/v1/appointments/${paymentRecordId}/mark-paid`;
-      }
-      
-      console.log('🔍 Отправляем запрос на:', url);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      const paymentResults = [];
+      for (const record of recordsToUpdate) {
+        const recordType = record.record_type || (record.id >= 20000 ? 'visit' : 'appointment');
+        const recordId = record.id;
+
+        let url;
+        if (recordType === 'visit') {
+          url = `${API_BASE}/api/v1/registrar/visits/${recordId}/mark-paid`;
+        } else {
+          url = `${API_BASE}/api/v1/appointments/${recordId}/mark-paid`;
         }
-      });
-      
-      console.log('Ответ сервера:', response.status, response.statusText);
 
-      if (response.ok) {
-        const updatedAppointment = await response.json();
-        console.log('Успешный ответ:', updatedAppointment);
-        
+        console.log(`🔍 Оплата записи ${recordId} (${recordType}):`, url);
+
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            paymentResults.push({ success: true, recordId, result });
+            console.log(`✅ Запись ${recordId} успешно оплачена`);
+          } else {
+            const errorText = await response.text();
+            console.warn(`⚠️ Ошибка оплаты записи ${recordId}:`, errorText);
+            paymentResults.push({ success: false, recordId, error: errorText });
+          }
+        } catch (error) {
+          console.error(`❌ Ошибка при оплате записи ${recordId}:`, error);
+          paymentResults.push({ success: false, recordId, error: error.message });
+        }
+      }
+
+      const successCount = paymentResults.filter(r => r.success).length;
+      console.log(`✅ Успешно оплачено ${successCount} из ${recordsToUpdate.length} записей`);
+
+      if (successCount > 0) {
         console.log('✅ Оплата успешна, обновляем локальное состояние для всех записей пациента');
         console.log('Обновляем записи:', recordsToUpdate.map(r => r.id));
 
@@ -1812,54 +1908,13 @@ const RegistrarPanel = () => {
         )));
         });
 
-        toast.success(`Оплачено ${recordsToUpdate.length} записей пациента и добавлены в очередь!`);
+        toast.success(`Оплачено ${successCount} записей пациента и добавлены в очередь!`);
         // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
         setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
-        return updatedAppointment;
+        return paymentResults;
       } else {
-        const errorText = await response.text();
-        console.error('Ошибка API:', response.status, errorText);
-        
-        let errorMessage = 'Ошибка при оплате';
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.detail) {
-            errorMessage = errorData.detail;
-            // Если запись уже оплачена, обрабатываем как успех
-            if (errorMessage.includes('уже оплачена') || errorMessage.includes('PAID -> PAID')) {
-              toast('Запись уже оплачена', { icon: 'ℹ️' });
-              const updatedAppointment = {
-                ...appointment,
-                status: 'queued',
-                payment_status: 'paid'
-              };
-              // Сохраняем локальный оверрайд
-              try {
-                const overridesRaw = localStorage.getItem('appointments_local_overrides');
-                const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-                overrides[String(appointment.id)] = {
-                  status: updatedAppointment.status,
-                  payment_status: updatedAppointment.payment_status,
-                  expiresAt: Date.now() + 10 * 60 * 1000
-                };
-                localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
-              } catch(_) {
-        // Игнорируем ошибки парсинга JSON
-      }
-
-              setAppointments(prev => prev.map(apt => (
-                apt.id === appointment.id ? updatedAppointment : apt
-              )));
-              setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
-              return updatedAppointment;
-            }
-          }
-        } catch (e) {
-          errorMessage = errorText || errorMessage;
-        }
-        
-        toast.error(errorMessage);
-        return null;
+        toast.error('Не удалось оплатить записи');
+        return paymentResults;
       }
     } catch (error) {
       console.error('RegistrarPanel: Payment error:', error);
@@ -1942,7 +1997,8 @@ const RegistrarPanel = () => {
         if (isFromVisits) {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/start-visit`;
         } else {
-          url = `${API_BASE}/api/v1/appointments/${realId}/start-visit`;
+          // Используем эндпоинт для очереди регистратора
+          url = `${API_BASE}/api/v1/registrar/queue/${realId}/start-visit`;
         }
       } else {
         console.log('Неподдерживаемый статус:', status);
@@ -2137,7 +2193,7 @@ const RegistrarPanel = () => {
                 return serviceByID.service_code;
               }
             }
-            
+
             // Затем пробуем найти по названию
             const serviceByName = groupServices.find(s => s.name === service);
             if (serviceByName && serviceByName.service_code) {
@@ -2146,12 +2202,26 @@ const RegistrarPanel = () => {
           }
         }
       }
+
+      // ВАЖНО: Если service_code не найден, но название услуги содержит "ЭКГ", возвращаем 'K10'
+      if (typeof service === 'string' && (service.includes('ЭКГ') || service.includes('ЭКг') || service.includes('экг') || service.toUpperCase().includes('ECG'))) {
+        return 'K10';
+      }
+
       return null;
     }).filter(code => code !== null);
-    
+
     // Объединяем коды из service_codes и преобразованные из services
     const allServiceCodes = [...appointmentServiceCodes, ...serviceCodesFromServices];
-    
+
+    console.log('🔍 isInDepartment - коды услуг:', {
+      appointmentId: appointment.id,
+      departmentKey,
+      appointmentServiceCodes,
+      serviceCodesFromServices,
+      allServiceCodes
+    });
+
     // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
     const departmentCategoryMapping = {
       'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
@@ -2168,9 +2238,9 @@ const RegistrarPanel = () => {
     // Маппинг кодов услуг к категориям (обновлен согласно новым требованиям)
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
-      
-      // ЭКГ - отдельная категория (только ЭКГ)
-      if (serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
+
+      // ЭКГ - отдельная категория (только ЭКГ) - ВАЖНО: K10 это ЭКГ!
+      if (serviceCode === 'K10' || serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
 
       // ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
       if (serviceCode === 'K11' || serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO') || serviceCode.includes('ЭхоКГ')) return 'ECHO';
@@ -2184,7 +2254,7 @@ const RegistrarPanel = () => {
       // Косметологические процедуры - коды C01-C12
       if (serviceCode.match(/^C\d+$/)) return 'C';
 
-      // Кардиология - коды K01, K11
+      // Кардиология - коды K01, K11 (НО НЕ K10 - это ЭКГ!)
       if (serviceCode.match(/^K\d+$/)) return 'K';
 
       // Стоматология - коды S01, S10
@@ -2212,14 +2282,21 @@ const RegistrarPanel = () => {
     };
 
     // Приоритет по услугам: если в услугах есть ЭКГ, то это всегда вкладка 'echokg'
-    const serviceCategories = new Set(
-      allServiceCodes
-        .map(getServiceCategoryByCode)
-        .filter(Boolean)
-    );
+    const serviceCategoriesArray = allServiceCodes.map(getServiceCategoryByCode);
+    const serviceCategories = new Set(serviceCategoriesArray.filter(Boolean));
+
+    console.log('🔍 isInDepartment - категории:', {
+      appointmentId: appointment.id,
+      departmentKey,
+      allServiceCodes,
+      serviceCategoriesArray,
+      serviceCategories: Array.from(serviceCategories),
+      hasECG: serviceCategories.has('ECG')
+    });
 
     // Если есть ECG — жестко относим к echokg и исключаем из cardio
     if (serviceCategories.has('ECG')) {
+      console.log('✅ ЭКГ найдено! Возвращаем:', departmentKey === 'echokg', 'для departmentKey:', departmentKey);
       return departmentKey === 'echokg';
     }
     
@@ -2276,7 +2353,8 @@ const RegistrarPanel = () => {
       
       stats[dept] = {
         todayCount: todayAppointments.length,
-        hasActiveQueue: deptAppointments.some(a => a.status === 'queued'),
+        // ✅ ИСПРАВЛЕНО: Проверяем наличие queue_numbers вместо статуса 'queued'
+        hasActiveQueue: deptAppointments.some(a => a.queue_numbers && a.queue_numbers.length > 0),
         hasPendingPayments: deptAppointments.some(a => a.status === 'paid_pending' || a.payment_status === 'pending')
       };
     });

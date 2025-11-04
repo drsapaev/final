@@ -90,8 +90,28 @@ export const usePWA = () => {
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
     
+    // ✅ ПРЕДОТВРАЩЕНИЕ МНОЖЕСТВЕННОЙ РЕГИСТРАЦИИ
+    // Проверяем, не зарегистрирован ли уже Service Worker
+    if (window.__sw_registration_pending || window.__sw_registered) {
+      // Если регистрация уже идет или завершена, просто проверяем состояние
+      navigator.serviceWorker.ready.then((registration) => {
+        setIsServiceWorkerReady(true);
+        console.log('Service Worker already registered:', registration);
+      }).catch(() => {
+        // Если регистрация не прошла, попробуем снова
+        window.__sw_registration_pending = false;
+        window.__sw_registered = false;
+      });
+      return;
+    }
+    
+    // Помечаем, что регистрация началась
+    window.__sw_registration_pending = true;
+    
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
+        window.__sw_registration_pending = false;
+        window.__sw_registered = true;
         console.log('Service Worker registered:', registration);
         setIsServiceWorkerReady(true);
 
@@ -107,15 +127,20 @@ export const usePWA = () => {
         });
       })
       .catch((error) => {
+        window.__sw_registration_pending = false;
+        window.__sw_registered = false;
         console.error('Service Worker registration failed:', error);
       });
 
-    // Слушаем сообщения от Service Worker
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'SYNC_COMPLETE') {
-        console.log('Background sync completed');
-      }
-    });
+    // Слушаем сообщения от Service Worker (только один раз)
+    if (!window.__sw_message_listener_added) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SYNC_COMPLETE') {
+          console.log('Background sync completed');
+        }
+      });
+      window.__sw_message_listener_added = true;
+    }
   }, []);
 
   // Установка PWA
