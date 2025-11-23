@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Button, useFade, useSlide } from '../ui/native';
+import { Button } from '../ui/macos';
+import { useFade, useSlide } from '../ui/native';
 import { colors } from '../../theme/tokens';
 
 const AdminNavigation = ({ sections = [] }) => {
@@ -50,34 +51,17 @@ const AdminNavigation = ({ sections = [] }) => {
               
               return (
                 <NavLink key={item.to} to={item.to}>
-                  <button
-                    className={`navigation-button ${active ? 'active' : ''} flex items-center space-x-2 transition-all duration-200 ${
-                      active 
-                        ? 'shadow-md transform scale-105' 
-                        : 'hover:shadow-sm hover:transform hover:scale-102'
-                    }`}
+                  <Button
+                    variant={active ? 'primary' : 'outline'}
+                    size="small"
                     style={{
-                      background: active
-                        ? colors.primary[500]  // ✅ Основной синий из токенов
-                        : colors.semantic.surface.selected,  // ✅ Полупрозрачный фон
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      borderColor: active
-                        ? colors.primary[500]  // ✅ Основной синий из токенов
-                        : colors.semantic.border.medium,  // ✅ Средняя граница из токенов
-                      color: active
-                        ? colors.semantic.text.inverse  // ✅ Белый текст для активных
-                        : colors.primary[400],  // ✅ Светлый синий для неактивных
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      fontSize: '14px'
+                      borderColor: active ? undefined : colors.semantic.border.medium,
+                      color: active ? undefined : colors.primary[400]
                     }}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="font-medium">{item.label}</span>
-                  </button>
+                  </Button>
                 </NavLink>
               );
             })}

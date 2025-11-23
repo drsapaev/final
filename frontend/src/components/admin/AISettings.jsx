@@ -20,7 +20,7 @@ import {
   Clock,
   TrendingUp
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge, MacOSInput, MacOSCheckbox } from '../ui/macos';
 
 const AISettings = () => {
   const [loading, setLoading] = useState(true);
@@ -193,35 +193,50 @@ const AISettings = () => {
 
   if (loading) {
     return (
-      <Card className="p-8">
-        <div className="flex items-center justify-center">
-          <RefreshCw className="animate-spin mr-2" size={20} />
-          <span>Загрузка AI настроек...</span>
+      <Card style={{ padding: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <RefreshCw style={{ 
+            width: '20px', 
+            height: '20px', 
+            marginRight: '8px', 
+            animation: 'spin 1s linear infinite' 
+          }} />
+          <span style={{ color: 'var(--mac-text-primary)' }}>Загрузка AI настроек...</span>
         </div>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            marginBottom: '4px'
+          }}>
             Настройки AI
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p style={{ 
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-text-secondary)',
+            margin: 0
+          }}>
             Управление AI провайдерами и шаблонами
           </p>
         </div>
         
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: '12px' }}>
           <Button variant="outline" onClick={loadData} disabled={loading}>
-            <RefreshCw size={16} className="mr-2" />
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
           </Button>
           <Button onClick={() => setShowAddForm(true)}>
-            <Plus size={16} className="mr-2" />
+            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Добавить провайдера
           </Button>
         </div>
@@ -229,15 +244,25 @@ const AISettings = () => {
 
       {/* Сообщения */}
       {message.text && (
-        <div className={`flex items-center p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '16px', 
+          borderRadius: 'var(--mac-radius-md)',
+          backgroundColor: message.type === 'success' 
+            ? 'var(--mac-success-bg)' 
+            : 'var(--mac-error-bg)',
+          color: message.type === 'success' 
+            ? 'var(--mac-success)' 
+            : 'var(--mac-error)',
+          border: `1px solid ${message.type === 'success' 
+            ? 'var(--mac-success-border)' 
+            : 'var(--mac-error-border)'}`
+        }}>
           {message.type === 'success' ? (
-            <CheckCircle size={20} className="mr-2" />
+            <CheckCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           ) : (
-            <AlertCircle size={20} className="mr-2" />
+            <AlertCircle style={{ width: '20px', height: '20px', marginRight: '8px' }} />
           )}
           {message.text}
         </div>
@@ -245,44 +270,111 @@ const AISettings = () => {
 
       {/* Статистика */}
       {stats.total_requests !== undefined && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.total_requests}</div>
-            <div className="text-sm text-gray-600">Всего запросов</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <Card style={{ padding: '24px', textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-accent-blue)',
+              marginBottom: '8px'
+            }}>
+              {stats.total_requests}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Всего запросов
+            </div>
           </Card>
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.successful_requests}</div>
-            <div className="text-sm text-gray-600">Успешных</div>
+          <Card style={{ padding: '24px', textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-success)',
+              marginBottom: '8px'
+            }}>
+              {stats.successful_requests}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Успешных
+            </div>
           </Card>
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-orange-600">{Math.round(stats.cache_hit_rate)}%</div>
-            <div className="text-sm text-gray-600">Кэш</div>
+          <Card style={{ padding: '24px', textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-warning)',
+              marginBottom: '8px'
+            }}>
+              {Math.round(stats.cache_hit_rate)}%
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Кэш
+            </div>
           </Card>
-          <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">{stats.total_tokens_used}</div>
-            <div className="text-sm text-gray-600">Токенов</div>
+          <Card style={{ padding: '24px', textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-accent-purple)',
+              marginBottom: '8px'
+            }}>
+              {stats.total_tokens_used}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Токенов
+            </div>
           </Card>
         </div>
       )}
 
       {/* Провайдеры */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
         {providers.map(provider => {
           const config = providerConfigs[provider.name] || {};
           const testResult = testResults[provider.id];
           
           return (
-            <Card key={provider.id} className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full mr-3 ${provider.active ? 'bg-green-500' : 'bg-gray-400'}`} />
+            <Card key={provider.id} style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ 
+                    width: '12px', 
+                    height: '12px', 
+                    borderRadius: '50%', 
+                    marginRight: '12px',
+                    backgroundColor: provider.active ? 'var(--mac-success)' : 'var(--mac-text-tertiary)'
+                  }} />
                   <div>
-                    <h3 className="text-lg font-medium">{provider.display_name}</h3>
-                    <p className="text-sm text-gray-500">{config.description}</p>
+                    <h3 style={{ 
+                      fontSize: 'var(--mac-font-size-lg)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-text-primary)',
+                      margin: 0
+                    }}>
+                      {provider.display_name}
+                    </h3>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-text-secondary)',
+                      margin: 0
+                    }}>
+                      {config.description}
+                    </p>
                   </div>
                 </div>
                 
-                <div className="flex gap-2">
+                <div style={{ display: 'flex', gap: '8px' }}>
                   {provider.is_default && (
                     <Badge variant="success">По умолчанию</Badge>
                   )}
@@ -293,27 +385,31 @@ const AISettings = () => {
               </div>
 
               {/* Настройки провайдера */}
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Модель:</span>
-                  <span className="font-medium">{provider.model || '—'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: 'var(--mac-font-size-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--mac-text-secondary)' }}>Модель:</span>
+                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>{provider.model || '—'}</span>
                 </div>
                 
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Температура:</span>
-                  <span className="font-medium">{provider.temperature}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--mac-text-secondary)' }}>Температура:</span>
+                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>{provider.temperature}</span>
                 </div>
                 
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Макс. токенов:</span>
-                  <span className="font-medium">{provider.max_tokens}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--mac-text-secondary)' }}>Макс. токенов:</span>
+                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>{provider.max_tokens}</span>
                 </div>
 
                 {/* API ключ */}
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">API ключ:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--mac-text-secondary)' }}>API ключ:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ 
+                      fontFamily: 'monospace', 
+                      fontSize: 'var(--mac-font-size-xs)',
+                      color: 'var(--mac-text-primary)'
+                    }}>
                       {showApiKeys[provider.id] 
                         ? provider.api_key || '***не установлен***'
                         : '***скрыт***'
@@ -324,18 +420,18 @@ const AISettings = () => {
                       variant="ghost"
                       onClick={() => toggleApiKeyVisibility(provider.id)}
                     >
-                      {showApiKeys[provider.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                      {showApiKeys[provider.id] ? <EyeOff style={{ width: '14px', height: '14px' }} /> : <Eye style={{ width: '14px', height: '14px' }} />}
                     </Button>
                   </div>
                 </div>
 
                 {/* Возможности */}
                 {provider.capabilities && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Возможности:</span>
-                    <div className="flex gap-1">
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--mac-text-secondary)' }}>Возможности:</span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
                       {provider.capabilities.map(cap => (
-                        <Badge key={cap} variant="outline" className="text-xs">
+                        <Badge key={cap} variant="outline" style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                           {cap}
                         </Badge>
                       ))}
@@ -346,35 +442,51 @@ const AISettings = () => {
 
               {/* Результат тестирования */}
               {testResult && (
-                <div className={`mt-4 p-3 rounded-lg ${
-                  testResult.success 
-                    ? 'bg-green-50 border border-green-200 dark:bg-green-900/20'
-                    : 'bg-red-50 border border-red-200 dark:bg-red-900/20'
-                }`}>
-                  <div className="text-sm">
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px', 
+                  borderRadius: 'var(--mac-radius-md)',
+                  backgroundColor: testResult.success 
+                    ? 'var(--mac-success-bg)' 
+                    : 'var(--mac-error-bg)',
+                  border: `1px solid ${testResult.success 
+                    ? 'var(--mac-success-border)' 
+                    : 'var(--mac-error-border)'}`
+                }}>
+                  <div style={{ fontSize: 'var(--mac-font-size-sm)' }}>
                     {testResult.testing ? (
-                      <div className="flex items-center">
-                        <RefreshCw size={14} className="animate-spin mr-2" />
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <RefreshCw style={{ width: '14px', height: '14px', marginRight: '8px', animation: 'spin 1s linear infinite' }} />
                         Тестирование...
                       </div>
                     ) : testResult.success ? (
                       <div>
-                        <div className="flex items-center text-green-700 dark:text-green-400 mb-1">
-                          <CheckCircle size={14} className="mr-2" />
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          color: 'var(--mac-success)', 
+                          marginBottom: '4px' 
+                        }}>
+                          <CheckCircle style={{ width: '14px', height: '14px', marginRight: '8px' }} />
                           Тест пройден успешно
                         </div>
-                        <div className="text-xs space-y-1">
-                          <div>Время ответа: {testResult.response_time_ms}мс</div>
-                          <div>Токенов: {testResult.tokens_used}</div>
+                        <div style={{ 
+                          fontSize: 'var(--mac-font-size-xs)', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '4px' 
+                        }}>
+                          <div style={{ color: 'var(--mac-text-primary)' }}>Время ответа: {testResult.response_time_ms}мс</div>
+                          <div style={{ color: 'var(--mac-text-primary)' }}>Токенов: {testResult.tokens_used}</div>
                         </div>
                       </div>
                     ) : (
-                      <div className="text-red-700 dark:text-red-400">
-                        <div className="flex items-center mb-1">
-                          <AlertCircle size={14} className="mr-2" />
+                      <div style={{ color: 'var(--mac-error)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                          <AlertCircle style={{ width: '14px', height: '14px', marginRight: '8px' }} />
                           Ошибка тестирования
                         </div>
-                        <div className="text-xs">{testResult.error_message}</div>
+                        <div style={{ fontSize: 'var(--mac-font-size-xs)' }}>{testResult.error_message}</div>
                       </div>
                     )}
                   </div>
@@ -382,14 +494,14 @@ const AISettings = () => {
               )}
 
               {/* Действия */}
-              <div className="flex gap-2 mt-4">
+              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setEditingProvider(provider)}
-                  className="flex-1"
+                  style={{ flex: 1 }}
                 >
-                  <Edit size={14} className="mr-2" />
+                  <Edit style={{ width: '14px', height: '14px', marginRight: '8px' }} />
                   Настроить
                 </Button>
                 <Button
@@ -398,7 +510,7 @@ const AISettings = () => {
                   onClick={() => handleTestProvider(provider.id)}
                   disabled={!provider.active || !provider.api_key}
                 >
-                  <TestTube size={14} />
+                  <TestTube style={{ width: '14px', height: '14px' }} />
                 </Button>
               </div>
             </Card>
@@ -406,27 +518,47 @@ const AISettings = () => {
         })}
 
         {/* Карточка добавления нового провайдера */}
-        <Card className="p-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
-          <div className="text-center">
-            <Brain size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Добавить AI провайдера
-            </h3>
-            <p className="text-gray-500 mb-4">
-              Настройте новый AI провайдер для использования в системе
-            </p>
-            <Button onClick={() => setShowAddForm(true)}>
-              <Plus size={16} className="mr-2" />
-              Добавить
-            </Button>
-          </div>
+        <Card style={{ 
+          padding: '24px', 
+          border: '2px dashed var(--mac-border)', 
+          textAlign: 'center' 
+        }}>
+          <Brain style={{ width: '48px', height: '48px', margin: '0 auto 16px', color: 'var(--mac-text-tertiary)' }} />
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px',
+            margin: 0
+          }}>
+            Добавить AI провайдера
+          </h3>
+          <p style={{ 
+            color: 'var(--mac-text-secondary)', 
+            marginBottom: '16px',
+            margin: 0
+          }}>
+            Настройте новый AI провайдер для использования в системе
+          </p>
+          <Button onClick={() => setShowAddForm(true)}>
+            <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+            Добавить
+          </Button>
         </Card>
       </div>
 
       {/* Системные настройки */}
-      <Card className="p-6">
-        <h3 className="text-lg font-medium mb-4 flex items-center">
-          <Settings size={20} className="mr-2 text-blue-600" />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          marginBottom: '16px', 
+          display: 'flex', 
+          alignItems: 'center',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          <Settings style={{ width: '20px', height: '20px', marginRight: '8px', color: 'var(--mac-accent-blue)' }} />
           Системные настройки AI
         </h3>
         
@@ -495,18 +627,30 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
   };
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-medium mb-4">
+    <Card style={{ padding: '24px' }}>
+      <h3 style={{ 
+        fontSize: 'var(--mac-font-size-lg)', 
+        fontWeight: 'var(--mac-font-weight-medium)', 
+        marginBottom: '16px',
+        color: 'var(--mac-text-primary)',
+        margin: 0
+      }}>
         {provider ? 'Редактирование провайдера' : 'Добавление AI провайдера'}
       </h3>
       
       {/* Быстрые пресеты */}
       {!provider && (
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px' 
+          }}>
             Быстрые настройки:
           </label>
-          <div className="flex gap-2 flex-wrap">
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {Object.entries(providerConfigs).map(([key, config]) => (
               <Button
                 key={key}
@@ -521,122 +665,156 @@ const ProviderForm = ({ provider, providerConfigs, onSave, onCancel }) => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Имя провайдера *
             </label>
-            <input
+            <MacOSInput
               type="text"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="openai, gemini, deepseek"
+              style={{ width: '100%' }}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Отображаемое имя *
             </label>
-            <input
+            <MacOSInput
               type="text"
               value={formData.display_name}
               onChange={(e) => setFormData(prev => ({ ...prev, display_name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="OpenAI GPT-4"
+              style={{ width: '100%' }}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <Key size={16} className="inline mr-1" />
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              <Key style={{ width: '16px', height: '16px', display: 'inline', marginRight: '4px' }} />
               API ключ
             </label>
-            <input
+            <MacOSInput
               type="password"
               value={formData.api_key}
               onChange={(e) => setFormData(prev => ({ ...prev, api_key: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="sk-..."
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Модель
             </label>
-            <input
+            <MacOSInput
               type="text"
               value={formData.model}
               onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               placeholder="gpt-4, gemini-pro"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Температура
             </label>
-            <input
+            <MacOSInput
               type="number"
               min="0"
               max="2"
               step="0.1"
               value={formData.temperature}
               onChange={(e) => setFormData(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
               Макс. токенов
             </label>
-            <input
+            <MacOSInput
               type="number"
               min="100"
               max="8000"
               value={formData.max_tokens}
               onChange={(e) => setFormData(prev => ({ ...prev, max_tokens: parseInt(e.target.value) }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <label style={{ display: 'flex', alignItems: 'center' }}>
+            <MacOSCheckbox
               checked={formData.active}
-              onChange={(e) => setFormData(prev => ({ ...prev, active: e.target.checked }))}
-              className="mr-2"
+              onChange={(checked) => setFormData(prev => ({ ...prev, active: checked }))}
+              style={{ marginRight: '8px' }}
             />
-            <span className="text-sm font-medium">Активен</span>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Активен</span>
           </label>
           
-          <label className="flex items-center">
-            <input
-              type="checkbox"
+          <label style={{ display: 'flex', alignItems: 'center' }}>
+            <MacOSCheckbox
               checked={formData.is_default}
-              onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-              className="mr-2"
+              onChange={(checked) => setFormData(prev => ({ ...prev, is_default: checked }))}
+              style={{ marginRight: '8px' }}
             />
-            <span className="text-sm font-medium">По умолчанию</span>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>По умолчанию</span>
           </label>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <Button type="button" variant="outline" onClick={onCancel}>
-            <X size={16} className="mr-2" />
+            <X style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Отменить
           </Button>
           <Button type="submit">
-            <Save size={16} className="mr-2" />
+            <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Сохранить
           </Button>
         </div>
@@ -654,60 +832,56 @@ const SystemSettingsForm = ({ settings, onSave }) => {
   }, [settings]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
         <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
+          <label style={{ display: 'flex', alignItems: 'center' }}>
+            <MacOSCheckbox
               checked={formData.enabled || false}
-              onChange={(e) => setFormData(prev => ({ ...prev, enabled: e.target.checked }))}
-              className="mr-2"
+              onChange={(checked) => setFormData(prev => ({ ...prev, enabled: checked }))}
+              style={{ marginRight: '8px' }}
             />
-            <span className="text-sm font-medium">AI система включена</span>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>AI система включена</span>
           </label>
         </div>
 
         <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
+          <label style={{ display: 'flex', alignItems: 'center' }}>
+            <MacOSCheckbox
               checked={formData.cache_enabled || false}
-              onChange={(e) => setFormData(prev => ({ ...prev, cache_enabled: e.target.checked }))}
-              className="mr-2"
+              onChange={(checked) => setFormData(prev => ({ ...prev, cache_enabled: checked }))}
+              style={{ marginRight: '8px' }}
             />
-            <span className="text-sm font-medium">Кэширование включено</span>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Кэширование включено</span>
           </label>
         </div>
 
         <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
+          <label style={{ display: 'flex', alignItems: 'center' }}>
+            <MacOSCheckbox
               checked={formData.require_consent_for_files || false}
-              onChange={(e) => setFormData(prev => ({ ...prev, require_consent_for_files: e.target.checked }))}
-              className="mr-2"
+              onChange={(checked) => setFormData(prev => ({ ...prev, require_consent_for_files: checked }))}
+              style={{ marginRight: '8px' }}
             />
-            <span className="text-sm font-medium">Требовать согласие для файлов</span>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Требовать согласие для файлов</span>
           </label>
         </div>
 
         <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
+          <label style={{ display: 'flex', alignItems: 'center' }}>
+            <MacOSCheckbox
               checked={formData.anonymize_data || false}
-              onChange={(e) => setFormData(prev => ({ ...prev, anonymize_data: e.target.checked }))}
-              className="mr-2"
+              onChange={(checked) => setFormData(prev => ({ ...prev, anonymize_data: checked }))}
+              style={{ marginRight: '8px' }}
             />
-            <span className="text-sm font-medium">Анонимизировать данные</span>
+            <span style={{ fontSize: 'var(--mac-font-size-sm)', fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)' }}>Анонимизировать данные</span>
           </label>
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Button onClick={() => onSave(formData)}>
-          <Save size={16} className="mr-2" />
+          <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
           Сохранить настройки
         </Button>
       </div>

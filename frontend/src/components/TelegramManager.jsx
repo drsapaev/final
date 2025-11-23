@@ -5,46 +5,31 @@ import {
   CardContent,
   Typography,
   Button,
-  TextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  IconButton,
+  Input,
+  Badge,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Alert,
   CircularProgress,
-  Grid,
-  FormControl,
-  InputLabel,
   Select,
-  MenuItem,
+  Option,
   Switch,
-  FormControlLabel,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon
-} from '@mui/material';
+  Checkbox,
+} from './ui/macos';
 import {
-  Add,
+  Plus,
   Edit,
-  Delete,
+  Trash2,
   Send,
-  Telegram,
+  MessageSquare,
   Settings,
-  Refresh,
+  RefreshCw,
   CheckCircle,
-  Error,
-  Warning
-} from '@mui/icons-material';
+  XCircle,
+  AlertTriangle,
+} from 'lucide-react';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);

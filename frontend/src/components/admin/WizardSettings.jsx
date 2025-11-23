@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button } from '../ui';
-import { Settings, ToggleLeft, ToggleRight, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSCheckbox,
+  MacOSLoadingSkeleton,
+  MacOSEmptyState,
+  MacOSAlert,
+  MacOSBadge,
+  MacOSModal,
+  MacOSStatCard,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTab
+} from '../ui/macos';
+import { Settings, ToggleLeft, ToggleRight, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { api } from '../../utils/api';
 
 const WizardSettings = () => {
   const [settings, setSettings] = useState({
@@ -11,6 +25,8 @@ const WizardSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [error, setError] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Загрузка настроек
   useEffect(() => {
@@ -20,22 +36,18 @@ const WizardSettings = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/admin/wizard-settings`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Ошибка загрузки настроек');
-      }
-
-      const data = await response.json();
-      setSettings(data);
+      const response = await api.get('/admin/wizard-settings');
+      setSettings(response.data);
       setHasChanges(false);
     } catch (error) {
       console.error('Error fetching wizard settings:', error);
+      setError('Не удалось загрузить настройки мастера. Проверьте подключение к серверу.');
+      // Fallback данные при ошибке
+      setSettings({
+        use_new_wizard: false,
+        updated_at: new Date().toISOString()
+      });
+      setHasChanges(false);
       toast.error('Ошибка загрузки настроек мастера');
     } finally {
       setLoading(false);
@@ -51,31 +63,23 @@ const WizardSettings = () => {
   };
 
   const handleSave = async () => {
+    setShowConfirmModal(true);
+  };
+
+  const confirmSave = async () => {
     try {
       setSaving(true);
-      const response = await fetch(`/api/v1/admin/wizard-settings`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          use_new_wizard: settings.use_new_wizard
-        })
+      setShowConfirmModal(false);
+      const response = await api.post('/admin/wizard-settings', {
+        use_new_wizard: settings.use_new_wizard
       });
-
-      if (!response.ok) {
-        throw new Error('Ошибка сохранения настроек');
-      }
-
-      const data = await response.json();
       
-      if (data.success) {
-        toast.success(data.message);
-        setSettings(data.settings);
+      if (response.data.success) {
+        toast.success(response.data.message);
+        setSettings(response.data.settings);
         setHasChanges(false);
       } else {
-        throw new Error(data.message || 'Ошибка сохранения');
+        throw new Error(response.data.message || 'Ошибка сохранения');
       }
     } catch (error) {
       console.error('Error saving wizard settings:', error);
@@ -87,155 +91,456 @@ const WizardSettings = () => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Settings className="h-6 w-6 text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Настройки мастера регистрации
-          </h2>
-        </div>
-        <Card className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+      <MacOSCard style={{ 
+        padding: '24px',
+        backgroundColor: 'var(--mac-bg-primary)',
+        minHeight: '100vh'
+      }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            marginBottom: '24px' 
+          }}>
+            <Settings style={{ 
+              width: '32px', 
+              height: '32px', 
+              color: 'var(--mac-accent-blue)' 
+            }} />
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Настройки мастера регистрации
+            </h2>
           </div>
-        </Card>
-      </div>
+          <MacOSLoadingSkeleton height="400px" />
+      </MacOSCard>
+    );
+  }
+
+  // Критическая ошибка загрузки
+  if (error && !settings.updated_at) {
+    return (
+      <MacOSCard style={{ 
+        padding: '24px',
+        backgroundColor: 'var(--mac-bg-primary)',
+        minHeight: '100vh'
+      }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px', 
+            marginBottom: '24px' 
+          }}>
+            <Settings style={{ 
+              width: '32px', 
+              height: '32px', 
+              color: 'var(--mac-accent-blue)' 
+            }} />
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Настройки мастера регистрации
+            </h2>
+          </div>
+          <MacOSEmptyState
+            icon={AlertCircle}
+            title="Не удалось загрузить настройки"
+            description="Проверьте подключение к серверу и попробуйте обновить страницу"
+            action={
+              <MacOSButton onClick={fetchSettings} variant="primary">
+                <RefreshCw style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  marginRight: '4px' 
+                }} />
+                Попробовать снова
+              </MacOSButton>
+            }
+          />
+      </MacOSCard>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Settings className="h-6 w-6 text-blue-600" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Настройки мастера регистрации
-        </h2>
-      </div>
+    <MacOSCard style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '8px', 
+        marginBottom: '24px',
+        flexWrap: 'wrap'
+      }}>
+          <Settings style={{ 
+            width: '32px', 
+            height: '32px', 
+            color: 'var(--mac-accent-blue)' 
+          }} />
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            flex: 1,
+            minWidth: '200px'
+          }}>
+            Настройки мастера регистрации
+          </h2>
 
-      <Card className="p-6">
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Критическая ошибка */}
+          {error && (
+            <MacOSAlert
+              type="error"
+              title="Ошибка загрузки"
+              message={error}
+              onClose={() => setError(null)}
+            />
+          )}
+
           {/* A/B Переключатель */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex-1">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Версия мастера регистрации
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {settings.use_new_wizard 
-                  ? 'Используется новый мастер с улучшенным дизайном, корзиной и онлайн-оплатой'
-                  : 'Используется классический мастер регистрации'
-                }
-              </p>
+          <MacOSCard style={{ 
+            padding: '24px', 
+            backgroundColor: 'var(--mac-bg-secondary)',
+            border: '1px solid var(--mac-border)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              marginBottom: '16px'
+            }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ 
+                  fontSize: 'var(--mac-font-size-lg)', 
+                  fontWeight: 'var(--mac-font-weight-semibold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 4px 0'
+                }}>
+                  Версия мастера регистрации
+                </h3>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  {settings.use_new_wizard 
+                    ? 'Используется новый мастер с улучшенным дизайном, корзиной и онлайн-оплатой'
+                    : 'Используется классический мастер регистрации'
+                  }
+                </p>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MacOSCheckbox
+                  checked={settings.use_new_wizard}
+                  onChange={handleToggleWizard}
+                />
+                <span style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: settings.use_new_wizard ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+                }}>
+                  {settings.use_new_wizard ? 'Новый мастер' : 'Старый мастер'}
+                </span>
+              </div>
             </div>
+          </MacOSCard>
+
+          {/* Статистика использования */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <MacOSStatCard
+              title="Использование нового мастера"
+              value={settings.use_new_wizard ? "100%" : "0%"}
+              icon={settings.use_new_wizard ? CheckCircle : AlertCircle}
+              color={settings.use_new_wizard ? "var(--mac-success)" : "var(--mac-warning)"}
+              trend={settings.use_new_wizard ? "Активен" : "Неактивен"}
+              trendColor={settings.use_new_wizard ? "var(--mac-success)" : "var(--mac-warning)"}
+            />
             
-            <button
-              onClick={handleToggleWizard}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                settings.use_new_wizard
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-500'
-              }`}
-            >
-              {settings.use_new_wizard ? (
-                <>
-                  <ToggleRight className="h-5 w-5" />
-                  Новый мастер
-                </>
-              ) : (
-                <>
-                  <ToggleLeft className="h-5 w-5" />
-                  Старый мастер
-                </>
-              )}
-            </button>
+            <MacOSStatCard
+              title="Последнее обновление"
+              value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : "Неизвестно"}
+              icon={RefreshCw}
+              color="var(--mac-info)"
+              trend="Настройки"
+              trendColor="var(--mac-text-secondary)"
+            />
           </div>
 
           {/* Информация о версиях */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`p-4 border-2 rounded-lg ${
-              !settings.use_new_wizard 
-                ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20' 
-                : 'border-gray-200 dark:border-gray-700'
-            }`}>
-              <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                Классический мастер
-              </h4>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <MacOSCard style={{ 
+              padding: '24px',
+              border: !settings.use_new_wizard ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
+              backgroundColor: !settings.use_new_wizard ? 'var(--mac-accent-bg)' : 'var(--mac-bg-primary)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+              transform: !settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px', 
+                marginBottom: '8px' 
+              }}>
+                <h4 style={{ 
+                  fontSize: 'var(--mac-font-size-lg)', 
+                  fontWeight: 'var(--mac-font-weight-semibold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: 0
+                }}>
+                  Классический мастер
+                </h4>
+                <MacOSBadge 
+                  variant={!settings.use_new_wizard ? "primary" : "secondary"}
+                  size="sm"
+                >
+                  {!settings.use_new_wizard ? "Активен" : "Неактивен"}
+                </MacOSBadge>
+              </div>
+              <ul style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)', 
+                margin: 0,
+                paddingLeft: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
                 <li>• Проверенная стабильность</li>
                 <li>• Привычный интерфейс</li>
                 <li>• Базовая функциональность</li>
                 <li>• Простая оплата</li>
               </ul>
-            </div>
+            </MacOSCard>
 
-            <div className={`p-4 border-2 rounded-lg ${
-              settings.use_new_wizard 
-                ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20' 
-                : 'border-gray-200 dark:border-gray-700'
-            }`}>
-              <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                Новый мастер
-              </h4>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <li>• Windows 11 дизайн</li>
+            <MacOSCard style={{ 
+              padding: '24px',
+              border: settings.use_new_wizard ? '2px solid var(--mac-success)' : '1px solid var(--mac-border)',
+              backgroundColor: settings.use_new_wizard ? 'var(--mac-success-bg)' : 'var(--mac-bg-primary)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+              transform: settings.use_new_wizard ? 'scale(1.02)' : 'scale(1)'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px', 
+                marginBottom: '8px' 
+              }}>
+                <h4 style={{ 
+                  fontSize: 'var(--mac-font-size-lg)', 
+                  fontWeight: 'var(--mac-font-weight-semibold)', 
+                  color: 'var(--mac-text-primary)',
+                  margin: 0
+                }}>
+                  Новый мастер
+                </h4>
+                <MacOSBadge 
+                  variant={settings.use_new_wizard ? "success" : "secondary"}
+                  size="sm"
+                >
+                  {settings.use_new_wizard ? "Активен" : "Неактивен"}
+                </MacOSBadge>
+              </div>
+              <ul style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)', 
+                margin: 0,
+                paddingLeft: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <li>• macOS дизайн</li>
                 <li>• Корзина услуг</li>
                 <li>• Онлайн-оплата (Click)</li>
                 <li>• Автосохранение</li>
                 <li>• Горячие клавиши</li>
                 <li>• Льготы и повторные визиты</li>
               </ul>
-            </div>
+            </MacOSCard>
           </div>
 
           {/* Предупреждение */}
           {hasChanges && (
-            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                Изменения не сохранены. Нажмите "Сохранить" для применения настроек.
-              </p>
-            </div>
+            <MacOSCard style={{ 
+              padding: '16px', 
+              backgroundColor: 'var(--mac-warning-bg)', 
+              border: '1px solid var(--mac-warning-border)' 
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px' 
+              }}>
+                <AlertCircle style={{ 
+                  width: '20px', 
+                  height: '20px', 
+                  color: 'var(--mac-warning)',
+                  flexShrink: 0
+                }} />
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-warning)',
+                  margin: 0,
+                  fontWeight: 'var(--mac-font-weight-medium)'
+                }}>
+                  Изменения не сохранены. Нажмите "Сохранить" для применения настроек.
+                </p>
+              </div>
+            </MacOSCard>
           )}
 
           {/* Информация об обновлении */}
           {settings.updated_at && (
-            <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-text-tertiary)',
+              textAlign: 'center',
+              padding: '8px 0'
+            }}>
               Последнее обновление: {new Date(settings.updated_at).toLocaleString('ru-RU')}
             </div>
           )}
 
           {/* Кнопки действий */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Button
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: '8px', 
+            paddingTop: '16px', 
+            borderTop: '1px solid var(--mac-border)',
+            flexWrap: 'wrap'
+          }}>
+            <MacOSButton
               variant="outline"
               onClick={fetchSettings}
               disabled={saving}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                padding: '4px 16px',
+                minWidth: '120px'
+              }}
             >
               Отменить
-            </Button>
+            </MacOSButton>
             
-            <Button
+            <MacOSButton
               onClick={handleSave}
               disabled={!hasChanges || saving}
-              className="flex items-center gap-2"
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                backgroundColor: 'var(--mac-accent-blue)',
+                border: 'none',
+                padding: '4px 16px',
+                minWidth: '120px'
+              }}
             >
               {saving ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <RefreshCw style={{ 
+                    width: '16px', 
+                    height: '16px',
+                    animation: 'spin 1s linear infinite'
+                  }} />
                   Сохранение...
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4" />
+                  <Save style={{ width: '16px', height: '16px' }} />
                   Сохранить
                 </>
               )}
-            </Button>
+            </MacOSButton>
           </div>
         </div>
-      </Card>
-    </div>
+      </div>
+
+      {/* Модальное окно подтверждения */}
+      <MacOSModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        title="Подтверждение изменений"
+        size="sm"
+      >
+        <div style={{ padding: '24px' }}>
+          <p style={{ 
+            fontSize: 'var(--mac-font-size-base)', 
+            color: 'var(--mac-text-primary)',
+            marginBottom: '24px',
+            lineHeight: 'var(--mac-line-height-relaxed)'
+          }}>
+            Вы собираетесь {settings.use_new_wizard ? 'включить' : 'отключить'} новый мастер регистрации. 
+            Это изменение повлияет на всех пользователей системы.
+          </p>
+          
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: 'var(--mac-spacing-sm)' 
+          }}>
+            <MacOSButton
+              variant="outline"
+              onClick={() => setShowConfirmModal(false)}
+              disabled={saving}
+            >
+              Отмена
+            </MacOSButton>
+            <MacOSButton
+              onClick={confirmSave}
+              disabled={saving}
+              style={{ 
+                backgroundColor: 'var(--mac-accent-blue)',
+                border: 'none'
+              }}
+            >
+              {saving ? (
+                <>
+                  <RefreshCw style={{ 
+                    width: '16px', 
+                    height: '16px',
+                    animation: 'spin 1s linear infinite',
+                    marginRight: '4px'
+                  }} />
+                  Сохранение...
+                </>
+              ) : (
+                <>
+                  <Save style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    marginRight: '4px' 
+                  }} />
+                  Подтвердить
+                </>
+              )}
+            </MacOSButton>
+          </div>
+        </div>
+      </MacOSModal>
+    </MacOSCard>
   );
 };
 

@@ -23,7 +23,7 @@ import {
   Plus,
   Edit
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge } from '../ui/macos';
 
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);

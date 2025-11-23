@@ -8,16 +8,14 @@ import {
   DialogActions,
   Typography,
   Alert,
-  IconButton,
-  Paper
-} from '@mui/material';
+} from '../ui/macos';
 import {
-  QrCodeScanner as ScanIcon,
-  Close as CloseIcon,
-  CameraAlt as CameraIcon,
-  FlashOn as FlashOnIcon,
-  FlashOff as FlashOffIcon
-} from '@mui/icons-material';
+  QrCode,
+  X,
+  Camera,
+  Flashlight,
+  FlashlightOff,
+} from 'lucide-react';
 
 const QRScanner = ({ open, onClose, onScan }) => {
   const [error, setError] = useState('');
@@ -206,8 +204,8 @@ const QRScanner = ({ open, onClose, onScan }) => {
                 />
                 
                 {/* Overlay для прицела */}
-                <Box
-                  sx={{
+                <div
+                  style={{
                     position: 'absolute',
                     top: '50%',
                     left: '50%',
@@ -222,27 +220,33 @@ const QRScanner = ({ open, onClose, onScan }) => {
                 />
 
                 {/* Кнопки управления */}
-                <Box
-                  sx={{
+                <div
+                  style={{
                     position: 'absolute',
                     bottom: 16,
                     right: 16,
                     display: 'flex',
-                    gap: 1
+                    gap: 8
                   }}
                 >
-                  <IconButton
+                  <button
                     onClick={toggleFlash}
-                    sx={{ 
-                      bgcolor: 'rgba(0, 0, 0, 0.6)', 
+                    style={{
+                      padding: '8px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
                       color: 'white',
-                      '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.8)' }
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}
                   >
-                    {flashOn ? <FlashOffIcon /> : <FlashOnIcon />}
-                  </IconButton>
-                </Box>
-              </Paper>
+                    {flashOn ? <FlashlightOff style={{ width: 20, height: 20 }} /> : <Flashlight style={{ width: 20, height: 20 }} />}
+                  </button>
+                </div>
+              </div>
 
               <canvas
                 ref={canvasRef}

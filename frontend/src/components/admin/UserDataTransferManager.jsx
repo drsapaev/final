@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Input, Label, Select } from '../ui/native';
+import { Card, Button, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
 import { Users, ArrowRight, Search, CheckCircle, XCircle, AlertTriangle, History, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const UserDataTransferManager = () => {
   const [activeTab, setActiveTab] = useState('transfer');
@@ -183,41 +183,83 @@ const UserDataTransferManager = () => {
   };
 
   const renderTransferTab = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Поиск пользователей */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Search className="mr-2" size={20} />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Search style={{ width: '20px', height: '20px' }} />
           Поиск пользователей
         </h3>
         
-        <div className="relative">
-          <Input
+        <div style={{ position: 'relative' }}>
+          <MacOSInput
             type="text"
             placeholder="Введите имя, телефон или email..."
             value={searchQuery}
             onChange={handleSearchChange}
-            className="w-full"
+            style={{ width: '100%' }}
           />
           
           {isSearching && (
-            <div className="absolute right-3 top-3">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <div style={{ position: 'absolute', right: '12px', top: '12px' }}>
+              <div style={{ 
+                width: '16px', 
+                height: '16px', 
+                border: '2px solid var(--mac-accent-blue)', 
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
             </div>
           )}
           
           {searchResults.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+            <div style={{ 
+              position: 'absolute', 
+              zIndex: 10, 
+              width: '100%', 
+              marginTop: '4px', 
+              backgroundColor: 'var(--mac-bg-primary)', 
+              border: '1px solid var(--mac-border)', 
+              borderRadius: 'var(--mac-radius-md)', 
+              boxShadow: 'var(--mac-shadow-lg)', 
+              maxHeight: '240px', 
+              overflowY: 'auto'
+            }}>
               {searchResults.map(user => (
-                <div key={user.id} className="p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
-                  <div className="flex justify-between items-center">
+                <div key={user.id} style={{ 
+                  padding: '12px', 
+                  borderBottom: '1px solid var(--mac-border)',
+                  transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div className="font-medium">{user.full_name || user.username}</div>
-                      <div className="text-sm text-gray-500">
+                      <div style={{ 
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        fontSize: 'var(--mac-font-size-sm)',
+                        color: 'var(--mac-text-primary)'
+                      }}>
+                        {user.full_name || user.username}
+                      </div>
+                      <div style={{ 
+                        fontSize: 'var(--mac-font-size-xs)', 
+                        color: 'var(--mac-text-secondary)' 
+                      }}>
                         {user.phone} • {user.email}
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <Button
                         size="sm"
                         variant="outline"
@@ -244,14 +286,41 @@ const UserDataTransferManager = () => {
       </Card>
 
       {/* Выбранные пользователи */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Пользователь-источник</h3>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+        gap: '24px' 
+      }}>
+        <Card style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 16px 0'
+          }}>
+            Пользователь-источник
+          </h3>
           {sourceUser ? (
-            <div className="space-y-2">
-              <div className="font-medium">{sourceUser.full_name || sourceUser.username}</div>
-              <div className="text-sm text-gray-500">{sourceUser.phone}</div>
-              <div className="text-sm text-gray-500">{sourceUser.email}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)',
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                {sourceUser.full_name || sourceUser.username}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                {sourceUser.phone}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                {sourceUser.email}
+              </div>
               <Button
                 size="sm"
                 variant="outline"
@@ -259,34 +328,69 @@ const UserDataTransferManager = () => {
                   setSourceUser(null);
                   setUserDataSummary(null);
                 }}
+                style={{ marginTop: '8px', alignSelf: 'flex-start' }}
               >
                 Очистить
               </Button>
             </div>
           ) : (
-            <div className="text-gray-500 text-center py-8">
+            <div style={{ 
+              color: 'var(--mac-text-secondary)', 
+              textAlign: 'center', 
+              padding: '32px 0',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
               Выберите пользователя-источника из результатов поиска
             </div>
           )}
         </Card>
 
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Пользователь-получатель</h3>
+        <Card style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 16px 0'
+          }}>
+            Пользователь-получатель
+          </h3>
           {targetUser ? (
-            <div className="space-y-2">
-              <div className="font-medium">{targetUser.full_name || targetUser.username}</div>
-              <div className="text-sm text-gray-500">{targetUser.phone}</div>
-              <div className="text-sm text-gray-500">{targetUser.email}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)',
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                {targetUser.full_name || targetUser.username}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                {targetUser.phone}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                {targetUser.email}
+              </div>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setTargetUser(null)}
+                style={{ marginTop: '8px', alignSelf: 'flex-start' }}
               >
                 Очистить
               </Button>
             </div>
           ) : (
-            <div className="text-gray-500 text-center py-8">
+            <div style={{ 
+              color: 'var(--mac-text-secondary)', 
+              textAlign: 'center', 
+              padding: '32px 0',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
               Выберите пользователя-получателя из результатов поиска
             </div>
           )}
@@ -295,40 +399,118 @@ const UserDataTransferManager = () => {
 
       {/* Сводка данных источника */}
       {userDataSummary && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Данные для передачи</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{userDataSummary.data_counts.appointments}</div>
-              <div className="text-sm text-gray-500">Назначений</div>
+        <Card style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 16px 0'
+          }}>
+            Данные для передачи
+          </h3>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+            gap: '16px', 
+            marginBottom: '16px' 
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)', 
+                color: 'var(--mac-accent-blue)' 
+              }}>
+                {userDataSummary.data_counts.appointments}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                Назначений
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{userDataSummary.data_counts.visits}</div>
-              <div className="text-sm text-gray-500">Визитов</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)', 
+                color: 'var(--mac-success)' 
+              }}>
+                {userDataSummary.data_counts.visits}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                Визитов
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{userDataSummary.data_counts.queue_entries}</div>
-              <div className="text-sm text-gray-500">Записей в очереди</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)', 
+                color: 'var(--mac-warning)' 
+              }}>
+                {userDataSummary.data_counts.queue_entries}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                Записей в очереди
+              </div>
             </div>
           </div>
         </Card>
       )}
 
       {/* Выбор типов данных */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Типы данных для передачи</h3>
-        <div className="space-y-3">
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0'
+        }}>
+          Типы данных для передачи
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {availableDataTypes.map(dataType => (
-            <label key={dataType.key} className="flex items-center space-x-3">
-              <input
-                type="checkbox"
+            <label key={dataType.key} style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: 'var(--mac-radius-sm)',
+              transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <MacOSCheckbox
                 checked={selectedDataTypes.includes(dataType.key)}
-                onChange={() => handleDataTypeChange(dataType.key)}
-                className="rounded border-gray-300"
+                onChange={(checked) => {
+                  if (checked) {
+                    setSelectedDataTypes(prev => [...prev, dataType.key]);
+                  } else {
+                    setSelectedDataTypes(prev => prev.filter(type => type !== dataType.key));
+                  }
+                }}
               />
               <div>
-                <div className="font-medium">{dataType.name}</div>
-                <div className="text-sm text-gray-500">{dataType.description}</div>
+                <div style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  {dataType.name}
+                </div>
+                <div style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-secondary)' 
+                }}>
+                  {dataType.description}
+                </div>
               </div>
             </label>
           ))}
@@ -336,20 +518,28 @@ const UserDataTransferManager = () => {
       </Card>
 
       {/* Кнопка передачи */}
-      <div className="flex justify-center">
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
         <Button
           onClick={executeTransfer}
           disabled={!sourceUser || !targetUser || selectedDataTypes.length === 0 || isTransferring}
-          className="px-8 py-3"
+          style={{ padding: '12px 32px' }}
         >
           {isTransferring ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <div style={{ 
+                width: '16px', 
+                height: '16px', 
+                border: '2px solid white', 
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginRight: '8px'
+              }}></div>
               Передача данных...
             </>
           ) : (
             <>
-              <ArrowRight className="mr-2" size={20} />
+              <ArrowRight style={{ width: '20px', height: '20px', marginRight: '8px' }} />
               Передать данные
             </>
           )}
@@ -359,37 +549,65 @@ const UserDataTransferManager = () => {
   );
 
   const renderHistoryTab = () => (
-    <Card className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">История передач</h3>
+    <Card style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          История передач
+        </h3>
         <Button onClick={loadTransferHistory} variant="outline">
-          <History className="mr-2" size={16} />
+          <History style={{ width: '16px', height: '16px', marginRight: '8px' }} />
           Обновить
         </Button>
       </div>
       
       {transferHistory.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '32px 0', 
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
           История передач пуста
         </div>
       ) : (
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {transferHistory.map((transfer, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-start">
+            <div key={index} style={{ 
+              border: '1px solid var(--mac-border)', 
+              borderRadius: 'var(--mac-radius-md)', 
+              padding: '16px',
+              backgroundColor: 'var(--mac-bg-secondary)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div className="font-medium">
+                  <div style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
                     {transfer.source_user} → {transfer.target_user}
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-text-secondary)' 
+                  }}>
                     {new Date(transfer.transfer_date).toLocaleString()}
                   </div>
                 </div>
-                <div className="flex items-center">
+                <div style={{ display: 'flex', alignItems: 'center' }}>
                   {transfer.success ? (
-                    <CheckCircle className="text-green-500" size={20} />
+                    <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
                   ) : (
-                    <XCircle className="text-red-500" size={20} />
+                    <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
                   )}
                 </div>
               </div>
@@ -401,32 +619,81 @@ const UserDataTransferManager = () => {
   );
 
   const renderStatisticsTab = () => (
-    <Card className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Статистика передач</h3>
+    <Card style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          Статистика передач
+        </h3>
         <Button onClick={loadStatistics} variant="outline">
-          <BarChart3 className="mr-2" size={16} />
+          <BarChart3 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
           Обновить
         </Button>
       </div>
       
       {statistics ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600">{statistics.total_transfers}</div>
-            <div className="text-sm text-gray-500">Всего передач</div>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '24px' 
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-accent-blue)' 
+            }}>
+              {statistics.total_transfers}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Всего передач
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-green-600">{statistics.successful_transfers}</div>
-            <div className="text-sm text-gray-500">Успешных</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-success)' 
+            }}>
+              {statistics.successful_transfers}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Успешных
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-600">{statistics.failed_transfers}</div>
-            <div className="text-sm text-gray-500">Неудачных</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-error)' 
+            }}>
+              {statistics.failed_transfers}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-text-secondary)' 
+            }}>
+              Неудачных
+            </div>
           </div>
         </div>
       ) : (
-        <div className="text-center py-8 text-gray-500">
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '32px 0', 
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
           Нажмите "Обновить" для загрузки статистики
         </div>
       )}
@@ -434,56 +701,176 @@ const UserDataTransferManager = () => {
   );
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2 flex items-center">
-          <Users className="mr-3" size={28} />
+    <div style={{ 
+      maxWidth: '1200px', 
+      margin: '0 auto', 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ 
+          fontSize: 'var(--mac-font-size-2xl)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 8px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <Users style={{ width: '28px', height: '28px' }} />
           Передача данных пользователей
         </h1>
-        <p className="text-gray-600">
+        <p style={{ 
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)',
+          margin: 0
+        }}>
           Управление передачей назначений, визитов и записей в очереди между пользователями
         </p>
       </div>
 
       {/* Навигация по вкладкам */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+      <div style={{ 
+        display: 'flex', 
+        marginBottom: '24px'
+      }}>
         <button
           onClick={() => setActiveTab('transfer')}
-          className={`px-4 py-2 rounded-md transition-colors ${
-            activeTab === 'transfer'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'transfer' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'transfer' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'transfer') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'transfer') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
           Передача данных
+          {activeTab === 'transfer' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
         <button
           onClick={() => {
             setActiveTab('history');
             loadTransferHistory();
           }}
-          className={`px-4 py-2 rounded-md transition-colors ${
-            activeTab === 'history'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'history' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'history' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'history') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'history') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
           История
+          {activeTab === 'history' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
         <button
           onClick={() => {
             setActiveTab('statistics');
             loadStatistics();
           }}
-          className={`px-4 py-2 rounded-md transition-colors ${
-            activeTab === 'statistics'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'statistics' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'statistics' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'statistics') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'statistics') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
           Статистика
+          {activeTab === 'statistics' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Контент вкладок */}
       {activeTab === 'transfer' && renderTransferTab()}

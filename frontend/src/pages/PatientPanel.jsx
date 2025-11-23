@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { User, Calendar, Heart, FileText, Search } from 'lucide-react';
-import { Card, Button, Badge, Skeleton } from '../components/ui/native';
-import { useBreakpoint } from '../hooks/useMediaQuery';
-import { useTheme } from '../contexts/ThemeContext';
+import { Card, Button, Badge, Progress, Icon } from '../components/ui/macos';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 
 const PatientPanel = () => {
   const { isMobile } = useBreakpoint();
-  const { isDark, isLight, getColor, getSpacing } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [appointments, setAppointments] = useState([]);
@@ -30,30 +27,63 @@ const PatientPanel = () => {
   }, []);
 
   return (
-    <div style={{ padding: 16 }}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <User className="w-7 h-7 text-blue-600" />
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Панель пациента</h1>
-            <p className="text-sm text-gray-500">Записи, результаты и рекомендации</p>
-          </div>
-        </div>
+    <div style={{ 
+      padding: '0px', // Убираем padding, так как он уже есть в main контейнере
+      background: 'var(--mac-gradient-window)',
+      minHeight: '100vh',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+      color: 'var(--mac-text-primary)'
+    }}>
+      
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
         {/* Search */}
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Card style={{
+          backgroundColor: 'var(--mac-bg-primary)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-lg)',
+          padding: '16px',
+          boxShadow: 'var(--mac-shadow-sm)',
+          backdropFilter: 'var(--mac-blur-light)',
+          WebkitBackdropFilter: 'var(--mac-blur-light)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Icon 
+                name="magnifyingglass" 
+                size="small" 
+                style={{ 
+                  position: 'absolute', 
+                  left: '12px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  color: 'var(--mac-text-tertiary)'
+                }} 
+              />
               <input
                 value={query}
                 onChange={(e)=>setQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Поиск по врачу, услуге или результату"
+                style={{
+                  width: '100%',
+                  padding: '12px 12px 12px 40px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  backgroundColor: 'var(--mac-bg-secondary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'border-color var(--mac-duration-normal) var(--mac-ease)'
+                }}
+                placeholder="Search by doctor, service or result"
+                onFocus={(e) => e.target.style.borderColor = 'var(--mac-accent-blue)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--mac-border)'}
               />
             </div>
-            <Button>Новая запись</Button>
+            <Button variant="primary">
+              <Icon name="plus" size="small" />
+              New Appointment
+            </Button>
           </div>
         </Card>
 
@@ -68,9 +98,9 @@ const PatientPanel = () => {
               {isLoading ? (
                 <Skeleton className="h-24" />
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {appointments.map(a => (
-                    <div key={a.id} className="p-3 border border-gray-200 rounded-lg flex items-center justify-between">
+                    <div key={a.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{a.doctor}</div>
                         <div className="text-sm text-gray-500">{a.date} • {a.time}</div>
@@ -94,9 +124,9 @@ const PatientPanel = () => {
               {isLoading ? (
                 <Skeleton className="h-24" />
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {results.map(r => (
-                    <div key={r.id} className="p-3 border border-gray-200 rounded-lg flex items-center justify-between">
+                    <div key={r.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
                       <div>
                         <div className="font-medium text-gray-900">{r.title}</div>
                         <div className="text-sm text-gray-500">{r.date}</div>

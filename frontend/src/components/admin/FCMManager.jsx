@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Badge,
-  Skeleton
-} from '../ui/native';
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSLoadingSkeleton,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea,
+  MacOSCheckbox
+} from '../ui/macos';
 import {
   Bell,
   Send,
@@ -22,7 +23,7 @@ import {
   TestTube,
   Zap
 } from 'lucide-react';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 const FCMManager = () => {
@@ -148,174 +149,313 @@ const FCMManager = () => {
   };
 
   const renderOverview = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Статус FCM */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Статус FCM сервиса
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Статус сервиса</p>
-                <p className="font-medium">
-                  {fcmStatus?.active ? (
-                    <Badge variant="success" className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      Активен
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" />
-                      Неактивен
-                    </Badge>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Server Key</p>
-                <p className="font-medium">
-                  {fcmStatus?.server_key_configured ? (
-                    <Badge variant="success">Настроен</Badge>
-                  ) : (
-                    <Badge variant="secondary">Не настроен</Badge>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Пользователей с токенами</p>
-                <p className="text-2xl font-bold">{usersWithTokens.length}</p>
-              </div>
-              <Smartphone className="h-8 w-8 text-blue-500" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Activity style={{ width: '20px', height: '20px' }} />
+          Статус FCM сервиса
+        </h3>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            padding: '16px',
+            border: '1px solid var(--mac-border)', 
+            borderRadius: 'var(--mac-radius-md)',
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Статус сервиса
+              </p>
+              <p style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)',
+                margin: 0
+              }}>
+                {fcmStatus?.active ? (
+                  <MacOSBadge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle style={{ width: '12px', height: '12px' }} />
+                    Активен
+                  </MacOSBadge>
+                ) : (
+                  <MacOSBadge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangle style={{ width: '12px', height: '12px' }} />
+                    Неактивен
+                  </MacOSBadge>
+                )}
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            padding: '16px',
+            border: '1px solid var(--mac-border)', 
+            borderRadius: 'var(--mac-radius-md)',
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Server Key
+              </p>
+              <p style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)',
+                margin: 0
+              }}>
+                {fcmStatus?.server_key_configured ? (
+                  <MacOSBadge variant="success">Настроен</MacOSBadge>
+                ) : (
+                  <MacOSBadge variant="secondary">Не настроен</MacOSBadge>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            padding: '16px',
+            border: '1px solid var(--mac-border)', 
+            borderRadius: 'var(--mac-radius-md)',
+            backgroundColor: 'var(--mac-bg-secondary)'
+          }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Пользователей с токенами
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                {usersWithTokens.length}
+              </p>
+            </div>
+            <Smartphone style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
+          </div>
+        </div>
+      </MacOSCard>
 
       {/* Быстрые действия */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Быстрые действия
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button 
-              onClick={testFCMNotification} 
-              disabled={loading || !fcmStatus?.active}
-              className="flex items-center gap-2"
-            >
-              <TestTube className="h-4 w-4" />
-              Тест FCM
-            </Button>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Zap style={{ width: '20px', height: '20px' }} />
+          Быстрые действия
+        </h3>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSButton 
+            onClick={testFCMNotification} 
+            disabled={loading || !fcmStatus?.active}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <TestTube style={{ width: '16px', height: '16px' }} />
+            Тест FCM
+          </MacOSButton>
 
-            <Button 
-              onClick={loadData} 
-              disabled={loading}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Обновить данные
-            </Button>
+          <MacOSButton 
+            onClick={loadData} 
+            disabled={loading}
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw style={{ width: '16px', height: '16px' }} />
+            Обновить данные
+          </MacOSButton>
 
-            <Button 
-              onClick={() => setActiveTab('notifications')} 
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Send className="h-4 w-4" />
-              Отправить уведомление
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <MacOSButton 
+            onClick={() => setActiveTab('notifications')} 
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Send style={{ width: '16px', height: '16px' }} />
+            Отправить уведомление
+          </MacOSButton>
+        </div>
+      </MacOSCard>
     </div>
   );
 
   const renderNotifications = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            Отправка FCM уведомлений
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Send style={{ width: '20px', height: '20px' }} />
+          Отправка FCM уведомлений
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium mb-2">Заголовок</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Заголовок
+            </label>
+            <MacOSInput
               type="text"
               value={notificationForm.title}
               onChange={(e) => setNotificationForm(prev => ({ ...prev, title: e.target.value }))}
               placeholder="Заголовок уведомления"
-              className="w-full p-3 border border-gray-300 rounded-lg"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Текст сообщения</label>
-            <textarea
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Текст сообщения
+            </label>
+            <MacOSTextarea
               value={notificationForm.body}
               onChange={(e) => setNotificationForm(prev => ({ ...prev, body: e.target.value }))}
               placeholder="Текст уведомления..."
-              className="w-full p-3 border border-gray-300 rounded-lg resize-vertical min-h-[100px]"
+              style={{ width: '100%', minHeight: '100px' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Изображение (URL)</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Изображение (URL)
+            </label>
+            <MacOSInput
               type="url"
               value={notificationForm.image}
               onChange={(e) => setNotificationForm(prev => ({ ...prev, image: e.target.value }))}
               placeholder="https://example.com/image.jpg"
-              className="w-full p-3 border border-gray-300 rounded-lg"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Звук</label>
-            <select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Звук
+            </label>
+            <MacOSSelect
               value={notificationForm.sound}
               onChange={(e) => setNotificationForm(prev => ({ ...prev, sound: e.target.value }))}
-              className="w-full p-3 border border-gray-300 rounded-lg"
-            >
-              <option value="default">По умолчанию</option>
-              <option value="notification">Уведомление</option>
-              <option value="alert">Предупреждение</option>
-              <option value="chime">Звонок</option>
-            </select>
+              options={[
+                { value: 'default', label: 'По умолчанию' },
+                { value: 'notification', label: 'Уведомление' },
+                { value: 'alert', label: 'Предупреждение' },
+                { value: 'chime', label: 'Звонок' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Получатели</label>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Получатели
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)',
+                margin: 0
+              }}>
                 Если не выбрать пользователей, уведомление будет отправлено всем активным пользователям
               </p>
               
-              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
+              <div style={{ 
+                maxHeight: '160px', 
+                overflowY: 'auto', 
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)', 
+                padding: '8px',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
                 {usersWithTokens.map(user => (
-                  <label key={user.user_id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded">
-                    <input
-                      type="checkbox"
+                  <label key={user.user_id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px', 
+                    padding: '8px',
+                    borderRadius: 'var(--mac-radius-sm)',
+                    cursor: 'pointer',
+                    transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  >
+                    <MacOSCheckbox
                       checked={notificationForm.user_ids.includes(user.user_id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
+                      onChange={(checked) => {
+                        if (checked) {
                           setNotificationForm(prev => ({
                             ...prev,
                             user_ids: [...prev.user_ids, user.user_id]
@@ -328,76 +468,117 @@ const FCMManager = () => {
                         }
                       }}
                     />
-                    <span className="text-sm">{user.full_name || user.username}</span>
-                    <Badge variant={user.push_enabled ? "success" : "secondary"} className="ml-auto">
+                    <span style={{ 
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-primary)'
+                    }}>
+                      {user.full_name || user.username}
+                    </span>
+                    <MacOSBadge variant={user.push_enabled ? "success" : "secondary"} style={{ marginLeft: 'auto' }}>
                       {user.device_type}
-                    </Badge>
+                    </MacOSBadge>
                   </label>
                 ))}
               </div>
             </div>
           </div>
 
-          <Button 
+          <MacOSButton 
             onClick={sendNotification} 
             disabled={loading || !fcmStatus?.active || !notificationForm.title.trim() || !notificationForm.body.trim()}
-            className="w-full"
+            style={{ width: '100%' }}
           >
             {loading ? 'Отправка...' : 'Отправить FCM уведомление'}
-          </Button>
-        </CardContent>
-      </Card>
+          </MacOSButton>
+        </div>
+      </MacOSCard>
     </div>
   );
 
   const renderUsers = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Пользователи с FCM токенами ({usersWithTokens.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {usersWithTokens.map(user => (
-              <div key={user.user_id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{user.full_name || user.username}</p>
-                    <p className="text-sm text-gray-600">
-                      Токен: {user.fcm_token}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Users style={{ width: '20px', height: '20px' }} />
+          Пользователи с FCM токенами ({usersWithTokens.length})
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {usersWithTokens.map(user => (
+            <div key={user.user_id} style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '16px',
+              border: '1px solid var(--mac-border)', 
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--mac-bg-secondary)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Smartphone style={{ width: '20px', height: '20px', color: 'var(--mac-text-tertiary)' }} />
+                <div>
+                  <p style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-primary)',
+                    margin: '0 0 4px 0'
+                  }}>
+                    {user.full_name || user.username}
+                  </p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: '0 0 4px 0'
+                  }}>
+                    Токен: {user.fcm_token}
+                  </p>
+                  {user.last_login && (
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-text-tertiary)',
+                      margin: 0
+                    }}>
+                      Последний вход: {new Date(user.last_login).toLocaleString()}
                     </p>
-                    {user.last_login && (
-                      <p className="text-xs text-gray-500">
-                        Последний вход: {new Date(user.last_login).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </div>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MacOSBadge variant={user.push_enabled ? "success" : "secondary"}>
+                  {user.push_enabled ? "Push включен" : "Push отключен"}
+                </MacOSBadge>
                 
-                <div className="flex items-center gap-2">
-                  <Badge variant={user.push_enabled ? "success" : "secondary"}>
-                    {user.push_enabled ? "Push включен" : "Push отключен"}
-                  </Badge>
-                  
-                  <Badge variant="outline">
-                    {user.device_type || 'web'}
-                  </Badge>
-                </div>
+                <MacOSBadge variant="outline">
+                  {user.device_type || 'web'}
+                </MacOSBadge>
               </div>
-            ))}
-            
-            {usersWithTokens.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                Нет пользователей с зарегистрированными FCM токенами
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          ))}
+          
+          {usersWithTokens.length === 0 && (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '32px 0', 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
+              Нет пользователей с зарегистрированными FCM токенами
+            </div>
+          )}
+        </div>
+      </MacOSCard>
     </div>
   );
 
@@ -408,60 +589,121 @@ const FCMManager = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
       {/* Заголовок */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bell className="h-8 w-8 text-orange-500" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Bell style={{ width: '32px', height: '32px', color: 'var(--mac-warning)' }} />
           <div>
-            <h1 className="text-2xl font-bold">Firebase Cloud Messaging</h1>
-            <p className="text-gray-600">Управление push-уведомлениями</p>
+            <h1 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Firebase Cloud Messaging
+            </h1>
+            <p style={{ 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              margin: 0
+            }}>
+              Управление push-уведомлениями
+            </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {fcmStatus?.active ? (
-            <Badge variant="success" className="flex items-center gap-1">
-              <CheckCircle className="h-3 w-3" />
+            <MacOSBadge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CheckCircle style={{ width: '12px', height: '12px' }} />
               FCM активен
-            </Badge>
+            </MacOSBadge>
           ) : (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
+            <MacOSBadge variant="secondary" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertTriangle style={{ width: '12px', height: '12px' }} />
               FCM неактивен
-            </Badge>
+            </MacOSBadge>
           )}
         </div>
       </div>
 
       {/* Вкладки */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
+      <div style={{ 
+        display: 'flex', 
+        marginBottom: '24px'
+      }}>
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 20px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                position: 'relative',
+                marginBottom: '-1px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                }
+              }}
+            >
+              <Icon style={{ 
+                width: '16px', 
+                height: '16px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+              }} />
+              {tab.label}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '3px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  borderRadius: '2px 2px 0 0'
+                }} />
+              )}
+            </button>
+          );
+        })}
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Контент вкладок */}
       {loading && !fcmStatus ? (
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-64 w-full" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <MacOSLoadingSkeleton height="128px" style={{ width: '100%' }} />
+          <MacOSLoadingSkeleton height="256px" style={{ width: '100%' }} />
         </div>
       ) : (
         <>

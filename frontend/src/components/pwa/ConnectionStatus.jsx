@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Chip,
+  Badge,
   Alert,
-  Snackbar,
   Typography,
-  LinearProgress
-} from '@mui/material';
+  Progress,
+} from '../ui/macos';
 import {
   Wifi,
   WifiOff,
-  CloudDone,
+  Cloud,
   CloudOff,
-  Sync,
-  SyncDisabled
-} from '@mui/icons-material';
+  RefreshCw,
+  RefreshCwOff,
+} from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
 
 const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {

@@ -247,9 +247,15 @@ class CRUDAppointment(CRUDBase[Appointment, AppointmentCreate, AppointmentUpdate
         """
         Отметить как оплаченное (переход pending -> paid)
         """
-        return self.update_status(
+        appointment = self.update_status(
             db, appointment_id=appointment_id, new_status=AppointmentStatus.PAID
         )
+        if appointment:
+            # ✅ ВАЖНО: устанавливаем visit_type для корректного отображения payment_status
+            appointment.visit_type = "paid"
+            db.commit()
+            db.refresh(appointment)
+        return appointment
 
     def cancel_appointment(
         self, db: Session, *, appointment_id: int

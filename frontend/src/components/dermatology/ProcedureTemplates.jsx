@@ -9,51 +9,37 @@ import {
   Card,
   CardContent,
   Typography,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  IconButton,
   Button,
+  Input,
+  Alert,
+  Badge,
+  Grid,
+  List,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  Chip,
-  Grid,
-  Divider,
-  Alert,
-  FormControl,
-  InputLabel,
   Select,
-  MenuItem,
-  InputAdornment,
+  Option,
   Checkbox,
-  FormControlLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-} from '@mui/material';
+  Textarea,
+} from '../ui/macos';
 import {
-  LocalHospital,
-  Add,
+  Hospital,
+  Plus,
   Edit,
-  Delete,
-  ContentCopy,
-  ExpandMore,
-  Timer,
-  AttachMoney,
-  Category,
+  Trash2,
+  Copy,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  Tag,
   CheckCircle,
-  Warning,
-  Face,
-  Spa,
-  Healing,
-  AutoFixHigh,
-} from '@mui/icons-material';
+  AlertTriangle,
+  Search,
+  RefreshCw,
+  Sparkles,
+} from 'lucide-react';
 import { api } from '../../api/client';
 
 const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
@@ -78,11 +64,11 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
 
   // Категории процедур
   const categories = [
-    { id: 'all', name: 'Все процедуры', icon: <LocalHospital /> },
-    { id: 'injection', name: 'Инъекционные', icon: <Healing /> },
-    { id: 'hardware', name: 'Аппаратные', icon: <AutoFixHigh /> },
-    { id: 'peeling', name: 'Пилинги', icon: <Face /> },
-    { id: 'care', name: 'Уходовые', icon: <Spa /> },
+    { id: 'all', name: 'Все процедуры', icon: <Hospital /> },
+    { id: 'injection', name: 'Инъекционные', icon: <Sparkles /> },
+    { id: 'hardware', name: 'Аппаратные', icon: <Sparkles /> },
+    { id: 'peeling', name: 'Пилинги', icon: <Sparkles /> },
+    { id: 'care', name: 'Уходовые', icon: <Sparkles /> },
   ];
 
   // Предустановленные шаблоны
@@ -271,11 +257,11 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
   // Иконка категории
   const getCategoryIcon = (category) => {
     switch (category) {
-      case 'injection': return <Healing color="error" />;
-      case 'hardware': return <AutoFixHigh color="primary" />;
-      case 'peeling': return <Face color="warning" />;
-      case 'care': return <Spa color="success" />;
-      default: return <LocalHospital />;
+      case 'injection': return <Sparkles />;
+      case 'hardware': return <Sparkles />;
+      case 'peeling': return <Sparkles />;
+      case 'care': return <Sparkles />;
+      default: return <Hospital />;
     }
   };
 
@@ -283,91 +269,101 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
     <Box>
       <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Typography variant="h6">
-              <LocalHospital sx={{ mr: 1, verticalAlign: 'middle' }} />
+              <Hospital style={{ marginRight: 8, verticalAlign: 'middle' }} />
               Шаблоны процедур
             </Typography>
             
             <Button
-              variant="contained"
-              startIcon={<Add />}
+              variant="primary"
               onClick={handleCreateNew}
             >
+              <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
               Создать шаблон
             </Button>
-          </Box>
+          </div>
 
           {/* Категории */}
-          <Box sx={{ mb: 2 }}>
+          <div style={{ marginBottom: 16 }}>
             {categories.map((category) => (
-              <Chip
+              <Badge
                 key={category.id}
-                label={category.name}
-                icon={category.icon}
+                variant={expandedCategory === category.id ? 'primary' : 'info'}
+                style={{ marginRight: 8, marginBottom: 8, cursor: 'pointer' }}
                 onClick={() => setExpandedCategory(category.id)}
-                color={expandedCategory === category.id ? 'primary' : 'default'}
-                sx={{ mr: 1, mb: 1 }}
-              />
+              >
+                {category.icon}
+                {category.name}
+              </Badge>
             ))}
-          </Box>
+          </div>
 
           {/* Список шаблонов */}
-          <List>
+          <div>
             {filteredTemplates.map((template, index) => (
-              <React.Fragment key={template.id}>
-                {index > 0 && <Divider />}
-                
-                <ListItem disablePadding>
-                  <ListItemButton onClick={() => handleSelectTemplate(template)}>
-                    <ListItemIcon>
+              <div key={template.id} style={{ marginBottom: 16 }}>
+                <div style={{
+                  padding: 16,
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 8,
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onClick={() => handleSelectTemplate(template)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ marginTop: 4 }}>
                       {getCategoryIcon(template.category)}
-                    </ListItemIcon>
+                    </div>
                     
-                    <ListItemText
-                      primary={template.name}
-                      secondary={
-                        <Box component="div">
-                          <Typography variant="caption" display="block">
-                            {template.description}
-                          </Typography>
-                          <Box sx={{ mt: 0.5 }}>
-                            <Chip
-                              size="small"
-                              icon={<Timer />}
-                              label={`${template.duration} мин`}
-                              sx={{ mr: 1 }}
-                            />
-                            <Chip
-                              size="small"
-                              icon={<AttachMoney />}
-                              label={`${(template.price / 1000).toFixed(0)}k сум`}
-                              color="success"
-                            />
-                          </Box>
-                        </Box>
-                      }
-                    />
+                    <div style={{ flex: 1 }}>
+                      <Typography variant="h6" style={{ marginBottom: 4 }}>
+                        {template.name}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 8 }}>
+                        {template.description}
+                      </Typography>
+                      
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Badge variant="info">
+                          <Clock style={{ width: 12, height: 12, marginRight: 4 }} />
+                          {template.duration} мин
+                        </Badge>
+                        <Badge variant="success">
+                          <DollarSign style={{ width: 12, height: 12, marginRight: 4 }} />
+                          {(template.price / 1000).toFixed(0)}k сум
+                        </Badge>
+                      </div>
+                    </div>
                     
-                    <ListItemSecondaryAction>
-                      <IconButton
-                        edge="end"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(template);
-                        }}
-                      >
-                        <Edit />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItemButton>
-                </ListItem>
-              </React.Fragment>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(template);
+                      }}
+                      style={{
+                        padding: '8px',
+                        border: '1px solid var(--mac-border)',
+                        borderRadius: 4,
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Edit style={{ width: 16, height: 16 }} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
-          </List>
+          </div>
 
           {filteredTemplates.length === 0 && (
-            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+            <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', padding: '32px 0' }}>
               Нет шаблонов в выбранной категории
             </Typography>
           )}
@@ -388,19 +384,13 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                 <Typography variant="subtitle2" gutterBottom>
                   Необходимые материалы:
                 </Typography>
-                <List dense>
-                  {selectedTemplate.materials.map((material, i) => (
-                    <ListItem key={i}>
-                      <ListItemIcon>
-                        <CheckCircle color="success" fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={material.name}
-                        secondary={`${material.quantity} ${material.unit}`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+                <List 
+                  items={selectedTemplate.materials.map(material => ({
+                    label: `${material.name} - ${material.quantity} ${material.unit}`,
+                    icon: CheckCircle
+                  }))}
+                  size="sm"
+                />
               </Grid>
               
               {/* Этапы процедуры */}
@@ -408,15 +398,10 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                 <Typography variant="subtitle2" gutterBottom>
                   Этапы процедуры:
                 </Typography>
-                <List dense>
-                  {selectedTemplate.steps.map((step, i) => (
-                    <ListItem key={i}>
-                      <ListItemText
-                        primary={`${i + 1}. ${step}`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+                <List 
+                  items={selectedTemplate.steps.map((step, i) => `${i + 1}. ${step}`)}
+                  size="sm"
+                />
               </Grid>
               
               {/* Противопоказания */}
@@ -467,64 +452,50 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} md={8}>
-              <TextField
-                fullWidth
-                label="Название процедуры"
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Название процедуры</div>
+              <Input
                 value={templateForm.name}
                 onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
               />
             </Grid>
             
             <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Категория</InputLabel>
-                <Select
-                  value={templateForm.category}
-                  onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
-                  label="Категория"
-                >
-                  <MenuItem value="injection">Инъекционные</MenuItem>
-                  <MenuItem value="hardware">Аппаратные</MenuItem>
-                  <MenuItem value="peeling">Пилинги</MenuItem>
-                  <MenuItem value="care">Уходовые</MenuItem>
-                </Select>
-              </FormControl>
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Категория</div>
+              <Select
+                value={templateForm.category}
+                onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
+              >
+                <Option value="injection">Инъекционные</Option>
+                <Option value="hardware">Аппаратные</Option>
+                <Option value="peeling">Пилинги</Option>
+                <Option value="care">Уходовые</Option>
+              </Select>
             </Grid>
             
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Описание"
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Описание</div>
+              <Textarea
                 value={templateForm.description}
                 onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                rows={3}
               />
             </Grid>
             
             <Grid item xs={6}>
-              <TextField
-                fullWidth
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Длительность (мин)</div>
+              <Input
                 type="number"
-                label="Длительность"
                 value={templateForm.duration}
-                onChange={(e) => setTemplateForm({ ...templateForm, duration: parseInt(e.target.value) })}
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">мин</InputAdornment>,
-                }}
+                onChange={(e) => setTemplateForm({ ...templateForm, duration: parseInt(e.target.value || '0', 10) })}
               />
             </Grid>
             
             <Grid item xs={6}>
-              <TextField
-                fullWidth
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Стоимость (сум)</div>
+              <Input
                 type="number"
-                label="Стоимость"
                 value={templateForm.price}
                 onChange={(e) => setTemplateForm({ ...templateForm, price: e.target.value })}
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">сум</InputAdornment>,
-                }}
               />
             </Grid>
             
@@ -536,9 +507,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
               {templateForm.materials.map((material, index) => (
                 <Grid container spacing={1} key={index} sx={{ mb: 1 }}>
                   <Grid item xs={6}>
-                    <TextField
-                      fullWidth
-                      size="small"
+                    <Input
                       placeholder="Название материала"
                       value={material.name}
                       onChange={(e) => {
@@ -549,9 +518,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                     />
                   </Grid>
                   <Grid item xs={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
+                    <Input
                       placeholder="Кол-во"
                       value={material.quantity}
                       onChange={(e) => {
@@ -562,9 +529,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                     />
                   </Grid>
                   <Grid item xs={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
+                    <Input
                       placeholder="Ед."
                       value={material.unit}
                       onChange={(e) => {
@@ -576,8 +541,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                   </Grid>
                 </Grid>
               ))}
-              <Button size="small" startIcon={<Add />} onClick={addMaterial}>
-                Добавить материал
+              <Button size="small" onClick={addMaterial}>
+                <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> Добавить материал
               </Button>
             </Grid>
             
@@ -587,10 +552,8 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                 Этапы процедуры
               </Typography>
               {templateForm.steps.map((step, index) => (
-                <TextField
+                <Input
                   key={index}
-                  fullWidth
-                  size="small"
                   sx={{ mb: 1 }}
                   placeholder={`Шаг ${index + 1}`}
                   value={step}
@@ -601,18 +564,16 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
                   }}
                 />
               ))}
-              <Button size="small" startIcon={<Add />} onClick={addStep}>
-                Добавить шаг
+              <Button size="small" onClick={addStep}>
+                <Plus style={{ width: 14, height: 14, marginRight: 6 }} /> Добавить шаг
               </Button>
             </Grid>
             
             {/* Постуход */}
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
+              <div style={{ fontSize: 12, color: 'var(--mac-text-secondary)', marginBottom: 6 }}>Рекомендации после процедуры</div>
+              <Textarea
                 rows={3}
-                label="Рекомендации после процедуры"
                 value={templateForm.aftercare}
                 onChange={(e) => setTemplateForm({ ...templateForm, aftercare: e.target.value })}
               />

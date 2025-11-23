@@ -106,11 +106,33 @@ export function setupInterceptors() {
 
       // Обработка 403 ошибок (недостаточно прав)
       if (error.response?.status === 403) {
-        console.warn('Недостаточно прав доступа');
+        const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Недостаточно прав для выполнения операции';
+        console.warn(`❌ 403 Forbidden: ${errorMessage}`, {
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          role: error.response?.data?.role
+        });
         
-        // Можно показать уведомление пользователю
+        // Показываем понятное сообщение пользователю
         if (window.showToast) {
-          window.showToast('Недостаточно прав для выполнения операции', 'error');
+          window.showToast(errorMessage, 'error');
+        } else {
+          console.error(`403 Forbidden: ${errorMessage}`);
+        }
+      }
+
+      // Обработка 404 ошибок (ресурс не найден)
+      if (error.response?.status === 404) {
+        const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Запрашиваемый ресурс не найден';
+        console.warn(`❌ 404 Not Found: ${errorMessage}`, {
+          url: originalRequest?.url,
+          method: originalRequest?.method
+        });
+        
+        if (window.showToast) {
+          window.showToast(errorMessage, 'warning');
+        } else {
+          console.error(`404 Not Found: ${errorMessage}`);
         }
       }
 

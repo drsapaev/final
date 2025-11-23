@@ -12,7 +12,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
-import './PaymentProviderSettings.css';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSCheckbox
+} from '../ui/macos';
 
 const API_BASE = '/api/v1';
 
@@ -188,105 +194,199 @@ const PaymentProviderSettings = () => {
     const testResult = testResults[providerName];
     
     return (
-      <div key={providerName} className="provider-config">
-        <div className="provider-header">
-          <div className="provider-title">
-            <CreditCard size={20} />
-            <h3>{providerName.toUpperCase()}</h3>
-            <div className="provider-toggle">
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={providerConfig.enabled}
-                  onChange={() => toggleProviderEnabled(providerName)}
-                />
-                <span className="slider"></span>
-              </label>
-              <span>{providerConfig.enabled ? 'Включён' : 'Отключён'}</span>
+      <MacOSCard key={providerName} style={{ padding: '20px', border: '1px solid var(--mac-border)' }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '16px',
+          paddingBottom: '16px',
+          borderBottom: '1px solid var(--mac-border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CreditCard style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              {providerName.toUpperCase()}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MacOSCheckbox
+                checked={providerConfig.enabled}
+                onChange={() => toggleProviderEnabled(providerName)}
+              />
+              <span style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                {providerConfig.enabled ? 'Включён' : 'Отключён'}
+              </span>
             </div>
           </div>
           
-          <div className="provider-actions">
-            <button
-              className="test-btn"
-              onClick={() => testProvider(providerName)}
-              disabled={!providerConfig.enabled || loading}
-            >
-              <RefreshCw size={16} />
-              Тест
-            </button>
-          </div>
+          <MacOSButton
+            variant="outline"
+            onClick={() => testProvider(providerName)}
+            disabled={!providerConfig.enabled || loading}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              padding: '6px 12px'
+            }}
+          >
+            <RefreshCw style={{ width: '16px', height: '16px' }} />
+            Тест
+          </MacOSButton>
         </div>
         
         {testResult && (
-          <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-            {testResult.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
-            <span>{testResult.message}</span>
-            <small>{testResult.timestamp}</small>
-          </div>
+          <MacOSCard style={{ 
+            padding: '12px', 
+            marginBottom: '16px',
+            backgroundColor: testResult.success ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
+            border: testResult.success ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {testResult.success ? (
+                <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-success)' }} />
+              ) : (
+                <XCircle style={{ width: '16px', height: '16px', color: 'var(--mac-error)' }} />
+              )}
+              <span style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: testResult.success ? 'var(--mac-success)' : 'var(--mac-error)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                {testResult.message}
+              </span>
+              <small style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-tertiary)',
+                marginLeft: 'auto'
+              }}>
+                {testResult.timestamp}
+              </small>
+            </div>
+          </MacOSCard>
         )}
         
         {providerConfig.enabled && (
-          <form className="provider-fields" onSubmit={(e) => e.preventDefault()}>
-            <div className="field-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={providerConfig.test_mode}
-                  onChange={(e) => updateProviderSetting(providerName, 'test_mode', e.target.checked)}
-                />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MacOSCheckbox
+                checked={providerConfig.test_mode}
+                onChange={(checked) => updateProviderSetting(providerName, 'test_mode', checked)}
+              />
+              <span style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-primary)' 
+              }}>
                 Тестовый режим
-              </label>
+              </span>
             </div>
             
             {providerName === 'click' && (
               <>
-                <div className="field-row">
-                  <label>Service ID</label>
-                  <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Service ID
+                  </label>
+                  <MacOSInput
                     type="text"
                     value={providerConfig.service_id}
                     onChange={(e) => updateProviderSetting(providerName, 'service_id', e.target.value)}
                     placeholder="Введите Service ID"
+                    style={{ width: '100%' }}
                   />
                 </div>
                 
-                <div className="field-row">
-                  <label>Merchant ID</label>
-                  <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Merchant ID
+                  </label>
+                  <MacOSInput
                     type="text"
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
                     placeholder="Введите Merchant ID"
+                    style={{ width: '100%' }}
                   />
                 </div>
                 
-                <div className="field-row">
-                  <label>Secret Key</label>
-                  <div className="secret-field">
-                    <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Secret Key
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <MacOSInput
                       type={showSecrets.click ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
                       placeholder="Введите Secret Key"
+                      style={{ width: '100%', paddingRight: '40px' }}
                     />
-                    <button
+                    <MacOSButton
                       type="button"
-                      className="toggle-secret"
+                      variant="outline"
                       onClick={() => toggleShowSecret('click')}
+                      style={{ 
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        padding: '4px',
+                        minWidth: 'auto',
+                        width: '32px',
+                        height: '32px'
+                      }}
                     >
-                      {showSecrets.click ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      {showSecrets.click ? (
+                        <EyeOff style={{ width: '16px', height: '16px' }} />
+                      ) : (
+                        <Eye style={{ width: '16px', height: '16px' }} />
+                      )}
+                    </MacOSButton>
                   </div>
                 </div>
                 
-                <div className="field-row">
-                  <label>Base URL</label>
-                  <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Base URL
+                  </label>
+                  <MacOSInput
                     type="url"
                     value={providerConfig.base_url}
                     onChange={(e) => updateProviderSetting(providerName, 'base_url', e.target.value)}
                     placeholder="https://api.click.uz/v2"
+                    style={{ width: '100%' }}
                   />
                 </div>
               </>
@@ -294,127 +394,252 @@ const PaymentProviderSettings = () => {
             
             {providerName === 'payme' && (
               <>
-                <div className="field-row">
-                  <label>Merchant ID</label>
-                  <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Merchant ID
+                  </label>
+                  <MacOSInput
                     type="text"
                     value={providerConfig.merchant_id}
                     onChange={(e) => updateProviderSetting(providerName, 'merchant_id', e.target.value)}
                     placeholder="Введите Merchant ID"
+                    style={{ width: '100%' }}
                   />
                 </div>
                 
-                <div className="field-row">
-                  <label>Secret Key</label>
-                  <div className="secret-field">
-                    <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Secret Key
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <MacOSInput
                       type={showSecrets.payme ? 'text' : 'password'}
                       value={providerConfig.secret_key}
                       onChange={(e) => updateProviderSetting(providerName, 'secret_key', e.target.value)}
                       placeholder="Введите Secret Key"
+                      style={{ width: '100%', paddingRight: '40px' }}
                     />
-                    <button
+                    <MacOSButton
                       type="button"
-                      className="toggle-secret"
+                      variant="outline"
                       onClick={() => toggleShowSecret('payme')}
+                      style={{ 
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        padding: '4px',
+                        minWidth: 'auto',
+                        width: '32px',
+                        height: '32px'
+                      }}
                     >
-                      {showSecrets.payme ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                      {showSecrets.payme ? (
+                        <EyeOff style={{ width: '16px', height: '16px' }} />
+                      ) : (
+                        <Eye style={{ width: '16px', height: '16px' }} />
+                      )}
+                    </MacOSButton>
                   </div>
                 </div>
                 
-                <div className="field-row">
-                  <label>Base URL</label>
-                  <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    Base URL
+                  </label>
+                  <MacOSInput
                     type="url"
                     value={providerConfig.base_url}
                     onChange={(e) => updateProviderSetting(providerName, 'base_url', e.target.value)}
                     placeholder="https://checkout.paycom.uz"
+                    style={{ width: '100%' }}
                   />
                 </div>
                 
-                <div className="field-row">
-                  <label>API URL</label>
-                  <input
+                <div>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-primary)', 
+                    marginBottom: '8px' 
+                  }}>
+                    API URL
+                  </label>
+                  <MacOSInput
                     type="url"
                     value={providerConfig.api_url}
                     onChange={(e) => updateProviderSetting(providerName, 'api_url', e.target.value)}
                     placeholder="https://api.paycom.uz"
+                    style={{ width: '100%' }}
                   />
                 </div>
               </>
             )}
-          </form>
+          </div>
         )}
-      </div>
+      </MacOSCard>
     );
   };
   
   return (
-    <div className="payment-provider-settings">
-      <div className="settings-header">
-        <div className="header-title">
-          <Settings size={24} />
-          <h2>Настройки платежных провайдеров</h2>
+    <div style={{ 
+      padding: 0,
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        {/* Заголовок */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '24px',
+          paddingBottom: '24px',
+          borderBottom: '1px solid var(--mac-border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+            <h2 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Настройки платежных провайдеров
+            </h2>
+          </div>
+          
+          <MacOSButton
+            onClick={saveSettings}
+            disabled={loading}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              border: 'none',
+              padding: '8px 16px'
+            }}
+          >
+            <Save style={{ width: '16px', height: '16px' }} />
+            Сохранить
+          </MacOSButton>
         </div>
-        
-        <button
-          className="save-btn primary"
-          onClick={saveSettings}
-          disabled={loading}
-        >
-          <Save size={16} />
-          Сохранить
-        </button>
-      </div>
       
-      <div className="settings-content">
-        {/* Общие настройки */}
-        <div className="general-settings">
-          <h3>Общие настройки</h3>
-          
-          <div className="field-row">
-            <label>Провайдер по умолчанию</label>
-            <select
-              value={settings.default_provider}
-              onChange={(e) => updateGeneralSetting('default_provider', e.target.value)}
-            >
-              {settings.enabled_providers.map(provider => (
-                <option key={provider} value={provider}>
-                  {provider.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="info-block">
-            <AlertTriangle size={16} />
-            <div>
-              <p><strong>Важно:</strong></p>
-              <ul>
-                <li>Провайдер по умолчанию будет предложен пользователям первым</li>
-                <li>Тестовый режим использует sandbox окружение провайдеров</li>
-                <li>Обязательно протестируйте настройки перед использованием</li>
-                <li>Secret Key хранится в зашифрованном виде</li>
-              </ul>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Общие настройки */}
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '16px' 
+            }}>
+              Общие настройки
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '8px' 
+                }}>
+                  Провайдер по умолчанию
+                </label>
+                <MacOSSelect
+                  value={settings.default_provider}
+                  onChange={(e) => updateGeneralSetting('default_provider', e.target.value)}
+                  options={settings.enabled_providers.map(provider => ({
+                    value: provider,
+                    label: provider.toUpperCase()
+                  }))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+              
+              <MacOSCard style={{ 
+                padding: '16px', 
+                backgroundColor: 'var(--mac-warning-bg)', 
+                border: '1px solid var(--mac-warning-border)' 
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <AlertTriangle style={{ 
+                    width: '20px', 
+                    height: '20px', 
+                    color: 'var(--mac-warning)', 
+                    marginTop: '2px',
+                    flexShrink: 0
+                  }} />
+                  <div>
+                    <p style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      fontWeight: 'var(--mac-font-weight-medium)', 
+                      color: 'var(--mac-warning)', 
+                      margin: '0 0 8px 0' 
+                    }}>
+                      <strong>Важно:</strong>
+                    </p>
+                    <ul style={{ 
+                      fontSize: 'var(--mac-font-size-sm)', 
+                      color: 'var(--mac-warning)', 
+                      margin: 0,
+                      paddingLeft: '16px'
+                    }}>
+                      <li>Провайдер по умолчанию будет предложен пользователям первым</li>
+                      <li>Тестовый режим использует sandbox окружение провайдеров</li>
+                      <li>Обязательно протестируйте настройки перед использованием</li>
+                      <li>Secret Key хранится в зашифрованном виде</li>
+                    </ul>
+                  </div>
+                </div>
+              </MacOSCard>
             </div>
-          </div>
-        </div>
+          </MacOSCard>
         
-        {/* Настройки провайдеров */}
-        <div className="providers-settings">
-          <h3>Конфигурация провайдеров</h3>
-          
-          <div className="providers-list">
-            {Object.entries(settings).map(([key, value]) => {
-              if (key === 'click' || key === 'payme') {
-                return renderProviderConfig(key, value);
-              }
-              return null;
-            })}
-          </div>
+          {/* Настройки провайдеров */}
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '16px' 
+            }}>
+              Конфигурация провайдеров
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {Object.entries(settings).map(([key, value]) => {
+                if (key === 'click' || key === 'payme') {
+                  return renderProviderConfig(key, value);
+                }
+                return null;
+              })}
+            </div>
+          </MacOSCard>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 };

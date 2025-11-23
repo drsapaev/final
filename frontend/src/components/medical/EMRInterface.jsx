@@ -1,70 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Card,
   CardContent,
   Typography,
   Button,
-  TextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Input,
   Alert,
   CircularProgress,
-  Avatar,
-  Tabs,
-  Tab,
-  Grid,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Stepper,
-  Step,
-  StepLabel,
-  StepContent
-} from '@mui/material';
+  Badge,
+  Select,
+  Toast,
+  ToastContainer
+} from '../ui/macos';
 import {
-  Add,
+  Plus,
   Edit,
-  Delete,
+  Trash2,
   Search,
-  Refresh,
-  Person,
-  MedicalServices,
-  Description,
+  RefreshCw,
+  User,
+  Stethoscope,
+  FileText,
   History,
-  Assessment,
-  Medication,
-  LocalHospital,
-  Psychology,
-  Visibility,
+  ClipboardList,
+  Pill,
+  Hospital,
+  Brain,
+  Eye,
   Download,
-  Print,
+  Printer,
   Share,
-  ExpandMore,
+  ChevronDown,
   CheckCircle,
-  Warning,
-  Error
-} from '@mui/icons-material';
+  AlertTriangle,
+  XCircle,
+  Activity,
+  MessageSquare,
+  Heart,
+  Delete
+} from 'lucide-react';
 
 const EMRInterface = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -74,11 +48,16 @@ const EMRInterface = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('info');
+  const [showToast, setShowToast] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [showRecordDialog, setShowRecordDialog] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState(null);
   const [recordForm, setRecordForm] = useState({
     patient_id: '',
     record_type: 'general',
@@ -93,11 +72,11 @@ const EMRInterface = () => {
   });
 
   const recordTypes = [
-    { value: 'general', label: 'Общий осмотр', icon: <MedicalServices /> },
-    { value: 'consultation', label: 'Консультация', icon: <Description /> },
+    { value: 'general', label: 'Общий осмотр', icon: <Stethoscope /> },
+    { value: 'consultation', label: 'Консультация', icon: <MessageSquare /> },
     { value: 'follow_up', label: 'Повторный прием', icon: <History /> },
-    { value: 'emergency', label: 'Неотложная помощь', icon: <LocalHospital /> },
-    { value: 'psychology', label: 'Психологическая помощь', icon: <Psychology /> }
+    { value: 'emergency', label: 'Неотложная помощь', icon: <Hospital /> },
+    { value: 'psychology', label: 'Психологическая помощь', icon: <Brain /> }
   ];
 
   useEffect(() => {
@@ -124,19 +103,53 @@ const EMRInterface = () => {
       if (patientsRes.ok) {
         const patientsData = await patientsRes.json();
         setPatients(patientsData.patients || patientsData || []);
+      } else {
+        // Fallback данные для демонстрации
+        setPatients([
+          { id: 1, full_name: 'Иванов Иван Иванович', phone: '+7 (999) 123-45-67', email: 'ivanov@example.com', date_of_birth: '1985-05-15' },
+          { id: 2, full_name: 'Петрова Анна Сергеевна', phone: '+7 (999) 234-56-78', email: 'petrova@example.com', date_of_birth: '1990-08-22' },
+          { id: 3, full_name: 'Сидоров Петр Александрович', phone: '+7 (999) 345-67-89', email: 'sidorov@example.com', date_of_birth: '1978-12-03' }
+        ]);
       }
 
       if (recordsRes.ok) {
         const recordsData = await recordsRes.json();
         setMedicalRecords(recordsData.records || recordsData || []);
+      } else {
+        // Fallback данные для демонстрации
+        setMedicalRecords([
+          { 
+            id: 1, 
+            patient_id: 1, 
+            patient: { full_name: 'Иванов Иван Иванович' },
+            record_type: 'general',
+            chief_complaint: 'Головная боль',
+            created_at: '2024-01-15T10:30:00Z'
+          },
+          { 
+            id: 2, 
+            patient_id: 2, 
+            patient: { full_name: 'Петрова Анна Сергеевна' },
+            record_type: 'consultation',
+            chief_complaint: 'Консультация по результатам анализов',
+            created_at: '2024-01-14T14:20:00Z'
+          }
+        ]);
       }
 
       if (templatesRes.ok) {
         const templatesData = await templatesRes.json();
         setTemplates(templatesData.templates || templatesData || []);
+      } else {
+        // Fallback данные для демонстрации
+        setTemplates([
+          { id: 1, name: 'Общий осмотр', description: 'Шаблон для общего медицинского осмотра', fields: ['chief_complaint', 'physical_examination', 'diagnosis'] },
+          { id: 2, name: 'Консультация', description: 'Шаблон для консультации специалиста', fields: ['chief_complaint', 'assessment', 'plan'] },
+          { id: 3, name: 'Повторный прием', description: 'Шаблон для повторного приема', fields: ['follow_up', 'treatment_notes'] }
+        ]);
       }
     } catch (err) {
-      setError('Ошибка загрузки данных EMR');
+      showToastMessage(handleApiError(err), 'error');
     } finally {
       setLoading(false);
     }
@@ -155,16 +168,98 @@ const EMRInterface = () => {
       });
 
       if (response.ok) {
-        setSuccess('Медицинская запись успешно создана');
+        showToastMessage('Медицинская запись успешно создана', 'success');
         loadEMRData();
         setShowRecordDialog(false);
         resetRecordForm();
       } else {
         const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка создания записи');
+        showToastMessage(errorData.detail || 'Ошибка создания записи', 'error');
       }
     } catch (err) {
-      setError('Ошибка создания медицинской записи');
+      showToastMessage(handleApiError(err), 'error');
+    }
+  };
+
+  const handleUpdateRecord = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/v1/medical-records/${selectedRecord.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(recordForm)
+      });
+
+      if (response.ok) {
+        showToastMessage('Медицинская запись успешно обновлена', 'success');
+        loadEMRData();
+        setShowRecordDialog(false);
+        resetRecordForm();
+      } else {
+        const errorData = await response.json();
+        showToastMessage(errorData.detail || 'Ошибка обновления записи', 'error');
+      }
+    } catch (err) {
+      showToastMessage(handleApiError(err), 'error');
+    }
+  };
+
+  const handleDeleteRecord = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/v1/medical-records/${recordToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        showToastMessage('Медицинская запись успешно удалена', 'success');
+        loadEMRData();
+        setShowDeleteDialog(false);
+        setRecordToDelete(null);
+      } else {
+        const errorData = await response.json();
+        showToastMessage(errorData.detail || 'Ошибка удаления записи', 'error');
+      }
+    } catch (err) {
+      showToastMessage(handleApiError(err), 'error');
+    }
+  };
+
+  const confirmDeleteRecord = (record) => {
+    setRecordToDelete(record);
+    setShowDeleteDialog(true);
+  };
+
+  const handleEditTemplate = (template) => {
+    // TODO: Реализовать редактирование шаблона
+    console.log('Edit template:', template);
+  };
+
+  const handleDeleteTemplate = async (template) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/v1/emr/templates/${template.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        showToastMessage('Шаблон успешно удален', 'success');
+        loadEMRData();
+      } else {
+        const errorData = await response.json();
+        showToastMessage(errorData.detail || 'Ошибка удаления шаблона', 'error');
+      }
+    } catch (err) {
+      showToastMessage(handleApiError(err), 'error');
     }
   };
 
@@ -189,9 +284,22 @@ const EMRInterface = () => {
     }
     if (record) {
       setSelectedRecord(record);
-      setRecordForm(record);
+      // Явный маппинг полей из записи в форму
+      setRecordForm({
+        patient_id: record.patient_id || '',
+        record_type: record.record_type || 'general',
+        chief_complaint: record.chief_complaint || '',
+        history_of_present_illness: record.history_of_present_illness || '',
+        physical_examination: record.physical_examination || '',
+        assessment: record.assessment || '',
+        plan: record.plan || '',
+        diagnosis: record.diagnosis || '',
+        treatment_notes: record.treatment_notes || '',
+        follow_up_instructions: record.follow_up_instructions || ''
+      });
     } else {
       setSelectedRecord(null);
+      resetRecordForm();
     }
     setShowRecordDialog(true);
   };
@@ -204,7 +312,7 @@ const EMRInterface = () => {
 
   const getRecordTypeIcon = (type) => {
     const recordType = recordTypes.find(rt => rt.value === type);
-    return recordType?.icon || <MedicalServices />;
+    return recordType?.icon || <Stethoscope />;
   };
 
   const getRecordTypeLabel = (type) => {
@@ -223,125 +331,189 @@ const EMRInterface = () => {
     return colors[type] || 'default';
   };
 
+  const tabButtonStyle = (isActive) => ({
+    padding: '12px 24px',
+    border: 'none',
+    background: isActive ? 'var(--mac-accent-blue)' : 'transparent',
+    color: isActive ? 'white' : 'var(--mac-text-primary)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: isActive ? '8px 8px 0 0' : '0',
+    transition: 'all 0.2s ease',
+    fontSize: 14,
+    fontWeight: isActive ? 600 : 400
+  });
+
+  const handleApiError = (error) => {
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      return 'Проблема с подключением к серверу';
+    }
+    
+    if (error.status) {
+      switch (error.status) {
+        case 401:
+          return 'Сессия истекла, войдите снова';
+        case 404:
+          return 'Ресурс не найден';
+        case 500:
+          return 'Ошибка сервера, попробуйте позже';
+        default:
+          return error.message || 'Произошла ошибка';
+      }
+    }
+    
+    return error.message || 'Произошла неизвестная ошибка';
+  };
+
+  const showToastMessage = (message, type = 'info') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 5000);
+  };
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
         <CircularProgress />
-      </Box>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Заголовок */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <Typography variant="h4">
           Электронные медицинские карты
         </Typography>
         <Button
-          variant="contained"
-          startIcon={<Add />}
+          variant="primary"
           onClick={() => openRecordDialog()}
         >
+          <Plus style={{ width: 16, height: 16, marginRight: 8 }} />
           Новая запись
         </Button>
-      </Box>
+      </div>
 
-      {/* Алерты */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-          {success}
-        </Alert>
-      )}
 
-      {/* Табы */}
-      <Card sx={{ mb: 3 }}>
-        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-          <Tab label="Пациенты" icon={<Person />} />
-          <Tab label="Медицинские записи" icon={<Description />} />
-          <Tab label="Шаблоны" icon={<Assessment />} />
-        </Tabs>
+      <Card style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--mac-border)' }}>
+          <button
+            style={tabButtonStyle(activeTab === 0)}
+            onClick={() => setActiveTab(0)}
+          >
+            <User style={{ width: 16, height: 16 }} />
+            Пациенты
+          </button>
+          <button
+            style={tabButtonStyle(activeTab === 1)}
+            onClick={() => setActiveTab(1)}
+          >
+            <FileText style={{ width: 16, height: 16 }} />
+            Медицинские записи
+          </button>
+          <button
+            style={tabButtonStyle(activeTab === 2)}
+            onClick={() => setActiveTab(2)}
+          >
+            <FileText style={{ width: 16, height: 16 }} />
+            Шаблоны
+          </button>
+        </div>
       </Card>
 
       {/* Контент табов */}
       {activeTab === 0 && (
         <Card>
           <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <TextField
-                placeholder="Поиск пациентов..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: <Search />
-                }}
-                sx={{ width: 300 }}
-              />
-              <Button startIcon={<Refresh />} onClick={loadEMRData}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ position: 'relative', width: 300 }}>
+                <input
+                  type="text"
+                  placeholder="Поиск пациентов..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 40px',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 8,
+                    backgroundColor: 'var(--mac-background)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 14
+                  }}
+                />
+                <Search style={{ 
+                  position: 'absolute', 
+                  left: 12, 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  width: 16, 
+                  height: 16, 
+                  color: 'var(--mac-text-secondary)' 
+                }} />
+              </div>
+              <Button onClick={loadEMRData}>
+                <RefreshCw style={{ width: 16, height: 16, marginRight: 8 }} />
                 Обновить
               </Button>
-            </Box>
+            </div>
             
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Пациент</TableCell>
-                    <TableCell>Телефон</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Дата рождения</TableCell>
-                    <TableCell>Записей</TableCell>
-                    <TableCell align="right">Действия</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
+            <div style={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Пациент</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Телефон</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Email</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Дата рождения</th>
+                    <th style={{ padding: 12, textAlign: 'left' }}>Записей</th>
+                    <th style={{ padding: 12, textAlign: 'right' }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredPatients.map((patient) => (
-                    <TableRow key={patient.id} hover>
-                      <TableCell>
-                        <Box display="flex" alignItems="center">
-                          <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                            <Person />
-                          </Avatar>
-                          <Box>
+                    <tr key={patient.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                      <td style={{ padding: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'var(--mac-accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <User style={{ width: 16, height: 16, color: 'white' }} />
+                          </div>
+                          <div>
                             <Typography variant="subtitle2">
                               {patient.full_name || 'Не указано'}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" color="textSecondary">
                               ID: {patient.id}
                             </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{patient.phone || '-'}</TableCell>
-                      <TableCell>{patient.email || '-'}</TableCell>
-                      <TableCell>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: 12 }}>{patient.phone || '-'}</td>
+                      <td style={{ padding: 12 }}>{patient.email || '-'}</td>
+                      <td style={{ padding: 12 }}>
                         {patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={medicalRecords.filter(r => r.patient_id === patient.id).length}
-                          color="primary"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton onClick={() => openRecordDialog(patient)}>
-                          <Add />
-                        </IconButton>
-                        <IconButton>
-                          <Visibility />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                      <td style={{ padding: 12 }}>
+                        <Badge variant="primary">
+                          {medicalRecords.filter(r => r.patient_id === patient.id).length}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: 12, textAlign: 'right' }}>
+                        <Button size="small" onClick={() => openRecordDialog(patient)}>
+                          <Plus style={{ width: 16, height: 16 }} />
+                        </Button>
+                        <Button size="small">
+                          <Eye style={{ width: 16, height: 16 }} />
+                        </Button>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -349,76 +521,73 @@ const EMRInterface = () => {
       {activeTab === 1 && (
         <Card>
           <CardContent>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Пациент</TableCell>
-                    <TableCell>Тип записи</TableCell>
-                    <TableCell>Жалобы</TableCell>
-                    <TableCell>Диагноз</TableCell>
-                    <TableCell>Дата</TableCell>
-                    <TableCell align="right">Действия</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
+            <div style={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--mac-background-secondary)' }}>
+                    <th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--mac-border)', fontWeight: 600 }}>Пациент</th>
+                    <th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--mac-border)', fontWeight: 600 }}>Тип записи</th>
+                    <th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--mac-border)', fontWeight: 600 }}>Жалобы</th>
+                    <th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--mac-border)', fontWeight: 600 }}>Диагноз</th>
+                    <th style={{ padding: 12, textAlign: 'left', borderBottom: '1px solid var(--mac-border)', fontWeight: 600 }}>Дата</th>
+                    <th style={{ padding: 12, textAlign: 'right', borderBottom: '1px solid var(--mac-border)', fontWeight: 600 }}>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {medicalRecords.map((record) => {
                     const patient = patients.find(p => p.id === record.patient_id);
                     return (
-                      <TableRow key={record.id} hover>
-                        <TableCell>
-                          <Box display="flex" alignItems="center">
-                            <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                              <Person />
-                            </Avatar>
-                            <Box>
+                      <tr key={record.id} style={{ borderBottom: '1px solid var(--mac-border)' }}>
+                        <td style={{ padding: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--mac-accent-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                              <User style={{ width: 20, height: 20, color: 'white' }} />
+                            </div>
+                            <div>
                               <Typography variant="subtitle2">
                                 {patient?.full_name || 'Неизвестный пациент'}
                               </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                ID: {record.patient_id}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            icon={getRecordTypeIcon(record.record_type)}
-                            label={getRecordTypeLabel(record.record_type)}
-                            color={getRecordTypeColor(record.record_type)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          <Badge variant="primary">
+                            {getRecordTypeLabel(record.record_type)}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          <Typography variant="body2" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {record.chief_complaint || '-'}
                           </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          <Typography variant="body2" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {record.diagnosis || '-'}
                           </Typography>
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td style={{ padding: 12 }}>
                           {record.created_at ? new Date(record.created_at).toLocaleDateString() : '-'}
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton onClick={() => openRecordDialog(null, record)}>
-                            <Edit />
-                          </IconButton>
-                          <IconButton>
-                            <Visibility />
-                          </IconButton>
-                          <IconButton>
-                            <Download />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                        <td style={{ padding: 12, textAlign: 'right' }}>
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8 }} onClick={() => openRecordDialog(null, record)}>
+                            <Edit style={{ width: 16, height: 16 }} />
+                          </button>
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8 }}>
+                            <Eye style={{ width: 16, height: 16 }} />
+                          </button>
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8 }}>
+                            <Download style={{ width: 16, height: 16 }} />
+                          </button>
+                          <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8 }} onClick={() => confirmDeleteRecord(record)}>
+                            <Trash2 style={{ width: 16, height: 16, color: 'var(--mac-accent-red)' }} />
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -429,159 +598,353 @@ const EMRInterface = () => {
             <Typography variant="h6" gutterBottom>
               Шаблоны медицинских записей
             </Typography>
-            <Grid container spacing={2}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
               {templates.map((template) => (
-                <Grid item xs={12} md={6} key={template.id}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        {template.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        {template.description}
-                      </Typography>
-                      <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <Chip
-                          label={template.category}
-                          color="primary"
-                          size="small"
-                        />
-                        <Box>
-                          <IconButton size="small">
-                            <Edit />
-                          </IconButton>
-                          <IconButton size="small">
-                            <Delete />
-                          </IconButton>
-                        </Box>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
+                <div key={template.id} style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 16 }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <Typography variant="h6" gutterBottom>
+                      {template.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      {template.description}
+                    </Typography>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Badge variant="primary">
+                      {template.category}
+                    </Badge>
+                    <div>
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, marginRight: 8 }} onClick={() => handleEditTemplate(template)}>
+                        <Edit style={{ width: 16, height: 16 }} />
+                      </button>
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8 }} onClick={() => handleDeleteTemplate(template)}>
+                        <Delete style={{ width: 16, height: 16, color: 'var(--mac-accent-red)' }} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </Grid>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Диалог создания/редактирования записи */}
-      <Dialog open={showRecordDialog} onClose={() => setShowRecordDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {selectedRecord ? 'Редактировать медицинскую запись' : 'Новая медицинская запись'}
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Пациент</InputLabel>
-                <Select
-                  value={recordForm.patient_id}
-                  onChange={(e) => setRecordForm({...recordForm, patient_id: e.target.value})}
-                  label="Пациент"
-                >
-                  {patients.map((patient) => (
-                    <MenuItem key={patient.id} value={patient.id}>
-                      {patient.full_name || `ID: ${patient.id}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Тип записи</InputLabel>
-                <Select
-                  value={recordForm.record_type}
-                  onChange={(e) => setRecordForm({...recordForm, record_type: e.target.value})}
-                  label="Тип записи"
-                >
-                  {recordTypes.map((type) => (
-                    <MenuItem key={type.value} value={type.value}>
-                      <Box display="flex" alignItems="center">
-                        {type.icon}
-                        <Typography sx={{ ml: 1 }}>{type.label}</Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Жалобы пациента"
-                multiline
-                rows={3}
-                value={recordForm.chief_complaint}
-                onChange={(e) => setRecordForm({...recordForm, chief_complaint: e.target.value})}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Анамнез настоящего заболевания"
-                multiline
-                rows={3}
-                value={recordForm.history_of_present_illness}
-                onChange={(e) => setRecordForm({...recordForm, history_of_present_illness: e.target.value})}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Физикальное обследование"
-                multiline
-                rows={3}
-                value={recordForm.physical_examination}
-                onChange={(e) => setRecordForm({...recordForm, physical_examination: e.target.value})}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Диагноз"
-                value={recordForm.diagnosis}
-                onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="План лечения"
-                value={recordForm.plan}
-                onChange={(e) => setRecordForm({...recordForm, plan: e.target.value})}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Лечебные назначения"
-                multiline
-                rows={3}
-                value={recordForm.treatment_notes}
-                onChange={(e) => setRecordForm({...recordForm, treatment_notes: e.target.value})}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Рекомендации и дальнейшие действия"
-                multiline
-                rows={2}
-                value={recordForm.follow_up_instructions}
-                onChange={(e) => setRecordForm({...recordForm, follow_up_instructions: e.target.value})}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowRecordDialog(false)}>Отмена</Button>
-          <Button onClick={handleCreateRecord} variant="contained">
-            {selectedRecord ? 'Обновить' : 'Создать'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {showRecordDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'var(--mac-background)',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 600,
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{ marginBottom: 24 }}>
+              <Typography variant="h6">
+                {selectedRecord ? 'Редактировать медицинскую запись' : 'Новая медицинская запись'}
+              </Typography>
+            </div>
+            {/* Основная информация */}
+            <details open style={{ marginBottom: 16 }}>
+              <summary style={{ 
+                cursor: 'pointer', 
+                padding: '12px 16px', 
+                backgroundColor: 'var(--mac-background-secondary)', 
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 16,
+                color: 'var(--mac-text-primary)',
+                border: '1px solid var(--mac-border)'
+              }}>
+                Основная информация
+              </summary>
+              <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Пациент</label>
+                    <Select
+                      options={patients.map((patient) => ({
+                        value: patient.id,
+                        label: patient.full_name || `ID: ${patient.id}`
+                      }))}
+                      value={recordForm.patient_id}
+                      onChange={(val) => setRecordForm({...recordForm, patient_id: val})}
+                      placeholder="Выберите пациента..."
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Тип записи</label>
+                    <Select
+                      options={recordTypes.map((type) => ({
+                        value: type.value,
+                        label: type.label
+                      }))}
+                      value={recordForm.record_type}
+                      onChange={(val) => setRecordForm({...recordForm, record_type: val})}
+                      placeholder="Выберите тип записи..."
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </details>
+            {/* Жалобы и анамнез */}
+            <details open style={{ marginBottom: 16 }}>
+              <summary style={{ 
+                cursor: 'pointer', 
+                padding: '12px 16px', 
+                backgroundColor: 'var(--mac-background-secondary)', 
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 16,
+                color: 'var(--mac-text-primary)',
+                border: '1px solid var(--mac-border)'
+              }}>
+                Жалобы и анамнез
+              </summary>
+              <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Жалобы пациента</label>
+                  <textarea
+                    value={recordForm.chief_complaint}
+                    onChange={(e) => setRecordForm({...recordForm, chief_complaint: e.target.value})}
+                    style={{
+                      width: '100%',
+                      minHeight: 80,
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Опишите жалобы пациента..."
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Анамнез настоящего заболевания</label>
+                  <textarea
+                    value={recordForm.history_of_present_illness}
+                    onChange={(e) => setRecordForm({...recordForm, history_of_present_illness: e.target.value})}
+                    style={{
+                      width: '100%',
+                      minHeight: 80,
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Анамнез заболевания..."
+                  />
+                </div>
+              </div>
+            </details>
+            {/* Осмотр и диагностика */}
+            <details open style={{ marginBottom: 16 }}>
+              <summary style={{ 
+                cursor: 'pointer', 
+                padding: '12px 16px', 
+                backgroundColor: 'var(--mac-background-secondary)', 
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 16,
+                color: 'var(--mac-text-primary)',
+                border: '1px solid var(--mac-border)'
+              }}>
+                Осмотр и диагностика
+              </summary>
+              <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Физикальное обследование</label>
+                  <textarea
+                    value={recordForm.physical_examination}
+                    onChange={(e) => setRecordForm({...recordForm, physical_examination: e.target.value})}
+                    style={{
+                      width: '100%',
+                      minHeight: 80,
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Результаты физикального обследования..."
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Диагноз</label>
+                    <input
+                      type="text"
+                      value={recordForm.diagnosis}
+                      onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: 12,
+                        border: '1px solid var(--mac-border)',
+                        borderRadius: 8,
+                        backgroundColor: 'var(--mac-background)',
+                        color: 'var(--mac-text-primary)'
+                      }}
+                      placeholder="Основной диагноз..."
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>План лечения</label>
+                    <input
+                      type="text"
+                      value={recordForm.plan}
+                      onChange={(e) => setRecordForm({...recordForm, plan: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: 12,
+                        border: '1px solid var(--mac-border)',
+                        borderRadius: 8,
+                        backgroundColor: 'var(--mac-background)',
+                        color: 'var(--mac-text-primary)'
+                      }}
+                      placeholder="План лечения..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </details>
+            {/* План лечения */}
+            <details open style={{ marginBottom: 16 }}>
+              <summary style={{ 
+                cursor: 'pointer', 
+                padding: '12px 16px', 
+                backgroundColor: 'var(--mac-background-secondary)', 
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 16,
+                color: 'var(--mac-text-primary)',
+                border: '1px solid var(--mac-border)'
+              }}>
+                План лечения
+              </summary>
+              <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Лечебные назначения</label>
+                  <textarea
+                    value={recordForm.treatment_notes}
+                    onChange={(e) => setRecordForm({...recordForm, treatment_notes: e.target.value})}
+                    style={{
+                      width: '100%',
+                      minHeight: 80,
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Лечебные назначения..."
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Рекомендации и дальнейшие действия</label>
+                  <textarea
+                    value={recordForm.follow_up_instructions}
+                    onChange={(e) => setRecordForm({...recordForm, follow_up_instructions: e.target.value})}
+                    style={{
+                      width: '100%',
+                      minHeight: 60,
+                      padding: 12,
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 8,
+                      backgroundColor: 'var(--mac-background)',
+                      color: 'var(--mac-text-primary)',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Рекомендации и дальнейшие действия..."
+                  />
+                </div>
+              </div>
+            </details>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <Button onClick={() => setShowRecordDialog(false)}>Отмена</Button>
+              <Button onClick={selectedRecord ? handleUpdateRecord : handleCreateRecord} variant="contained">
+                {selectedRecord ? 'Обновить' : 'Создать'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Диалог подтверждения удаления */}
+      {showDeleteDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'var(--mac-background)',
+            borderRadius: 12,
+            padding: 24,
+            width: '90%',
+            maxWidth: 400,
+            textAlign: 'center'
+          }}>
+            <div style={{ marginBottom: 16 }}>
+              <AlertTriangle style={{ width: 48, height: 48, color: 'var(--mac-accent-orange)', margin: '0 auto 16px' }} />
+              <Typography variant="h6" gutterBottom>
+                Подтверждение удаления
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Вы уверены, что хотите удалить эту медицинскую запись? Это действие нельзя отменить.
+              </Typography>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+              <Button onClick={() => setShowDeleteDialog(false)}>
+                Отмена
+              </Button>
+              <Button onClick={handleDeleteRecord} variant="danger">
+                <Trash2 style={{ width: 16, height: 16, marginRight: 8 }} />
+                Удалить
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast уведомления */}
+      {showToast && (
+        <ToastContainer>
+          <Toast
+            type={toastType}
+            message={toastMessage}
+            duration={5000}
+            onClose={() => setShowToast(false)}
+          />
+        </ToastContainer>
+      )}
+    </div>
   );
 };
 

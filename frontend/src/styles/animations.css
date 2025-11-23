@@ -319,3 +319,63 @@
   transform: translateY(0);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
+
+/* Reduced Motion Support - отключение анимаций для пользователей с ограничениями */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in-up,
+  .animate-fade-in-left,
+  .animate-fade-in-right,
+  .animate-fade-in-scale,
+  .animate-pulse,
+  .animate-spin,
+  .animate-wave,
+  .animate-shimmer,
+  .animate-gradient {
+    animation: none !important;
+  }
+
+  .hover-lift:hover,
+  .hover-scale:hover,
+  .hover-rotate:hover,
+  .icon-bounce:hover {
+    transform: none !important;
+  }
+}
+
+/* macOS-specific animations */
+@keyframes macFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes macSlideIn {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.mac-animate-fade-in {
+  animation: macFadeIn var(--mac-duration-normal) var(--mac-ease);
+}
+
+.mac-animate-slide-in {
+  animation: macSlideIn var(--mac-duration-normal) var(--mac-ease);
+}

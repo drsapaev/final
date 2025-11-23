@@ -20,14 +20,11 @@ import {
   Clock,
   User
 } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Label, Skeleton } from '../ui/native';
-import { useTheme } from '../../contexts/ThemeContext';
+import { Card, Button, Badge, MacOSInput, MacOSSelect, Skeleton } from '../ui/macos';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const GroupPermissionsManager = () => {
-  const { theme, getColor, getSpacing } = useTheme();
-  
   // Состояние
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(false);
@@ -222,42 +219,48 @@ const GroupPermissionsManager = () => {
 
   // Стили
   const containerStyle = {
-    padding: getSpacing('lg'),
+    padding: '24px',
     minHeight: '100vh',
-    backgroundColor: theme === 'light' ? getColor('gray', 50) : getColor('gray', 900)
+    backgroundColor: 'var(--mac-bg-primary)'
   };
 
   const tabStyle = (isActive) => ({
-    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-    backgroundColor: isActive 
-      ? (theme === 'light' ? getColor('blue', 500) : getColor('blue', 600))
-      : 'transparent',
-    color: isActive 
-      ? 'white' 
-      : (theme === 'light' ? getColor('gray', 700) : getColor('gray', 300)),
+    padding: '12px 16px',
+    backgroundColor: isActive ? 'var(--mac-accent-blue)' : 'transparent',
+    color: isActive ? 'white' : 'var(--mac-text-secondary)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-sm)',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
     alignItems: 'center',
-    gap: getSpacing('xs')
+    gap: '8px',
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
   });
 
   const renderUsersTab = () => (
-    <div style={{ display: 'flex', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', gap: '24px' }}>
       {/* Левая панель - список пользователей */}
-      <Card style={{ flex: '0 0 300px', padding: getSpacing('md') }}>
-        <h3 style={{ margin: `0 0 ${getSpacing('md')} 0`, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-          <Users size={20} />
+      <Card style={{ flex: '0 0 300px', padding: '16px' }}>
+        <h3 style={{ 
+          margin: '0 0 16px 0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          <Users style={{ width: '20px', height: '20px' }} />
           Пользователи
         </h3>
         
-        <Input
+        <MacOSInput
           placeholder="Поиск пользователей..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ marginBottom: getSpacing('md') }}
+          style={{ marginBottom: '16px' }}
         />
         
         <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -269,23 +272,36 @@ const GroupPermissionsManager = () => {
                 loadUserPermissions(user.id);
               }}
               style={{
-                padding: getSpacing('sm'),
-                borderRadius: '6px',
+                padding: '12px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
                 backgroundColor: selectedUser?.id === user.id 
-                  ? (theme === 'light' ? getColor('blue', 100) : getColor('blue', 900))
+                  ? 'var(--mac-accent-blue-light)'
                   : 'transparent',
-                marginBottom: getSpacing('xs'),
+                marginBottom: '8px',
                 border: selectedUser?.id === user.id 
-                  ? `2px solid ${getColor('blue', 500)}`
-                  : '1px solid transparent'
+                  ? '2px solid var(--mac-accent-blue)'
+                  : '1px solid transparent',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
               }}
             >
-              <div style={{ fontWeight: 'bold' }}>{user.username}</div>
-              <div style={{ fontSize: '0.875rem', color: getColor('gray', 600) }}>
+              <div style={{ 
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                {user.username}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
                 {user.full_name || 'Без имени'}
               </div>
-              <div style={{ fontSize: '0.75rem', color: getColor('gray', 500) }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-tertiary)' 
+              }}>
                 Роль: {user.role}
               </div>
             </div>
@@ -294,55 +310,77 @@ const GroupPermissionsManager = () => {
       </Card>
 
       {/* Правая панель - разрешения пользователя */}
-      <Card style={{ flex: 1, padding: getSpacing('md') }}>
+      <Card style={{ flex: 1, padding: '16px' }}>
         {selectedUser ? (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('md') }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                <Shield size={20} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ 
+                margin: 0, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                <Shield style={{ width: '20px', height: '20px' }} />
                 Разрешения: {selectedUser.username}
               </h3>
               <Button
                 onClick={() => loadUserPermissions(selectedUser.id)}
                 disabled={loading}
               >
-                <RefreshCw size={16} />
+                <RefreshCw style={{ width: '16px', height: '16px' }} />
                 Обновить
               </Button>
             </div>
 
             {loading ? (
               <div>
-                <Skeleton height="20px" style={{ marginBottom: getSpacing('sm') }} />
-                <Skeleton height="20px" style={{ marginBottom: getSpacing('sm') }} />
+                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
+                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
                 <Skeleton height="20px" />
               </div>
             ) : userPermissions ? (
               <div>
-                <div style={{ marginBottom: getSpacing('md') }}>
+                <div style={{ marginBottom: '16px' }}>
                   <Badge variant="primary">
                     Всего разрешений: {userPermissions.permissions_count}
                   </Badge>
-                  <Badge variant="secondary" style={{ marginLeft: getSpacing('xs') }}>
+                  <Badge variant="secondary" style={{ marginLeft: '8px' }}>
                     Ролей: {userPermissions.roles.length}
                   </Badge>
-                  <Badge variant="info" style={{ marginLeft: getSpacing('xs') }}>
+                  <Badge variant="info" style={{ marginLeft: '8px' }}>
                     Групп: {userPermissions.groups.length}
                   </Badge>
                 </div>
 
-                <div style={{ marginBottom: getSpacing('lg') }}>
-                  <h4>Роли:</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: getSpacing('xs') }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    Роли:
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {userPermissions.roles.map(role => (
                       <Badge key={role} variant="success">{role}</Badge>
                     ))}
                   </div>
                 </div>
 
-                <div style={{ marginBottom: getSpacing('lg') }}>
-                  <h4>Группы:</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: getSpacing('xs') }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    Группы:
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {userPermissions.groups.map(group => (
                       <Badge key={group} variant="info">{group}</Badge>
                     ))}
@@ -350,28 +388,36 @@ const GroupPermissionsManager = () => {
                 </div>
 
                 <div>
-                  <h4>Разрешения:</h4>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    Разрешения:
+                  </h4>
                   <div style={{ 
                     maxHeight: '300px', 
                     overflowY: 'auto',
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-                    gap: getSpacing('xs')
+                    gap: '8px'
                   }}>
                     {userPermissions.permissions.map(permission => (
                       <div
                         key={permission}
                         style={{
-                          padding: getSpacing('xs'),
-                          backgroundColor: theme === 'light' ? getColor('green', 50) : getColor('green', 900),
-                          borderRadius: '4px',
-                          fontSize: '0.875rem',
+                          padding: '8px',
+                          backgroundColor: 'var(--mac-success-bg)',
+                          borderRadius: 'var(--mac-radius-sm)',
+                          fontSize: 'var(--mac-font-size-xs)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: getSpacing('xs')
+                          gap: '8px',
+                          border: '1px solid var(--mac-success-border)'
                         }}
                       >
-                        <CheckCircle size={14} color={getColor('green', 600)} />
+                        <CheckCircle style={{ width: '14px', height: '14px', color: 'var(--mac-success)' }} />
                         {permission}
                       </div>
                     ))}
@@ -379,39 +425,61 @@ const GroupPermissionsManager = () => {
                 </div>
 
                 {/* Инструменты проверки разрешений */}
-                <div style={{ marginTop: getSpacing('lg'), padding: getSpacing('md'), backgroundColor: theme === 'light' ? getColor('gray', 100) : getColor('gray', 800), borderRadius: '8px' }}>
-                  <h4>Проверить разрешение:</h4>
-                  <div style={{ display: 'flex', gap: getSpacing('sm'), alignItems: 'end' }}>
+                <div style={{ 
+                  marginTop: '24px', 
+                  padding: '16px', 
+                  backgroundColor: 'var(--mac-bg-secondary)', 
+                  borderRadius: 'var(--mac-radius-md)',
+                  border: '1px solid var(--mac-border)'
+                }}>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    Проверить разрешение:
+                  </h4>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
                     <div style={{ flex: 1 }}>
-                      <Label>Код разрешения:</Label>
-                      <Select
+                      <MacOSSelect
                         onChange={(e) => {
                           if (e.target.value) {
                             checkUserPermission(selectedUser.id, e.target.value);
                           }
                         }}
-                      >
-                        <option value="">Выберите разрешение...</option>
-                        {permissions.map(perm => (
-                          <option key={perm.id} value={perm.codename}>
-                            {perm.name} ({perm.codename})
-                          </option>
-                        ))}
-                      </Select>
+                        options={[
+                          { value: '', label: 'Выберите разрешение...' },
+                          ...permissions.map(perm => ({
+                            value: perm.codename,
+                            label: `${perm.name} (${perm.codename})`
+                          }))
+                        ]}
+                        style={{ width: '100%' }}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', color: getColor('gray', 500) }}>
+              <div style={{ 
+                textAlign: 'center', 
+                color: 'var(--mac-text-secondary)',
+                fontSize: 'var(--mac-font-size-sm)'
+              }}>
                 Выберите пользователя для просмотра разрешений
               </div>
             )}
           </>
         ) : (
-          <div style={{ textAlign: 'center', color: getColor('gray', 500), padding: getSpacing('xl') }}>
-            <User size={48} style={{ marginBottom: getSpacing('md') }} />
-            <p>Выберите пользователя из списка слева</p>
+          <div style={{ 
+            textAlign: 'center', 
+            color: 'var(--mac-text-secondary)', 
+            padding: '32px',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
+            <User style={{ width: '48px', height: '48px', marginBottom: '16px', color: 'var(--mac-text-tertiary)' }} />
+            <p style={{ margin: 0 }}>Выберите пользователя из списка слева</p>
           </div>
         )}
       </Card>
@@ -419,19 +487,27 @@ const GroupPermissionsManager = () => {
   );
 
   const renderGroupsTab = () => (
-    <div style={{ display: 'flex', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', gap: '24px' }}>
       {/* Левая панель - список групп */}
-      <Card style={{ flex: '0 0 300px', padding: getSpacing('md') }}>
-        <h3 style={{ margin: `0 0 ${getSpacing('md')} 0`, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-          <Users size={20} />
+      <Card style={{ flex: '0 0 300px', padding: '16px' }}>
+        <h3 style={{ 
+          margin: '0 0 16px 0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          <Users style={{ width: '20px', height: '20px' }} />
           Группы
         </h3>
         
-        <Input
+        <MacOSInput
           placeholder="Поиск групп..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ marginBottom: getSpacing('md') }}
+          style={{ marginBottom: '16px' }}
         />
         
         <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -443,26 +519,39 @@ const GroupPermissionsManager = () => {
                 loadGroupSummary(group.id);
               }}
               style={{
-                padding: getSpacing('sm'),
-                borderRadius: '6px',
+                padding: '12px',
+                borderRadius: 'var(--mac-radius-sm)',
                 cursor: 'pointer',
                 backgroundColor: selectedGroup?.id === group.id 
-                  ? (theme === 'light' ? getColor('blue', 100) : getColor('blue', 900))
+                  ? 'var(--mac-accent-blue-light)'
                   : 'transparent',
-                marginBottom: getSpacing('xs'),
+                marginBottom: '8px',
                 border: selectedGroup?.id === group.id 
-                  ? `2px solid ${getColor('blue', 500)}`
-                  : '1px solid transparent'
+                  ? '2px solid var(--mac-accent-blue)'
+                  : '1px solid transparent',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
               }}
             >
-              <div style={{ fontWeight: 'bold' }}>{group.display_name}</div>
-              <div style={{ fontSize: '0.875rem', color: getColor('gray', 600) }}>
+              <div style={{ 
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                {group.display_name}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
                 {group.name}
               </div>
-              <div style={{ fontSize: '0.75rem', color: getColor('gray', 500) }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xs)', 
+                color: 'var(--mac-text-tertiary)' 
+              }}>
                 Пользователей: {group.users_count} | Ролей: {group.roles_count}
               </div>
-              <Badge variant={group.group_type === 'department' ? 'primary' : 'secondary'} style={{ fontSize: '0.7rem' }}>
+              <Badge variant={group.group_type === 'department' ? 'primary' : 'secondary'} style={{ fontSize: 'var(--mac-font-size-xs)' }}>
                 {group.group_type}
               </Badge>
             </div>
@@ -471,113 +560,146 @@ const GroupPermissionsManager = () => {
       </Card>
 
       {/* Правая панель - сводка группы */}
-      <Card style={{ flex: 1, padding: getSpacing('md') }}>
+      <Card style={{ flex: 1, padding: '16px' }}>
         {selectedGroup ? (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('md') }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                <Shield size={20} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ 
+                margin: 0, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                <Shield style={{ width: '20px', height: '20px' }} />
                 Группа: {selectedGroup.display_name}
               </h3>
               <Button
                 onClick={() => loadGroupSummary(selectedGroup.id)}
                 disabled={loading}
               >
-                <RefreshCw size={16} />
+                <RefreshCw style={{ width: '16px', height: '16px' }} />
                 Обновить
               </Button>
             </div>
 
             {loading ? (
               <div>
-                <Skeleton height="20px" style={{ marginBottom: getSpacing('sm') }} />
-                <Skeleton height="20px" style={{ marginBottom: getSpacing('sm') }} />
+                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
+                <Skeleton height="20px" style={{ marginBottom: '8px' }} />
                 <Skeleton height="20px" />
               </div>
             ) : groupSummary ? (
               <div>
-                <div style={{ marginBottom: getSpacing('md') }}>
+                <div style={{ marginBottom: '16px' }}>
                   <Badge variant="primary">
                     Пользователей: {groupSummary.users_count}
                   </Badge>
-                  <Badge variant="secondary" style={{ marginLeft: getSpacing('xs') }}>
+                  <Badge variant="secondary" style={{ marginLeft: '8px' }}>
                     Ролей: {groupSummary.roles.length}
                   </Badge>
-                  <Badge variant="info" style={{ marginLeft: getSpacing('xs') }}>
+                  <Badge variant="info" style={{ marginLeft: '8px' }}>
                     Разрешений: {groupSummary.permissions_count}
                   </Badge>
                 </div>
 
-                <div style={{ marginBottom: getSpacing('lg') }}>
-                  <h4>Роли группы:</h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: getSpacing('xs'), marginBottom: getSpacing('sm') }}>
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    Роли группы:
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                     {groupSummary.roles.map(role => (
-                      <div key={role.id} style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
+                      <div key={role.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Badge variant="success">{role.display_name}</Badge>
                         <Button
                           size="sm"
                           variant="danger"
                           onClick={() => revokeRoleFromGroup(selectedGroup.id, role.id)}
                         >
-                          <Trash2 size={12} />
+                          <Trash2 style={{ width: '12px', height: '12px' }} />
                         </Button>
                       </div>
                     ))}
                   </div>
                   
                   {/* Добавление новой роли */}
-                  <div style={{ display: 'flex', gap: getSpacing('sm'), alignItems: 'end' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'end' }}>
                     <div style={{ flex: 1 }}>
-                      <Label>Добавить роль:</Label>
-                      <Select
+                      <MacOSSelect
                         onChange={(e) => {
                           if (e.target.value) {
                             assignRoleToGroup(selectedGroup.id, parseInt(e.target.value));
                             e.target.value = '';
                           }
                         }}
-                      >
-                        <option value="">Выберите роль...</option>
-                        {roles.filter(role => !groupSummary.roles.some(gr => gr.id === role.id)).map(role => (
-                          <option key={role.id} value={role.id}>
-                            {role.display_name}
-                          </option>
-                        ))}
-                      </Select>
+                        options={[
+                          { value: '', label: 'Выберите роль...' },
+                          ...roles.filter(role => !groupSummary.roles.some(gr => gr.id === role.id)).map(role => ({
+                            value: role.id,
+                            label: role.display_name
+                          }))
+                        ]}
+                        style={{ width: '100%' }}
+                      />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h4>Разрешения по категориям:</h4>
+                  <h4 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    Разрешения по категориям:
+                  </h4>
                   <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                     {Object.entries(groupSummary.permissions_by_category).map(([category, perms]) => (
-                      <div key={category} style={{ marginBottom: getSpacing('md') }}>
+                      <div key={category} style={{ marginBottom: '16px' }}>
                         <h5 style={{ 
-                          color: getColor('blue', 600),
+                          color: 'var(--mac-accent-blue)',
                           textTransform: 'capitalize',
-                          marginBottom: getSpacing('xs')
+                          marginBottom: '8px',
+                          fontSize: 'var(--mac-font-size-sm)',
+                          fontWeight: 'var(--mac-font-weight-medium)'
                         }}>
                           {category} ({perms.length})
                         </h5>
                         <div style={{ 
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                          gap: getSpacing('xs'),
-                          paddingLeft: getSpacing('md')
+                          gap: '8px',
+                          paddingLeft: '16px'
                         }}>
                           {perms.map(perm => (
                             <div
                               key={perm.codename}
                               style={{
-                                padding: getSpacing('xs'),
-                                backgroundColor: theme === 'light' ? getColor('green', 50) : getColor('green', 900),
-                                borderRadius: '4px',
-                                fontSize: '0.875rem'
+                                padding: '8px',
+                                backgroundColor: 'var(--mac-success-bg)',
+                                borderRadius: 'var(--mac-radius-sm)',
+                                fontSize: 'var(--mac-font-size-xs)',
+                                border: '1px solid var(--mac-success-border)'
                               }}
                             >
-                              <div style={{ fontWeight: 'bold' }}>{perm.name}</div>
-                              <div style={{ fontSize: '0.75rem', color: getColor('gray', 600) }}>
+                              <div style={{ 
+                                fontWeight: 'var(--mac-font-weight-semibold)',
+                                color: 'var(--mac-text-primary)'
+                              }}>
+                                {perm.name}
+                              </div>
+                              <div style={{ 
+                                fontSize: 'var(--mac-font-size-xs)', 
+                                color: 'var(--mac-text-secondary)' 
+                              }}>
                                 {perm.codename}
                               </div>
                             </div>
@@ -589,15 +711,24 @@ const GroupPermissionsManager = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', color: getColor('gray', 500) }}>
+              <div style={{ 
+                textAlign: 'center', 
+                color: 'var(--mac-text-secondary)',
+                fontSize: 'var(--mac-font-size-sm)'
+              }}>
                 Загрузка сводки группы...
               </div>
             )}
           </>
         ) : (
-          <div style={{ textAlign: 'center', color: getColor('gray', 500), padding: getSpacing('xl') }}>
-            <Users size={48} style={{ marginBottom: getSpacing('md') }} />
-            <p>Выберите группу из списка слева</p>
+          <div style={{ 
+            textAlign: 'center', 
+            color: 'var(--mac-text-secondary)', 
+            padding: '32px',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
+            <Users style={{ width: '48px', height: '48px', marginBottom: '16px', color: 'var(--mac-text-tertiary)' }} />
+            <p style={{ margin: 0 }}>Выберите группу из списка слева</p>
           </div>
         )}
       </Card>
@@ -605,58 +736,85 @@ const GroupPermissionsManager = () => {
   );
 
   const renderCacheTab = () => (
-    <Card style={{ padding: getSpacing('lg') }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
-        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-          <Settings size={20} />
+    <Card style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h3 style={{ 
+          margin: 0, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          <Settings style={{ width: '20px', height: '20px' }} />
           Управление кэшем разрешений
         </h3>
         <Button onClick={clearCache} variant="danger">
-          <Trash2 size={16} />
+          <Trash2 style={{ width: '16px', height: '16px' }} />
           Очистить кэш
         </Button>
       </div>
 
       {cacheStats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md') }}>
-          <Card style={{ padding: getSpacing('md'), backgroundColor: theme === 'light' ? getColor('blue', 50) : getColor('blue', 900) }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-              <Clock size={24} color={getColor('blue', 600)} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <Card style={{ padding: '16px', backgroundColor: 'var(--mac-info-bg)', border: '1px solid var(--mac-info-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Clock style={{ width: '24px', height: '24px', color: 'var(--mac-info)' }} />
               <div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{cacheStats.cache_ttl}с</div>
-                <div style={{ fontSize: '0.875rem', color: getColor('gray', 600) }}>TTL кэша</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>
+                  {cacheStats.cache_ttl}с
+                </div>
+                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                  TTL кэша
+                </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: getSpacing('md'), backgroundColor: theme === 'light' ? getColor('green', 50) : getColor('green', 900) }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-              <Users size={24} color={getColor('green', 600)} />
+          <Card style={{ padding: '16px', backgroundColor: 'var(--mac-success-bg)', border: '1px solid var(--mac-success-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Users style={{ width: '24px', height: '24px', color: 'var(--mac-success)' }} />
               <div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{cacheStats.cache_size}</div>
-                <div style={{ fontSize: '0.875rem', color: getColor('gray', 600) }}>Записей в кэше</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>
+                  {cacheStats.cache_size}
+                </div>
+                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                  Записей в кэше
+                </div>
               </div>
             </div>
           </Card>
 
-          <Card style={{ padding: getSpacing('md'), backgroundColor: theme === 'light' ? getColor('purple', 50) : getColor('purple', 900) }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('sm') }}>
-              <Key size={24} color={getColor('purple', 600)} />
+          <Card style={{ padding: '16px', backgroundColor: 'var(--mac-warning-bg)', border: '1px solid var(--mac-warning-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Key style={{ width: '24px', height: '24px', color: 'var(--mac-warning)' }} />
               <div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{cacheStats.cached_users.length}</div>
-                <div style={{ fontSize: '0.875rem', color: getColor('gray', 600) }}>Пользователей в кэше</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xl)', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-text-primary)' }}>
+                  {cacheStats.cached_users.length}
+                </div>
+                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
+                  Пользователей в кэше
+                </div>
               </div>
             </div>
           </Card>
         </div>
       )}
 
-      <div style={{ marginTop: getSpacing('lg') }}>
-        <h4>Пользователи в кэше:</h4>
+      <div style={{ marginTop: '24px' }}>
+        <h4 style={{ 
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)',
+          marginBottom: '8px'
+        }}>
+          Пользователи в кэше:
+        </h4>
         <div style={{ 
           display: 'flex', 
           flexWrap: 'wrap', 
-          gap: getSpacing('xs'),
+          gap: '8px',
           maxHeight: '200px',
           overflowY: 'auto'
         }}>
@@ -672,22 +830,23 @@ const GroupPermissionsManager = () => {
 
   return (
     <div style={containerStyle}>
-      <div style={{ marginBottom: getSpacing('lg') }}>
+      <div style={{ marginBottom: '24px' }}>
         <h1 style={{ 
           margin: 0, 
-          fontSize: '1.875rem', 
-          fontWeight: 'bold',
-          color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+          fontSize: 'var(--mac-font-size-2xl)', 
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '12px'
         }}>
-          <Shield size={32} />
+          <Shield style={{ width: '32px', height: '32px' }} />
           Управление разрешениями групп
         </h1>
         <p style={{ 
-          margin: `${getSpacing('sm')} 0 0 0`, 
-          color: getColor('gray', 600) 
+          margin: '8px 0 0 0', 
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
         }}>
           Управление ролями, группами и разрешениями пользователей
         </p>
@@ -696,33 +855,153 @@ const GroupPermissionsManager = () => {
       {/* Табы */}
       <div style={{ 
         display: 'flex', 
-        gap: getSpacing('sm'), 
-        marginBottom: getSpacing('lg'),
-        borderBottom: `1px solid ${theme === 'light' ? getColor('gray', 200) : getColor('gray', 700)}`,
-        paddingBottom: getSpacing('sm')
+        marginBottom: '24px'
       }}>
         <button
-          style={tabStyle(activeTab === 'users')}
           onClick={() => setActiveTab('users')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'users' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'users' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'users') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'users') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
-          <User size={16} />
+          <User style={{ 
+            width: '16px', 
+            height: '16px',
+            color: activeTab === 'users' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+          }} />
           Пользователи
+          {activeTab === 'users' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
         <button
-          style={tabStyle(activeTab === 'groups')}
           onClick={() => setActiveTab('groups')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'groups' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'groups' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'groups') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'groups') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
-          <Users size={16} />
+          <Users style={{ 
+            width: '16px', 
+            height: '16px',
+            color: activeTab === 'groups' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+          }} />
           Группы
+          {activeTab === 'groups' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
         <button
-          style={tabStyle(activeTab === 'cache')}
           onClick={() => setActiveTab('cache')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'cache' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'cache' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'cache') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'cache') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
-          <Settings size={16} />
+          <Settings style={{ 
+            width: '16px', 
+            height: '16px',
+            color: activeTab === 'cache' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+          }} />
           Кэш
+          {activeTab === 'cache' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Содержимое табов */}
       {activeTab === 'users' && renderUsersTab()}

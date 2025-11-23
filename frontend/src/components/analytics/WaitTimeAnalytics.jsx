@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Badge, Input, Label, Select } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSBadge, 
+  MacOSInput, 
+  MacOSSelect, 
+  MacOSTab,
+  MacOSStatCard,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton
+} from '../ui/macos';
 import { 
   Clock, 
   TrendingUp, 
@@ -16,12 +26,10 @@ import {
   Eye,
   Zap
 } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const WaitTimeAnalytics = () => {
-  const { theme, getColor, getSpacing } = useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
@@ -49,6 +57,19 @@ const WaitTimeAnalytics = () => {
     const interval = setInterval(loadRealTimeEstimates, 30000);
     return () => clearInterval(interval);
   }, [dateRange, filters]);
+
+  // Загружаем данные при переключении на вкладки
+  useEffect(() => {
+    if (activeTab === 'detailed' && !analytics) {
+      loadAnalytics();
+    }
+    if (activeTab === 'services' && !serviceAnalytics) {
+      loadServiceAnalytics();
+    }
+    if (activeTab === 'heatmap' && !heatmapData) {
+      loadHeatmap();
+    }
+  }, [activeTab]);
 
   const loadAnalytics = async () => {
     setLoading(true);
@@ -144,127 +165,105 @@ const WaitTimeAnalytics = () => {
 
   const getPerformanceColor = (rating) => {
     switch (rating) {
-      case 'Отлично': return getColor('green', 600);
-      case 'Хорошо': return getColor('blue', 600);
-      case 'Удовлетворительно': return getColor('yellow', 600);
-      case 'Требует улучшения': return getColor('orange', 600);
-      case 'Критично': return getColor('red', 600);
-      default: return getColor('gray', 600);
+      case 'Отлично': return 'var(--mac-success)';
+      case 'Хорошо': return 'var(--mac-info)';
+      case 'Удовлетворительно': return 'var(--mac-warning)';
+      case 'Требует улучшения': return 'var(--mac-warning)';
+      case 'Критично': return 'var(--mac-error)';
+      default: return 'var(--mac-text-secondary)';
     }
   };
 
   const renderOverviewTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Сводка */}
       {summary && (
-        <Card style={{ padding: getSpacing('lg') }}>
+        <MacOSCard style={{ padding: '24px' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            marginBottom: getSpacing('md')
+            marginBottom: '16px'
           }}>
             <h3 style={{ 
               margin: 0,
-              color: getColor('text', 900),
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               display: 'flex',
               alignItems: 'center',
-              gap: getSpacing('sm')
+              gap: '8px'
             }}>
-              <Activity size={20} />
+              <Activity style={{ width: '20px', height: '20px' }} />
               Сводка за последние {summary.period_days} дней
             </h3>
-            <Badge style={{ 
-              backgroundColor: getPerformanceColor(summary.performance_rating),
-              color: 'white'
-            }}>
+            <MacOSBadge 
+              variant="secondary"
+              style={{ 
+                backgroundColor: getPerformanceColor(summary.performance_rating),
+                color: 'white'
+              }}
+            >
               {summary.performance_rating}
-            </Badge>
+            </MacOSBadge>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md') }}>
-            <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('blue', 50),
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('blue', 600) }}>
-                {formatTime(summary.average_wait_time_minutes)}
-              </div>
-              <div style={{ color: getColor('text', 600) }}>Среднее время ожидания</div>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <MacOSStatCard
+              title="Среднее время ожидания"
+              value={formatTime(summary.average_wait_time_minutes)}
+              icon={Clock}
+              color="var(--mac-info)"
+            />
 
-            <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('green', 50),
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('green', 600) }}>
-                {formatTime(summary.median_wait_time_minutes)}
-              </div>
-              <div style={{ color: getColor('text', 600) }}>Медианное время</div>
-            </div>
+            <MacOSStatCard
+              title="Медианное время"
+              value={formatTime(summary.median_wait_time_minutes)}
+              icon={Activity}
+              color="var(--mac-success)"
+            />
 
-            <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('purple', 50),
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('purple', 600) }}>
-                {summary.total_analyzed_entries}
-              </div>
-              <div style={{ color: getColor('text', 600) }}>Проанализировано записей</div>
-            </div>
+            <MacOSStatCard
+              title="Проанализировано записей"
+              value={summary.total_analyzed_entries.toString()}
+              icon={BarChart3}
+              color="var(--mac-accent-purple)"
+            />
 
-            <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: summary.trend_change_percent > 0 ? getColor('red', 50) : getColor('green', 50),
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ 
-                fontSize: '24px', 
-                fontWeight: 'bold', 
-                color: summary.trend_change_percent > 0 ? getColor('red', 600) : getColor('green', 600),
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: getSpacing('xs')
-              }}>
-                {summary.trend_change_percent > 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
-                {Math.abs(summary.trend_change_percent)}%
-              </div>
-              <div style={{ color: getColor('text', 600) }}>Тренд</div>
-            </div>
+            <MacOSStatCard
+              title="Тренд"
+              value={`${Math.abs(summary.trend_change_percent)}%`}
+              icon={summary.trend_change_percent > 0 ? TrendingUp : TrendingDown}
+              color={summary.trend_change_percent > 0 ? 'var(--mac-error)' : 'var(--mac-success)'}
+            />
           </div>
 
           {summary.top_recommendations && summary.top_recommendations.length > 0 && (
-            <div style={{ marginTop: getSpacing('md') }}>
+            <div style={{ marginTop: '16px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('sm')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 8px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Рекомендации
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs') }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {summary.top_recommendations.map((recommendation, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: getSpacing('sm'),
-                      backgroundColor: getColor('yellow', 50),
-                      border: `1px solid ${getColor('yellow', 200)}`,
-                      borderRadius: '6px',
+                      padding: '8px',
+                      backgroundColor: 'var(--mac-warning-bg)',
+                      border: '1px solid var(--mac-warning-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('sm')
+                      gap: '8px'
                     }}
                   >
-                    <AlertTriangle size={16} color={getColor('yellow', 600)} />
-                    <span style={{ fontSize: '14px', color: getColor('text', 700) }}>
+                    <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
+                    <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
                       {recommendation}
                     </span>
                   </div>
@@ -272,76 +271,77 @@ const WaitTimeAnalytics = () => {
               </div>
             </div>
           )}
-        </Card>
+        </MacOSCard>
       )}
 
       {/* Real-time оценки */}
       {realTimeEstimates && (
-        <Card style={{ padding: getSpacing('lg') }}>
+        <MacOSCard style={{ padding: '24px' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            marginBottom: getSpacing('md')
+            marginBottom: '16px'
           }}>
             <h3 style={{ 
               margin: 0,
-              color: getColor('text', 900),
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               display: 'flex',
               alignItems: 'center',
-              gap: getSpacing('sm')
+              gap: '8px'
             }}>
-              <Zap size={20} />
+              <Zap style={{ width: '20px', height: '20px' }} />
               Текущие оценки времени ожидания
             </h3>
-            <div style={{ fontSize: '12px', color: getColor('text', 500) }}>
+            <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
               Обновлено: {new Date(realTimeEstimates.timestamp).toLocaleTimeString()}
             </div>
           </div>
 
           {Object.keys(realTimeEstimates.queues).length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: getSpacing('xl'),
-              color: getColor('text', 500)
-            }}>
-              Нет активных очередей
-            </div>
+            <MacOSEmptyState
+              icon={Clock}
+              title="Нет активных очередей"
+              description="В данный момент нет активных очередей для отображения"
+            />
           ) : (
-            <div style={{ display: 'grid', gap: getSpacing('md') }}>
+            <div style={{ display: 'grid', gap: '16px' }}>
               {Object.values(realTimeEstimates.queues).map((queue) => (
                 <div
                   key={queue.queue_id}
                   style={{
-                    padding: getSpacing('md'),
-                    border: `1px solid ${getColor('gray', 200)}`,
-                    borderRadius: '8px',
+                    padding: '16px',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 'var(--mac-radius-md)',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    backgroundColor: 'var(--mac-bg-secondary)'
                   }}
                 >
                   <div>
                     <div style={{ 
-                      fontWeight: 'bold',
-                      color: getColor('text', 900),
-                      marginBottom: getSpacing('xs')
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      color: 'var(--mac-text-primary)',
+                      marginBottom: '4px'
                     }}>
                       {queue.department} - {queue.doctor_name}
                     </div>
                     <div style={{ 
-                      fontSize: '14px',
-                      color: getColor('text', 600),
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('md')
+                      gap: '16px'
                     }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                        <Users size={14} />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Users style={{ width: '14px', height: '14px' }} />
                         {queue.current_queue_length} в очереди
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-                        <Clock size={14} />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock style={{ width: '14px', height: '14px' }} />
                         ~{formatTime(queue.average_service_time)} на пациента
                       </span>
                     </div>
@@ -349,14 +349,14 @@ const WaitTimeAnalytics = () => {
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ 
                       fontSize: '20px', 
-                      fontWeight: 'bold', 
-                      color: queue.estimated_wait_time_minutes > 30 ? getColor('red', 600) : getColor('green', 600)
+                      fontWeight: 'var(--mac-font-weight-bold)', 
+                      color: queue.estimated_wait_time_minutes > 30 ? 'var(--mac-error)' : 'var(--mac-success)'
                     }}>
                       {formatTime(queue.estimated_wait_time_minutes)}
                     </div>
                     <div style={{ 
-                      fontSize: '12px', 
-                      color: getColor('text', 500)
+                      fontSize: 'var(--mac-font-size-xs)', 
+                      color: 'var(--mac-text-tertiary)'
                     }}>
                       Уверенность: {Math.round(queue.confidence_level * 100)}%
                     </div>
@@ -368,268 +368,325 @@ const WaitTimeAnalytics = () => {
 
           {realTimeEstimates.summary && Object.keys(realTimeEstimates.queues).length > 0 && (
             <div style={{ 
-              marginTop: getSpacing('md'),
-              padding: getSpacing('md'),
-              backgroundColor: getColor('gray', 50),
-              borderRadius: '6px'
+              marginTop: '16px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-bg-secondary)',
+              borderRadius: 'var(--mac-radius-sm)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span>Минимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
-                <span>Среднее ожидание: <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
-                <span>Максимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--mac-font-size-sm)' }}>
+                <span style={{ color: 'var(--mac-text-primary)' }}>Минимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.shortest_wait)}</strong></span>
+                <span style={{ color: 'var(--mac-text-primary)' }}>Среднее ожидание: <strong>{formatTime(realTimeEstimates.summary.average_wait)}</strong></span>
+                <span style={{ color: 'var(--mac-text-primary)' }}>Максимальное ожидание: <strong>{formatTime(realTimeEstimates.summary.longest_wait)}</strong></span>
               </div>
             </div>
           )}
-        </Card>
+        </MacOSCard>
       )}
     </div>
   );
 
   const renderDetailedTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
-      {analytics && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {loading ? (
+        <MacOSCard style={{ padding: '24px' }}>
+          <MacOSLoadingSkeleton height="200px" />
+        </MacOSCard>
+      ) : analytics ? (
         <>
           {/* Общая статистика */}
-          <Card style={{ padding: getSpacing('lg') }}>
+          <MacOSCard style={{ padding: '24px' }}>
             <h3 style={{ 
-              margin: `0 0 ${getSpacing('md')} 0`,
-              color: getColor('text', 900),
+              margin: `0 0 16px 0`,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               display: 'flex',
               alignItems: 'center',
-              gap: getSpacing('sm')
+              gap: '8px'
             }}>
-              <BarChart3 size={20} />
+              <BarChart3 style={{ width: '20px', height: '20px' }} />
               Детальная статистика ({analytics.period.start_date} - {analytics.period.end_date})
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: getSpacing('md') }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('blue', 600) }}>
-                  {formatTime(analytics.overall_stats.average_minutes)}
-                </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Среднее</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('green', 600) }}>
-                  {formatTime(analytics.overall_stats.median_minutes)}
-                </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Медиана</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('orange', 600) }}>
-                  {formatTime(analytics.overall_stats.min_minutes)}
-                </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Минимум</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('red', 600) }}>
-                  {formatTime(analytics.overall_stats.max_minutes)}
-                </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Максимум</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('purple', 600) }}>
-                  {formatTime(analytics.overall_stats.percentile_90)}
-                </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>90-й процентиль</div>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+              <MacOSStatCard
+                title="Среднее"
+                value={formatTime(analytics.overall_stats.average_minutes)}
+                icon={Clock}
+                color="var(--mac-info)"
+              />
+
+              <MacOSStatCard
+                title="Медиана"
+                value={formatTime(analytics.overall_stats.median_minutes)}
+                icon={Activity}
+                color="var(--mac-success)"
+              />
+
+              <MacOSStatCard
+                title="Минимум"
+                value={formatTime(analytics.overall_stats.min_minutes)}
+                icon={TrendingDown}
+                color="var(--mac-warning)"
+              />
+
+              <MacOSStatCard
+                title="Максимум"
+                value={formatTime(analytics.overall_stats.max_minutes)}
+                icon={TrendingUp}
+                color="var(--mac-error)"
+              />
+
+              <MacOSStatCard
+                title="90-й процентиль"
+                value={formatTime(analytics.overall_stats.percentile_90)}
+                icon={BarChart3}
+                color="var(--mac-accent-purple)"
+              />
             </div>
-          </Card>
+          </MacOSCard>
 
           {/* Разбивка по отделениям */}
           {Object.keys(analytics.department_breakdown).length > 0 && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 По отделениям
               </h3>
-              <div style={{ display: 'grid', gap: getSpacing('md') }}>
+              <div style={{ display: 'grid', gap: '16px' }}>
                 {Object.entries(analytics.department_breakdown).map(([dept, stats]) => (
                   <div
                     key={dept}
                     style={{
-                      padding: getSpacing('md'),
-                      border: `1px solid ${getColor('gray', 200)}`,
-                      borderRadius: '6px',
+                      padding: '16px',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      backgroundColor: 'var(--mac-bg-secondary)'
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 'bold', color: getColor('text', 900) }}>
+                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                         {dept}
                       </div>
-                      <div style={{ fontSize: '14px', color: getColor('text', 600) }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                         {stats.count} записей
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+                      <div style={{ fontSize: '16px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                         {formatTime(stats.average_minutes)}
                       </div>
-                      <div style={{ fontSize: '12px', color: getColor('text', 500) }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                         медиана: {formatTime(stats.median_minutes)}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
 
           {/* Рекомендации */}
           {analytics.recommendations && analytics.recommendations.length > 0 && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Рекомендации по улучшению
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('sm') }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {analytics.recommendations.map((recommendation, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: getSpacing('md'),
-                      backgroundColor: getColor('blue', 50),
-                      border: `1px solid ${getColor('blue', 200)}`,
-                      borderRadius: '6px',
+                      padding: '16px',
+                      backgroundColor: 'var(--mac-info-bg)',
+                      border: '1px solid var(--mac-info-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('sm')
+                      gap: '8px'
                     }}
                   >
-                    <CheckCircle size={16} color={getColor('blue', 600)} />
-                    <span style={{ color: getColor('text', 700) }}>
+                    <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
+                    <span style={{ color: 'var(--mac-text-primary)' }}>
                       {recommendation}
                     </span>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
         </>
+      ) : (
+        <MacOSEmptyState
+          icon={BarChart3}
+          title="Нет данных для детального анализа"
+          description="Примените фильтры и загрузите данные для отображения детальной статистики"
+        />
       )}
     </div>
   );
 
   const renderServicesTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: getColor('text', 900) }}>
+        <h3 style={{ 
+          margin: 0, 
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
           Аналитика по услугам
         </h3>
-        <Button 
+        <MacOSButton 
           onClick={loadServiceAnalytics}
           disabled={loading}
+          variant="outline"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          {loading ? <RefreshCw size={16} className="animate-spin" /> : <Eye size={16} />}
+          {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </Button>
+        </MacOSButton>
       </div>
 
-      {serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 && (
-        <Card style={{ padding: getSpacing('lg') }}>
-          <div style={{ display: 'grid', gap: getSpacing('md') }}>
+      {loading ? (
+        <MacOSCard style={{ padding: '24px' }}>
+          <MacOSLoadingSkeleton height="300px" />
+        </MacOSCard>
+      ) : serviceAnalytics && Object.keys(serviceAnalytics.service_analytics).length > 0 ? (
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ display: 'grid', gap: '16px' }}>
             {Object.entries(serviceAnalytics.service_analytics).map(([serviceCode, data]) => (
               <div
                 key={serviceCode}
                 style={{
-                  padding: getSpacing('md'),
-                  border: `1px solid ${getColor('gray', 200)}`,
-                  borderRadius: '8px'
+                  padding: '16px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-md)',
+                  backgroundColor: 'var(--mac-bg-secondary)'
                 }}
               >
                 <div style={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center',
-                  marginBottom: getSpacing('sm')
+                  marginBottom: '8px'
                 }}>
                   <div>
-                    <div style={{ fontWeight: 'bold', color: getColor('text', 900) }}>
+                    <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                       {data.service_name}
                     </div>
-                    <div style={{ fontSize: '14px', color: getColor('text', 600) }}>
+                    <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                       Код: {serviceCode} • {data.total_visits} визитов
                     </div>
                   </div>
                   {data.service_efficiency && (
-                    <Badge style={{ 
-                      backgroundColor: data.service_efficiency.efficiency_score > 80 ? getColor('green', 100) : getColor('orange', 100),
-                      color: data.service_efficiency.efficiency_score > 80 ? getColor('green', 800) : getColor('orange', 800)
-                    }}>
+                    <MacOSBadge 
+                      variant={data.service_efficiency.efficiency_score > 80 ? "success" : "warning"}
+                    >
                       {data.service_efficiency.efficiency_score}% эффективность
-                    </Badge>
+                    </MacOSBadge>
                   )}
                 </div>
                 
                 {data.wait_time_stats && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: getSpacing('sm') }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', color: getColor('blue', 600) }}>
-                        {formatTime(data.wait_time_stats.average_minutes)}
-                      </div>
-                      <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Среднее</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', color: getColor('green', 600) }}>
-                        {formatTime(data.wait_time_stats.median_minutes)}
-                      </div>
-                      <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Медиана</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', color: getColor('purple', 600) }}>
-                        {data.analyzed_visits}
-                      </div>
-                      <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Анализ</div>
-                    </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
+                    <MacOSStatCard
+                      title="Среднее"
+                      value={formatTime(data.wait_time_stats.average_minutes)}
+                      icon={Clock}
+                      color="var(--mac-info)"
+                      size="small"
+                    />
+
+                    <MacOSStatCard
+                      title="Медиана"
+                      value={formatTime(data.wait_time_stats.median_minutes)}
+                      icon={Activity}
+                      color="var(--mac-success)"
+                      size="small"
+                    />
+
+                    <MacOSStatCard
+                      title="Анализ"
+                      value={data.analyzed_visits.toString()}
+                      icon={BarChart3}
+                      color="var(--mac-accent-purple)"
+                      size="small"
+                    />
                   </div>
                 )}
               </div>
             ))}
           </div>
-        </Card>
+        </MacOSCard>
+      ) : (
+        <MacOSEmptyState
+          icon={Users}
+          title="Нет данных по услугам"
+          description="Нажмите 'Загрузить' или переключитесь на эту вкладку для автоматической загрузки данных по услугам"
+        />
       )}
     </div>
   );
 
   const renderHeatmapTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: getColor('text', 900) }}>
+        <h3 style={{ 
+          margin: 0, 
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
           Тепловая карта времени ожидания
         </h3>
-        <Button 
+        <MacOSButton 
           onClick={loadHeatmap}
           disabled={loading}
+          variant="outline"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          {loading ? <RefreshCw size={16} className="animate-spin" /> : <BarChart3 size={16} />}
+          {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </Button>
+        </MacOSButton>
       </div>
 
-      {heatmapData && (
-        <Card style={{ padding: getSpacing('lg') }}>
-          <div style={{ marginBottom: getSpacing('md') }}>
-            <h4 style={{ margin: `0 0 ${getSpacing('sm')} 0`, color: getColor('text', 900) }}>
+      {loading ? (
+        <MacOSCard style={{ padding: '24px' }}>
+          <MacOSLoadingSkeleton height="400px" />
+        </MacOSCard>
+      ) : heatmapData ? (
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h4 style={{ 
+              margin: `0 0 8px 0`, 
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
               Время ожидания по часам дня
             </h4>
-            <div style={{ fontSize: '14px', color: getColor('text', 600) }}>
+            <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
               Период: {heatmapData.period.start_date} - {heatmapData.period.end_date}
             </div>
           </div>
@@ -637,22 +694,22 @@ const WaitTimeAnalytics = () => {
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', 
-            gap: getSpacing('sm'),
-            marginBottom: getSpacing('md')
+            gap: '8px',
+            marginBottom: '16px'
           }}>
             {heatmapData.heatmap_data.map((hourData) => (
               <div
                 key={hourData.hour}
                 style={{
-                  padding: getSpacing('sm'),
+                  padding: '8px',
                   backgroundColor: `rgba(59, 130, 246, ${hourData.intensity})`,
-                  color: hourData.intensity > 0.5 ? 'white' : getColor('text', 900),
-                  borderRadius: '6px',
+                  color: hourData.intensity > 0.5 ? 'white' : 'var(--mac-text-primary)',
+                  borderRadius: 'var(--mac-radius-sm)',
                   textAlign: 'center',
-                  border: `1px solid ${getColor('gray', 200)}`
+                  border: '1px solid var(--mac-border)'
                 }}
               >
-                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-semibold)' }}>
                   {hourData.hour_label}
                 </div>
                 <div style={{ fontSize: '10px' }}>
@@ -667,19 +724,25 @@ const WaitTimeAnalytics = () => {
 
           {heatmapData.summary && (
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('gray', 50),
-              borderRadius: '6px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-bg-secondary)',
+              borderRadius: 'var(--mac-radius-sm)',
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: '14px'
+              fontSize: 'var(--mac-font-size-sm)'
             }}>
-              <span>Пиковый час: <strong>{heatmapData.summary.peak_hour}:00</strong></span>
-              <span>Лучший час: <strong>{heatmapData.summary.best_hour}:00</strong></span>
-              <span>Самый загруженный: <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
+              <span style={{ color: 'var(--mac-text-primary)' }}>Пиковый час: <strong>{heatmapData.summary.peak_hour}:00</strong></span>
+              <span style={{ color: 'var(--mac-text-primary)' }}>Лучший час: <strong>{heatmapData.summary.best_hour}:00</strong></span>
+              <span style={{ color: 'var(--mac-text-primary)' }}>Самый загруженный: <strong>{heatmapData.summary.busiest_hour}:00</strong></span>
             </div>
           )}
-        </Card>
+        </MacOSCard>
+      ) : (
+        <MacOSEmptyState
+          icon={Calendar}
+          title="Нет данных тепловой карты"
+          description="Нажмите 'Загрузить' или переключитесь на эту вкладку для автоматической загрузки данных тепловой карты"
+        />
       )}
     </div>
   );
@@ -692,101 +755,109 @@ const WaitTimeAnalytics = () => {
   ];
 
   return (
-    <div style={{ padding: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Заголовок */}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: getSpacing('md'),
-        marginBottom: getSpacing('lg')
+        gap: '16px',
+        marginBottom: '8px'
       }}>
-        <Clock size={24} color={getColor('primary', 600)} />
-        <h2 style={{ 
-          margin: 0, 
-          color: getColor('text', 900),
-          fontSize: '24px',
-          fontWeight: 'bold'
-        }}>
-          Аналитика времени ожидания
-        </h2>
+        <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+        <div>
+          <h1 style={{ 
+            margin: 0, 
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)'
+          }}>
+            Аналитика времени ожидания
+          </h1>
+          <p style={{ 
+            margin: '4px 0 0 0',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-base)'
+          }}>
+            Анализ времени ожидания пациентов и оптимизация очередей
+          </p>
+        </div>
       </div>
 
       {/* Фильтры */}
-      <Card style={{ padding: getSpacing('md'), marginBottom: getSpacing('lg') }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md') }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <div>
-            <Label>Начальная дата</Label>
-            <Input
+            <label style={{ 
+              display: 'block',
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}>
+              Начальная дата
+            </label>
+            <MacOSInput
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
             />
           </div>
           <div>
-            <Label>Конечная дата</Label>
-            <Input
+            <label style={{ 
+              display: 'block',
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}>
+              Конечная дата
+            </label>
+            <MacOSInput
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
             />
           </div>
           <div>
-            <Label>Отделение</Label>
-            <Input
+            <label style={{ 
+              display: 'block',
+              marginBottom: '8px',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}>
+              Отделение
+            </label>
+            <MacOSInput
               placeholder="Фильтр по отделению"
               value={filters.department}
               onChange={(e) => setFilters({...filters, department: e.target.value})}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'end' }}>
-            <Button 
+            <MacOSButton 
               onClick={loadAnalytics}
               disabled={loading}
+              variant="primary"
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: getSpacing('sm'),
-                backgroundColor: getColor('primary', 600),
-                color: 'white'
+                gap: '8px'
               }}
             >
-              {loading ? <RefreshCw size={16} className="animate-spin" /> : <Filter size={16} />}
+              {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
               Применить
-            </Button>
+            </MacOSButton>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Вкладки */}
-      <div style={{ 
-        display: 'flex', 
-        borderBottom: `1px solid ${getColor('gray', 200)}`,
-        marginBottom: getSpacing('lg')
-      }}>
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: `${getSpacing('md')} ${getSpacing('lg')}`,
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: getSpacing('sm'),
-                borderBottom: activeTab === tab.id ? `2px solid ${getColor('primary', 600)}` : '2px solid transparent',
-                color: activeTab === tab.id ? getColor('primary', 600) : getColor('text', 600),
-                fontWeight: activeTab === tab.id ? 'bold' : 'normal'
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <MacOSTab
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       {/* Содержимое вкладок */}
       {activeTab === 'overview' && renderOverviewTab()}

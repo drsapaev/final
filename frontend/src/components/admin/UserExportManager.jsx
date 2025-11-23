@@ -16,14 +16,11 @@ import {
   FileText as FilePdf,
   File
 } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Label, Skeleton } from '../ui/native';
-import { useTheme } from '../../contexts/ThemeContext';
+import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSCheckbox, Skeleton } from '../ui/macos';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const UserExportManager = () => {
-  const { theme, getColor, getSpacing } = useTheme();
-  
   // Состояние
   const [activeTab, setActiveTab] = useState('export');
   const [loading, setLoading] = useState(false);
@@ -179,11 +176,11 @@ const UserExportManager = () => {
   };
 
   const getFileIcon = (filename) => {
-    if (filename.endsWith('.csv')) return <FileText size={20} color={getColor('green', 600)} />;
-    if (filename.endsWith('.xlsx')) return <FileSpreadsheet size={20} color={getColor('blue', 600)} />;
-    if (filename.endsWith('.json')) return <FileJson size={20} color={getColor('orange', 600)} />;
-    if (filename.endsWith('.pdf')) return <FilePdf size={20} color={getColor('red', 600)} />;
-    return <File size={20} color={getColor('gray', 600)} />;
+    if (filename.endsWith('.csv')) return <FileText style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />;
+    if (filename.endsWith('.xlsx')) return <FileSpreadsheet style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />;
+    if (filename.endsWith('.json')) return <FileJson style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />;
+    if (filename.endsWith('.pdf')) return <FilePdf style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />;
+    return <File style={{ width: '20px', height: '20px', color: 'var(--mac-text-tertiary)' }} />;
   };
 
   const formatFileSize = (bytes) => {
@@ -196,103 +193,170 @@ const UserExportManager = () => {
 
   // Стили
   const containerStyle = {
-    padding: getSpacing('lg'),
+    padding: '24px',
     minHeight: '100vh',
-    backgroundColor: theme === 'light' ? getColor('gray', 50) : getColor('gray', 900)
+    backgroundColor: 'var(--mac-bg-primary)'
   };
 
   const tabStyle = (isActive) => ({
-    padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-    backgroundColor: isActive 
-      ? (theme === 'light' ? getColor('blue', 500) : getColor('blue', 600))
-      : 'transparent',
-    color: isActive 
-      ? 'white' 
-      : (theme === 'light' ? getColor('gray', 700) : getColor('gray', 300)),
+    padding: '12px 16px',
+    backgroundColor: isActive ? 'var(--mac-accent-blue)' : 'transparent',
+    color: isActive ? 'white' : 'var(--mac-text-secondary)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: 'var(--mac-radius-sm)',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
     display: 'flex',
     alignItems: 'center',
-    gap: getSpacing('xs')
+    gap: '8px',
+    fontSize: 'var(--mac-font-size-sm)',
+    fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)'
   });
 
   const renderExportTab = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: getSpacing('lg') }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
       {/* Левая панель - настройки экспорта */}
-      <Card style={{ padding: getSpacing('lg') }}>
-        <h3 style={{ margin: `0 0 ${getSpacing('lg')} 0`, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-          <Settings size={20} />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          margin: '0 0 24px 0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          <Settings style={{ width: '20px', height: '20px' }} />
           Настройки экспорта
         </h3>
 
         {/* Формат экспорта */}
-        <div style={{ marginBottom: getSpacing('md') }}>
-          <Label>Формат файла:</Label>
-          <Select
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px' 
+          }}>
+            Формат файла:
+          </label>
+          <MacOSSelect
             value={exportForm.format}
             onChange={(e) => setExportForm(prev => ({ ...prev, format: e.target.value }))}
-          >
-            <option value="csv">CSV</option>
-            <option value="excel">Excel (XLSX)</option>
-            <option value="json">JSON</option>
-            <option value="pdf">PDF</option>
-          </Select>
+            options={[
+              { value: 'csv', label: 'CSV' },
+              { value: 'excel', label: 'Excel (XLSX)' },
+              { value: 'json', label: 'JSON' },
+              { value: 'pdf', label: 'PDF' }
+            ]}
+            style={{ width: '100%' }}
+          />
         </div>
 
         {/* Поля для экспорта */}
-        <div style={{ marginBottom: getSpacing('md') }}>
-          <Label>Поля для экспорта (оставьте пустым для всех полей):</Label>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px' 
+          }}>
+            Поля для экспорта (оставьте пустым для всех полей):
+          </label>
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
-            gap: getSpacing('xs'),
-            marginTop: getSpacing('sm'),
+            gap: '8px',
+            marginTop: '8px',
             maxHeight: '200px',
             overflowY: 'auto',
-            padding: getSpacing('sm'),
-            border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-            borderRadius: '6px'
+            padding: '12px',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-sm)',
+            backgroundColor: 'var(--mac-bg-secondary)'
           }}>
             {availableFields.map(field => (
-              <label key={field.value} style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
+              <label key={field.value} style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                cursor: 'pointer',
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                <MacOSCheckbox
                   checked={exportForm.fields.includes(field.value)}
-                  onChange={() => handleFieldToggle(field.value)}
+                  onChange={(checked) => {
+                    if (checked) {
+                      setExportForm(prev => ({ ...prev, fields: [...prev.fields, field.value] }));
+                    } else {
+                      setExportForm(prev => ({ ...prev, fields: prev.fields.filter(f => f !== field.value) }));
+                    }
+                  }}
+                  style={{ marginRight: '8px' }}
                 />
-                <span style={{ fontSize: '0.875rem' }}>{field.label}</span>
+                <span>{field.label}</span>
               </label>
             ))}
           </div>
         </div>
 
         {/* Дополнительные данные */}
-        <div style={{ marginBottom: getSpacing('md') }}>
-          <Label>Дополнительные данные:</Label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs'), marginTop: getSpacing('sm') }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), cursor: 'pointer' }}>
-              <input
-                type="checkbox"
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ 
+            display: 'block', 
+            fontSize: 'var(--mac-font-size-sm)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)', 
+            marginBottom: '8px' 
+          }}>
+            Дополнительные данные:
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              cursor: 'pointer',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              <MacOSCheckbox
                 checked={exportForm.include_profile}
-                onChange={(e) => setExportForm(prev => ({ ...prev, include_profile: e.target.checked }))}
+                onChange={(checked) => setExportForm(prev => ({ ...prev, include_profile: checked }))}
+                style={{ marginRight: '8px' }}
               />
               <span>Включить профили пользователей</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), cursor: 'pointer' }}>
-              <input
-                type="checkbox"
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              cursor: 'pointer',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              <MacOSCheckbox
                 checked={exportForm.include_preferences}
-                onChange={(e) => setExportForm(prev => ({ ...prev, include_preferences: e.target.checked }))}
+                onChange={(checked) => setExportForm(prev => ({ ...prev, include_preferences: checked }))}
+                style={{ marginRight: '8px' }}
               />
               <span>Включить настройки пользователей</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: getSpacing('xs'), cursor: 'pointer' }}>
-              <input
-                type="checkbox"
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              cursor: 'pointer',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              <MacOSCheckbox
                 checked={exportForm.include_audit_logs}
-                onChange={(e) => setExportForm(prev => ({ ...prev, include_audit_logs: e.target.checked }))}
+                onChange={(checked) => setExportForm(prev => ({ ...prev, include_audit_logs: checked }))}
+                style={{ marginRight: '8px' }}
               />
               <span>Включить журнал аудита</span>
             </label>
@@ -301,55 +365,95 @@ const UserExportManager = () => {
       </Card>
 
       {/* Правая панель - фильтры */}
-      <Card style={{ padding: getSpacing('lg') }}>
-        <h3 style={{ margin: `0 0 ${getSpacing('lg')} 0`, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-          <Filter size={20} />
+      <Card style={{ padding: '24px' }}>
+        <h3 style={{ 
+          margin: '0 0 24px 0', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          <Filter style={{ width: '20px', height: '20px' }} />
           Фильтры
         </h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('md') }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <Label>Имя пользователя:</Label>
-            <Input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Имя пользователя:
+            </label>
+            <MacOSInput
               placeholder="Поиск по имени пользователя"
               value={exportForm.filters.username}
               onChange={(e) => setExportForm(prev => ({
                 ...prev,
                 filters: { ...prev.filters, username: e.target.value }
               }))}
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <Label>Email:</Label>
-            <Input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Email:
+            </label>
+            <MacOSInput
               placeholder="Поиск по email"
               value={exportForm.filters.email}
               onChange={(e) => setExportForm(prev => ({
                 ...prev,
                 filters: { ...prev.filters, email: e.target.value }
               }))}
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <Label>Роль:</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Роль:
+            </label>
+            <MacOSSelect
               value={exportForm.filters.role}
               onChange={(e) => setExportForm(prev => ({
                 ...prev,
                 filters: { ...prev.filters, role: e.target.value }
               }))}
-            >
-              {userRoles.map(role => (
-                <option key={role.value} value={role.value}>{role.label}</option>
-              ))}
-            </Select>
+              options={userRoles}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <Label>Статус:</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Статус:
+            </label>
+            <MacOSSelect
               value={exportForm.filters.is_active === null ? '' : exportForm.filters.is_active.toString()}
               onChange={(e) => setExportForm(prev => ({
                 ...prev,
@@ -358,40 +462,60 @@ const UserExportManager = () => {
                   is_active: e.target.value === '' ? null : e.target.value === 'true'
                 }
               }))}
-            >
-              <option value="">Все пользователи</option>
-              <option value="true">Только активные</option>
-              <option value="false">Только неактивные</option>
-            </Select>
+              options={[
+                { value: '', label: 'Все пользователи' },
+                { value: 'true', label: 'Только активные' },
+                { value: 'false', label: 'Только неактивные' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <Label>Дата создания (от):</Label>
-            <Input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Дата создания (от):
+            </label>
+            <MacOSInput
               type="date"
               value={exportForm.filters.created_from}
               onChange={(e) => setExportForm(prev => ({
                 ...prev,
                 filters: { ...prev.filters, created_from: e.target.value }
               }))}
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <Label>Дата создания (до):</Label>
-            <Input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Дата создания (до):
+            </label>
+            <MacOSInput
               type="date"
               value={exportForm.filters.created_to}
               onChange={(e) => setExportForm(prev => ({
                 ...prev,
                 filters: { ...prev.filters, created_to: e.target.value }
               }))}
+              style={{ width: '100%' }}
             />
           </div>
         </div>
 
         {/* Кнопка экспорта */}
-        <div style={{ marginTop: getSpacing('lg') }}>
+        <div style={{ marginTop: '24px' }}>
           <Button
             onClick={handleExport}
             disabled={loading}
@@ -399,12 +523,12 @@ const UserExportManager = () => {
           >
             {loading ? (
               <>
-                <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                <RefreshCw style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} />
                 Экспорт...
               </>
             ) : (
               <>
-                <Download size={16} />
+                <Download style={{ width: '16px', height: '16px' }} />
                 Запустить экспорт
               </>
             )}
@@ -415,32 +539,45 @@ const UserExportManager = () => {
   );
 
   const renderFilesTab = () => (
-    <Card style={{ padding: getSpacing('lg') }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: getSpacing('lg') }}>
-        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: getSpacing('xs') }}>
-          <FileText size={20} />
+    <Card style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h3 style={{ 
+          margin: 0, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          <FileText style={{ width: '20px', height: '20px' }} />
           Файлы экспорта
         </h3>
         <Button onClick={loadExportFiles} disabled={loading}>
-          <RefreshCw size={16} />
+          <RefreshCw style={{ width: '16px', height: '16px' }} />
           Обновить
         </Button>
       </div>
 
       {loading ? (
         <div>
-          <Skeleton height="60px" style={{ marginBottom: getSpacing('sm') }} />
-          <Skeleton height="60px" style={{ marginBottom: getSpacing('sm') }} />
+          <Skeleton height="60px" style={{ marginBottom: '8px' }} />
+          <Skeleton height="60px" style={{ marginBottom: '8px' }} />
           <Skeleton height="60px" />
         </div>
       ) : exportFiles.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: getSpacing('xl'), color: getColor('gray', 500) }}>
-          <FileText size={48} style={{ marginBottom: getSpacing('md') }} />
-          <p>Нет файлов экспорта</p>
-          <p>Создайте экспорт на вкладке "Экспорт"</p>
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '32px', 
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
+        }}>
+          <FileText style={{ width: '48px', height: '48px', marginBottom: '16px', color: 'var(--mac-text-tertiary)' }} />
+          <p style={{ margin: 0 }}>Нет файлов экспорта</p>
+          <p style={{ margin: '8px 0 0 0' }}>Создайте экспорт на вкладке "Экспорт"</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('sm') }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {exportFiles.map((file, index) => (
             <div
               key={index}
@@ -448,31 +585,38 @@ const UserExportManager = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: getSpacing('md'),
-                backgroundColor: theme === 'light' ? getColor('gray', 100) : getColor('gray', 800),
-                borderRadius: '8px',
-                border: `1px solid ${theme === 'light' ? getColor('gray', 200) : getColor('gray', 700)}`
+                padding: '16px',
+                backgroundColor: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: getSpacing('md') }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {getFileIcon(file.filename)}
                 <div>
-                  <div style={{ fontWeight: 'bold', fontSize: '0.875rem' }}>
+                  <div style={{ 
+                    fontWeight: 'var(--mac-font-weight-semibold)', 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
                     {file.filename}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: getColor('gray', 600) }}>
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-text-secondary)' 
+                  }}>
                     Размер: {formatFileSize(file.size)} | 
                     Создан: {new Date(file.created_at).toLocaleString('ru-RU')}
                   </div>
                 </div>
               </div>
               
-              <div style={{ display: 'flex', gap: getSpacing('xs') }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <Button
                   size="sm"
                   onClick={() => handleDownload(file.filename)}
                 >
-                  <Download size={14} />
+                  <Download style={{ width: '14px', height: '14px' }} />
                   Скачать
                 </Button>
                 <Button
@@ -480,7 +624,7 @@ const UserExportManager = () => {
                   variant="danger"
                   onClick={() => handleDeleteFile(file.filename)}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 style={{ width: '14px', height: '14px' }} />
                   Удалить
                 </Button>
               </div>
@@ -493,22 +637,23 @@ const UserExportManager = () => {
 
   return (
     <div style={containerStyle}>
-      <div style={{ marginBottom: getSpacing('lg') }}>
+      <div style={{ marginBottom: '24px' }}>
         <h1 style={{ 
           margin: 0, 
-          fontSize: '1.875rem', 
-          fontWeight: 'bold',
-          color: theme === 'light' ? getColor('gray', 900) : getColor('gray', 100),
+          fontSize: 'var(--mac-font-size-2xl)', 
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '12px'
         }}>
-          <Users size={32} />
+          <Users style={{ width: '32px', height: '32px' }} />
           Экспорт пользователей
         </h1>
         <p style={{ 
-          margin: `${getSpacing('sm')} 0 0 0`, 
-          color: getColor('gray', 600) 
+          margin: '8px 0 0 0', 
+          color: 'var(--mac-text-secondary)',
+          fontSize: 'var(--mac-font-size-sm)'
         }}>
           Экспорт данных пользователей в различных форматах
         </p>
@@ -517,26 +662,107 @@ const UserExportManager = () => {
       {/* Табы */}
       <div style={{ 
         display: 'flex', 
-        gap: getSpacing('sm'), 
-        marginBottom: getSpacing('lg'),
-        borderBottom: `1px solid ${theme === 'light' ? getColor('gray', 200) : getColor('gray', 700)}`,
-        paddingBottom: getSpacing('sm')
+        marginBottom: '24px'
       }}>
         <button
-          style={tabStyle(activeTab === 'export')}
           onClick={() => setActiveTab('export')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'export' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'export' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'export') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'export') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
-          <Download size={16} />
+          <Download style={{ 
+            width: '16px', 
+            height: '16px',
+            color: activeTab === 'export' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+          }} />
           Экспорт
+          {activeTab === 'export' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
         <button
-          style={tabStyle(activeTab === 'files')}
           onClick={() => setActiveTab('files')}
+          style={{
+            padding: '12px 20px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: activeTab === 'files' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+            fontWeight: activeTab === 'files' ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+            fontSize: 'var(--mac-font-size-sm)',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            position: 'relative',
+            marginBottom: '-1px'
+          }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'files') {
+              e.target.style.color = 'var(--mac-text-primary)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'files') {
+              e.target.style.color = 'var(--mac-text-secondary)';
+            }
+          }}
         >
-          <FileText size={16} />
+          <FileText style={{ 
+            width: '16px', 
+            height: '16px',
+            color: activeTab === 'files' ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+          }} />
           Файлы ({exportFiles.length})
+          {activeTab === 'files' && (
+            <div style={{
+              position: 'absolute',
+              bottom: '0',
+              left: '0',
+              right: '0',
+              height: '3px',
+              backgroundColor: 'var(--mac-accent-blue)',
+              borderRadius: '2px 2px 0 0'
+            }} />
+          )}
         </button>
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Содержимое табов */}
       {activeTab === 'export' && renderExportTab()}

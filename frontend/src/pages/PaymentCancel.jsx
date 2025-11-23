@@ -1,25 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Grid,
-  Alert,
-  Paper
-} from '@mui/material';
-import {
-  Cancel as CancelIcon,
-  Home as HomeIcon,
-  Refresh as RetryIcon,
-  ContactSupport as SupportIcon
-} from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+import { Box, Card, CardContent, Typography, Button, Alert } from '../components/ui/macos';
+import { XCircle as CancelIcon, Home as HomeIcon, RefreshCw as RetryIcon, Headset as SupportIcon } from 'lucide-react';
 
 const PaymentCancel = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -56,18 +40,12 @@ const PaymentCancel = () => {
   };
 
   return (
-    <Box maxWidth="md" mx="auto" mt={4} px={2}>
+    <Box style={{ maxWidth: 960, margin: '32px auto', padding: '0 16px' }}>
       {/* Заголовок */}
-      <Card elevation={3} sx={{ mb: 3 }}>
-        <CardContent sx={{ textAlign: 'center', py: 4 }}>
-          <CancelIcon 
-            sx={{ 
-              fontSize: 80, 
-              color: 'warning.main', 
-              mb: 2 
-            }} 
-          />
-          <Typography variant="h4" color="warning.main" gutterBottom>
+      <Card style={{ marginBottom: 16 }}>
+        <CardContent style={{ textAlign: 'center', padding: '32px 16px' }}>
+          <CancelIcon style={{ fontSize: 80, color: 'var(--mac-warning)', marginBottom: 8 }} />
+          <Typography variant="h4" color="warning" gutterBottom>
             Платеж отменен
           </Typography>
           <Typography variant="h6" color="textSecondary">
@@ -78,8 +56,8 @@ const PaymentCancel = () => {
 
       {/* Информация об ошибке */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          <Typography variant="body1" fontWeight="bold">
+        <Alert severity="error" style={{ marginBottom: 12 }}>
+          <Typography variant="body1" style={{ fontWeight: 600 }}>
             Детали ошибки:
           </Typography>
           <Typography variant="body2">
@@ -90,47 +68,32 @@ const PaymentCancel = () => {
 
       {/* Информация о платеже */}
       {paymentId && (
-        <Card elevation={2} sx={{ mb: 3 }}>
+        <Card style={{ marginBottom: 16 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
               Информация о платеже
             </Typography>
-            
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Номер платежа
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    #{paymentId}
-                  </Typography>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" color="textSecondary">
-                    Время отмены
-                  </Typography>
-                  <Typography variant="body1">
-                    {new Date().toLocaleString('ru-RU')}
-                  </Typography>
-                </Paper>
-              </Grid>
-            </Grid>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+              <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12 }}>
+                <Typography variant="body2" color="textSecondary">Номер платежа</Typography>
+                <Typography variant="h6">#{paymentId}</Typography>
+              </div>
+              <div style={{ border: '1px solid var(--mac-border)', borderRadius: 8, padding: 12 }}>
+                <Typography variant="body2" color="textSecondary">Время отмены</Typography>
+                <Typography variant="body1">{new Date().toLocaleString('ru-RU')}</Typography>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Рекомендации */}
-      <Card elevation={2} sx={{ mb: 3 }}>
+      <Card style={{ marginBottom: 16 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Что делать дальше?
           </Typography>
-          
-          <Box sx={{ mt: 2 }}>
+          <Box style={{ marginTop: 8 }}>
             <Typography variant="body1" paragraph>
               • Проверьте баланс на карте или счете
             </Typography>
@@ -148,62 +111,22 @@ const PaymentCancel = () => {
       </Card>
 
       {/* Действия */}
-      <Card elevation={2}>
+      <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Доступные действия
           </Typography>
-          
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="contained"
-                fullWidth
-                startIcon={<RetryIcon />}
-                onClick={handleRetryPayment}
-                color="primary"
-              >
-                Повторить оплату
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<SupportIcon />}
-                onClick={handleContactSupport}
-              >
-                Связаться с поддержкой
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<HomeIcon />}
-                onClick={() => navigate('/')}
-              >
-                На главную
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={6} md={3}>
-              <Button
-                variant="outlined"
-                fullWidth
-                onClick={() => navigate('/cashier')}
-              >
-                К оплате в кассе
-              </Button>
-            </Grid>
-          </Grid>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginTop: 8 }}>
+            <Button onClick={handleRetryPayment}><RetryIcon style={{ marginRight: 8 }} />Повторить оплату</Button>
+            <Button variant="outline" onClick={handleContactSupport}><SupportIcon style={{ marginRight: 8 }} />Связаться с поддержкой</Button>
+            <Button variant="outline" onClick={() => navigate('/')}><HomeIcon style={{ marginRight: 8 }} />На главную</Button>
+            <Button variant="outline" onClick={() => navigate('/cashier')}>К оплате в кассе</Button>
+          </div>
         </CardContent>
       </Card>
 
       {/* Контактная информация */}
-      <Box mt={4} textAlign="center">
+      <Box style={{ marginTop: 16, textAlign: 'center' }}>
         <Typography variant="body2" color="textSecondary" paragraph>
           Служба поддержки: +998 (71) 123-45-67
         </Typography>

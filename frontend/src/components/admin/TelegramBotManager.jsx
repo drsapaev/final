@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Badge,
-  Skeleton
-} from '../ui/native';
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSLoadingSkeleton,
+  MacOSTextarea,
+  MacOSCheckbox
+} from '../ui/macos';
 import {
   Bot,
   Send,
@@ -26,7 +25,7 @@ import {
   Pause,
   TestTube
 } from 'lucide-react';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 const TelegramBotManager = () => {
@@ -41,19 +40,25 @@ const TelegramBotManager = () => {
     send_to_all_users: false,
     user_ids: []
   });
+  const [statsError, setStatsError] = useState('');
+  const [usersError, setUsersError] = useState('');
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    loadData();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    loadData().finally(() => {
+      // allow subsequent manual reloads via button
+      inFlight.current = false;
+    });
   }, []);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      await Promise.all([
-        loadStats(),
-        loadUsers(),
-        loadCommands()
-      ]);
+      setStatsError('');
+      setUsersError('');
+      await Promise.all([loadStats(), loadUsers(), loadCommands()]);
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Ошибка загрузки данных');
@@ -64,19 +69,24 @@ const TelegramBotManager = () => {
 
   const loadStats = async () => {
     try {
-      const response = await api.get('/telegram-bot/stats');
+      const response = await api.get('/admin/telegram/stats', { params: { days_back: 30 } });
       setStats(response.data);
+      setStatsError('');
     } catch (error) {
       console.error('Error loading stats:', error);
+      setStatsError('Не удалось загрузить статистику');
     }
   };
 
   const loadUsers = async () => {
     try {
-      const response = await api.get('/telegram-bot/users-with-telegram');
-      setUsers(response.data.users || []);
+      const response = await api.get('/admin/telegram/users', { params: { limit: 50 } });
+      const data = response.data || {};
+      setUsers(data.users || data || []);
+      setUsersError('');
     } catch (error) {
       console.error('Error loading users:', error);
+      setUsersError('Не удалось загрузить пользователей');
     }
   };
 
@@ -175,257 +185,443 @@ const TelegramBotManager = () => {
   };
 
   const renderOverview = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '16px' 
+      }}>
+        <MacOSCard style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm text-gray-600">Всего пользователей</p>
-                <p className="text-2xl font-bold">{stats?.total_users || 0}</p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Всего пользователей
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                {stats?.total_users || 0}
+              </p>
               </div>
-              <Users className="h-8 w-8 text-blue-500" />
+            <Users style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
             </div>
-          </CardContent>
-        </Card>
+        </MacOSCard>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <MacOSCard style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm text-gray-600">Активные пользователи</p>
-                <p className="text-2xl font-bold">{stats?.active_users || 0}</p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Активные пользователи
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                {stats?.active_users || 0}
+              </p>
               </div>
-              <Activity className="h-8 w-8 text-green-500" />
+            <Activity style={{ width: '24px', height: '24px', color: 'var(--mac-success)' }} />
             </div>
-          </CardContent>
-        </Card>
+        </MacOSCard>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <MacOSCard style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm text-gray-600">Администраторы</p>
-                <p className="text-2xl font-bold">{stats?.admin_users || 0}</p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Администраторы
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                {stats?.admin_users || 0}
+              </p>
               </div>
-              <Shield className="h-8 w-8 text-purple-500" />
+            <Shield style={{ width: '24px', height: '24px', color: 'var(--mac-warning)' }} />
             </div>
-          </CardContent>
-        </Card>
+        </MacOSCard>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <MacOSCard style={{ padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-sm text-gray-600">Сообщений сегодня</p>
-                <p className="text-2xl font-bold">{stats?.messages_sent_today || 0}</p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Сообщений сегодня
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                {stats?.messages_sent_today || 0}
+              </p>
               </div>
-              <MessageSquare className="h-8 w-8 text-orange-500" />
+            <MessageSquare style={{ width: '24px', height: '24px', color: 'var(--mac-warning)' }} />
             </div>
-          </CardContent>
-        </Card>
+        </MacOSCard>
       </div>
 
       {/* Быстрые действия */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Zap style={{ width: '20px', height: '20px' }} />
             Быстрые действия
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button 
+        </h3>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <MacOSButton 
               onClick={testBot} 
               disabled={loading}
-              className="flex items-center gap-2"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              <TestTube className="h-4 w-4" />
+            <TestTube style={{ width: '16px', height: '16px' }} />
               Тест бота
-            </Button>
+          </MacOSButton>
 
-            <Button 
+          <MacOSButton 
               onClick={sendAdminAlert} 
               disabled={loading}
               variant="outline"
-              className="flex items-center gap-2"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              <AlertTriangle className="h-4 w-4" />
+            <AlertTriangle style={{ width: '16px', height: '16px' }} />
               Срочное уведомление
-            </Button>
+          </MacOSButton>
 
-            <Button 
+          <MacOSButton 
               onClick={broadcastSystemMessage} 
               disabled={loading}
               variant="outline"
-              className="flex items-center gap-2"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              <Bell className="h-4 w-4" />
+            <Bell style={{ width: '16px', height: '16px' }} />
               Системное сообщение
-            </Button>
+          </MacOSButton>
 
-            <Button 
+          <MacOSButton 
               onClick={loadData} 
               disabled={loading}
               variant="outline"
-              className="flex items-center gap-2"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
-              <RefreshCw className="h-4 w-4" />
+            <RefreshCw style={{ width: '16px', height: '16px' }} />
               Обновить данные
-            </Button>
+          </MacOSButton>
           </div>
-        </CardContent>
-      </Card>
+      </MacOSCard>
     </div>
   );
 
   const renderNotifications = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Send style={{ width: '20px', height: '20px' }} />
             Отправка уведомлений
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium mb-2">Текст сообщения</label>
-            <textarea
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Текст сообщения
+            </label>
+            <MacOSTextarea
               value={notificationForm.message}
               onChange={(e) => setNotificationForm(prev => ({ ...prev, message: e.target.value }))}
               placeholder="Введите текст уведомления..."
-              className="w-full p-3 border border-gray-300 rounded-lg resize-vertical min-h-[100px]"
+              style={{ width: '100%', minHeight: '100px' }}
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">Получатели</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Получатели
+            </label>
             
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                cursor: 'pointer'
+              }}>
+                <MacOSCheckbox
                   checked={notificationForm.send_to_all_admins}
-                  onChange={(e) => setNotificationForm(prev => ({ 
+                  onChange={(checked) => setNotificationForm(prev => ({ 
                     ...prev, 
-                    send_to_all_admins: e.target.checked,
+                    send_to_all_admins: checked,
                     send_to_all_users: false
                   }))}
                 />
-                <span>Всем администраторам</span>
+                <span style={{ 
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Всем администраторам
+                </span>
               </label>
 
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                cursor: 'pointer'
+              }}>
+                <MacOSCheckbox
                   checked={notificationForm.send_to_all_users}
-                  onChange={(e) => setNotificationForm(prev => ({ 
+                  onChange={(checked) => setNotificationForm(prev => ({ 
                     ...prev, 
-                    send_to_all_users: e.target.checked,
+                    send_to_all_users: checked,
                     send_to_all_admins: false
                   }))}
                 />
-                <span>Всем пользователям</span>
+                <span style={{ 
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Всем пользователям
+                </span>
               </label>
             </div>
           </div>
 
-          <Button 
+          <MacOSButton 
             onClick={sendNotification} 
             disabled={loading || !notificationForm.message.trim()}
-            className="w-full"
+            style={{ width: '100%' }}
           >
             {loading ? 'Отправка...' : 'Отправить уведомление'}
-          </Button>
-        </CardContent>
-      </Card>
+          </MacOSButton>
+        </div>
+      </MacOSCard>
     </div>
   );
 
   const renderUsers = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Users style={{ width: '20px', height: '20px' }} />
             Пользователи с Telegram ({users.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {users.map(user => (
-              <div key={user.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-3">
+            <div key={user.id} style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '16px',
+              border: '1px solid var(--mac-border)', 
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--mac-bg-secondary)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--mac-bg-secondary)'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div>
-                    <p className="font-medium">{user.full_name || user.username}</p>
-                    <p className="text-sm text-gray-600">@{user.username}</p>
+                  <p style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-primary)',
+                    margin: '0 0 4px 0'
+                  }}>
+                    {user.full_name || user.username}
+                  </p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>
+                    @{user.username}
+                  </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2">
-                  <Badge variant={user.is_active ? "success" : "secondary"}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MacOSBadge variant={user.is_active ? "success" : "secondary"}>
                     {user.is_active ? "Активен" : "Неактивен"}
-                  </Badge>
+                </MacOSBadge>
                   
-                  <Badge variant={user.role === "Admin" || user.role === "SuperAdmin" ? "primary" : "outline"}>
+                <MacOSBadge variant={user.role === "Admin" || user.role === "SuperAdmin" ? "primary" : "outline"}>
                     {user.role}
-                  </Badge>
+                </MacOSBadge>
                 </div>
               </div>
             ))}
             
             {users.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '32px 0', 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
                 Нет пользователей с настроенным Telegram
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+      </MacOSCard>
     </div>
   );
 
   const renderCommands = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Пользовательские команды</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+        gap: '24px' 
+      }}>
+        <MacOSCard style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 16px 0'
+          }}>
+            Пользовательские команды
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {commands.user_commands.map(cmd => (
-                <div key={cmd.command} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
-                  <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
+              <div key={cmd.command} style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '12px', 
+                padding: '12px',
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <code style={{ 
+                  backgroundColor: 'var(--mac-bg-tertiary)', 
+                  padding: '4px 8px', 
+                  borderRadius: 'var(--mac-radius-sm)', 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  fontFamily: 'var(--mac-font-mono)',
+                  color: 'var(--mac-text-primary)',
+                  fontWeight: 'var(--mac-font-weight-medium)'
+                }}>
                     {cmd.command}
                   </code>
-                  <p className="text-sm text-gray-600 flex-1">{cmd.description}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0,
+                  flex: 1
+                }}>
+                  {cmd.description}
+                </p>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </MacOSCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Административные команды</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+        <MacOSCard style={{ padding: '24px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 16px 0'
+          }}>
+            Административные команды
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {commands.admin_commands.map(cmd => (
-                <div key={cmd.command} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
-                  <code className="bg-red-100 px-2 py-1 rounded text-sm font-mono">
+              <div key={cmd.command} style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '12px', 
+                padding: '12px',
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <code style={{ 
+                  backgroundColor: 'var(--mac-error-bg)', 
+                  padding: '4px 8px', 
+                  borderRadius: 'var(--mac-radius-sm)', 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  fontFamily: 'var(--mac-font-mono)',
+                  color: 'var(--mac-error)',
+                  fontWeight: 'var(--mac-font-weight-medium)'
+                }}>
                     {cmd.command}
                   </code>
-                  <p className="text-sm text-gray-600 flex-1">{cmd.description}</p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0,
+                  flex: 1
+                }}>
+                  {cmd.description}
+                </p>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </MacOSCard>
       </div>
     </div>
   );
@@ -438,53 +634,114 @@ const TelegramBotManager = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
       {/* Заголовок */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bot className="h-8 w-8 text-blue-500" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Bot style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
           <div>
-            <h1 className="text-2xl font-bold">Telegram Bot</h1>
-            <p className="text-gray-600">Управление Telegram ботом клиники</p>
+            <h1 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Telegram Bot
+            </h1>
+            <p style={{ 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              margin: 0
+            }}>
+              Управление Telegram ботом клиники
+            </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Badge variant="success" className="flex items-center gap-1">
-            <CheckCircle className="h-3 w-3" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <MacOSBadge variant="success" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <CheckCircle style={{ width: '12px', height: '12px' }} />
             Активен
-          </Badge>
+          </MacOSBadge>
         </div>
       </div>
 
       {/* Вкладки */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
+      <div style={{ 
+        display: 'flex', 
+        marginBottom: '24px'
+      }}>
           {tabs.map(tab => {
             const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
+              style={{
+                padding: '12px 20px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                position: 'relative',
+                marginBottom: '-1px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                }
+              }}
+            >
+              <Icon style={{ 
+                width: '16px', 
+                height: '16px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+              }} />
                 {tab.label}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '3px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  borderRadius: '2px 2px 0 0'
+                }} />
+              )}
               </button>
             );
           })}
-        </nav>
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Контент вкладок */}
       {loading && !stats ? (
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-64 w-full" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <MacOSLoadingSkeleton height="128px" style={{ width: '100%' }} />
+          <MacOSLoadingSkeleton height="256px" style={{ width: '100%' }} />
         </div>
       ) : (
         <>

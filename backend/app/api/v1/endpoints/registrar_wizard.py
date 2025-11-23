@@ -1481,6 +1481,49 @@ def get_all_appointments(
                         # Если service_id не число, возможно это уже название
                         service_names.append(str(service_id))
             
+            # Определяем payment_status для Appointment
+            payment_status = 'pending'
+            is_paid = False
+            visit_type = getattr(apt, 'visit_type', None)
+            if visit_type == 'paid':
+                payment_status = 'paid'
+                is_paid = True
+            elif apt.status and apt.status.lower() in ('paid', 'in_visit', 'completed', 'done'):
+                payment_status = 'paid'
+                is_paid = True
+            elif getattr(apt, 'payment_processed_at', None):
+                payment_status = 'paid'
+                is_paid = True
+            else:
+                # Проверяем Payment table
+                try:
+                    from app.models.payment import Payment
+                    from sqlalchemy import and_
+                    # Ищем связанный Visit
+                    related_visit = db.query(Visit).filter(
+                        and_(
+                            Visit.patient_id == apt.patient_id,
+                            Visit.visit_date == apt.appointment_date,
+                            Visit.doctor_id == apt.doctor_id
+                        )
+                    ).first()
+                    if related_visit:
+                        payment_row = db.query(Payment).filter(Payment.visit_id == related_visit.id).order_by(Payment.created_at.desc()).first()
+                        if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+                            payment_status = 'paid'
+                            is_paid = True
+                except Exception:
+                    pass
+
+            # ✅ ВАЖНО: Сохраняем visit_type в БД для существующих записей
+            if is_paid and apt.visit_type != 'paid':
+                apt.visit_type = 'paid'
+                try:
+                    db.commit()
+                    db.refresh(apt)
+                except Exception:
+                    db.rollback()
+
             result.append({
                 'id': apt.id,
                 'patient_id': apt.patient_id,
@@ -1493,6 +1536,8 @@ def get_all_appointments(
                 'services': service_names,  # Преобразованные названия услуг
                 'service_codes': service_codes,  # Коды услуг для фильтрации
                 'total_amount': total_amount,  # Общая сумма услуг
+                'payment_status': payment_status,  # ✅ ДОБАВЛЕНО: Статус оплаты
+                'visit_type': visit_type,  # Тип визита для совместимости
                 'notes': apt.notes,
                 'created_at': apt.created_at,
                 'source': 'appointments',
@@ -1610,7 +1655,46 @@ def get_all_appointments(
                 confirmation_status = "confirmed"
             else:
                 confirmation_status = "none"
-            
+
+            # Определяем payment_status для Visit (та же логика что в registrar_integration.py)
+            payment_status = 'pending'
+            is_paid = False
+            try:
+                v_status = (getattr(visit, 'status', None) or '').lower()
+                if v_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                    payment_status = 'paid'
+                    is_paid = True
+                elif getattr(visit, 'payment_processed_at', None):
+                    payment_status = 'paid'
+                    is_paid = True
+                else:
+                    # Проверяем Payment table
+                    from app.models.payment import Payment
+                    payment_row = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
+                    if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+                        payment_status = 'paid'
+                        is_paid = True
+                    elif visit.discount_mode == 'paid' and v_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                        payment_status = 'paid'
+                        is_paid = True
+                    elif visit.discount_mode == 'paid' and getattr(visit, 'payment_processed_at', None):
+                        payment_status = 'paid'
+                        is_paid = True
+            except Exception:
+                # Если не удалось определить, проверяем discount_mode
+                if visit.discount_mode == 'paid':
+                    payment_status = 'paid'
+                    is_paid = True
+
+            # ✅ ВАЖНО: Сохраняем discount_mode в БД для существующих записей
+            if is_paid and visit.discount_mode != 'paid':
+                visit.discount_mode = 'paid'
+                try:
+                    db.commit()
+                    db.refresh(visit)
+                except Exception:
+                    db.rollback()
+
             result.append({
                 'id': visit.id + 20000,  # Смещение для избежания конфликтов
                 'patient_id': visit.patient_id,
@@ -1623,6 +1707,7 @@ def get_all_appointments(
                 'services': service_names,  # Реальные названия услуг
                 'service_codes': service_codes,  # Коды услуг для фильтрации
                 'total_amount': total_amount,  # Общая сумма услуг
+                'payment_status': payment_status,  # ✅ ДОБАВЛЕНО: Статус оплаты
                 'discount_mode': visit.discount_mode,  # Тип визита для отображения
                 'notes': visit.notes,
                 'created_at': visit.created_at,
@@ -1660,11 +1745,14 @@ def get_all_appointments(
 def mark_visit_as_paid(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor"))
 ):
     """Отметить запись из таблицы visits как оплаченную"""
     try:
         from app.models.visit import Visit
+        
+        # Логирование для диагностики
+        print(f"[mark_visit_as_paid] User: {current_user.username}, Role: {current_user.role}, Visit ID: {visit_id}")
         
         # Находим запись
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
@@ -1674,8 +1762,9 @@ def mark_visit_as_paid(
                 detail="Запись не найдена"
             )
         
-        # Обновляем статус
+        # Обновляем статус и discount_mode
         visit.status = "paid"
+        visit.discount_mode = "paid"  # ✅ ВАЖНО: устанавливаем discount_mode для корректного отображения payment_status
         db.commit()
         db.refresh(visit)
         
@@ -1688,6 +1777,7 @@ def mark_visit_as_paid(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[mark_visit_as_paid] Error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления записи: {str(e)}"
@@ -1698,7 +1788,7 @@ def mark_visit_as_paid(
 def complete_visit(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor"))
 ):
     """Завершить запись из таблицы visits"""
     try:

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Icon from '../Icon';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -11,9 +11,41 @@ import '../../styles/cursor-effects.css';
  * Используется во всех панелях для единообразия
  */
 const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
+  const asideRef = useRef(null);
   const location = useLocation();
   const { isDark, getColor, toggleTheme } = useTheme();
   const [language, setLanguage] = useState('en');
+  
+  // Локально дублируем активную схему на контейнер сайдбара, чтобы исключить зависимость от <html>
+  useEffect(() => {
+    const applyLocalScheme = () => {
+      try {
+        const customScheme = localStorage.getItem('customColorScheme');
+        const schemeId = localStorage.getItem('activeColorSchemeId');
+        const el = asideRef.current;
+        if (!el) return;
+        if (customScheme === 'true' && schemeId) {
+          el.setAttribute('data-color-scheme', schemeId);
+        } else {
+          el.removeAttribute('data-color-scheme');
+        }
+      } catch (_) {}
+    };
+    applyLocalScheme();
+    const handler = () => applyLocalScheme();
+    window.addEventListener('colorSchemeChanged', handler);
+    window.addEventListener('storage', handler);
+    document.addEventListener('visibilitychange', handler);
+    window.addEventListener('focus', handler);
+    window.addEventListener('pageshow', handler);
+    return () => {
+      window.removeEventListener('colorSchemeChanged', handler);
+      window.removeEventListener('storage', handler);
+      document.removeEventListener('visibilitychange', handler);
+      window.removeEventListener('focus', handler);
+      window.removeEventListener('pageshow', handler);
+    };
+  }, []);
   
   // Функции переключения
   const handleThemeToggle = () => {
@@ -89,6 +121,13 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
   // Дополнительные элементы
   const additionalItems = [
     {
+      id: 'emr-system',
+      label: 'EMR System',
+      iconName: 'FileText',
+      path: '/advanced-emr',
+      roles: ['admin', 'doctor', 'nurse']
+    },
+    {
       id: 'settings',
       label: 'Settings',
       iconName: 'Settings',
@@ -142,46 +181,51 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
     alignItems: 'center',
     justifyContent: isCollapsed ? 'center' : 'flex-start',
     gap: isCollapsed ? '0' : '12px',
-    padding: isCollapsed ? '8px' : '12px 16px',
-    borderRadius: '12px',
-    color: isActive ? '#ffffff' : (isDark ? '#cbd5e1' : '#64748b'),
-    background: isActive ? 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' : 'transparent',
-    textShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.6)' : 'none',
+    padding: isCollapsed ? '0' : '12px 16px',
+    borderRadius: isCollapsed ? '8px' : '12px',
+    color: isActive ? '#ffffff' : 'var(--mac-text-secondary)',
+    background: isActive ? 'var(--accent)' : 'transparent',
+    textShadow: isActive ? '0 1px 2px rgba(0, 0, 0, 0.35)' : 'none',
     backgroundColor: isActive ? 'transparent' : 'transparent',
-    boxShadow: isActive ? '0 8px 25px rgba(102, 126, 234, 0.3), 0 4px 12px rgba(118, 75, 162, 0.2), 0 2px 6px rgba(240, 147, 251, 0.2)' : 'none',
+    boxShadow: isActive ? '0 6px 18px rgba(0,0,0,0.18)' : 'none',
     textDecoration: 'none',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontSize: '14px',
     fontWeight: isActive ? '500' : '400',
-    marginBottom: isCollapsed ? '2px' : '4px',
-    width: isCollapsed ? '48px' : 'auto',
-    height: isCollapsed ? '36px' : 'auto',
+    marginBottom: isCollapsed ? '4px' : '4px',
+    width: isCollapsed ? '40px' : 'auto',
+    minWidth: isCollapsed ? '40px' : 'auto',
+    maxWidth: isCollapsed ? '40px' : 'auto',
+    height: isCollapsed ? '40px' : 'auto',
+    minHeight: isCollapsed ? '40px' : 'auto',
+    maxHeight: isCollapsed ? '40px' : 'auto',
+    flexShrink: 0,
     cursor: 'pointer',
     position: 'relative',
     overflow: 'hidden'
   });
 
   const hoverStyle = {
-    background: isDark 
-      ? 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)' 
-      : 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
+    background: 'var(--surface)',
     backgroundColor: 'transparent',
-    color: isDark ? '#f8fafc' : '#1e293b',
-    boxShadow: isDark 
-      ? '0 8px 25px rgba(74, 85, 104, 0.4), 0 4px 12px rgba(45, 55, 72, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2)' 
-      : '0 8px 25px rgba(247, 250, 252, 0.5), 0 4px 12px rgba(237, 242, 247, 0.4), 0 2px 6px rgba(0, 0, 0, 0.1)',
+    color: 'var(--mac-text-primary)',
+    boxShadow: 'var(--shadow)',
     transform: 'translateY(-2px) scale(1.02)',
-    backdropFilter: 'blur(10px)'
+    backdropFilter: 'var(--mac-blur-light)'
   };
 
 
   return (
     <aside 
+      ref={asideRef}
       style={{
         width: isCollapsed ? '80px' : '280px',
         height: '100vh',
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderRight: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+        background: 'var(--mac-gradient-sidebar, var(--mac-bg-toolbar))',
+        backdropFilter: 'var(--mac-blur-light)',
+        WebkitBackdropFilter: 'var(--mac-blur-light)',
+        borderRight: '1px solid var(--mac-separator)',
+        borderRadius: isCollapsed ? '0' : 'var(--mac-radius-md)',
         display: 'flex',
         flexDirection: 'column',
         transition: 'width 0.3s ease',
@@ -189,14 +233,14 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         left: 0,
         top: 0,
         zIndex: 1000,
-        boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)'
+        boxShadow: 'var(--shadow)'
       }}
     >
        {/* Имя пользователя и кнопка сворачивания */}
        <div 
          style={{
            padding: isCollapsed ? '12px 8px' : '20px 16px',
-           borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+           borderBottom: '1px solid var(--mac-separator)',
            display: 'flex',
            alignItems: 'center',
            justifyContent: 'space-between'
@@ -266,11 +310,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       <nav 
         style={{
           flex: 1,
-          padding: isCollapsed ? '8px 4px' : '16px 12px',
-          overflowY: 'auto',
+          padding: isCollapsed ? '8px 0' : '16px 12px',
+          overflowY: isCollapsed ? 'hidden' : 'auto',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: isCollapsed ? 'center' : 'stretch'
+          alignItems: isCollapsed ? 'center' : 'stretch',
+          gap: isCollapsed ? '4px' : '0'
         }}
       >
         {visibleMainItems.map((item) => {
@@ -281,6 +326,17 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
             ? item.path.replace('/', '/medilab-demo')
             : item.path;
           
+          const inlineStyle = isCollapsed ? {
+            width: '40px',
+            height: '40px',
+            minWidth: '40px',
+            minHeight: '40px',
+            maxWidth: '40px',
+            maxHeight: '40px',
+            padding: '0',
+            margin: '0 auto'
+          } : {};
+          
           return (
             <NavLink
               key={item.id}
@@ -288,11 +344,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
               style={({ isHovered }) => ({
                 ...navItemStyle(active),
-                ...(isHovered && !active ? hoverStyle : {})
+                ...(isHovered && !active ? hoverStyle : {}),
+                ...inlineStyle
               })}
               title={isCollapsed ? item.label : ''}
             >
-              <Icon name={item.iconName} size={16} />
+              <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
               {!isCollapsed && <span>{item.label}</span>}
             </NavLink>
           );
@@ -302,7 +359,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         <div 
           style={{
             height: '1px',
-            backgroundColor: isDark ? '#334155' : '#e2e8f0',
+            backgroundColor: 'var(--mac-separator)',
             margin: '16px 0'
           }}
         />
@@ -311,6 +368,17 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
         {visibleAdditionalItems.map((item) => {
           const active = isActive(item.path);
           
+          const inlineStyle = isCollapsed ? {
+            width: '40px',
+            height: '40px',
+            minWidth: '40px',
+            minHeight: '40px',
+            maxWidth: '40px',
+            maxHeight: '40px',
+            padding: '0',
+            margin: '0 auto'
+          } : {};
+          
           return (
             <NavLink
               key={item.id}
@@ -318,11 +386,12 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
               className="interactive-element hover-lift ripple-effect nav-item-hover focus-ring"
               style={({ isHovered }) => ({
                 ...navItemStyle(active),
-                ...(isHovered && !active ? hoverStyle : {})
+                ...(isHovered && !active ? hoverStyle : {}),
+                ...inlineStyle
               })}
               title={isCollapsed ? item.label : ''}
             >
-              <Icon name={item.iconName} size={16} />
+              <Icon name={item.iconName} size={isCollapsed ? 24 : 16} />
               {!isCollapsed && <span>{item.label}</span>}
             </NavLink>
           );
@@ -333,7 +402,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
       <div 
         style={{
           padding: isCollapsed ? '4px' : '12px 16px',
-          borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+          borderTop: '1px solid var(--mac-separator)',
           display: 'flex',
           flexDirection: isCollapsed ? 'column' : 'row',
           gap: isCollapsed ? '2px' : '8px',
@@ -407,7 +476,7 @@ const UnifiedSidebar = ({ isCollapsed = false, onToggle }) => {
        <div 
          style={{
            padding: isCollapsed ? '8px' : '16px',
-           borderTop: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
+           borderTop: '1px solid var(--mac-separator)',
            display: 'flex',
            justifyContent: isCollapsed ? 'center' : 'flex-start'
          }}

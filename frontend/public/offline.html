@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Офлайн режим - Клиника</title>
+    <title>Медицинская клиника - Офлайн</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -15,39 +15,44 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            text-align: center;
         }
         .container {
-            text-align: center;
             max-width: 500px;
             padding: 40px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 20px;
             backdrop-filter: blur(10px);
-        }
-        .icon {
-            font-size: 64px;
-            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         h1 {
-            margin: 0 0 20px 0;
-            font-size: 2.5em;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-weight: 300;
         }
         p {
-            margin: 0 0 30px 0;
-            font-size: 1.2em;
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 30px;
             opacity: 0.9;
         }
-        .button {
-            display: inline-block;
-            padding: 12px 24px;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            text-decoration: none;
-            border-radius: 25px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease;
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
         }
-        .button:hover {
+        .retry-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .retry-btn:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: translateY(-2px);
         }
@@ -57,8 +62,10 @@
     <div class="container">
         <div class="icon">📱</div>
         <h1>Офлайн режим</h1>
-        <p>Нет подключения к интернету. Проверьте соединение и попробуйте снова.</p>
-        <a href="/" class="button">Попробовать снова</a>
+        <p>Похоже, что у вас нет подключения к интернету. Проверьте соединение и попробуйте снова.</p>
+        <a href="/" class="retry-btn" onclick="window.location.reload()">
+            Попробовать снова
+        </a>
     </div>
 </body>
 </html>

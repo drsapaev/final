@@ -1,113 +1,170 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSSelect, 
+  MacOSModal,
+  MacOSBadge,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton
+} from '../components/ui/macos';
+import { 
+  Sun, 
+  Moon, 
+  User, 
+  Key, 
+  MapPin, 
+  Phone, 
+  Clock, 
+  MessageSquare,
+  Globe
+} from 'lucide-react';
 import AppActivation from '../components/activation/AppActivation';
+
+// macOS-стиль анимации для декоративных элементов
+const floatingAnimation = `
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(180deg); }
+  }
+`;
+
+// Добавляем стили в head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = floatingAnimation;
+  document.head.appendChild(style);
+}
 
 export default function Landing() {
   const navigate = useNavigate();
   const [language, setLanguage] = useState('RU');
   const [showActivation, setShowActivation] = useState(false);
-  
-  // Используем централизованную систему темизации
-  const { 
-    theme, 
-    isDark, 
-    isLight, 
-    toggleTheme
-  } = useTheme();
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const textColor = isDark ? 'var(--color-text-secondary)' : 'var(--color-text-primary)';
-  const bgColor = isDark ? 'var(--color-background-primary)' : 'var(--color-background-secondary)';
+  // Detect system theme preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const systemIsDark = mediaQuery.matches;
+    setIsDarkMode(systemIsDark);
+    
+    // Initialize theme classes
+    document.documentElement.style.colorScheme = systemIsDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', systemIsDark ? 'dark' : 'light');
+    
+    if (systemIsDark) {
+      document.documentElement.classList.add('dark-theme');
+      document.documentElement.classList.remove('light-theme');
+    } else {
+      document.documentElement.classList.add('light-theme');
+      document.documentElement.classList.remove('dark-theme');
+    }
+    
+    const handleChange = (e) => {
+      const newIsDark = e.matches;
+      setIsDarkMode(newIsDark);
+      
+      document.documentElement.style.colorScheme = newIsDark ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', newIsDark ? 'dark' : 'light');
+      
+      if (newIsDark) {
+        document.documentElement.classList.add('dark-theme');
+        document.documentElement.classList.remove('light-theme');
+      } else {
+        document.documentElement.classList.add('light-theme');
+        document.documentElement.classList.remove('dark-theme');
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Toggle dark mode with system integration
+  const toggleDarkMode = () => {
+    const newDarkMode = !isDarkMode;
+    setIsDarkMode(newDarkMode);
+    
+    // Update system color scheme and theme class
+    document.documentElement.style.colorScheme = newDarkMode ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', newDarkMode ? 'dark' : 'light');
+    
+    // Force CSS variables update
+    if (newDarkMode) {
+      document.documentElement.classList.add('dark-theme');
+      document.documentElement.classList.remove('light-theme');
+    } else {
+      document.documentElement.classList.add('light-theme');
+      document.documentElement.classList.remove('dark-theme');
+    }
+  };
 
   const pageStyle = {
     minHeight: '100vh',
-    background: isLight 
-      ? 'linear-gradient(135deg, var(--color-background-secondary) 0%, var(--color-background-tertiary) 100%)'
-      : 'linear-gradient(135deg, var(--color-background-primary) 0%, var(--color-background-secondary) 100%)',
-    padding: '1.5rem',
-    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    color: textColor,
+    background: 'var(--mac-bg-primary)',
+    backdropFilter: 'var(--mac-blur-heavy)',
+    WebkitBackdropFilter: 'var(--mac-blur-heavy)',
+    padding: 'var(--mac-spacing-lg)',
+    fontFamily: 'var(--mac-font-family)',
+    color: 'var(--mac-text-primary)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+    position: 'relative'
   };
 
   const cardStyle = {
-    background: isLight 
-      ? 'rgba(255, 255, 255, 0.95)' 
-      : 'rgba(30, 41, 59, 0.9)',
-    border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderRadius: '20px',
-    padding: '2rem',
-    marginBottom: '1.5rem',
-    boxShadow: isLight 
-      ? 'var(--shadow-xl)'
-      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-    backdropFilter: 'blur(10px)',
-    maxWidth: '600px',
-    width: '100%'
-  };
-
-  const buttonStyle = {
-    padding: '0.5rem 1.5rem',
-    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    marginRight: '0.5rem',
-    marginBottom: '0.5rem'
-  };
-
-  const buttonSecondaryStyle = {
-    ...buttonStyle,
-    background: 'linear-gradient(135deg, var(--color-text-secondary) 0%, var(--color-text-tertiary) 100%)',
-    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
+    backgroundColor: 'var(--mac-bg-glass)',
+    backdropFilter: 'var(--mac-blur-heavy)',
+    WebkitBackdropFilter: 'var(--mac-blur-heavy)',
+    border: '1px solid var(--mac-border-glass)',
+    borderRadius: 'var(--mac-radius-xl)',
+    padding: '48px 40px',
+    marginBottom: '32px',
+    boxShadow: 'var(--mac-shadow-lg)',
+    maxWidth: '650px',
+    width: '100%',
+    minHeight: '280px',
+    transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+    position: 'relative',
+    zIndex: 1
   };
 
   const headerStyle = {
-    fontSize: '48px',
-    fontWeight: '800',
-    marginBottom: '1rem',
-    background: 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-400) 100%)',
-    backgroundClip: 'text',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    textAlign: 'center'
+    fontSize: '52px',
+    fontWeight: 'var(--mac-font-weight-bold)',
+    marginBottom: '24px',
+    color: 'var(--mac-text-primary)',
+    textAlign: 'center',
+    letterSpacing: '-0.02em',
+    lineHeight: '1.1'
   };
 
   const subtitleStyle = {
-    fontSize: '18px',
-    opacity: 0.8,
-    marginBottom: '2rem',
+    fontSize: '20px',
+    color: 'var(--mac-text-secondary)',
+    marginBottom: '40px',
     textAlign: 'center',
-    lineHeight: '1.6'
+    lineHeight: '1.5',
+    fontWeight: 'var(--mac-font-weight-normal)',
+    maxWidth: '500px',
+    margin: '0 auto 40px auto'
   };
 
   const contactCardStyle = {
     ...cardStyle,
-    padding: '1.5rem',
-    marginBottom: '0.5rem'
-  };
-
-  const toggleButtonStyle = {
-    padding: '0.25rem',
-    background: isLight ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
-    border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.2)' : 'var(--color-border-light)'}`,
-    borderRadius: '8px',
-    cursor: 'pointer',
-    color: textColor,
-    marginLeft: '0.5rem'
+    padding: '32px 28px',
+    marginBottom: '24px',
+    minHeight: '200px'
   };
 
   const translations = {
     RU: {
-      title: '🏥 Clinic Manager',
+      title: 'Clinic Manager',
       subtitle: 'Добро пожаловать в современную систему управления клиникой',
       login: 'Войти',
       activate: 'Активировать аккаунт',
@@ -119,7 +176,7 @@ export default function Landing() {
       footer: 'v1.0.0 · Политика конфиденциальности · Условия использования'
     },
     UZ: {
-      title: '🏥 Klinika Menejeri',
+      title: 'Klinika Menejeri',
       subtitle: 'Zamonaviy klinika boshqaruv tizimiga xush kelibsiz',
       login: 'Kirish',
       activate: 'Akkauntni faollashtirish',
@@ -131,7 +188,7 @@ export default function Landing() {
       footer: 'v1.0.0 · Maxfiylik siyosati · Foydalanish shartlari'
     },
     EN: {
-      title: '🏥 Clinic Manager',
+      title: 'Clinic Manager',
       subtitle: 'Welcome to the modern clinic management system',
       login: 'Login',
       activate: 'Activate Account',
@@ -148,83 +205,179 @@ export default function Landing() {
 
   return (
     <div style={pageStyle}>
-      {/* Переключатели темы и языка */}
-              <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', alignItems: 'center' }}>
-        <button 
-          onClick={toggleTheme}
-          style={toggleButtonStyle}
-          title="Переключить тему"
-        >
-          {theme === 'light' ? '🌙' : '☀️'}
-        </button>
-        <select 
-          value={language} 
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{
-            ...toggleButtonStyle,
-            marginLeft: '0.5rem',
-            background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'var(--color-background-secondary)',
-            color: isLight ? 'var(--color-text-primary)' : 'var(--color-text-primary)'
-          }}
-        >
-          <option value="RU">RU</option>
-          <option value="UZ">UZ</option>
-          <option value="EN">EN</option>
-        </select>
-      </div>
-
-      {/* Главная карточка */}
-      <div style={cardStyle}>
-        <div style={headerStyle}>{t.title}</div>
-        <div style={subtitleStyle}>{t.subtitle}</div>
+      {/* Главная карточка (macOS UI) */}
+      <MacOSCard style={cardStyle}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={headerStyle}>
+            {t.title}
+          </div>
+          <div style={subtitleStyle}>{t.subtitle}</div>
+        </div>
         
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <button 
-            onClick={() => navigate('/login')} 
-            style={buttonStyle}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+        {/* Кнопки темы и языка */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '12px', 
+          justifyContent: 'center', 
+          marginBottom: '32px',
+          alignItems: 'center'
+        }}>
+          {/* Theme Toggle */}
+          <MacOSButton 
+            variant="ghost" 
+            onClick={toggleDarkMode}
+            style={{
+              minWidth: '32px',
+              width: '32px',
+              height: '32px',
+              padding: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
           >
+            {isDarkMode ? <Sun style={{ width: '16px', height: '16px' }} /> : <Moon style={{ width: '16px', height: '16px' }} />}
+          </MacOSButton>
+          
+          {/* Language Selector */}
+          <MacOSSelect
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{
+              width: '60px',
+              height: '32px',
+              padding: '0 var(--mac-spacing-xs)'
+            }}
+          >
+            <option value="RU">RU</option>
+            <option value="UZ">UZ</option>
+            <option value="EN">EN</option>
+          </MacOSSelect>
+        </div>
+        
+        <div style={{ 
+          display: 'flex', 
+          gap: '16px', 
+          flexWrap: 'wrap', 
+          justifyContent: 'center', 
+          marginBottom: '0' 
+        }}>
+          <MacOSButton 
+            variant="primary" 
+            onClick={() => navigate('/login')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              fontSize: '16px',
+              fontWeight: '600'
+            }}
+          >
+            <User style={{ width: '18px', height: '18px' }} />
             {t.login}
-          </button>
-          <button 
-            onClick={() => setShowActivation(true)} 
-            style={buttonSecondaryStyle}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+          </MacOSButton>
+          <MacOSButton 
+            variant="outline" 
+            onClick={() => setShowActivation(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
           >
+            <Key style={{ width: '18px', height: '18px' }} />
             {t.activate}
-          </button>
+          </MacOSButton>
         </div>
-      </div>
+      </MacOSCard>
 
-      {/* Карточка контактов */}
-      <div style={contactCardStyle}>
-        <div style={{ fontWeight: '700', marginBottom: '0.5rem', fontSize: '18px', color: 'var(--color-primary-600)' }}>
-          {t.contacts}
+      {/* Карточка контактов (macOS UI) */}
+      <MacOSCard style={contactCardStyle}>
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ 
+            fontWeight: '600', 
+            fontSize: '20px', 
+            color: 'var(--mac-accent-blue)',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <MapPin style={{ width: '22px', height: '22px', color: 'var(--mac-accent-blue)' }} />
+            {t.contacts}
+          </div>
         </div>
-        <div style={{ lineHeight: '1.6', color: isLight ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
-          <div style={{ marginBottom: '4px' }}>{t.address}</div>
-          <div style={{ marginBottom: '4px' }}>{t.phone}</div>
-          <div style={{ marginBottom: '4px' }}>{t.schedule}</div>
-          <div>{t.telegram}</div>
+        
+        <div style={{ 
+          lineHeight: '1.7', 
+          color: 'var(--mac-text-secondary)',
+          fontSize: '16px'
+        }}>
+          <div style={{ 
+            marginBottom: '12px', 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
+            {t.address}
+          </div>
+          <div style={{ 
+            marginBottom: '12px', 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Phone style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
+            {t.phone}
+          </div>
+          <div style={{ 
+            marginBottom: '12px', 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <Clock style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
+            {t.schedule}
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <MessageSquare style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
+            {t.telegram}
+          </div>
         </div>
-      </div>
+      </MacOSCard>
 
       {/* Футер */}
       <div style={{ 
-        opacity: 0.6, 
+        opacity: 0.7, 
         fontSize: '14px', 
+        color: 'var(--mac-text-tertiary)',
         textAlign: 'center',
-        marginTop: '1.5rem' 
+        marginTop: '32px',
+        fontWeight: '400',
+        padding: '16px 0'
       }}>
         {t.footer}
       </div>
 
       {/* Модальное окно активации */}
-      {showActivation && (
+      <MacOSModal
+        isOpen={showActivation}
+        onClose={() => setShowActivation(false)}
+        title="Активация аккаунта"
+        size="md"
+      >
         <AppActivation onClose={() => setShowActivation(false)} />
-      )}
+      </MacOSModal>
     </div>
   );
 }

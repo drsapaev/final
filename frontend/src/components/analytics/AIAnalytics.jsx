@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Badge, Input, Label, Select } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSBadge, 
+  MacOSInput, 
+  MacOSSelect,
+  MacOSTab,
+  MacOSTable,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton,
+  MacOSStatCard
+} from '../ui/macos';
 import { 
   Brain, 
   TrendingUp, 
@@ -21,12 +32,10 @@ import {
   Cpu,
   PieChart
 } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const AIAnalytics = () => {
-  const { theme, getColor, getSpacing } = useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState({
@@ -182,147 +191,151 @@ const AIAnalytics = () => {
 
   const getPerformanceColor = (rating) => {
     switch (rating) {
-      case 'Отлично': return getColor('green', 600);
-      case 'Хорошо': return getColor('blue', 600);
-      case 'Удовлетворительно': return getColor('yellow', 600);
-      case 'Требует улучшения': return getColor('orange', 600);
-      default: return getColor('gray', 600);
+      case 'Отлично': return 'var(--mac-success)';
+      case 'Хорошо': return 'var(--mac-info)';
+      case 'Удовлетворительно': return 'var(--mac-warning)';
+      case 'Требует улучшения': return 'var(--mac-error)';
+      default: return 'var(--mac-text-tertiary)';
     }
   };
 
   const renderOverviewTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Сводка */}
       {usageSummary && (
-        <Card style={{ padding: getSpacing('lg') }}>
+        <MacOSCard style={{ padding: '24px' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            marginBottom: getSpacing('md')
+            marginBottom: '16px'
           }}>
             <h3 style={{ 
               margin: 0,
-              color: getColor('text', 900),
+              color: 'var(--mac-text-primary)',
               display: 'flex',
               alignItems: 'center',
-              gap: getSpacing('sm')
+              gap: '8px',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
-              <Activity size={20} />
+              <Activity style={{ width: '20px', height: '20px' }} />
               Сводка AI использования за {usageSummary.period_days} дней
             </h3>
-            <div style={{ fontSize: '12px', color: getColor('text', 500) }}>
+            <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
               Обновлено: {new Date(usageSummary.last_updated).toLocaleString()}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md') }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('blue', 50),
-              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-info-bg)',
+              borderRadius: 'var(--mac-radius-md)',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+              <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                 {usageSummary.total_requests}
               </div>
-              <div style={{ color: getColor('text', 600) }}>Всего запросов</div>
+              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Всего запросов</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('green', 50),
-              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-success-bg)',
+              borderRadius: 'var(--mac-radius-md)',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('green', 600) }}>
+              <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
                 {usageSummary.success_rate.toFixed(1)}%
               </div>
-              <div style={{ color: getColor('text', 600) }}>Успешность</div>
+              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Успешность</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('purple', 50),
-              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-accent-purple-bg)',
+              borderRadius: 'var(--mac-radius-md)',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('purple', 600) }}>
+              <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
                 {formatTime(usageSummary.average_response_time)}
               </div>
-              <div style={{ color: getColor('text', 600) }}>Среднее время</div>
+              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Среднее время</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('orange', 50),
-              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-warning-bg)',
+              borderRadius: 'var(--mac-radius-md)',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('orange', 600) }}>
+              <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-warning)' }}>
                 {formatCurrency(usageSummary.total_cost_usd)}
               </div>
-              <div style={{ color: getColor('text', 600) }}>Общие затраты</div>
+              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Общие затраты</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: usageSummary.cost_trend === 'increasing' ? getColor('red', 50) : getColor('green', 50),
-              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: usageSummary.cost_trend === 'increasing' ? 'var(--mac-error-bg)' : 'var(--mac-success-bg)',
+              borderRadius: 'var(--mac-radius-md)',
               textAlign: 'center'
             }}>
               <div style={{ 
                 fontSize: '20px', 
-                fontWeight: 'bold', 
-                color: usageSummary.cost_trend === 'increasing' ? getColor('red', 600) : getColor('green', 600),
+                fontWeight: 'var(--mac-font-weight-bold)', 
+                color: usageSummary.cost_trend === 'increasing' ? 'var(--mac-error)' : 'var(--mac-success)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: getSpacing('xs')
+                gap: '4px'
               }}>
-                {usageSummary.cost_trend === 'increasing' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                {usageSummary.cost_trend === 'increasing' ? <TrendingUp style={{ width: '20px', height: '20px' }} /> : <TrendingDown style={{ width: '20px', height: '20px' }} />}
                 {usageSummary.cost_trend}
               </div>
-              <div style={{ color: getColor('text', 600) }}>Тренд затрат</div>
+              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Тренд затрат</div>
             </div>
 
             <div style={{ 
-              padding: getSpacing('md'),
-              backgroundColor: getColor('indigo', 50),
-              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: 'var(--mac-accent-blue-bg)',
+              borderRadius: 'var(--mac-radius-md)',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: getColor('indigo', 600) }}>
+              <div style={{ fontSize: '20px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-blue)' }}>
                 {usageSummary.most_used_function || 'N/A'}
               </div>
-              <div style={{ color: getColor('text', 600) }}>Популярная функция</div>
+              <div style={{ color: 'var(--mac-text-secondary)', fontSize: 'var(--mac-font-size-sm)' }}>Популярная функция</div>
             </div>
           </div>
 
           {usageSummary.recommendations && usageSummary.recommendations.length > 0 && (
-            <div style={{ marginTop: getSpacing('md') }}>
+            <div style={{ marginTop: '16px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('sm')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 8px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Рекомендации
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('xs') }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {usageSummary.recommendations.map((recommendation, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: getSpacing('sm'),
-                      backgroundColor: getColor('blue', 50),
-                      border: `1px solid ${getColor('blue', 200)}`,
-                      borderRadius: '6px',
+                      padding: '8px',
+                      backgroundColor: 'var(--mac-info-bg)',
+                      border: '1px solid var(--mac-info-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('sm')
+                      gap: '8px'
                     }}
                   >
-                    <CheckCircle size={16} color={getColor('blue', 600)} />
-                    <span style={{ fontSize: '14px', color: getColor('text', 700) }}>
+                    <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
+                    <span style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
                       {recommendation}
                     </span>
                   </div>
@@ -330,217 +343,222 @@ const AIAnalytics = () => {
               </div>
             </div>
           )}
-        </Card>
+        </MacOSCard>
       )}
 
       {/* Быстрые действия */}
-      <Card style={{ padding: getSpacing('lg') }}>
+      <MacOSCard style={{ padding: '24px' }}>
         <h3 style={{ 
-          margin: `0 0 ${getSpacing('md')} 0`,
-          color: getColor('text', 900),
+          margin: `0 0 16px 0`,
+          color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
-          gap: getSpacing('sm')
+          gap: '8px',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
         }}>
-          <Settings size={20} />
+          <Settings style={{ width: '20px', height: '20px' }} />
           Быстрые действия
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: getSpacing('md') }}>
-          <Button 
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+          <MacOSButton 
             onClick={optimizeModels}
             disabled={loading}
+            variant="primary"
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: getSpacing('sm'),
-              backgroundColor: getColor('primary', 600),
-              color: 'white',
-              padding: getSpacing('md')
+              gap: '8px',
+              padding: '12px'
             }}
           >
-            {loading ? <RefreshCw size={16} className="animate-spin" /> : <Target size={16} />}
+            {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Target style={{ width: '16px', height: '16px' }} />}
             Оптимизировать модели
-          </Button>
+          </MacOSButton>
 
-          <Button 
+          <MacOSButton 
             onClick={() => generateTrainingDataset('diagnostic_patterns')}
             disabled={loading}
+            variant="success"
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: getSpacing('sm'),
-              backgroundColor: getColor('green', 600),
-              color: 'white',
-              padding: getSpacing('md')
+              gap: '8px',
+              padding: '12px'
             }}
           >
-            {loading ? <RefreshCw size={16} className="animate-spin" /> : <Database size={16} />}
+            {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             Генерировать датасет диагностики
-          </Button>
+          </MacOSButton>
 
-          <Button 
+          <MacOSButton 
             onClick={() => generateTrainingDataset('treatment_outcomes')}
             disabled={loading}
+            variant="secondary"
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: getSpacing('sm'),
-              backgroundColor: getColor('purple', 600),
-              color: 'white',
-              padding: getSpacing('md')
+              gap: '8px',
+              padding: '12px'
             }}
           >
-            {loading ? <RefreshCw size={16} className="animate-spin" /> : <Database size={16} />}
+            {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Database style={{ width: '16px', height: '16px' }} />}
             Генерировать датасет лечения
-          </Button>
+          </MacOSButton>
 
-          <Button 
+          <MacOSButton 
             onClick={loadModelComparison}
             disabled={loading}
+            variant="warning"
             style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: getSpacing('sm'),
-              backgroundColor: getColor('orange', 600),
-              color: 'white',
-              padding: getSpacing('md')
+              gap: '8px',
+              padding: '12px'
             }}
           >
-            {loading ? <RefreshCw size={16} className="animate-spin" /> : <BarChart3 size={16} />}
+            {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <BarChart3 style={{ width: '16px', height: '16px' }} />}
             Сравнить модели
-          </Button>
+          </MacOSButton>
         </div>
-      </Card>
+      </MacOSCard>
     </div>
   );
 
   const renderUsageTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {usageAnalytics && (
         <>
           {/* Общая статистика */}
-          <Card style={{ padding: getSpacing('lg') }}>
+          <MacOSCard style={{ padding: '24px' }}>
             <h3 style={{ 
-              margin: `0 0 ${getSpacing('md')} 0`,
-              color: getColor('text', 900),
+              margin: `0 0 16px 0`,
+              color: 'var(--mac-text-primary)',
               display: 'flex',
               alignItems: 'center',
-              gap: getSpacing('sm')
+              gap: '8px',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
-              <BarChart3 size={20} />
+              <BarChart3 style={{ width: '20px', height: '20px' }} />
               Статистика использования ({usageAnalytics.period.start_date} - {usageAnalytics.period.end_date})
             </h3>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: getSpacing('md') }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+                <div style={{ fontSize: '18px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                   {usageAnalytics.usage_statistics.total_requests}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Всего запросов</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Всего запросов</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('green', 600) }}>
+                <div style={{ fontSize: '18px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
                   {usageAnalytics.usage_statistics.success_rate?.toFixed(1)}%
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Успешность</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Успешность</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('purple', 600) }}>
+                <div style={{ fontSize: '18px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
                   {formatTime(usageAnalytics.usage_statistics.average_execution_time)}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Среднее время</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Среднее время</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('orange', 600) }}>
+                <div style={{ fontSize: '18px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-warning)' }}>
                   {usageAnalytics.usage_statistics.total_tokens_used}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Токенов</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Токенов</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: getColor('red', 600) }}>
+                <div style={{ fontSize: '18px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-error)' }}>
                   {formatCurrency(usageAnalytics.usage_statistics.total_cost_usd)}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Затраты</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Затраты</div>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
 
           {/* Разбивка по функциям */}
           {Object.keys(usageAnalytics.function_breakdown).length > 0 && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 По AI функциям
               </h3>
-              <div style={{ display: 'grid', gap: getSpacing('md') }}>
+              <div style={{ display: 'grid', gap: '16px' }}>
                 {Object.entries(usageAnalytics.function_breakdown).map(([func, stats]) => (
                   <div
                     key={func}
                     style={{
-                      padding: getSpacing('md'),
-                      border: `1px solid ${getColor('gray', 200)}`,
-                      borderRadius: '8px',
+                      padding: '16px',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-md)',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      backgroundColor: 'var(--mac-bg-secondary)'
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 'bold', color: getColor('text', 900) }}>
+                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                         {func}
                       </div>
-                      <div style={{ fontSize: '14px', color: getColor('text', 600) }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                         {stats.requests} запросов • {stats.success_rate?.toFixed(1)}% успешность
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+                      <div style={{ fontSize: '16px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                         {formatTime(stats.average_time)}
                       </div>
-                      <div style={{ fontSize: '12px', color: getColor('text', 500) }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                         {formatCurrency(stats.total_cost)}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
 
           {/* Рекомендации */}
           {usageAnalytics.recommendations && usageAnalytics.recommendations.length > 0 && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Рекомендации по оптимизации
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('sm') }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {usageAnalytics.recommendations.map((recommendation, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: getSpacing('md'),
-                      backgroundColor: getColor('yellow', 50),
-                      border: `1px solid ${getColor('yellow', 200)}`,
-                      borderRadius: '6px',
+                      padding: '16px',
+                      backgroundColor: 'var(--mac-warning-bg)',
+                      border: '1px solid var(--mac-warning-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('sm')
+                      gap: '8px'
                     }}
                   >
-                    <AlertTriangle size={16} color={getColor('yellow', 600)} />
-                    <span style={{ color: getColor('text', 700) }}>
+                    <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--mac-warning)' }} />
+                    <span style={{ color: 'var(--mac-text-primary)' }}>
                       {recommendation}
                     </span>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
         </>
       )}
@@ -548,54 +566,66 @@ const AIAnalytics = () => {
   );
 
   const renderLearningTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: getColor('text', 900) }}>
+        <h3 style={{ 
+          margin: 0, 
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
           Инсайты для обучения AI
         </h3>
-        <Button 
+        <MacOSButton 
           onClick={loadLearningInsights}
           disabled={loading}
+          variant="outline"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          {loading ? <RefreshCw size={16} className="animate-spin" /> : <Brain size={16} />}
+          {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Brain style={{ width: '16px', height: '16px' }} />}
           Обновить
-        </Button>
+        </MacOSButton>
       </div>
 
       {learningInsights && (
         <>
           {/* Медицинские паттерны */}
           {learningInsights.medical_patterns && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Медицинские паттерны
               </h4>
               
-              {learningInsights.medical_patterns.common_symptoms && (
-                <div style={{ marginBottom: getSpacing('md') }}>
-                  <h5 style={{ margin: `0 0 ${getSpacing('sm')} 0`, color: getColor('text', 800) }}>
+              {learningInsights.medical_patterns.common_symptoms && Array.isArray(learningInsights.medical_patterns.common_symptoms) && (
+                <div style={{ marginBottom: '16px' }}>
+                  <h5 style={{ 
+                    margin: `0 0 8px 0`, 
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     Частые симптомы
                   </h5>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: getSpacing('xs') }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {learningInsights.medical_patterns.common_symptoms.map((symptom, index) => (
-                      <Badge
+                      <MacOSBadge
                         key={index}
+                        variant="secondary"
                         style={{
-                          backgroundColor: getColor('blue', 100),
-                          color: getColor('blue', 800),
-                          padding: `${getSpacing('xs')} ${getSpacing('sm')}`
+                          fontSize: 'var(--mac-font-size-xs)'
                         }}
                       >
                         {symptom}
-                      </Badge>
+                      </MacOSBadge>
                     ))}
                   </div>
                 </div>
@@ -603,23 +633,28 @@ const AIAnalytics = () => {
 
               {learningInsights.medical_patterns.diagnosis_frequency && (
                 <div>
-                  <h5 style={{ margin: `0 0 ${getSpacing('sm')} 0`, color: getColor('text', 800) }}>
+                  <h5 style={{ 
+                    margin: `0 0 8px 0`, 
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     Топ диагнозы
                   </h5>
-                  <div style={{ display: 'grid', gap: getSpacing('xs') }}>
+                  <div style={{ display: 'grid', gap: '4px' }}>
                     {learningInsights.medical_patterns.diagnosis_frequency.top_diagnoses?.map((item, index) => (
                       <div
                         key={index}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
-                          padding: getSpacing('sm'),
-                          backgroundColor: getColor('gray', 50),
-                          borderRadius: '4px'
+                          padding: '8px',
+                          backgroundColor: 'var(--mac-bg-secondary)',
+                          borderRadius: 'var(--mac-radius-sm)'
                         }}
                       >
-                        <span>{item.diagnosis}</span>
-                        <span style={{ fontWeight: 'bold' }}>
+                        <span style={{ color: 'var(--mac-text-primary)' }}>{item.diagnosis}</span>
+                        <span style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                           {item.count} ({item.percentage}%)
                         </span>
                       </div>
@@ -627,73 +662,77 @@ const AIAnalytics = () => {
                   </div>
                 </div>
               )}
-            </Card>
+            </MacOSCard>
           )}
 
           {/* Точность диагностики */}
           {learningInsights.diagnostic_accuracy && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Точность диагностики
               </h4>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: getSpacing('md') }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.ai_accuracy}%
                   </div>
-                  <div style={{ fontSize: '12px', color: getColor('text', 600) }}>AI точность</div>
+                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>AI точность</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('green', 600) }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.doctor_accuracy}%
                   </div>
-                  <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Врач точность</div>
+                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Врач точность</div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: getColor('purple', 600) }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
                     {learningInsights.diagnostic_accuracy.ai_vs_doctor_accuracy?.agreement_rate}%
                   </div>
-                  <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Согласованность</div>
+                  <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Согласованность</div>
                 </div>
               </div>
-            </Card>
+            </MacOSCard>
           )}
 
           {/* Рекомендации для обучения */}
           {learningInsights.learning_recommendations && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Рекомендации для обучения
               </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('sm') }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {learningInsights.learning_recommendations.map((recommendation, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: getSpacing('md'),
-                      backgroundColor: getColor('green', 50),
-                      border: `1px solid ${getColor('green', 200)}`,
-                      borderRadius: '6px',
+                      padding: '16px',
+                      backgroundColor: 'var(--mac-success-bg)',
+                      border: '1px solid var(--mac-success-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('sm')
+                      gap: '8px'
                     }}
                   >
-                    <CheckCircle size={16} color={getColor('green', 600)} />
-                    <span style={{ color: getColor('text', 700) }}>
+                    <CheckCircle style={{ width: '16px', height: '16px', color: 'var(--mac-success)' }} />
+                    <span style={{ color: 'var(--mac-text-primary)' }}>
                       {recommendation}
                     </span>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
         </>
       )}
@@ -701,148 +740,161 @@ const AIAnalytics = () => {
   );
 
   const renderCostTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: getColor('text', 900) }}>
+        <h3 style={{ 
+          margin: 0, 
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
           Анализ затрат на AI
         </h3>
-        <Button 
+        <MacOSButton 
           onClick={loadCostAnalysis}
           disabled={loading}
+          variant="outline"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          {loading ? <RefreshCw size={16} className="animate-spin" /> : <DollarSign size={16} />}
+          {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <DollarSign style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </Button>
+        </MacOSButton>
       </div>
 
       {costAnalysis && (
         <>
           {/* Сводка затрат */}
-          <Card style={{ padding: getSpacing('lg') }}>
+          <MacOSCard style={{ padding: '24px' }}>
             <h4 style={{ 
-              margin: `0 0 ${getSpacing('md')} 0`,
-              color: getColor('text', 900)
+              margin: `0 0 16px 0`,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
               Сводка затрат
             </h4>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: getSpacing('md') }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: getColor('green', 600) }}>
+                <div style={{ fontSize: '20px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-success)' }}>
                   {formatCurrency(costAnalysis.summary?.total_cost_usd || 0)}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Общие затраты</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Общие затраты</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: getColor('blue', 600) }}>
+                <div style={{ fontSize: '20px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-info)' }}>
                   {formatCurrency(costAnalysis.summary?.average_daily_cost || 0)}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>В день</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>В день</div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: getColor('purple', 600) }}>
+                <div style={{ fontSize: '20px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-accent-purple)' }}>
                   {formatCurrency(costAnalysis.forecasts?.monthly_usd || 0)}
                 </div>
-                <div style={{ fontSize: '12px', color: getColor('text', 600) }}>Прогноз на месяц</div>
+                <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-secondary)' }}>Прогноз на месяц</div>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
 
           {/* Затраты по функциям */}
           {costAnalysis.function_costs && Object.keys(costAnalysis.function_costs).length > 0 && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Затраты по функциям
               </h4>
-              <div style={{ display: 'grid', gap: getSpacing('md') }}>
+              <div style={{ display: 'grid', gap: '16px' }}>
                 {Object.entries(costAnalysis.function_costs).map(([func, data]) => (
                   <div
                     key={func}
                     style={{
-                      padding: getSpacing('md'),
-                      border: `1px solid ${getColor('gray', 200)}`,
-                      borderRadius: '8px',
+                      padding: '16px',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-md)',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      backgroundColor: 'var(--mac-bg-secondary)'
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 'bold', color: getColor('text', 900) }}>
+                      <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-text-primary)' }}>
                         {func}
                       </div>
-                      <div style={{ fontSize: '14px', color: getColor('text', 600) }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                         {data.requests} запросов • {data.cost_percentage?.toFixed(1)}% от общих затрат
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: getColor('orange', 600) }}>
+                      <div style={{ fontSize: '16px', fontWeight: 'var(--mac-font-weight-bold)', color: 'var(--mac-warning)' }}>
                         {formatCurrency(data.total_cost)}
                       </div>
-                      <div style={{ fontSize: '12px', color: getColor('text', 500) }}>
+                      <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
                         {formatCurrency(data.average_cost_per_request)} за запрос
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
 
           {/* Рекомендации по оптимизации затрат */}
           {costAnalysis.cost_optimization?.recommendations && (
-            <Card style={{ padding: getSpacing('lg') }}>
+            <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 ${getSpacing('md')} 0`,
-                color: getColor('text', 900)
+                margin: `0 0 16px 0`,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-base)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
               }}>
                 Оптимизация затрат
               </h4>
               
               <div style={{ 
-                padding: getSpacing('md'),
-                backgroundColor: getColor('green', 50),
-                borderRadius: '6px',
-                marginBottom: getSpacing('md')
+                padding: '16px',
+                backgroundColor: 'var(--mac-success-bg)',
+                borderRadius: 'var(--mac-radius-sm)',
+                marginBottom: '16px'
               }}>
-                <div style={{ fontWeight: 'bold', color: getColor('green', 800) }}>
+                <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-success)' }}>
                   Потенциальная экономия: {formatCurrency(costAnalysis.cost_optimization.potential_savings?.amount_usd || 0)}
                 </div>
-                <div style={{ fontSize: '14px', color: getColor('text', 600) }}>
+                <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                   ({costAnalysis.cost_optimization.potential_savings?.percentage || 0}% от текущих затрат)
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('sm') }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {costAnalysis.cost_optimization.recommendations.map((recommendation, index) => (
                   <div
                     key={index}
                     style={{
-                      padding: getSpacing('sm'),
-                      backgroundColor: getColor('blue', 50),
-                      border: `1px solid ${getColor('blue', 200)}`,
-                      borderRadius: '6px',
+                      padding: '8px',
+                      backgroundColor: 'var(--mac-info-bg)',
+                      border: '1px solid var(--mac-info-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: getSpacing('sm')
+                      gap: '8px'
                     }}
                   >
-                    <DollarSign size={16} color={getColor('blue', 600)} />
-                    <span style={{ color: getColor('text', 700) }}>
+                    <DollarSign style={{ width: '16px', height: '16px', color: 'var(--mac-info)' }} />
+                    <span style={{ color: 'var(--mac-text-primary)' }}>
                       {recommendation}
                     </span>
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
         </>
       )}
@@ -850,255 +902,250 @@ const AIAnalytics = () => {
   );
 
   const renderModelsTab = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ margin: 0, color: getColor('text', 900) }}>
+        <h3 style={{ 
+          margin: 0, 
+          color: 'var(--mac-text-primary)',
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)'
+        }}>
           Сравнение AI моделей
         </h3>
-        <Button 
+        <MacOSButton 
           onClick={loadModelComparison}
           disabled={loading}
+          variant="outline"
           style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: getSpacing('sm')
+            gap: '8px'
           }}
         >
-          {loading ? <RefreshCw size={16} className="animate-spin" /> : <Cpu size={16} />}
+          {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Cpu style={{ width: '16px', height: '16px' }} />}
           Загрузить
-        </Button>
+        </MacOSButton>
       </div>
 
       {modelComparison && (
         <>
           {/* Сравнительная таблица */}
-          <Card style={{ padding: getSpacing('lg') }}>
+          <MacOSCard style={{ padding: '24px' }}>
             <h4 style={{ 
-              margin: `0 0 ${getSpacing('md')} 0`,
-              color: getColor('text', 900)
+              margin: `0 0 16px 0`,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
               Сравнение моделей для функции: {modelComparison.function}
             </h4>
             
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: getColor('gray', 50) }}>
-                    <th style={{ padding: getSpacing('sm'), textAlign: 'left', border: `1px solid ${getColor('gray', 200)}` }}>
-                      Модель
-                    </th>
-                    <th style={{ padding: getSpacing('sm'), textAlign: 'center', border: `1px solid ${getColor('gray', 200)}` }}>
-                      Точность
-                    </th>
-                    <th style={{ padding: getSpacing('sm'), textAlign: 'center', border: `1px solid ${getColor('gray', 200)}` }}>
-                      Скорость (с)
-                    </th>
-                    <th style={{ padding: getSpacing('sm'), textAlign: 'center', border: `1px solid ${getColor('gray', 200)}` }}>
-                      Стоимость
-                    </th>
-                    <th style={{ padding: getSpacing('sm'), textAlign: 'center', border: `1px solid ${getColor('gray', 200)}` }}>
-                      Удовлетворенность
-                    </th>
-                    <th style={{ padding: getSpacing('sm'), textAlign: 'center', border: `1px solid ${getColor('gray', 200)}` }}>
-                      Надежность
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(modelComparison.models).map(([model, data]) => (
-                    <tr key={model}>
-                      <td style={{ padding: getSpacing('sm'), border: `1px solid ${getColor('gray', 200)}`, fontWeight: 'bold' }}>
-                        {model}
-                      </td>
-                      <td style={{ padding: getSpacing('sm'), border: `1px solid ${getColor('gray', 200)}`, textAlign: 'center' }}>
-                        {data.accuracy}%
-                      </td>
-                      <td style={{ padding: getSpacing('sm'), border: `1px solid ${getColor('gray', 200)}`, textAlign: 'center' }}>
-                        {data.speed}
-                      </td>
-                      <td style={{ padding: getSpacing('sm'), border: `1px solid ${getColor('gray', 200)}`, textAlign: 'center' }}>
-                        {formatCurrency(data.cost_per_request)}
-                      </td>
-                      <td style={{ padding: getSpacing('sm'), border: `1px solid ${getColor('gray', 200)}`, textAlign: 'center' }}>
-                        {data.user_satisfaction}/5
-                      </td>
-                      <td style={{ padding: getSpacing('sm'), border: `1px solid ${getColor('gray', 200)}`, textAlign: 'center' }}>
-                        {data.reliability}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+            <MacOSTable
+              columns={[
+                { key: 'model', label: 'Модель', width: '20%' },
+                { key: 'accuracy', label: 'Точность', width: '15%', align: 'center' },
+                { key: 'speed', label: 'Скорость (с)', width: '15%', align: 'center' },
+                { key: 'cost', label: 'Стоимость', width: '15%', align: 'center' },
+                { key: 'satisfaction', label: 'Удовлетворенность', width: '15%', align: 'center' },
+                { key: 'reliability', label: 'Надежность', width: '20%', align: 'center' }
+              ]}
+              data={Object.entries(modelComparison.models).map(([model, data]) => ({
+                model: <span style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>{model}</span>,
+                accuracy: `${data.accuracy}%`,
+                speed: data.speed,
+                cost: formatCurrency(data.cost_per_request),
+                satisfaction: `${data.user_satisfaction}/5`,
+                reliability: `${data.reliability}%`
+              }))}
+              emptyState={
+                <MacOSEmptyState
+                  icon={Cpu}
+                  title="Нет данных о моделях"
+                  description="Загрузите данные для сравнения AI моделей"
+                />
+              }
+            />
+          </MacOSCard>
 
           {/* Рекомендации */}
-          <Card style={{ padding: getSpacing('lg') }}>
+          <MacOSCard style={{ padding: '24px' }}>
             <h4 style={{ 
-              margin: `0 0 ${getSpacing('md')} 0`,
-              color: getColor('text', 900)
+              margin: `0 0 16px 0`,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
             }}>
               Рекомендации
             </h4>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md'), marginBottom: getSpacing('md') }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
               {Object.entries(modelComparison.recommendations).map(([category, model]) => (
                 <div
                   key={category}
                   style={{
-                    padding: getSpacing('md'),
-                    backgroundColor: getColor('blue', 50),
-                    borderRadius: '6px',
+                    padding: '16px',
+                    backgroundColor: 'var(--mac-info-bg)',
+                    borderRadius: 'var(--mac-radius-sm)',
                     textAlign: 'center'
                   }}
                 >
-                  <div style={{ fontSize: '14px', color: getColor('text', 600), marginBottom: getSpacing('xs') }}>
+                  <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', marginBottom: '4px' }}>
                     {category.replace('best_for_', '').replace('_', ' ')}
                   </div>
-                  <div style={{ fontWeight: 'bold', color: getColor('blue', 700) }}>
+                  <div style={{ fontWeight: 'var(--mac-font-weight-semibold)', color: 'var(--mac-info)' }}>
                     {model}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: getSpacing('sm') }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {modelComparison.optimization_suggestions?.map((suggestion, index) => (
                 <div
                   key={index}
                   style={{
-                    padding: getSpacing('sm'),
-                    backgroundColor: getColor('green', 50),
-                    border: `1px solid ${getColor('green', 200)}`,
-                    borderRadius: '6px',
+                    padding: '8px',
+                    backgroundColor: 'var(--mac-success-bg)',
+                    border: '1px solid var(--mac-success-border)',
+                    borderRadius: 'var(--mac-radius-sm)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: getSpacing('sm')
+                    gap: '8px'
                   }}
                 >
-                  <Target size={16} color={getColor('green', 600)} />
-                  <span style={{ color: getColor('text', 700) }}>
+                  <Target style={{ width: '16px', height: '16px', color: 'var(--mac-success)' }} />
+                  <span style={{ color: 'var(--mac-text-primary)' }}>
                     {suggestion}
                   </span>
                 </div>
               ))}
             </div>
-          </Card>
+          </MacOSCard>
         </>
       )}
     </div>
   );
 
-  const tabs = [
-    { id: 'overview', label: 'Обзор', icon: Activity },
-    { id: 'usage', label: 'Использование', icon: BarChart3 },
-    { id: 'learning', label: 'Обучение', icon: Brain },
-    { id: 'cost', label: 'Затраты', icon: DollarSign },
-    { id: 'models', label: 'Модели', icon: Cpu }
-  ];
 
   return (
-    <div style={{ padding: getSpacing('lg') }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Заголовок */}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: getSpacing('md'),
-        marginBottom: getSpacing('lg')
+        gap: '16px'
       }}>
-        <Brain size={24} color={getColor('primary', 600)} />
-        <h2 style={{ 
+        <Brain style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
+        <div>
+          <h1 style={{ 
           margin: 0, 
-          color: getColor('text', 900),
-          fontSize: '24px',
-          fontWeight: 'bold'
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-2xl)',
+            fontWeight: 'var(--mac-font-weight-bold)'
         }}>
           Расширенная аналитика AI
-        </h2>
+          </h1>
+          <p style={{ 
+            margin: '4px 0 0 0',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-base)'
+          }}>
+            Мониторинг и оптимизация использования искусственного интеллекта
+          </p>
+        </div>
       </div>
 
       {/* Фильтры */}
-      <Card style={{ padding: getSpacing('md'), marginBottom: getSpacing('lg') }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: getSpacing('md') }}>
+      <MacOSCard style={{ padding: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <div>
-            <Label>Начальная дата</Label>
-            <Input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>
+              Начальная дата
+            </label>
+            <MacOSInput
               type="date"
               value={dateRange.startDate}
               onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
             />
           </div>
           <div>
-            <Label>Конечная дата</Label>
-            <Input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>
+              Конечная дата
+            </label>
+            <MacOSInput
               type="date"
               value={dateRange.endDate}
               onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
             />
           </div>
           <div>
-            <Label>AI функция</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>
+              AI функция
+            </label>
+            <MacOSSelect
               value={filters.aiFunction}
               onChange={(e) => setFilters({...filters, aiFunction: e.target.value})}
-            >
-              <option value="">Все функции</option>
-              <option value="diagnose_symptoms">Диагностика симптомов</option>
-              <option value="analyze_medical_image">Анализ изображений</option>
-              <option value="generate_treatment_plan">Планы лечения</option>
-              <option value="check_drug_interactions">Взаимодействия препаратов</option>
-              <option value="assess_patient_risk">Оценка рисков</option>
-            </Select>
+              options={[
+                { value: '', label: 'Все функции' },
+                { value: 'diagnose_symptoms', label: 'Диагностика симптомов' },
+                { value: 'analyze_medical_image', label: 'Анализ изображений' },
+                { value: 'generate_treatment_plan', label: 'Планы лечения' },
+                { value: 'check_drug_interactions', label: 'Взаимодействия препаратов' },
+                { value: 'assess_patient_risk', label: 'Оценка рисков' }
+              ]}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'end' }}>
-            <Button 
+            <MacOSButton 
               onClick={loadUsageAnalytics}
               disabled={loading}
+              variant="primary"
               style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: getSpacing('sm'),
-                backgroundColor: getColor('primary', 600),
-                color: 'white'
+                gap: '8px',
+                width: '100%'
               }}
             >
-              {loading ? <RefreshCw size={16} className="animate-spin" /> : <Filter size={16} />}
+              {loading ? <RefreshCw style={{ width: '16px', height: '16px' }} /> : <Filter style={{ width: '16px', height: '16px' }} />}
               Применить
-            </Button>
+            </MacOSButton>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Вкладки */}
-      <div style={{ 
-        display: 'flex', 
-        borderBottom: `1px solid ${getColor('gray', 200)}`,
-        marginBottom: getSpacing('lg')
-      }}>
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: `${getSpacing('md')} ${getSpacing('lg')}`,
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: getSpacing('sm'),
-                borderBottom: activeTab === tab.id ? `2px solid ${getColor('primary', 600)}` : '2px solid transparent',
-                color: activeTab === tab.id ? getColor('primary', 600) : getColor('text', 600),
-                fontWeight: activeTab === tab.id ? 'bold' : 'normal'
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <MacOSTab
+        tabs={[
+          { id: 'overview', label: 'Обзор', icon: Activity },
+          { id: 'usage', label: 'Использование', icon: BarChart3 },
+          { id: 'learning', label: 'Обучение', icon: Brain },
+          { id: 'cost', label: 'Затраты', icon: DollarSign },
+          { id: 'models', label: 'Модели', icon: Cpu }
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        size="md"
+        variant="default"
+      />
 
       {/* Содержимое вкладок */}
       {activeTab === 'overview' && renderOverviewTab()}

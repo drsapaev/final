@@ -271,13 +271,23 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio httpx
+        # Extra deps required for imports during server startup in CI
+        pip install pytest pytest-asyncio httpx requests pandas packaging google-generativeai \
+          google-api-core google-auth grpcio proto-plus protobuf psutil
     
     - name: 🗄️ Подготовка тестовой базы
+      env:
+        DATABASE_URL: "sqlite:///./test_clinic.db"
+        CORS_DISABLE: "1"
+        WS_DEV_ALLOW: "1"
       run: |
         cd backend
         export DATABASE_URL="sqlite:///./test_clinic.db"
         python -c "
+        import os
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
         from app.db.base import Base
         from app.db.session import engine
         Base.metadata.create_all(bind=engine)
@@ -285,15 +295,26 @@ jobs:
         "
     
     - name: 🚀 Запуск сервера
+      env:
+        DATABASE_URL: "sqlite:///./test_clinic.db"
+        CORS_DISABLE: "1"
+        WS_DEV_ALLOW: "1"
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./test_clinic.db"
+        echo "🔍 Проверяем что приложение может импортироваться..."
+        python -c "from app.main import app; print('✅ App импортирован успешно')" || {
+          echo "❌ Не удалось импортировать app.main"
+          exit 1
+        }
+        echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         echo $! > server.pid
-        sleep 10
+        echo "⏳ Ожидаем запуска сервера..."
+        sleep 15
+        echo "📋 Логи сервера после запуска:"
+        head -50 server.log || echo "Логи не доступны"
     
     - name: 🧪 Интеграционные тесты
-      continue-on-error: true
       run: |
         cd backend
         # Ждем запуска сервера
@@ -310,44 +331,13 @@ jobs:
           sleep 2
         done
         
-        # Проверяем существование директории интеграционных тестов
-        if [ ! -d "tests/integration" ]; then
-          echo "⚠️ Директория tests/integration не найдена, создаем"
-          mkdir -p tests/integration
-        fi
-        
-        # Проверяем существование файла тестов
-        if [ ! -f "tests/integration/test_api_integration.py" ]; then
-          echo "⚠️ Файл интеграционных тестов не найден, создаем базовый тест"
-          echo 'import pytest' > tests/integration/test_api_integration.py
-          echo 'import requests' >> tests/integration/test_api_integration.py
-          echo 'import time' >> tests/integration/test_api_integration.py
-          echo '' >> tests/integration/test_api_integration.py
-          echo 'class TestAPIIntegration:' >> tests/integration/test_api_integration.py
-          echo '    def test_health_endpoint(self):' >> tests/integration/test_api_integration.py
-          echo '        response = requests.get("http://127.0.0.1:8000/api/v1/health", timeout=30)' >> tests/integration/test_api_integration.py
-          echo '        assert response.status_code == 200' >> tests/integration/test_api_integration.py
-          echo '    def test_status_endpoint(self):' >> tests/integration/test_api_integration.py
-          echo '        response = requests.get("http://127.0.0.1:8000/api/v1/status", timeout=30)' >> tests/integration/test_api_integration.py
-          echo '        assert response.status_code == 200' >> tests/integration/test_api_integration.py
-          echo "✅ Базовые интеграционные тесты созданы"
-        fi
-        
-        # Проверяем, что тесты создались
-        if [ -f "tests/integration/test_api_integration.py" ]; then
-          echo "✅ Файл интеграционных тестов найден"
-          echo "📊 Размер файла: $(wc -c < tests/integration/test_api_integration.py) байт"
-        else
-          echo "❌ Файл интеграционных тестов не создан"
-          exit 1
-        fi
-        
-        # Запускаем интеграционные тесты
+        # Запускаем интеграционные тесты для запущенного сервера
         echo "🧪 Запускаем интеграционные тесты..."
-        python -m pytest tests/integration/ -v --tb=short || {
-          echo "⚠️ Некоторые интеграционные тесты не прошли, но это не критично"
-          echo "📊 Создаем отчет о тестах"
-          python -m pytest tests/integration/ -v --tb=short --junitxml=integration-results.xml || true
+        python tests/integration/test_server_integration.py || {
+          echo "⚠️ Некоторые интеграционные тесты не прошли"
+          echo "📊 Логи сервера:"
+          cat server.log || true
+          exit 1
         }
     
     - name: 🛑 Остановка сервера
@@ -380,7 +370,6 @@ jobs:
         pip install sphinx sphinx-rtd-theme
     
     - name: 📚 Генерация API документации
-      continue-on-error: true
       run: |
         cd backend
         # Проверяем существование основных файлов
@@ -399,20 +388,23 @@ jobs:
             # Добавляем текущую директорию в путь
             sys.path.insert(0, '.')
             
-            # Устанавливаем переменные окружения
-            os.environ.setdefault('DATABASE_URL', 'sqlite:///./clinic.db')
-            os.environ.setdefault('CORS_DISABLE', '1')
-            os.environ.setdefault('WS_DEV_ALLOW', '1')
+            # Устанавливаем переменные окружения ПЕРЕД импортом
+            os.environ['DATABASE_URL'] = 'sqlite:///./clinic.db'
+            os.environ['CORS_DISABLE'] = '1'
+            os.environ['WS_DEV_ALLOW'] = '1'
             
             print('🔧 Настройка окружения завершена')
+            print(f'📋 DATABASE_URL: {os.environ.get(\"DATABASE_URL\")}')
             
             # Импортируем приложение
+            print('📦 Импортируем app.main...')
             from app.main import app
             import json
             
             print('✅ Импорт app.main успешен')
             
             # Генерируем схему
+            print('📝 Генерируем OpenAPI схему...')
             openapi_schema = app.openapi()
             
             # Сохраняем схему
@@ -422,33 +414,24 @@ jobs:
             print('✅ OpenAPI схема создана успешно')
             print(f'📊 Размер файла: {os.path.getsize(\"openapi.json\")} байт')
             
-        except ImportError as e:
-            print(f'❌ Ошибка импорта: {e}')
+        except Exception as e:
+            print(f'❌ Ошибка генерации документации: {e}')
             print('📋 Детали ошибки:')
             traceback.print_exc()
             
-            # Создаем базовую схему
-            basic_schema = {
+            # Создаем минимальную схему в случае ошибки
+            print('⚠️ Создаем минимальную схему...')
+            minimal_schema = {
                 'openapi': '3.0.0',
-                'info': {'title': 'Clinic API', 'version': '1.0.0'},
+                'info': {
+                    'title': 'Clinic API', 
+                    'version': '1.0.0',
+                    'description': 'API documentation - generation failed'
+                },
                 'paths': {},
                 'components': {'schemas': {}}
             }
-            with open('openapi.json', 'w', encoding='utf-8') as f:
-                json.dump(basic_schema, f, indent=2, ensure_ascii=False)
-            print('✅ Базовая OpenAPI схема создана')
-            
-        except Exception as e:
-            print(f'❌ Критическая ошибка генерации схемы: {e}')
-            print('📋 Детали ошибки:')
-            traceback.print_exc()
-            
-            # Создаем минимальную схему
-            minimal_schema = {
-                'openapi': '3.0.0',
-                'info': {'title': 'Clinic API', 'version': '1.0.0'},
-                'paths': {}
-            }
+            import json
             with open('openapi.json', 'w', encoding='utf-8') as f:
                 json.dump(minimal_schema, f, indent=2, ensure_ascii=False)
             print('✅ Минимальная OpenAPI схема создана')
@@ -475,7 +458,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
-    if: github.ref == 'refs/heads/develop'
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/develop' ||
+      github.event_name == 'pull_request' && github.base_ref == 'develop'
     
     steps:
     - uses: actions/checkout@v4
@@ -494,7 +479,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      github.event_name == 'pull_request' && github.base_ref == 'main'
     
     steps:
     - uses: actions/checkout@v4

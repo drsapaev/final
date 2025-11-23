@@ -11,9 +11,9 @@ const API_CACHE = 'clinic-api-v2.0.0';
 // Файлы для кэширования при установке
 const STATIC_FILES = [
   '/',
-  '/index.html',
   '/manifest.json',
   '/favicon.ico',
+  '/offline.html',
   // Основные страницы (только существующие)
   '/login',
   '/dashboard',
@@ -209,12 +209,16 @@ async function networkFirst(request, cacheName) {
     
     return networkResponse;
   } catch (error) {
+    console.warn('Service Worker: Network request failed, trying cache:', request.url);
+    
     const cachedResponse = await caches.match(request);
     
     if (cachedResponse) {
       return cachedResponse;
     }
     
+    // Если нет кэша, возвращаем ошибку с более информативным сообщением
+    console.error('Service Worker: No cache available for:', request.url);
     throw error;
   }
 }

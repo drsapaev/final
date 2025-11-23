@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '../components/ui/native';
-import { useBreakpoint } from '../hooks/useMediaQuery';
+import { Card, Badge, Button, Progress, Icon } from '../components/ui/macos';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import PaymentWidget from '../components/payment/PaymentWidget';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal';
+import useModal from '../hooks/useModal.jsx';
 import { 
   Dialog, 
   DialogTitle, 
@@ -13,8 +13,9 @@ import {
   DialogActions,
   Typography,
   Box,
-  Alert
-} from '@mui/material';
+  Alert,
+  Skeleton
+} from '../components/ui/macos';
 
 const CashierPanel = () => {
   const { isMobile } = useBreakpoint();
@@ -213,77 +214,137 @@ const CashierPanel = () => {
   });
 
   return (
-    <div style={{ padding: 16 }}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CreditCard className="w-7 h-7 text-blue-600" />
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Панель кассира</h1>
-              <p className="text-sm text-gray-500">Приём оплат и выдача чеков</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="clinic-button clinic-button-outline"><Calendar className="w-4 h-4 mr-2"/>Сегодня</button>
-            <button className="clinic-button clinic-button-outline"><Download className="w-4 h-4 mr-2"/>Экспорт</button>
-          </div>
-        </div>
+    <div style={{ 
+      padding: '0',
+      minHeight: '100vh',
+      background: 'var(--mac-gradient-window)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+      color: 'var(--mac-text-primary)',
+      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
+    }}>
+
+      <div style={{ padding: '0px' }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Старый header удален - теперь используется macOS Header */}
 
         {/* Filters */}
-        <Card className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Card 
+          variant="default"
+          padding="default"
+          style={{ marginBottom: '16px' }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+            <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
+              <Search style={{ 
+                position: 'absolute', 
+                left: '12px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                width: '16px', 
+                height: '16px', 
+                color: 'var(--mac-text-tertiary)' 
+              }} />
               <input
                 value={query}
                 onChange={(e)=>setQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '12px',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
                 placeholder="Поиск по пациенту, услуге, способу оплаты"
               />
             </div>
             <select
               value={status}
               onChange={(e)=>setStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
+              style={{
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: '14px',
+                outline: 'none'
+              }}
             >
               <option value="all">Все статусы</option>
               <option value="paid">Оплачено</option>
               <option value="pending">Ожидает</option>
             </select>
-            <Button variant="outline"><Filter className="w-4 h-4 mr-2"/>Фильтры</Button>
+            <Button variant="outline">
+              <Filter style={{ width: '16px', height: '16px', marginRight: '8px' }}/>
+              Фильтры
+            </Button>
           </div>
         </Card>
 
         {/* Записи ожидающие оплаты */}
         {appointments.length > 0 && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-orange-500" />
+          <Card 
+            variant="default"
+            padding="default"
+            style={{ marginBottom: '16px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ 
+                fontSize: '18px', 
+                fontWeight: '600', 
+                color: 'var(--mac-text-primary)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                margin: 0
+              }}>
+                <DollarSign style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
                 Записи ожидающие оплаты ({appointments.length})
               </h2>
             </div>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {appointments.map((appointment) => (
-                <div key={appointment.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900">
+                <div key={appointment.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  padding: '12px', 
+                  backgroundColor: 'var(--mac-bg-tertiary)', 
+                  border: '1px solid var(--mac-border)', 
+                  borderRadius: 'var(--mac-radius-sm)'
+                }}>
+                  <div style={{ flex: '1' }}>
+                    <div style={{ 
+                      fontWeight: '500', 
+                      color: 'var(--mac-text-primary)',
+                      fontSize: '14px'
+                    }}>
                       {appointment.patient_name || `Пациент #${appointment.patient_id}`}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div style={{ 
+                      fontSize: '13px', 
+                      color: 'var(--mac-text-secondary)',
+                      marginTop: '4px'
+                    }}>
                       {appointment.department} • {appointment.appointment_date} {appointment.appointment_time}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Badge variant="warning">Ожидает оплаты</Badge>
-                    <div className="flex gap-2">
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <Button 
                         size="sm" 
                         variant="outline"
                         onClick={() => openPaymentWidget(appointment)}
                       >
-                        <CreditCard className="w-4 h-4 mr-1" />
+                        <CreditCard style={{ width: '16px', height: '16px', marginRight: '4px' }} />
                         Онлайн
                       </Button>
                       <Button 
@@ -292,7 +353,7 @@ const CashierPanel = () => {
                           paymentModal.openModal(appointment);
                         }}
                       >
-                        <DollarSign className="w-4 h-4 mr-1" />
+                        <DollarSign style={{ width: '16px', height: '16px', marginRight: '4px' }} />
                         Касса
                       </Button>
                     </div>
@@ -304,39 +365,99 @@ const CashierPanel = () => {
         )}
 
         {/* Table */}
-        <Card className="p-0 overflow-hidden">
+        <Card 
+          variant="default"
+          padding="none"
+        >
           {isLoading ? (
-            <Skeleton className="h-48" />
+            <Skeleton style={{ height: '192px' }} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%' }}>
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Время</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Пациент</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Услуга</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Способ</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Сумма</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Статус</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Действия</th>
+                  <tr style={{ 
+                    backgroundColor: 'var(--mac-bg-tertiary)', 
+                    borderBottom: '1px solid var(--mac-border)' 
+                  }}>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Время</th>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Пациент</th>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Услуга</th>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Способ</th>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Сумма</th>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Статус</th>
+                    <th style={{ 
+                      textAlign: 'left', 
+                      padding: '12px 16px', 
+                      color: 'var(--mac-text-primary)', 
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}>Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(row => (
-                    <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3">{row.time}</td>
-                      <td className="px-4 py-3">{row.patient}</td>
-                      <td className="px-4 py-3">{row.service}</td>
-                      <td className="px-4 py-3">{row.method}</td>
-                      <td className="px-4 py-3 font-medium">{format(row.amount)}</td>
-                      <td className="px-4 py-3">
+                    <tr key={row.id} style={{ 
+                      borderBottom: '1px solid var(--mac-border)', 
+                      transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                      <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>{row.time}</td>
+                      <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>{row.patient}</td>
+                      <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>{row.service}</td>
+                      <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>{row.method}</td>
+                      <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px', fontWeight: '500' }}>{format(row.amount)}</td>
+                      <td style={{ padding: '12px 16px' }}>
                         <Badge variant={row.status === 'paid' ? 'success' : 'warning'}>
                           {row.status === 'paid' ? 'Оплачено' : 'Ожидает'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 flex gap-2">
-                        <Button size="sm" variant="success"><CheckCircle className="w-4 h-4 mr-1"/>Принять</Button>
-                        <Button size="sm" variant="danger"><XCircle className="w-4 h-4 mr-1"/>Отмена</Button>
+                      <td style={{ padding: '12px 16px', display: 'flex', gap: '8px' }}>
+                        <Button size="sm" variant="success">
+                          <CheckCircle style={{ width: '16px', height: '16px', marginRight: '4px' }}/>
+                          Принять
+                        </Button>
+                        <Button size="sm" variant="danger">
+                          <XCircle style={{ width: '16px', height: '16px', marginRight: '4px' }}/>
+                          Отмена
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -375,7 +496,7 @@ const CashierPanel = () => {
           
           <DialogContent>
             {paymentError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert severity="error" style={{ marginBottom: 8 }}>
                 {paymentError}
               </Alert>
             )}
@@ -437,9 +558,12 @@ const CashierPanel = () => {
           </DialogActions>
         </Dialog>
       </div>
+      </div>
     </div>
   );
 };
+
+export default CashierPanel;
 
 // Компонент модального окна оплаты
 const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
@@ -472,74 +596,101 @@ const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
       zIndex: 9999
     }}>
       <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
+        backgroundColor: 'var(--mac-bg-secondary)',
+        borderRadius: 'var(--mac-radius-md)',
         padding: '24px',
         width: '100%',
         maxWidth: '400px',
-        margin: '16px'
+        margin: '16px',
+        border: '1px solid var(--mac-border)',
+        boxShadow: 'var(--mac-shadow-lg)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Обработка оплаты</h3>
-          <button onClick={onClose} style={{ color: '#9CA3AF', cursor: 'pointer', border: 'none', background: 'none' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>Обработка оплаты</h3>
+          <button onClick={onClose} style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}>
             <XCircle className="w-6 h-6" />
           </button>
         </div>
-
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <div className="font-medium text-gray-900">
-            {appointment.patient_name || `Пациент #${appointment.patient_id}`}
-          </div>
-          <div className="text-sm text-gray-600">
-            {appointment.department} • {appointment.appointment_date} {appointment.appointment_time}
-          </div>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>Пациент:</p>
+          <p style={{ fontSize: '16px', fontWeight: '500', color: 'var(--mac-text-primary)' }}>
+            {appointment?.patient_name || `Пациент #${appointment?.patient_id}`}
+          </p>
+          <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+            {appointment?.department} • {appointment?.appointment_date} {appointment?.appointment_time}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
               Сумма (сум)
             </label>
             <input
               type="number"
               value={paymentData.amount}
-              onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '16px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
+              }}
               placeholder="Введите сумму"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
               Способ оплаты
             </label>
             <select
               value={paymentData.method}
-              onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setPaymentData(prev => ({ ...prev, method: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '16px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
+              }}
             >
               <option value="cash">Наличные</option>
-              <option value="card">Банковская карта</option>
-              <option value="online">Онлайн оплата</option>
+              <option value="card">Карта</option>
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
               Примечание (необязательно)
             </label>
             <textarea
               value={paymentData.note}
-              onChange={(e) => setPaymentData({ ...paymentData, note: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows="2"
+              onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '16px',
+                minHeight: '80px',
+                resize: 'vertical',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
+              }}
               placeholder="Дополнительная информация"
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="submit" className="flex-1">
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <Button type="submit" variant="primary">
               <CheckCircle className="w-4 h-4 mr-2" />
               Обработать оплату
             </Button>
@@ -552,8 +703,4 @@ const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     </div>
   );
 };
-
-export default CashierPanel;
-
-
 

@@ -10,40 +10,30 @@ import {
   CardContent,
   Typography,
   Button,
-  TextField,
-  Grid,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction,
-  IconButton,
-  Chip,
+  Input,
   Alert,
+  Badge,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,
-  InputLabel,
   Select,
-  MenuItem,
-  Paper,
-  Divider,
-} from '@mui/material';
+  Option,
+  Textarea,
+} from '../ui/macos';
 import {
-  CalendarToday,
-  Add,
+  Calendar,
+  Plus,
   Edit,
-  Delete,
+  Trash2,
   CheckCircle,
-  Schedule,
-  AttachMoney,
-  LocalHospital,
-  Print,
+  Clock,
+  DollarSign,
+  Hospital,
+  Printer,
   Share,
-  Assignment,
-} from '@mui/icons-material';
+  FileText,
+} from 'lucide-react';
 import { api } from '../../api/client';
 
 const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
@@ -179,7 +169,7 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
                   {index > 0 && <Divider />}
                   <ListItem>
                     <ListItemIcon>
-                      <LocalHospital color="primary" />
+                      <Hospital color="primary" />
                     </ListItemIcon>
                     <ListItemText
                       primary={stage.name}
@@ -188,7 +178,7 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
                           <Typography variant="body2">{stage.description}</Typography>
                           <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
                             <Chip size="small" icon={<CalendarToday />} label={stage.date || 'Не назначено'} />
-                            <Chip size="small" icon={<Schedule />} label={`${stage.duration} визит`} />
+                            <Chip size="small" icon={<Clock />} label={`${stage.duration} визит`} />
                             <Chip size="small" icon={<AttachMoney />} label={`${(stage.cost / 1000).toFixed(0)}k`} />
                             <Chip size="small" label={PRIORITIES[stage.priority].label} color={PRIORITIES[stage.priority].color} />
                           </Box>

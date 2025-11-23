@@ -9,29 +9,23 @@ import {
   Card,
   CardContent,
   Typography,
-  Paper,
-  Chip,
-  IconButton,
-  Tooltip,
   Button,
-  ButtonGroup,
-  ToggleButton,
-  ToggleButtonGroup,
-} from '@mui/material';
+  Badge,
+} from '../ui/macos';
 import {
-  Healing,
-  LocalHospital,
-  Brightness1,
-  CropSquare,
-  ChangeHistory,
-  Close,
-  RemoveCircleOutline,
-  Build,
-  Psychology,
-  Refresh,
+  Heart,
+  Hospital,
+  Circle,
+  Square,
+  Triangle,
+  X,
+  Minus,
+  Wrench,
+  Brain,
+  RefreshCw,
   ZoomIn,
   ZoomOut,
-} from '@mui/icons-material';
+} from 'lucide-react';
 
 // Статусы зубов
 const TOOTH_STATUS = {
@@ -128,55 +122,47 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
     const status = toothData.status || TOOTH_STATUS.HEALTHY;
     
     // Определяем форму зуба
-    let ToothIcon = Brightness1; // По умолчанию круг (моляры)
+    let ToothIcon = Circle; // По умолчанию круг (моляры)
     if ([13, 12, 11, 21, 22, 23, 33, 32, 31, 41, 42, 43].includes(toothNumber)) {
-      ToothIcon = CropSquare; // Резцы
+      ToothIcon = Square; // Резцы
     } else if ([14, 15, 24, 25, 34, 35, 44, 45].includes(toothNumber)) {
-      ToothIcon = ChangeHistory; // Премоляры
+      ToothIcon = Triangle; // Премоляры
     }
     
     return (
-      <Tooltip
+      <div
         key={toothNumber}
-        title={
-          <Box>
-            <Typography variant="caption">Зуб №{toothNumber}</Typography>
-            <Typography variant="caption" display="block">
-              Статус: {STATUS_NAMES[status]}
-            </Typography>
-            {toothData.note && (
-              <Typography variant="caption" display="block">
-                {toothData.note}
-              </Typography>
-            )}
-          </Box>
-        }
+        title={`Зуб №${toothNumber} • ${STATUS_NAMES[status]}`}
       >
-        <IconButton
+        <button
           onClick={() => handleToothClick(toothNumber)}
-          sx={{
+          style={{
             color: STATUS_COLORS[status],
-            border: isSelected ? '2px solid' : 'none',
-            borderColor: 'primary.main',
+            border: isSelected ? '2px solid var(--mac-accent-blue)' : '1px solid var(--mac-border)',
             transform: `scale(${zoom})`,
-            transition: 'all 0.2s',
-            '&:hover': {
-              transform: `scale(${zoom * 1.2})`,
-            },
+            transition: 'transform 0.2s',
+            background: 'transparent',
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer'
           }}
           disabled={readOnly && !onToothClick}
         >
           {status === TOOTH_STATUS.MISSING ? (
-            <Close />
+            <X />
           ) : status === TOOTH_STATUS.IMPLANT ? (
-            <Build />
+            <Wrench />
           ) : status === TOOTH_STATUS.ROOT ? (
-            <RemoveCircleOutline />
+            <Minus />
           ) : (
-            <ToothIcon fontSize="large" />
+            <ToothIcon />
           )}
-        </IconButton>
-      </Tooltip>
+        </button>
+      </div>
     );
   };
 
@@ -197,42 +183,78 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
       <CardContent>
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">
-            <LocalHospital sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <Hospital style={{ marginRight: 8, verticalAlign: 'middle' }} />
             Зубная карта
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             {/* Режим просмотра */}
-            <ToggleButtonGroup
-              value={viewMode}
-              exclusive
-              onChange={(e, newMode) => newMode && setViewMode(newMode)}
-              size="small"
-            >
-              <ToggleButton value="adult">
+            {/* Режим отображения */}
+            <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
+              <button
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: viewMode === 'adult' ? 'var(--mac-accent-blue)' : 'transparent',
+                  color: viewMode === 'adult' ? 'white' : 'var(--mac-text-primary)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setViewMode('adult')}
+              >
                 Постоянные
-              </ToggleButton>
-              <ToggleButton value="child">
+              </button>
+              <button
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: viewMode === 'child' ? 'var(--mac-accent-blue)' : 'transparent',
+                  color: viewMode === 'child' ? 'white' : 'var(--mac-text-primary)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setViewMode('child')}
+              >
                 Молочные
-              </ToggleButton>
-            </ToggleButtonGroup>
+              </button>
+            </div>
             
             {/* Масштаб */}
-            <ButtonGroup size="small">
-              <Button onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}>
-                <ZoomOut />
-              </Button>
-              <Button onClick={() => setZoom(Math.min(2, zoom + 0.1))}>
-                <ZoomIn />
-              </Button>
-            </ButtonGroup>
+            <div style={{ display: 'flex', border: '1px solid var(--mac-border)', borderRadius: 8, overflow: 'hidden' }}>
+              <button
+                onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ZoomOut style={{ width: 16, height: 16 }} />
+              </button>
+              <button
+                onClick={() => setZoom(Math.min(2, zoom + 0.1))}
+                style={{
+                  padding: '8px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ZoomIn style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
             
             {!readOnly && (
               <Button
-                size="small"
-                startIcon={<Refresh />}
+                variant="outline"
                 onClick={handleClearAll}
               >
+                <RefreshCw style={{ width: 16, height: 16, marginRight: 8 }} />
                 Очистить
               </Button>
             )}
@@ -241,37 +263,38 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
 
         {/* Инструменты выбора статуса */}
         {!readOnly && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" gutterBottom>
+          <div style={{ marginBottom: 24 }}>
+            <Typography variant="subtitle2" style={{ marginBottom: 8 }}>
               Выберите состояние для отметки:
             </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {Object.entries(STATUS_NAMES).map(([status, name]) => (
-                <Chip
+                <Badge
                   key={status}
-                  label={name}
-                  onClick={() => setSelectedStatus(status)}
-                  sx={{
-                    bgcolor: selectedStatus === status ? STATUS_COLORS[status] : 'transparent',
+                  variant={selectedStatus === status ? 'primary' : 'info'}
+                  style={{
+                    backgroundColor: selectedStatus === status ? STATUS_COLORS[status] : 'transparent',
                     color: selectedStatus === status ? 'white' : STATUS_COLORS[status],
                     border: `2px solid ${STATUS_COLORS[status]}`,
-                    '&:hover': {
-                      bgcolor: STATUS_COLORS[status],
-                      color: 'white',
-                    },
+                    cursor: 'pointer',
+                    padding: '8px 12px',
+                    borderRadius: 4,
                   }}
-                />
+                  onClick={() => setSelectedStatus(status)}
+                >
+                  {name}
+                </Badge>
               ))}
-            </Box>
-          </Box>
+            </div>
+          </div>
         )}
 
         {/* Зубная карта */}
-        <Paper sx={{ p: 3, bgcolor: 'background.default' }}>
-          <Box sx={{ position: 'relative' }}>
+        <div style={{ padding: 24, backgroundColor: 'var(--mac-bg-primary)', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+          <div style={{ position: 'relative' }}>
             {/* Верхняя челюсть */}
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="caption" align="center" display="block" sx={{ mb: 1 }}>
+            <div style={{ marginBottom: 32 }}>
+              <Typography variant="caption" style={{ textAlign: 'center', display: 'block', marginBottom: 8 }}>
                 Верхняя челюсть
               </Typography>
               
@@ -295,34 +318,36 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                   {renderTeethRow(currentTeeth.upperLeft)}
                 </Box>
               </Box>
-            </Box>
+              {/* Закрываем внутренние боксы верхней челюсти */}
+              
+            </div>
 
             {/* Линия между челюстями */}
             <Box sx={{ height: '2px', bgcolor: 'divider', my: 2 }} />
 
             {/* Нижняя челюсть */}
-            <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
                 {/* Правая сторона (4 квадрант) */}
-                <Box>
+                <div>
                   {renderTeethRow(currentTeeth.lowerRight, true)}
-                </Box>
+                </div>
                 
                 {/* Разделитель */}
-                <Box sx={{ width: '1px', bgcolor: 'divider', mx: 1 }} />
+                <div style={{ width: 1, backgroundColor: 'var(--mac-border)', margin: '0 8px' }} />
                 
                 {/* Левая сторона (3 квадрант) */}
-                <Box>
+                <div>
                   {renderTeethRow(currentTeeth.lowerLeft)}
-                </Box>
-              </Box>
+                </div>
+              </div>
               
               <Typography variant="caption" align="center" display="block" sx={{ mt: 1 }}>
                 Нижняя челюсть
               </Typography>
-            </Box>
-          </Box>
-        </Paper>
+            </div>
+          </div>
+        </div>
 
         {/* Легенда */}
         <Box sx={{ mt: 3 }}>
@@ -360,15 +385,14 @@ const TeethChart = ({ onToothClick, initialData = {}, readOnly = false }) => {
                   return acc;
                 }, {})
               ).map(([status, count]) => (
-                <Chip
-                  key={status}
-                  label={`${STATUS_NAMES[status]}: ${count}`}
-                  size="small"
-                  sx={{
-                    bgcolor: STATUS_COLORS[status],
-                    color: 'white',
-                  }}
-                />
+                <Badge key={status} variant="info" style={{
+                  backgroundColor: STATUS_COLORS[status],
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: 6
+                }}>
+                  {`${STATUS_NAMES[status]}: ${count}`}
+                </Badge>
               ))}
             </Box>
           </Box>

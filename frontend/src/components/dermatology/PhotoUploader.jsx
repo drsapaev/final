@@ -10,35 +10,29 @@ import {
   CardContent,
   Typography,
   Button,
-  Grid,
-  IconButton,
+  Alert,
+  Progress,
+  Input,
+  Select,
+  Option,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Alert,
-  Chip,
-  LinearProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Paper,
-} from '@mui/material';
+} from '../ui/macos';
 import {
-  PhotoCamera,
-  CloudUpload,
-  Delete,
-  Visibility,
-  CompareArrows,
-  Warning,
+  Camera,
+  Upload,
+  Trash2,
+  Eye,
+  ArrowLeftRight,
+  AlertTriangle,
   CheckCircle,
-  CameraAlt,
-  FlipCameraAndroid,
-  Brightness5,
+  CameraIcon,
+  RotateCcw,
+  Sun,
   ZoomIn,
-} from '@mui/icons-material';
+} from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
 import { api } from '../../api/client';
@@ -237,304 +231,288 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
   return (
     <Box>
       {/* Метаданные фото */}
-      <Card sx={{ mb: 2 }}>
+      <Card style={{ marginBottom: 16 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Параметры съемки
           </Typography>
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
-              <TextField
-                fullWidth
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div>
+              <Input
                 label="Зона"
                 value={metadata.zone}
                 onChange={(e) => setMetadata({ ...metadata, zone: e.target.value })}
                 placeholder="Лицо, спина, руки..."
               />
-            </Grid>
+            </div>
             
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Ракурс</InputLabel>
-                <Select
-                  value={metadata.angle}
-                  onChange={(e) => setMetadata({ ...metadata, angle: e.target.value })}
-                  label="Ракурс"
-                >
-                  <MenuItem value="front">Спереди</MenuItem>
-                  <MenuItem value="side">Сбоку</MenuItem>
-                  <MenuItem value="back">Сзади</MenuItem>
-                  <MenuItem value="close">Крупный план</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+            <div>
+              <Select
+                label="Ракурс"
+                value={metadata.angle}
+                onChange={(e) => setMetadata({ ...metadata, angle: e.target.value })}
+              >
+                <Option value="front">Спереди</Option>
+                <Option value="side">Сбоку</Option>
+                <Option value="back">Сзади</Option>
+                <Option value="close">Крупный план</Option>
+              </Select>
+            </div>
             
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Освещение</InputLabel>
-                <Select
-                  value={metadata.lighting}
-                  onChange={(e) => setMetadata({ ...metadata, lighting: e.target.value })}
-                  label="Освещение"
-                >
-                  <MenuItem value="natural">Естественное</MenuItem>
-                  <MenuItem value="artificial">Искусственное</MenuItem>
-                  <MenuItem value="mixed">Смешанное</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+            <div>
+              <Select
+                label="Освещение"
+                value={metadata.lighting}
+                onChange={(e) => setMetadata({ ...metadata, lighting: e.target.value })}
+              >
+                <Option value="natural">Естественное</Option>
+                <Option value="artificial">Искусственное</Option>
+                <Option value="mixed">Смешанное</Option>
+              </Select>
+            </div>
             
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Вспышка</InputLabel>
-                <Select
-                  value={metadata.flash ? 'yes' : 'no'}
-                  onChange={(e) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}
-                  label="Вспышка"
-                >
-                  <MenuItem value="no">Без вспышки</MenuItem>
-                  <MenuItem value="yes">Со вспышкой</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+            <div>
+              <Select
+                label="Вспышка"
+                value={metadata.flash ? 'yes' : 'no'}
+                onChange={(e) => setMetadata({ ...metadata, flash: e.target.value === 'yes' })}
+              >
+                <Option value="no">Без вспышки</Option>
+                <Option value="yes">Со вспышкой</Option>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      <Grid container spacing={2}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16 }}>
         {/* Фото ДО */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                <PhotoCamera sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Фото ДО процедуры
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              <Camera style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              Фото ДО процедуры
+            </Typography>
+            
+            <div
+              {...getBeforeRootProps()}
+              style={{
+                marginTop: 16,
+                padding: 24,
+                border: '2px dashed',
+                borderColor: isBeforeDragActive ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
+                borderRadius: 8,
+                backgroundColor: isBeforeDragActive ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.3s',
+              }}
+            >
+              <input {...getBeforeInputProps()} />
+              <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
+              <Typography variant="body1" color="textSecondary">
+                {isBeforeDragActive
+                  ? 'Отпустите файлы здесь...'
+                  : 'Перетащите фото или нажмите для выбора'}
               </Typography>
+              <Typography variant="caption" color="textSecondary">
+                JPG, PNG, HEIC до 10MB
+              </Typography>
+            </div>
+            
+            <Button
+              fullWidth
+              variant="outline"
+              style={{ marginTop: 16 }}
+              onClick={() => {
+                setCameraType('before');
+                setCameraOpen(true);
+              }}
+            >
+              <CameraIcon style={{ width: 16, height: 16, marginRight: 8 }} />
+              Сделать фото
+            </Button>
               
-              <Box
-                {...getBeforeRootProps()}
-                sx={{
-                  mt: 2,
-                  p: 3,
-                  border: '2px dashed',
-                  borderColor: isBeforeDragActive ? 'primary.main' : 'divider',
-                  borderRadius: 2,
-                  bgcolor: isBeforeDragActive ? 'action.hover' : 'background.paper',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                }}
-              >
-                <input {...getBeforeInputProps()} />
-                <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                <Typography variant="body1" color="text.secondary">
-                  {isBeforeDragActive
-                    ? 'Отпустите файлы здесь...'
-                    : 'Перетащите фото или нажмите для выбора'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  JPG, PNG, HEIC до 10MB
-                </Typography>
-              </Box>
-              
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<CameraAlt />}
-                sx={{ mt: 2 }}
-                onClick={() => {
-                  setCameraType('before');
-                  setCameraOpen(true);
-                }}
-              >
-                Сделать фото
-              </Button>
-              
-              {/* Превью фото ДО */}
-              {photos.before.length > 0 && (
-                <Grid container spacing={1} sx={{ mt: 2 }}>
-                  {photos.before.map((photo) => (
-                    <Grid item xs={6} key={photo.id}>
-                      <Paper sx={{ position: 'relative' }}>
-                        <img
-                          src={photo.preview}
-                          alt="Before"
-                          style={{
-                            width: '100%',
-                            height: '150px',
-                            objectFit: 'cover',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => openViewer(photo, 'before')}
-                        />
-                        <Box sx={{
-                          position: 'absolute',
-                          top: 0,
-                          right: 0,
-                          p: 0.5,
-                          bgcolor: 'rgba(0,0,0,0.5)',
-                        }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => deletePhoto(photo.id, 'before')}
-                            sx={{ color: 'white' }}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            p: 0.5,
-                            bgcolor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                          }}
-                        >
-                          {photo.metadata.zone || 'Без зоны'}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
+            {/* Превью фото ДО */}
+            {photos.before.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 16 }}>
+                {photos.before.map((photo) => (
+                  <div key={photo.id} style={{ position: 'relative' }}>
+                    <img
+                      src={photo.preview}
+                      alt="Before"
+                      style={{
+                        width: '100%',
+                        height: '150px',
+                        objectFit: 'cover',
+                        cursor: 'pointer',
+                        borderRadius: 8,
+                      }}
+                      onClick={() => openViewer(photo, 'before')}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      padding: 4,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      borderRadius: 4,
+                    }}>
+                      <button
+                        onClick={() => deletePhoto(photo.id, 'before')}
+                        style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Trash2 style={{ width: 16, height: 16 }} />
+                      </button>
+                    </div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: 4,
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      color: 'white',
+                      fontSize: '12px',
+                      borderRadius: '0 0 8px 8px',
+                    }}>
+                      {photo.metadata.zone || 'Без зоны'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Фото ПОСЛЕ */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                <PhotoCamera sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Фото ПОСЛЕ процедуры
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              <Camera style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              Фото ПОСЛЕ процедуры
+            </Typography>
+            
+            <div
+              {...getAfterRootProps()}
+              style={{
+                marginTop: 16,
+                padding: 24,
+                border: '2px dashed',
+                borderColor: isAfterDragActive ? 'var(--mac-accent-blue)' : 'var(--mac-border)',
+                borderRadius: 8,
+                backgroundColor: isAfterDragActive ? 'var(--mac-bg-secondary)' : 'var(--mac-bg-primary)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.3s',
+              }}
+            >
+              <input {...getAfterInputProps()} />
+              <Upload style={{ width: 48, height: 48, color: 'var(--mac-text-secondary)', marginBottom: 8 }} />
+              <Typography variant="body1" color="textSecondary">
+                {isAfterDragActive
+                  ? 'Отпустите файлы здесь...'
+                  : 'Перетащите фото или нажмите для выбора'}
               </Typography>
-              
-              <Box
-                {...getAfterRootProps()}
-                sx={{
-                  mt: 2,
-                  p: 3,
-                  border: '2px dashed',
-                  borderColor: isAfterDragActive ? 'primary.main' : 'divider',
-                  borderRadius: 2,
-                  bgcolor: isAfterDragActive ? 'action.hover' : 'background.paper',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                }}
-              >
-                <input {...getAfterInputProps()} />
-                <CloudUpload sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                <Typography variant="body1" color="text.secondary">
-                  {isAfterDragActive
-                    ? 'Отпустите файлы здесь...'
-                    : 'Перетащите фото или нажмите для выбора'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  JPG, PNG, HEIC до 10MB
-                </Typography>
-              </Box>
-              
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<CameraAlt />}
-                sx={{ mt: 2 }}
-                onClick={() => {
-                  setCameraType('after');
-                  setCameraOpen(true);
-                }}
-              >
-                Сделать фото
-              </Button>
-              
-              {/* Превью фото ПОСЛЕ */}
-              {photos.after.length > 0 && (
-                <Grid container spacing={1} sx={{ mt: 2 }}>
-                  {photos.after.map((photo) => (
-                    <Grid item xs={6} key={photo.id}>
-                      <Paper sx={{ position: 'relative' }}>
-                        <img
-                          src={photo.preview}
-                          alt="After"
-                          style={{
-                            width: '100%',
-                            height: '150px',
-                            objectFit: 'cover',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => openViewer(photo, 'after')}
-                        />
-                        <Box sx={{
-                          position: 'absolute',
-                          top: 0,
-                          right: 0,
-                          p: 0.5,
-                          bgcolor: 'rgba(0,0,0,0.5)',
-                        }}>
-                          <IconButton
-                            size="small"
-                            onClick={() => deletePhoto(photo.id, 'after')}
-                            sx={{ color: 'white' }}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            p: 0.5,
-                            bgcolor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                          }}
-                        >
-                          {photo.metadata.zone || 'Без зоны'}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+              <Typography variant="caption" color="textSecondary">
+                JPG, PNG, HEIC до 10MB
+              </Typography>
+            </div>
+            
+            <Button
+              fullWidth
+              variant="outline"
+              style={{ marginTop: 16 }}
+              onClick={() => {
+                setCameraType('after');
+                setCameraOpen(true);
+              }}
+            >
+              <CameraIcon style={{ width: 16, height: 16, marginRight: 8 }} />
+              Сделать фото
+            </Button>
+            
+            {/* Превью фото ПОСЛЕ */}
+            {photos.after.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 16 }}>
+                {photos.after.map((photo) => (
+                  <div key={photo.id} style={{ position: 'relative' }}>
+                    <img
+                      src={photo.preview}
+                      alt="After"
+                      style={{
+                        width: '100%',
+                        height: '150px',
+                        objectFit: 'cover',
+                        cursor: 'pointer',
+                        borderRadius: 8,
+                      }}
+                      onClick={() => openViewer(photo, 'after')}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      padding: 4,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      borderRadius: 4,
+                    }}>
+                      <button
+                        onClick={() => deletePhoto(photo.id, 'after')}
+                        style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Trash2 style={{ width: 16, height: 16 }} />
+                      </button>
+                    </div>
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: 4,
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      color: 'white',
+                      fontSize: '12px',
+                      borderRadius: '0 0 8px 8px',
+                    }}>
+                      {photo.metadata.zone || 'Без зоны'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Кнопка сравнения */}
       {photos.before.length > 0 && photos.after.length > 0 && (
-        <Box sx={{ mt: 2, textAlign: 'center' }}>
+        <div style={{ marginTop: 16, textAlign: 'center' }}>
           <Button
-            variant="contained"
+            variant="primary"
             size="large"
-            startIcon={<CompareArrows />}
             onClick={openCompareMode}
           >
+            <ArrowLeftRight style={{ width: 16, height: 16, marginRight: 8 }} />
             Сравнить ДО и ПОСЛЕ
           </Button>
-        </Box>
+        </div>
       )}
 
       {/* Прогресс загрузки */}
       {uploadProgress > 0 && uploadProgress < 100 && (
-        <Box sx={{ mt: 2 }}>
-          <LinearProgress variant="determinate" value={uploadProgress} />
-          <Typography variant="caption" color="text.secondary" align="center">
+        <div style={{ marginTop: 16 }}>
+          <Progress variant="determinate" value={uploadProgress} />
+          <Typography variant="caption" color="textSecondary" style={{ textAlign: 'center', display: 'block', marginTop: 8 }}>
             Загрузка: {uploadProgress}%
           </Typography>
-        </Box>
+        </div>
       )}
 
       {/* Конвертация HEIC */}
       {converting && (
-        <Alert severity="info" sx={{ mt: 2 }}>
+        <Alert severity="info" style={{ marginTop: 16 }}>
           Конвертация HEIC в JPEG...
         </Alert>
       )}
@@ -552,62 +530,62 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
         
         <DialogContent>
           {compareMode ? (
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" align="center" gutterBottom>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+              <div>
+                <Typography variant="h6" style={{ textAlign: 'center', marginBottom: 16 }}>
                   ДО
                 </Typography>
                 {photos.before[0] && (
                   <img
                     src={photos.before[0].preview}
                     alt="Before"
-                    style={{ width: '100%', height: 'auto' }}
+                    style={{ width: '100%', height: 'auto', borderRadius: 8 }}
                   />
                 )}
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" align="center" gutterBottom>
+              </div>
+              <div>
+                <Typography variant="h6" style={{ textAlign: 'center', marginBottom: 16 }}>
                   ПОСЛЕ
                 </Typography>
                 {photos.after[0] && (
                   <img
                     src={photos.after[0].preview}
                     alt="After"
-                    style={{ width: '100%', height: 'auto' }}
+                    style={{ width: '100%', height: 'auto', borderRadius: 8 }}
                   />
                 )}
-              </Grid>
-            </Grid>
+              </div>
+            </div>
           ) : selectedPhoto && (
-            <Box>
+            <div>
               <img
                 src={selectedPhoto.preview}
                 alt={selectedPhoto.type}
-                style={{ width: '100%', height: 'auto' }}
+                style={{ width: '100%', height: 'auto', borderRadius: 8 }}
               />
               
               {selectedPhoto.metadata && (
-                <Box sx={{ mt: 2 }}>
+                <div style={{ marginTop: 16 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Параметры съемки:
                   </Typography>
-                  <Grid container spacing={1}>
-                    <Grid item xs={6}>
-                      <Chip label={`Зона: ${selectedPhoto.metadata.zone || 'Не указана'}`} size="small" />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Chip label={`Ракурс: ${selectedPhoto.metadata.angle}`} size="small" />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Chip label={`Освещение: ${selectedPhoto.metadata.lighting}`} size="small" />
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Chip label={selectedPhoto.metadata.flash ? 'Со вспышкой' : 'Без вспышки'} size="small" />
-                    </Grid>
-                  </Grid>
-                </Box>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                    <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
+                      Зона: {selectedPhoto.metadata.zone || 'Не указана'}
+                    </div>
+                    <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
+                      Ракурс: {selectedPhoto.metadata.angle}
+                    </div>
+                    <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
+                      Освещение: {selectedPhoto.metadata.lighting}
+                    </div>
+                    <div style={{ padding: 8, backgroundColor: 'var(--mac-bg-secondary)', borderRadius: 4 }}>
+                      {selectedPhoto.metadata.flash ? 'Со вспышкой' : 'Без вспышки'}
+                    </div>
+                  </div>
+                </div>
               )}
-            </Box>
+            </div>
           )}
         </DialogContent>
         
@@ -630,19 +608,19 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
         </DialogTitle>
         
         <DialogContent>
-          <Box sx={{ position: 'relative', width: '100%', height: '400px', bgcolor: 'black' }}>
+          <div style={{ position: 'relative', width: '100%', height: '400px', backgroundColor: 'black', borderRadius: 8 }}>
             {/* Здесь должен быть компонент Webcam */}
-            <Typography color="white" align="center" sx={{ pt: 20 }}>
+            <Typography color="white" style={{ textAlign: 'center', paddingTop: 160 }}>
               Камера (требуется react-webcam)
             </Typography>
-          </Box>
+          </div>
         </DialogContent>
         
         <DialogActions>
           <Button onClick={() => setCameraOpen(false)}>
             Отмена
           </Button>
-          <Button variant="contained" onClick={capturePhoto}>
+          <Button variant="primary" onClick={capturePhoto}>
             Сделать снимок
           </Button>
         </DialogActions>

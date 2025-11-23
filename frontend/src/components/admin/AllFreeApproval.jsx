@@ -15,7 +15,7 @@ import {
   Package,
   Bell
 } from 'lucide-react';
-import { Card, Badge, Button } from '../ui/native';
+import { Card, Badge, Button } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
@@ -109,10 +109,10 @@ const AllFreeApproval = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'approved': return 'text-green-600 bg-green-100';
-      case 'rejected': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'pending': return 'var(--mac-warning)';
+      case 'approved': return 'var(--mac-success)';
+      case 'rejected': return 'var(--mac-error)';
+      default: return 'var(--mac-text-tertiary)';
     }
   };
 
@@ -148,33 +148,56 @@ const AllFreeApproval = () => {
   const pendingCount = allFreeRequests.filter(req => req.approval_status === 'pending').length;
 
   return (
-    <Card className="p-6">
-      <div className="space-y-6">
+    <Card 
+      variant="default"
+      padding="default"
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Bell size={24} className="text-orange-600" />
+            <h2 style={{ 
+              fontSize: '24px', 
+              fontWeight: '700', 
+              color: 'var(--mac-text-primary)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              margin: 0
+            }}>
+              <Bell size={24} style={{ color: 'var(--mac-warning)' }} />
               Заявки All Free
               {pendingCount > 0 && (
-                <Badge variant="warning" className="ml-2">
+                <Badge variant="warning" style={{ marginLeft: '8px' }}>
                   {pendingCount} новых
                 </Badge>
               )}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <p style={{ 
+              color: 'var(--mac-text-secondary)', 
+              marginTop: '4px',
+              margin: '4px 0 0 0'
+            }}>
               Одобрение и отклонение заявок на бесплатные услуги
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Фильтр по статусу */}
-            <div className="flex items-center gap-2">
-              <Filter size={16} className="text-gray-500" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Filter size={16} style={{ color: 'var(--mac-text-tertiary)' }} />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  background: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none'
+                }}
               >
                 <option value="pending">Ожидают одобрения</option>
                 <option value="approved">Одобренные</option>
@@ -188,66 +211,144 @@ const AllFreeApproval = () => {
               onClick={loadAllFreeRequests}
               disabled={loading}
               variant="outline"
-              className="flex items-center gap-2"
             >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={16} style={{ 
+                animation: loading ? 'spin 1s linear infinite' : 'none',
+                marginRight: '8px'
+              }} />
               Обновить
             </Button>
           </div>
         </div>
 
         {/* Статистика */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock size={20} className="text-yellow-600" />
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <Card 
+            variant="default"
+            padding="default"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                padding: '8px', 
+                backgroundColor: 'var(--mac-warning-bg)', 
+                borderRadius: 'var(--mac-radius-md)' 
+              }}>
+                <Clock size={20} style={{ color: 'var(--mac-warning)' }} />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Ожидают</p>
-                <p className="text-xl font-semibold">
+                <p style={{ 
+                  fontSize: '14px', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  Ожидают
+                </p>
+                <p style={{ 
+                  fontSize: '20px', 
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>
                   {allFreeRequests.filter(req => req.approval_status === 'pending').length}
                 </p>
               </div>
             </div>
           </Card>
           
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle size={20} className="text-green-600" />
+          <Card 
+            variant="default"
+            padding="default"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                padding: '8px', 
+                backgroundColor: 'var(--mac-success-bg)', 
+                borderRadius: 'var(--mac-radius-md)' 
+              }}>
+                <CheckCircle size={20} style={{ color: 'var(--mac-success)' }} />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Одобрено</p>
-                <p className="text-xl font-semibold">
+                <p style={{ 
+                  fontSize: '14px', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  Одобрено
+                </p>
+                <p style={{ 
+                  fontSize: '20px', 
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>
                   {allFreeRequests.filter(req => req.approval_status === 'approved').length}
                 </p>
               </div>
             </div>
           </Card>
           
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <XCircle size={20} className="text-red-600" />
+          <Card 
+            variant="default"
+            padding="default"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                padding: '8px', 
+                backgroundColor: 'var(--mac-error-bg)', 
+                borderRadius: 'var(--mac-radius-md)' 
+              }}>
+                <XCircle size={20} style={{ color: 'var(--mac-error)' }} />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Отклонено</p>
-                <p className="text-xl font-semibold">
+                <p style={{ 
+                  fontSize: '14px', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  Отклонено
+                </p>
+                <p style={{ 
+                  fontSize: '20px', 
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>
                   {allFreeRequests.filter(req => req.approval_status === 'rejected').length}
                 </p>
               </div>
             </div>
           </Card>
           
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign size={20} className="text-blue-600" />
+          <Card 
+            variant="default"
+            padding="default"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ 
+                padding: '8px', 
+                backgroundColor: 'var(--mac-info-bg)', 
+                borderRadius: 'var(--mac-radius-md)' 
+              }}>
+                <DollarSign size={20} style={{ color: 'var(--mac-info)' }} />
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Общая сумма</p>
-                <p className="text-xl font-semibold">
+                <p style={{ 
+                  fontSize: '14px', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  Общая сумма
+                </p>
+                <p style={{ 
+                  fontSize: '20px', 
+                  fontWeight: '600',
+                  color: 'var(--mac-text-primary)',
+                  margin: '4px 0 0 0'
+                }}>
                   {formatPrice(
                     allFreeRequests
                       .filter(req => req.approval_status === 'approved')

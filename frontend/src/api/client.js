@@ -18,6 +18,16 @@ const api = axios.create({
   // Optionally timeout: timeout: 15000,
 });
 
+// Ensure Authorization header is attached for every request from localStorage
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
+
 function getApiBase() {
   return API_BASE;
 }

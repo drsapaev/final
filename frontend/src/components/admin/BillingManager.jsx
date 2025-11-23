@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Card, 
-  Button, 
-  Badge, 
-  Input, 
-  Select, 
-  Label, 
-  Textarea 
-} from '../ui/native';
+  MacOSCard, 
+  MacOSButton, 
+  MacOSBadge, 
+  MacOSInput, 
+  MacOSSelect, 
+  MacOSTextarea,
+  MacOSLoadingSkeleton,
+  MacOSEmptyState,
+  MacOSAlert
+} from '../ui/macos';
 import { 
   Plus, 
   Edit, 
@@ -284,90 +286,213 @@ const BillingManager = () => {
   };
 
   const renderInvoicesTab = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок и кнопки */}
-      <div className="flex justify-between items-center">
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center' 
+      }}>
         <div>
-          <h3 className="text-lg font-semibold">Счета</h3>
-          <p className="text-gray-600">Управление счетами и выставлением</p>
+          <h3 style={{ 
+            margin: '0 0 4px 0',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
+            Счета
+          </h3>
+          <p style={{ 
+            margin: 0,
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
+            Управление счетами и выставлением
+          </p>
         </div>
-        <Button onClick={() => setShowCreateInvoice(true)}>
-          <Plus className="w-4 h-4 mr-2" />
+        <MacOSButton 
+          onClick={() => setShowCreateInvoice(true)}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px' 
+          }}
+        >
+          <Plus size={16} />
           Создать счет
-        </Button>
+        </MacOSButton>
       </div>
 
       {/* Список счетов */}
-      <div className="grid gap-4">
-        {invoices.map(invoice => (
-          <Card key={invoice.id} className="p-4">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h4 className="font-medium">Счет № {invoice.invoice_number}</h4>
-                  {getStatusBadge(invoice.status)}
-                  <Badge variant="outline">{invoice.invoice_type}</Badge>
+      <div style={{ display: 'grid', gap: '16px' }}>
+        {invoices.length === 0 ? (
+          <MacOSEmptyState
+            type="invoice"
+            title="Счета не найдены"
+            description="В системе пока нет созданных счетов"
+            action={
+              <MacOSButton onClick={() => setShowCreateInvoice(true)}>
+                <Plus size={16} style={{ marginRight: '8px' }} />
+                Создать первый счет
+              </MacOSButton>
+            }
+          />
+        ) : (
+          invoices.map(invoice => (
+            <MacOSCard key={invoice.id} style={{ padding: 0 }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start' 
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    marginBottom: '12px'
+                  }}>
+                    <h4 style={{ 
+                      margin: 0,
+                      color: 'var(--mac-text-primary)',
+                      fontSize: 'var(--mac-font-size-md)',
+                      fontWeight: 'var(--mac-font-weight-semibold)'
+                    }}>
+                      Счет № {invoice.invoice_number}
+                    </h4>
+                    {getStatusBadge(invoice.status)}
+                    <MacOSBadge variant="outline">{invoice.invoice_type}</MacOSBadge>
+                  </div>
+                  
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                    gap: '8px',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)',
+                    marginBottom: '8px'
+                  }}>
+                    <div>Пациент ID: {invoice.patient_id}</div>
+                    <div>Дата: {new Date(invoice.issue_date).toLocaleDateString()}</div>
+                    <div>Срок оплаты: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Не указан'}</div>
+                    <div>Сумма: {invoice.total_amount.toLocaleString()} сум</div>
+                  </div>
+
+                  {invoice.balance > 0 && (
+                    <div style={{ 
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-error)'
+                    }}>
+                      К доплате: {invoice.balance.toLocaleString()} сум
+                    </div>
+                  )}
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-2">
-                  <div>Пациент ID: {invoice.patient_id}</div>
-                  <div>Дата: {new Date(invoice.issue_date).toLocaleDateString()}</div>
-                  <div>Срок оплаты: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Не указан'}</div>
-                  <div>Сумма: {invoice.total_amount.toLocaleString()} сум</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <MacOSButton
+                    variant="outline"
+                    onClick={() => handleViewInvoiceHTML(invoice.id)}
+                    style={{ 
+                      padding: '6px',
+                      minWidth: 'auto',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Просмотр"
+                  >
+                    <Eye size={16} />
+                  </MacOSButton>
+                  <MacOSButton
+                    variant="outline"
+                    onClick={() => handleSendInvoice(invoice.id)}
+                    style={{ 
+                      padding: '6px',
+                      minWidth: 'auto',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Отправить"
+                  >
+                    <Send size={16} />
+                  </MacOSButton>
+                  <MacOSButton
+                    variant="outline"
+                    onClick={() => {
+                      setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance });
+                      setShowRecordPayment(true);
+                    }}
+                    style={{ 
+                      padding: '6px',
+                      minWidth: 'auto',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Записать платеж"
+                  >
+                    <CreditCard size={16} />
+                  </MacOSButton>
                 </div>
-
-                {invoice.balance > 0 && (
-                  <div className="text-sm">
-                    <span className="text-red-600">К доплате: {invoice.balance.toLocaleString()} сум</span>
-                  </div>
-                )}
               </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleViewInvoiceHTML(invoice.id)}
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleSendInvoice(invoice.id)}
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance });
-                    setShowRecordPayment(true);
-                  }}
-                >
-                  <CreditCard className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </MacOSCard>
+          ))
+        )}
       </div>
 
       {/* Форма создания счета */}
       {showCreateInvoice && (
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-lg font-medium">Создать счет</h4>
-            <Button variant="outline" onClick={() => setShowCreateInvoice(false)}>
-              <X className="w-4 h-4" />
-            </Button>
+        <MacOSCard style={{ padding: 0 }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <h4 style={{ 
+              margin: 0,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
+              Создать счет
+            </h4>
+            <MacOSButton 
+              variant="outline" 
+              onClick={() => setShowCreateInvoice(false)}
+              style={{ 
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X size={16} />
+            </MacOSButton>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <Label>ID пациента</Label>
-              <Input
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                ID пациента
+              </label>
+              <MacOSInput
                 type="number"
                 value={invoiceForm.patient_id}
                 onChange={(e) => setInvoiceForm({...invoiceForm, patient_id: e.target.value})}
@@ -376,21 +501,38 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <Label>Тип счета</Label>
-              <Select
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Тип счета
+              </label>
+              <MacOSSelect
                 value={invoiceForm.invoice_type}
                 onChange={(e) => setInvoiceForm({...invoiceForm, invoice_type: e.target.value})}
-              >
-                <option value="STANDARD">Обычный</option>
-                <option value="RECURRING">Периодический</option>
-                <option value="ADVANCE">Авансовый</option>
-                <option value="CORRECTION">Корректировочный</option>
-              </Select>
+                options={[
+                  { value: 'STANDARD', label: 'Обычный' },
+                  { value: 'RECURRING', label: 'Периодический' },
+                  { value: 'ADVANCE', label: 'Авансовый' },
+                  { value: 'CORRECTION', label: 'Корректировочный' }
+                ]}
+              />
             </div>
 
             <div>
-              <Label>Срок оплаты (дней)</Label>
-              <Input
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Срок оплаты (дней)
+              </label>
+              <MacOSInput
                 type="number"
                 value={invoiceForm.due_days}
                 onChange={(e) => setInvoiceForm({...invoiceForm, due_days: parseInt(e.target.value)})}
@@ -398,20 +540,22 @@ const BillingManager = () => {
               />
             </div>
 
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
                 <input
                   type="checkbox"
                   checked={invoiceForm.auto_send}
                   onChange={(e) => setInvoiceForm({...invoiceForm, auto_send: e.target.checked})}
+                  style={{ margin: 0 }}
                 />
                 Автоотправка
               </label>
-              <label className="flex items-center gap-2">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-primary)' }}>
                 <input
                   type="checkbox"
                   checked={invoiceForm.send_reminders}
                   onChange={(e) => setInvoiceForm({...invoiceForm, send_reminders: e.target.checked})}
+                  style={{ margin: 0 }}
                 />
                 Напоминания
               </label>
@@ -419,83 +563,171 @@ const BillingManager = () => {
           </div>
 
           {/* Позиции счета */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <Label>Позиции счета</Label>
-              <Button size="sm" onClick={addInvoiceItem}>
-                <Plus className="w-4 h-4 mr-1" />
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <label style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)'
+              }}>
+                Позиции счета
+              </label>
+              <MacOSButton 
+                onClick={addInvoiceItem}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  padding: '4px 8px',
+                  fontSize: 'var(--mac-font-size-xs)'
+                }}
+              >
+                <Plus size={14} />
                 Добавить
-              </Button>
+              </MacOSButton>
             </div>
 
             {invoiceForm.items.map((item, index) => (
-              <div key={index} className="grid grid-cols-4 gap-2 mb-2 p-2 border rounded">
-                <Input
+              <div key={index} style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '2fr 1fr 1fr auto', 
+                gap: '8px',
+                marginBottom: '8px',
+                padding: '12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <MacOSInput
                   placeholder="Описание"
                   value={item.description}
                   onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
                 />
-                <Input
+                <MacOSInput
                   type="number"
                   placeholder="Количество"
                   value={item.quantity}
                   onChange={(e) => updateInvoiceItem(index, 'quantity', parseFloat(e.target.value))}
                 />
-                <Input
+                <MacOSInput
                   type="number"
                   placeholder="Цена"
                   value={item.unit_price}
                   onChange={(e) => updateInvoiceItem(index, 'unit_price', parseFloat(e.target.value))}
                 />
-                <Button
-                  size="sm"
+                <MacOSButton
                   variant="outline"
                   onClick={() => removeInvoiceItem(index)}
                   disabled={invoiceForm.items.length === 1}
+                  style={{ 
+                    padding: '6px',
+                    minWidth: 'auto',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                  <Trash2 size={16} />
+                </MacOSButton>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 mb-4">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <Label>Описание</Label>
-              <Textarea
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Описание
+              </label>
+              <MacOSTextarea
                 value={invoiceForm.description}
                 onChange={(e) => setInvoiceForm({...invoiceForm, description: e.target.value})}
                 placeholder="Описание счета"
+                rows={3}
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowCreateInvoice(false)}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <MacOSButton 
+              variant="outline" 
+              onClick={() => setShowCreateInvoice(false)}
+            >
               Отмена
-            </Button>
-            <Button onClick={handleCreateInvoice}>
-              <Save className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton 
+              onClick={handleCreateInvoice}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px' 
+              }}
+            >
+              <Save size={16} />
               Создать
-            </Button>
+            </MacOSButton>
           </div>
-        </Card>
+        </MacOSCard>
       )}
 
       {/* Форма записи платежа */}
       {showRecordPayment && (
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-lg font-medium">Записать платеж</h4>
-            <Button variant="outline" onClick={() => setShowRecordPayment(false)}>
-              <X className="w-4 h-4" />
-            </Button>
+        <MacOSCard style={{ padding: 0 }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <h4 style={{ 
+              margin: 0,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
+              Записать платеж
+            </h4>
+            <MacOSButton 
+              variant="outline" 
+              onClick={() => setShowRecordPayment(false)}
+              style={{ 
+                padding: '6px',
+                minWidth: 'auto',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X size={16} />
+            </MacOSButton>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <Label>ID счета</Label>
-              <Input
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                ID счета
+              </label>
+              <MacOSInput
                 type="number"
                 value={paymentForm.invoice_id}
                 onChange={(e) => setPaymentForm({...paymentForm, invoice_id: e.target.value})}
@@ -504,8 +736,16 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <Label>Сумма платежа</Label>
-              <Input
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Сумма платежа
+              </label>
+              <MacOSInput
                 type="number"
                 value={paymentForm.amount}
                 onChange={(e) => setPaymentForm({...paymentForm, amount: parseFloat(e.target.value)})}
@@ -514,49 +754,85 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <Label>Способ оплаты</Label>
-              <Select
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Способ оплаты
+              </label>
+              <MacOSSelect
                 value={paymentForm.payment_method}
                 onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
-              >
-                <option value="CASH">Наличные</option>
-                <option value="CARD">Банковская карта</option>
-                <option value="BANK_TRANSFER">Банковский перевод</option>
-                <option value="ONLINE">Онлайн платеж</option>
-                <option value="INSURANCE">Страховка</option>
-                <option value="INSTALLMENT">Рассрочка</option>
-              </Select>
+                options={[
+                  { value: 'CASH', label: 'Наличные' },
+                  { value: 'CARD', label: 'Банковская карта' },
+                  { value: 'BANK_TRANSFER', label: 'Банковский перевод' },
+                  { value: 'ONLINE', label: 'Онлайн платеж' },
+                  { value: 'INSURANCE', label: 'Страховка' },
+                  { value: 'INSTALLMENT', label: 'Рассрочка' }
+                ]}
+              />
             </div>
 
             <div>
-              <Label>Номер ссылки</Label>
-              <Input
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Номер ссылки
+              </label>
+              <MacOSInput
                 value={paymentForm.reference_number}
                 onChange={(e) => setPaymentForm({...paymentForm, reference_number: e.target.value})}
                 placeholder="Номер транзакции"
               />
             </div>
 
-            <div className="col-span-2">
-              <Label>Описание</Label>
-              <Textarea
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ 
+                display: 'block', 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)', 
+                marginBottom: '8px' 
+              }}>
+                Описание
+              </label>
+              <MacOSTextarea
                 value={paymentForm.description}
                 onChange={(e) => setPaymentForm({...paymentForm, description: e.target.value})}
                 placeholder="Описание платежа"
+                rows={3}
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowRecordPayment(false)}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <MacOSButton 
+              variant="outline" 
+              onClick={() => setShowRecordPayment(false)}
+            >
               Отмена
-            </Button>
-            <Button onClick={handleRecordPayment}>
-              <Save className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton 
+              onClick={handleRecordPayment}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px' 
+              }}
+            >
+              <Save size={16} />
               Записать
-            </Button>
+            </MacOSButton>
           </div>
-        </Card>
+        </MacOSCard>
       )}
     </div>
   );
@@ -676,29 +952,61 @@ const BillingManager = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">Управление биллингом</h2>
-        <p className="text-gray-600">
-          Автоматическое выставление счетов, управление платежами и аналитика
-        </p>
+    <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        <DollarSign size={24} color="var(--mac-accent)" />
+        <div>
+          <h2 style={{ 
+            margin: 0, 
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-xl)',
+            fontWeight: 'var(--mac-font-weight-bold)'
+          }}>
+            Управление биллингом
+          </h2>
+          <p style={{ 
+            margin: '4px 0 0 0',
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)'
+          }}>
+            Автоматическое выставление счетов, управление платежами и аналитика
+          </p>
+        </div>
       </div>
 
       {/* Табы */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+      <div style={{ 
+        display: 'flex', 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }}>
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-white shadow-sm text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              style={{
+                padding: '16px 24px',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderBottom: activeTab === tab.id ? '2px solid var(--mac-accent)' : '2px solid transparent',
+                color: activeTab === tab.id ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                fontWeight: activeTab === tab.id ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
             >
-              <Icon className="w-4 h-4" />
+              <Icon size={16} />
               {tab.label}
             </button>
           );
@@ -707,18 +1015,18 @@ const BillingManager = () => {
 
       {/* Контент */}
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Загрузка...</div>
-        </div>
+        <MacOSLoadingSkeleton type="card" count={3} />
       ) : (
         <>
           {activeTab === 'invoices' && renderInvoicesTab()}
           {activeTab === 'payments' && renderPaymentsTab()}
           {activeTab === 'analytics' && renderAnalyticsTab()}
           {activeTab === 'settings' && (
-            <div className="text-center text-gray-500">
-              Настройки биллинга будут добавлены в следующей версии
-            </div>
+            <MacOSEmptyState
+              type="settings"
+              title="Настройки биллинга"
+              description="Настройки биллинга будут добавлены в следующей версии"
+            />
           )}
         </>
       )}

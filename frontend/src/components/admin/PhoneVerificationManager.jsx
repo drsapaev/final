@@ -1,18 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Badge,
-  Skeleton,
-  Input,
-  Label,
-  Select,
-  Option,
-  Textarea
-} from '../ui/native';
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSLoadingSkeleton,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea
+} from '../ui/macos';
 import {
   Phone,
   Shield,
@@ -26,7 +21,7 @@ import {
   Settings,
   MessageSquare
 } from 'lucide-react';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
 const PhoneVerificationManager = () => {
@@ -110,244 +105,522 @@ const PhoneVerificationManager = () => {
   };
 
   const renderOverview = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Основная статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Активные коды</p>
-                <p className="text-2xl font-bold">{statistics?.total_active_codes || 0}</p>
-              </div>
-              <Shield className="h-8 w-8 text-blue-500" />
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '16px' 
+      }}>
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Активные коды
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                {statistics?.total_active_codes || 0}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <Shield style={{ width: '24px', height: '24px', color: 'var(--mac-accent-blue)' }} />
+          </div>
+        </MacOSCard>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Подтверждено</p>
-                <p className="text-2xl font-bold text-green-600">{statistics?.verified_codes || 0}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Подтверждено
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-success)',
+                margin: 0
+              }}>
+                {statistics?.verified_codes || 0}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <CheckCircle style={{ width: '24px', height: '24px', color: 'var(--mac-success)' }} />
+          </div>
+        </MacOSCard>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Ожидают</p>
-                <p className="text-2xl font-bold text-orange-600">{statistics?.pending_codes || 0}</p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-500" />
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Ожидают
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-warning)',
+                margin: 0
+              }}>
+                {statistics?.pending_codes || 0}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <Clock style={{ width: '24px', height: '24px', color: 'var(--mac-warning)' }} />
+          </div>
+        </MacOSCard>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Истекают скоро</p>
-                <p className="text-2xl font-bold text-red-600">{statistics?.expiring_soon || 0}</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-500" />
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)',
+                margin: '0 0 8px 0'
+              }}>
+                Истекают скоро
+              </p>
+              <p style={{ 
+                fontSize: 'var(--mac-font-size-2xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: 'var(--mac-error)',
+                margin: 0
+              }}>
+                {statistics?.expiring_soon || 0}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <AlertTriangle style={{ width: '24px', height: '24px', color: 'var(--mac-error)' }} />
+          </div>
+        </MacOSCard>
       </div>
 
       {/* Статистика по целям */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Статистика по целям верификации
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {statistics?.by_purpose && Object.entries(statistics.by_purpose).map(([purpose, count]) => (
-              <div key={purpose} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                <div>
-                  <p className="font-medium capitalize">{purpose}</p>
-                  <p className="text-sm text-gray-600">
-                    {purpose === 'verification' && 'Подтверждение номера'}
-                    {purpose === 'password_reset' && 'Сброс пароля'}
-                    {purpose === 'phone_change' && 'Смена номера'}
-                    {purpose === 'registration' && 'Регистрация'}
-                  </p>
-                </div>
-                <Badge variant="outline">{count}</Badge>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <BarChart3 style={{ width: '20px', height: '20px' }} />
+          Статистика по целям верификации
+        </h3>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: '16px' 
+        }}>
+          {statistics?.by_purpose && Object.entries(statistics.by_purpose).map(([purpose, count]) => (
+            <div key={purpose} style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '12px',
+              border: '1px solid var(--mac-border)', 
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--mac-bg-secondary)'
+            }}>
+              <div>
+                <p style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 4px 0',
+                  textTransform: 'capitalize'
+                }}>
+                  {purpose}
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  {purpose === 'verification' && 'Подтверждение номера'}
+                  {purpose === 'password_reset' && 'Сброс пароля'}
+                  {purpose === 'phone_change' && 'Смена номера'}
+                  {purpose === 'registration' && 'Регистрация'}
+                </p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <MacOSBadge variant="outline">{count}</MacOSBadge>
+            </div>
+          ))}
+        </div>
+      </MacOSCard>
 
       {/* Статистика по провайдерам */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            Статистика по SMS провайдерам
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {statistics?.by_provider && Object.entries(statistics.by_provider).map(([provider, count]) => (
-              <div key={provider} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                <div>
-                  <p className="font-medium capitalize">{provider}</p>
-                </div>
-                <Badge variant={provider === 'mock' ? 'secondary' : 'success'}>{count}</Badge>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Send style={{ width: '20px', height: '20px' }} />
+          Статистика по SMS провайдерам
+        </h3>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
+          {statistics?.by_provider && Object.entries(statistics.by_provider).map(([provider, count]) => (
+            <div key={provider} style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between', 
+              padding: '12px',
+              border: '1px solid var(--mac-border)', 
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--mac-bg-secondary)'
+            }}>
+              <div>
+                <p style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)',
+                  margin: 0,
+                  textTransform: 'capitalize'
+                }}>
+                  {provider}
+                </p>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              <MacOSBadge variant={provider === 'mock' ? 'secondary' : 'success'}>{count}</MacOSBadge>
+            </div>
+          ))}
+        </div>
+      </MacOSCard>
     </div>
   );
 
   const renderAdminTools = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            Отправка кода администратором
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Send style={{ width: '20px', height: '20px' }} />
+          Отправка кода администратором
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <Label htmlFor="admin-phone">Номер телефона</Label>
-            <Input
-              id="admin-phone"
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Номер телефона
+            </label>
+            <MacOSInput
               type="tel"
               value={adminForm.phone}
               onChange={(e) => setAdminForm(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
               placeholder="+998XXXXXXXXX"
+              style={{ width: '100%' }}
             />
           </div>
 
           <div>
-            <Label htmlFor="admin-purpose">Цель верификации</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Цель верификации
+            </label>
+            <MacOSSelect
               value={adminForm.purpose}
-              onValueChange={(value) => setAdminForm(prev => ({ ...prev, purpose: value }))}
-            >
-              <Option value="verification">Подтверждение номера</Option>
-              <Option value="password_reset">Сброс пароля</Option>
-              <Option value="phone_change">Смена номера</Option>
-              <Option value="registration">Регистрация</Option>
-            </Select>
+              onChange={(e) => setAdminForm(prev => ({ ...prev, purpose: e.target.value }))}
+              options={[
+                { value: 'verification', label: 'Подтверждение номера' },
+                { value: 'password_reset', label: 'Сброс пароля' },
+                { value: 'phone_change', label: 'Смена номера' },
+                { value: 'registration', label: 'Регистрация' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <Label htmlFor="admin-provider">SMS провайдер (опционально)</Label>
-            <Select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              SMS провайдер (опционально)
+            </label>
+            <MacOSSelect
               value={adminForm.provider}
-              onValueChange={(value) => setAdminForm(prev => ({ ...prev, provider: value }))}
-            >
-              <Option value="">По умолчанию</Option>
-              <Option value="eskiz">Eskiz</Option>
-              <Option value="playmobile">PlayMobile</Option>
-              <Option value="mock">Mock (тест)</Option>
-            </Select>
+              onChange={(e) => setAdminForm(prev => ({ ...prev, provider: e.target.value }))}
+              options={[
+                { value: '', label: 'По умолчанию' },
+                { value: 'eskiz', label: 'Eskiz' },
+                { value: 'playmobile', label: 'PlayMobile' },
+                { value: 'mock', label: 'Mock (тест)' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
           <div>
-            <Label htmlFor="admin-message">Кастомное сообщение (опционально)</Label>
-            <Textarea
-              id="admin-message"
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Кастомное сообщение (опционально)
+            </label>
+            <MacOSTextarea
               value={adminForm.message}
               onChange={(e) => setAdminForm(prev => ({ ...prev, message: e.target.value }))}
               placeholder="Ваш код подтверждения: {code}. Код действителен 5 минут."
-              className="min-h-[80px]"
+              style={{ minHeight: '80px', width: '100%' }}
             />
-            <p className="text-sm text-gray-600 mt-1">
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-text-secondary)',
+              margin: '4px 0 0 0'
+            }}>
               Используйте {'{code}'} для вставки кода верификации
             </p>
           </div>
 
-          <Button
+          <MacOSButton
             onClick={sendAdminCode}
             disabled={loading || !adminForm.phone.trim()}
-            className="w-full"
+            style={{ width: '100%' }}
           >
             {loading ? (
               <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  marginRight: '8px',
+                  animation: 'spin 1s linear infinite'
+                }} />
                 Отправка...
               </>
             ) : (
               <>
-                <Send className="h-4 w-4 mr-2" />
+                <Send style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Отправить код
               </>
             )}
-          </Button>
-        </CardContent>
-      </Card>
+          </MacOSButton>
+        </div>
+      </MacOSCard>
     </div>
   );
 
   const renderSettings = () => (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Настройки верификации
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {statistics?.settings && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border border-gray-200 rounded-lg">
-                  <p className="font-medium">Длина кода</p>
-                  <p className="text-2xl font-bold text-blue-600">{statistics.settings.code_length}</p>
-                  <p className="text-sm text-gray-600">цифр</p>
-                </div>
-
-                <div className="p-4 border border-gray-200 rounded-lg">
-                  <p className="font-medium">Время жизни кода</p>
-                  <p className="text-2xl font-bold text-green-600">{statistics.settings.ttl_minutes}</p>
-                  <p className="text-sm text-gray-600">минут</p>
-                </div>
-
-                <div className="p-4 border border-gray-200 rounded-lg">
-                  <p className="font-medium">Максимум попыток</p>
-                  <p className="text-2xl font-bold text-orange-600">{statistics.settings.max_attempts}</p>
-                  <p className="text-sm text-gray-600">попыток</p>
-                </div>
-
-                <div className="p-4 border border-gray-200 rounded-lg">
-                  <p className="font-medium">Лимит частоты</p>
-                  <p className="text-2xl font-bold text-red-600">{statistics.settings.rate_limit_minutes}</p>
-                  <p className="text-sm text-gray-600">минут</p>
-                </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Settings style={{ width: '20px', height: '20px' }} />
+          Настройки верификации
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {statistics?.settings && (
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '16px' 
+            }}>
+              <div style={{ 
+                padding: '16px',
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <p style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 8px 0'
+                }}>
+                  Длина кода
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-accent-blue)',
+                  margin: '0 0 4px 0'
+                }}>
+                  {statistics.settings.code_length}
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  цифр
+                </p>
               </div>
-            )}
 
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">Информация</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Коды верификации хранятся в памяти сервера</li>
-                <li>• Для production рекомендуется использовать Redis</li>
-                <li>• Истекшие коды автоматически удаляются</li>
-                <li>• Лимит частоты предотвращает спам</li>
-              </ul>
+              <div style={{ 
+                padding: '16px',
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <p style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 8px 0'
+                }}>
+                  Время жизни кода
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-success)',
+                  margin: '0 0 4px 0'
+                }}>
+                  {statistics.settings.ttl_minutes}
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  минут
+                </p>
+              </div>
+
+              <div style={{ 
+                padding: '16px',
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <p style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 8px 0'
+                }}>
+                  Максимум попыток
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-warning)',
+                  margin: '0 0 4px 0'
+                }}>
+                  {statistics.settings.max_attempts}
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  попыток
+                </p>
+              </div>
+
+              <div style={{ 
+                padding: '16px',
+                border: '1px solid var(--mac-border)', 
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: 'var(--mac-bg-secondary)'
+              }}>
+                <p style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)',
+                  margin: '0 0 8px 0'
+                }}>
+                  Лимит частоты
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-2xl)', 
+                  fontWeight: 'var(--mac-font-weight-bold)', 
+                  color: 'var(--mac-error)',
+                  margin: '0 0 4px 0'
+                }}>
+                  {statistics.settings.rate_limit_minutes}
+                </p>
+                <p style={{ 
+                  fontSize: 'var(--mac-font-size-xs)', 
+                  color: 'var(--mac-text-secondary)',
+                  margin: 0
+                }}>
+                  минут
+                </p>
+              </div>
             </div>
+          )}
+
+          <div style={{ 
+            padding: '16px', 
+            backgroundColor: 'var(--mac-info-bg)', 
+            border: '1px solid var(--mac-info-border)', 
+            borderRadius: 'var(--mac-radius-md)' 
+          }}>
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-info)',
+              fontSize: 'var(--mac-font-size-sm)',
+              margin: '0 0 8px 0'
+            }}>
+              Информация
+            </h4>
+            <ul style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-info)',
+              margin: 0,
+              paddingLeft: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}>
+              <li>• Коды верификации хранятся в памяти сервера</li>
+              <li>• Для production рекомендуется использовать Redis</li>
+              <li>• Истекшие коды автоматически удаляются</li>
+              <li>• Лимит частоты предотвращает спам</li>
+            </ul>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </MacOSCard>
     </div>
   );
 
@@ -358,51 +631,117 @@ const PhoneVerificationManager = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <div style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
       {/* Заголовок */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Phone className="h-8 w-8 text-blue-500" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Phone style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
           <div>
-            <h1 className="text-2xl font-bold">Верификация телефонов</h1>
-            <p className="text-gray-600">Управление SMS верификацией</p>
+            <h1 style={{ 
+              fontSize: 'var(--mac-font-size-2xl)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
+              Верификация телефонов
+            </h1>
+            <p style={{ 
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)',
+              margin: 0
+            }}>
+              Управление SMS верификацией
+            </p>
           </div>
         </div>
         
-        <Button onClick={loadStatistics} disabled={loading} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+        <MacOSButton onClick={loadStatistics} disabled={loading} variant="outline">
+          <RefreshCw style={{ 
+            width: '16px', 
+            height: '16px', 
+            marginRight: '8px',
+            animation: loading ? 'spin 1s linear infinite' : 'none'
+          }} />
           Обновить
-        </Button>
+        </MacOSButton>
       </div>
 
       {/* Вкладки */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-8">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
+      <div style={{ 
+        display: 'flex', 
+        marginBottom: '24px'
+      }}>
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 20px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                position: 'relative',
+                marginBottom: '-1px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                }
+              }}
+            >
+              <Icon style={{ 
+                width: '16px', 
+                height: '16px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+              }} />
+              {tab.label}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '3px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  borderRadius: '2px 2px 0 0'
+                }} />
+              )}
+            </button>
+          );
+        })}
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Контент вкладок */}
       {loading && !statistics ? (
-        <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-64 w-full" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <MacOSLoadingSkeleton height="128px" style={{ width: '100%' }} />
+          <MacOSLoadingSkeleton height="256px" style={{ width: '100%' }} />
         </div>
       ) : (
         <>

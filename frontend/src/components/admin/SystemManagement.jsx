@@ -24,8 +24,19 @@ import {
   AlertCircle,
   Info
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSBadge, 
+  MacOSInput, 
+  MacOSSelect, 
+  MacOSCheckbox, 
+  MacOSTable,
+  MacOSEmptyState,
+  MacOSLoadingSkeleton
+} from '../ui/macos';
 import { toast } from 'react-toastify';
+import { api } from '../../utils/api';
 
 const SystemManagement = () => {
   const [activeTab, setActiveTab] = useState('monitoring');
@@ -60,18 +71,8 @@ const SystemManagement = () => {
 
   const loadSystemHealth = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/monitoring/health', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/system/monitoring/health');
         setSystemHealth(data);
-      }
     } catch (error) {
       console.error('Ошибка загрузки состояния системы:', error);
     }
@@ -79,18 +80,8 @@ const SystemManagement = () => {
 
   const loadSystemMetrics = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/monitoring/metrics/system', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/system/monitoring/metrics/system');
         setSystemMetrics(data.metrics);
-      }
     } catch (error) {
       console.error('Ошибка загрузки метрик системы:', error);
     }
@@ -98,18 +89,8 @@ const SystemManagement = () => {
 
   const loadAlerts = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/monitoring/alerts?limit=50', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/system/monitoring/alerts', { params: { limit: 50 } });
         setAlerts(data.alerts || []);
-      }
     } catch (error) {
       console.error('Ошибка загрузки алертов:', error);
     }
@@ -117,18 +98,8 @@ const SystemManagement = () => {
 
   const loadThresholds = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/monitoring/thresholds', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const { data } = await api.get('/system/monitoring/thresholds');
         setThresholds(data.thresholds || {});
-      }
     } catch (error) {
       console.error('Ошибка загрузки порогов:', error);
     }
@@ -136,16 +107,8 @@ const SystemManagement = () => {
 
   const collectMetricsNow = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/monitoring/collect', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
+      const { status } = await api.post('/system/monitoring/collect');
+      if (status === 200 || status === 202) {
         toast.success('Метрики собраны');
         loadSystemMetrics();
         loadSystemHealth();
@@ -255,10 +218,10 @@ const SystemManagement = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'healthy': return 'text-green-600';
-      case 'warning': return 'text-yellow-600';
-      case 'critical': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'healthy': return 'var(--mac-success)';
+      case 'warning': return 'var(--mac-warning)';
+      case 'critical': return 'var(--mac-error)';
+      default: return 'var(--mac-text-tertiary)';
     }
   };
 
@@ -273,401 +236,699 @@ const SystemManagement = () => {
 
   const getSeverityColor = (severity) => {
     switch (severity) {
-      case 'critical': return 'bg-red-100 text-red-800';
-      case 'warning': return 'bg-yellow-100 text-yellow-800';
-      case 'info': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'critical': return 'error';
+      case 'warning': return 'warning';
+      case 'info': return 'info';
+      default: return 'default';
     }
   };
 
   // ===================== РЕНДЕРИНГ =====================
 
   const renderMonitoringTab = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Общее состояние системы */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center">
-            <Activity className="w-5 h-5 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Activity style={{ width: '20px', height: '20px' }} />
             Состояние системы
           </h3>
-          <Button
+          <MacOSButton
             onClick={collectMetricsNow}
             variant="outline"
             size="sm"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
-          </Button>
+          </MacOSButton>
         </div>
 
         {systemHealth && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className={`text-2xl font-bold ${getStatusColor(systemHealth.overall_status)}`}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-xl)', 
+                fontWeight: 'var(--mac-font-weight-bold)',
+                color: getStatusColor(systemHealth.overall_status)
+              }}>
                 {systemHealth.overall_status?.toUpperCase()}
               </div>
-              <div className="text-sm text-gray-500">Общий статус</div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                color: 'var(--mac-text-secondary)' 
+              }}>
+                Общий статус
+              </div>
             </div>
             
             {systemHealth.components && Object.entries(systemHealth.components).map(([component, status]) => {
               const StatusIcon = getStatusIcon(status);
               return (
-                <div key={component} className="text-center">
-                  <StatusIcon className={`w-8 h-8 mx-auto mb-2 ${getStatusColor(status)}`} />
-                  <div className="font-medium">{component}</div>
-                  <div className={`text-sm ${getStatusColor(status)}`}>{status}</div>
+                <div key={component} style={{ textAlign: 'center' }}>
+                  <StatusIcon style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    margin: '0 auto 8px auto',
+                    color: getStatusColor(status)
+                  }} />
+                  <div style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
+                    {component}
+                  </div>
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: getStatusColor(status)
+                  }}>
+                    {status}
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
-      </Card>
+      </MacOSCard>
 
       {/* Системные метрики */}
       {systemMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
           {/* CPU */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-semibold flex items-center">
-                <Cpu className="w-4 h-4 mr-2" />
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h4 style={{ 
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: 0
+              }}>
+                <Cpu style={{ width: '16px', height: '16px' }} />
                 CPU
               </h4>
-              <Badge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
+              <MacOSBadge variant={systemMetrics.cpu?.usage_percent > 80 ? 'error' : 'success'}>
                 {systemMetrics.cpu?.usage_percent?.toFixed(1)}%
-              </Badge>
+              </MacOSBadge>
             </div>
-            <div className="space-y-2 text-sm">
-              <div>Ядер: {systemMetrics.cpu?.count}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Ядер: {systemMetrics.cpu?.count}
+            </div>
               {systemMetrics.cpu?.frequency && (
-                <div>Частота: {systemMetrics.cpu.frequency.toFixed(0)} MHz</div>
+                <div style={{ 
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  Частота: {systemMetrics.cpu.frequency.toFixed(0)} MHz
+                </div>
               )}
             </div>
-          </Card>
+          </MacOSCard>
 
           {/* Память */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-semibold flex items-center">
-                <MemoryStick className="w-4 h-4 mr-2" />
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h4 style={{ 
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: 0
+              }}>
+                <MemoryStick style={{ width: '16px', height: '16px' }} />
                 Память
               </h4>
-              <Badge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
+              <MacOSBadge variant={systemMetrics.memory?.usage_percent > 85 ? 'error' : 'success'}>
                 {systemMetrics.memory?.usage_percent?.toFixed(1)}%
-              </Badge>
+              </MacOSBadge>
             </div>
-            <div className="space-y-2 text-sm">
-              <div>Всего: {formatBytes(systemMetrics.memory?.total)}</div>
-              <div>Используется: {formatBytes(systemMetrics.memory?.used)}</div>
-              <div>Доступно: {formatBytes(systemMetrics.memory?.available)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Всего: {formatBytes(systemMetrics.memory?.total)}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Используется: {formatBytes(systemMetrics.memory?.used)}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Доступно: {formatBytes(systemMetrics.memory?.available)}
             </div>
-          </Card>
+            </div>
+          </MacOSCard>
 
           {/* Диск */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-semibold flex items-center">
-                <HardDrive className="w-4 h-4 mr-2" />
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h4 style={{ 
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: 0
+              }}>
+                <HardDrive style={{ width: '16px', height: '16px' }} />
                 Диск
               </h4>
-              <Badge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
+              <MacOSBadge variant={systemMetrics.disk?.usage_percent > 90 ? 'error' : 'success'}>
                 {systemMetrics.disk?.usage_percent?.toFixed(1)}%
-              </Badge>
+              </MacOSBadge>
             </div>
-            <div className="space-y-2 text-sm">
-              <div>Всего: {formatBytes(systemMetrics.disk?.total)}</div>
-              <div>Используется: {formatBytes(systemMetrics.disk?.used)}</div>
-              <div>Свободно: {formatBytes(systemMetrics.disk?.free)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Всего: {formatBytes(systemMetrics.disk?.total)}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Используется: {formatBytes(systemMetrics.disk?.used)}
+              </div>
+              <div style={{ 
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-primary)'
+              }}>
+                Свободно: {formatBytes(systemMetrics.disk?.free)}
             </div>
-          </Card>
+            </div>
+          </MacOSCard>
         </div>
       )}
 
       {/* Алерты */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <AlertTriangle className="w-5 h-5 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <AlertTriangle style={{ width: '20px', height: '20px' }} />
           Последние алерты
         </h3>
         
         {alerts.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-500" />
-            <p>Нет активных алертов</p>
-          </div>
+          <MacOSEmptyState
+            icon={CheckCircle}
+            title="Нет активных алертов"
+            description="Система работает стабильно"
+            iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-success)' }}
+          />
         ) : (
-          <div className="space-y-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {alerts.slice(0, 10).map((alert, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <Badge className={getSeverityColor(alert.severity)}>
+              <div key={index} style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                padding: '12px', 
+                backgroundColor: 'var(--mac-bg-secondary)', 
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <MacOSBadge variant={getSeverityColor(alert.severity)}>
                     {alert.severity}
-                  </Badge>
-                  <span className="ml-3">{alert.message}</span>
+                  </MacOSBadge>
+                  <span style={{ 
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
+                    {alert.message}
+                  </span>
                 </div>
-                <div className="text-sm text-gray-500">
+                <div style={{ 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-text-secondary)' 
+                }}>
                   {new Date(alert.timestamp).toLocaleString()}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </MacOSCard>
     </div>
   );
 
   const renderBackupsTab = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Создание бэкапа */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Database className="w-5 h-5 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Database style={{ width: '20px', height: '20px' }} />
           Создание бэкапа
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
           <div>
-            <label className="block text-sm font-medium mb-2">Тип бэкапа</label>
-            <select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '8px' 
+            }}>
+              Тип бэкапа
+            </label>
+            <MacOSSelect
               value={backupForm.backup_type}
               onChange={(e) => setBackupForm(prev => ({ ...prev, backup_type: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-md"
-            >
-              <option value="database">База данных</option>
-              <option value="full">Полный бэкап</option>
-              <option value="configuration">Конфигурация</option>
-            </select>
+              options={[
+                { value: 'database', label: 'База данных' },
+                { value: 'full', label: 'Полный бэкап' },
+                { value: 'configuration', label: 'Конфигурация' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
 
-          <div className="flex items-center">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              cursor: 'pointer',
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              <MacOSCheckbox
                 checked={backupForm.include_files}
-                onChange={(e) => setBackupForm(prev => ({ ...prev, include_files: e.target.checked }))}
-                className="mr-2"
+                onChange={(checked) => setBackupForm(prev => ({ ...prev, include_files: checked }))}
+                style={{ marginRight: '8px' }}
               />
               Включить файлы
             </label>
           </div>
 
           <div>
-            <Button
+            <MacOSButton
               onClick={createBackup}
               disabled={loading}
-              className="w-full"
+              style={{ width: '100%' }}
             >
               {loading ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px', animation: 'spin 1s linear infinite' }} />
               ) : (
-                <Download className="w-4 h-4 mr-2" />
+                <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               )}
               Создать бэкап
-            </Button>
+            </MacOSButton>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Список бэкапов */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center">
-            <Shield className="w-5 h-5 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Shield style={{ width: '20px', height: '20px' }} />
             Список бэкапов
           </h3>
-          <Button
+          <MacOSButton
             onClick={loadBackups}
             variant="outline"
             size="sm"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
             Обновить
-          </Button>
+          </MacOSButton>
         </div>
 
         {backups.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Database className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Бэкапы не найдены</p>
-          </div>
+          <MacOSEmptyState
+            icon={Database}
+            title="Бэкапы не найдены"
+            description="Создайте первый бэкап системы"
+            iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }}
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">Название</th>
-                  <th className="text-left py-2">Тип</th>
-                  <th className="text-left py-2">Размер</th>
-                  <th className="text-left py-2">Создан</th>
-                  <th className="text-right py-2">Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backups.map((backup, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="py-3">
-                      <div className="flex items-center">
-                        <Database className="w-4 h-4 mr-2 text-gray-500" />
-                        <span className="font-medium">{backup.name}</span>
+          <MacOSTable
+            columns={[
+              { key: 'name', label: 'Название' },
+              { key: 'type', label: 'Тип' },
+              { key: 'size', label: 'Размер' },
+              { key: 'created_at', label: 'Создан' },
+              { key: 'actions', label: 'Действия' }
+            ]}
+            data={backups.map(backup => ({
+              ...backup,
+              name: (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Database style={{ width: '16px', height: '16px', color: 'var(--mac-text-tertiary)' }} />
+                  <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>{backup.name}</span>
                       </div>
-                    </td>
-                    <td className="py-3">
-                      <Badge variant="outline">{backup.type}</Badge>
-                    </td>
-                    <td className="py-3 text-gray-600">
-                      {formatBytes(backup.size)}
-                    </td>
-                    <td className="py-3 text-gray-600">
-                      {new Date(backup.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-3 text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
+              ),
+              type: <MacOSBadge variant="outline">{backup.type}</MacOSBadge>,
+              size: formatBytes(backup.size),
+              created_at: new Date(backup.created_at).toLocaleString(),
+              actions: (
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <MacOSButton size="sm" variant="outline">
+                    <Eye style={{ width: '14px', height: '14px' }} />
+                  </MacOSButton>
+                  <MacOSButton
                           onClick={() => deleteBackup(backup.name)}
                           size="sm"
                           variant="outline"
-                          className="text-red-600 hover:text-red-700"
+                    style={{ color: 'var(--mac-error)' }}
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                    <Trash2 style={{ width: '14px', height: '14px' }} />
+                  </MacOSButton>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              )
+            }))}
+            emptyState={
+              <MacOSEmptyState
+                icon={Database}
+                title="Бэкапы не найдены"
+                description="Создайте первый бэкап системы"
+              />
+            }
+          />
         )}
-      </Card>
+      </MacOSCard>
     </div>
   );
 
   const renderSettingsTab = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <Settings className="w-5 h-5 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        <h3 style={{ 
+          fontSize: 'var(--mac-font-size-lg)', 
+          fontWeight: 'var(--mac-font-weight-semibold)', 
+          color: 'var(--mac-text-primary)',
+          margin: '0 0 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Settings style={{ width: '20px', height: '20px' }} />
           Настройки мониторинга
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
           <div>
-            <h4 className="font-medium mb-3">Пороговые значения</h4>
-            <div className="space-y-3">
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              marginBottom: '12px'
+            }}>
+              Пороговые значения
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label className="block text-sm font-medium mb-1">CPU (%)</label>
-                <input
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '4px' 
+                }}>
+                  CPU (%)
+                </label>
+                <MacOSInput
                   type="number"
                   value={thresholds.cpu_usage || 80}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  onChange={(e) => setThresholds(prev => ({ ...prev, cpu_usage: parseInt(e.target.value) }))}
                   min="0"
                   max="100"
+                  style={{ width: '100%' }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Память (%)</label>
-                <input
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '4px' 
+                }}>
+                  Память (%)
+                </label>
+                <MacOSInput
                   type="number"
                   value={thresholds.memory_usage || 85}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  onChange={(e) => setThresholds(prev => ({ ...prev, memory_usage: parseInt(e.target.value) }))}
                   min="0"
                   max="100"
+                  style={{ width: '100%' }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Диск (%)</label>
-                <input
+                <label style={{ 
+                  display: 'block', 
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  fontWeight: 'var(--mac-font-weight-medium)', 
+                  color: 'var(--mac-text-primary)', 
+                  marginBottom: '4px' 
+                }}>
+                  Диск (%)
+                </label>
+                <MacOSInput
                   type="number"
                   value={thresholds.disk_usage || 90}
-                  className="w-full p-2 border border-gray-300 rounded-md"
+                  onChange={(e) => setThresholds(prev => ({ ...prev, disk_usage: parseInt(e.target.value) }))}
                   min="0"
                   max="100"
+                  style={{ width: '100%' }}
                 />
               </div>
             </div>
           </div>
           
           <div>
-            <h4 className="font-medium mb-3">Автоматизация</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <h4 style={{ 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              marginBottom: '12px'
+            }}>
+              Автоматизация
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                padding: '12px', 
+                backgroundColor: 'var(--mac-bg-secondary)', 
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)'
+              }}>
                 <div>
-                  <div className="font-medium">Автоматические бэкапы</div>
-                  <div className="text-sm text-gray-600">Ежедневно в 02:00</div>
+                  <div style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
+                    Автоматические бэкапы
+                  </div>
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)' 
+                  }}>
+                    Ежедневно в 02:00
+                  </div>
                 </div>
-                <Button size="sm" variant="outline">
+                <MacOSButton size="sm" variant="outline">
                   Настроить
-                </Button>
+                </MacOSButton>
               </div>
               
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                padding: '12px', 
+                backgroundColor: 'var(--mac-bg-secondary)', 
+                borderRadius: 'var(--mac-radius-md)',
+                border: '1px solid var(--mac-border)'
+              }}>
                 <div>
-                  <div className="font-medium">Уведомления</div>
-                  <div className="text-sm text-gray-600">Email при критических алертах</div>
+                  <div style={{ 
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)'
+                  }}>
+                    Уведомления
+                  </div>
+                  <div style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    color: 'var(--mac-text-secondary)' 
+                  }}>
+                    Email при критических алертах
+                  </div>
                 </div>
-                <Button size="sm" variant="outline">
+                <MacOSButton size="sm" variant="outline">
                   Настроить
-                </Button>
+                </MacOSButton>
               </div>
             </div>
           </div>
         </div>
         
-        <div className="mt-6">
-          <Button>
+        <div style={{ marginTop: '24px' }}>
+          <MacOSButton>
             Сохранить настройки
-          </Button>
+          </MacOSButton>
         </div>
-      </Card>
+      </MacOSCard>
     </div>
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Управление системой</h2>
-        <div className="flex items-center space-x-2">
+    <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        marginBottom: '24px'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '16px'
+        }}>
+          <Server style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
+          <div>
+            <h1 style={{ 
+              margin: 0, 
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
+              Управление системой
+            </h1>
+            <p style={{ 
+              margin: '4px 0 0 0',
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
+              Мониторинг, бэкапы и системные настройки
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {systemHealth && (
-            <Badge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
+            <MacOSBadge variant={systemHealth.overall_status === 'healthy' ? 'success' : 'error'}>
               {systemHealth.overall_status}
-            </Badge>
+            </MacOSBadge>
           )}
         </div>
       </div>
 
       {/* Табы */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      <div style={{ 
+        display: 'flex', 
+        marginBottom: '24px'
+      }}>
           {[
             { id: 'monitoring', label: 'Мониторинг', icon: Activity },
             { id: 'backups', label: 'Бэкапы', icon: Database },
             { id: 'settings', label: 'Настройки', icon: Settings }
           ].map(tab => {
             const IconComponent = tab.icon;
+          const isActive = activeTab === tab.id;
+          
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <IconComponent className="w-4 h-4 mr-2" />
+              style={{
+                padding: '12px 20px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                position: 'relative',
+                marginBottom: '-1px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                }
+              }}
+            >
+              <IconComponent style={{ 
+                width: '16px', 
+                height: '16px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+              }} />
                 {tab.label}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '3px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  borderRadius: '2px 2px 0 0'
+                }} />
+              )}
               </button>
             );
           })}
-        </nav>
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Контент табов */}
       {activeTab === 'monitoring' && renderMonitoringTab()}

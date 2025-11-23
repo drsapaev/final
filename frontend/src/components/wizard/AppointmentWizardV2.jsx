@@ -15,16 +15,37 @@ import {
   Grid,
   List,
   ChevronDown,
-  Calendar
+  Calendar,
+  User
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import ModernDialog from '../dialogs/ModernDialog';
-// Импорты PaymentClick и PaymentPayMe убраны
-import './AppointmentWizardV2.css';
-import './AppointmentWizardV2-step2.css';
-import './AppointmentWizardV2-compact.css';
+import { MacOSInput, MacOSButton, MacOSSelect, MacOSCheckbox } from '../ui/macos';
+import { useRoleAccess } from '../common/RoleGuard';
 
 const API_BASE = '/api/v1';
+
+// CSS Keyframes for animations
+const slideInKeyframes = `
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+`;
+
+// Inject keyframes into the document
+if (typeof document !== 'undefined' && !document.getElementById('wizard-keyframes')) {
+  const style = document.createElement('style');
+  style.id = 'wizard-keyframes';
+  style.textContent = slideInKeyframes;
+  document.head.appendChild(style);
+}
 
 const AppointmentWizardV2 = ({ 
   isOpen, 
@@ -33,6 +54,10 @@ const AppointmentWizardV2 = ({
   isProcessing = false,
   setIsProcessing = () => {} // Дефолтная функция-заглушка
 }) => {
+  // Проверка прав доступа
+  const { hasRole } = useRoleAccess();
+  const hasRegistrarAccess = hasRole(['Admin', 'Registrar']);
+  
   // Состояние мастера
   const [currentStep, setCurrentStep] = useState(1);
   
@@ -200,21 +225,40 @@ const AppointmentWizardV2 = ({
       if (response.ok) {
         const data = await response.json();
         
+        // ✅ Формируем fio из отдельных полей, если его нет
+        const patientsWithFio = data.map(patient => {
+          if (!patient.fio && (patient.last_name || patient.first_name)) {
+            const parts = [
+              patient.last_name || '',
+              patient.first_name || '',
+              patient.middle_name || ''
+            ].filter(p => p);
+            patient.fio = parts.join(' ').trim() || 'Без имени';
+          } else if (!patient.fio) {
+            patient.fio = 'Без имени';
+          }
+          return patient;
+        });
+        
         // Сортировка по приоритету: телефон > точное ФИО > частичное ФИО
-        const sorted = data.sort((a, b) => {
-          const queryLower = query.toLowerCase();
+        const sorted = patientsWithFio.sort((a, b) => {
+          const queryLower = (query || '').toLowerCase();
+          const aPhone = a?.phone || '';
+          const bPhone = b?.phone || '';
+          const aFio = (a?.fio || '').toLowerCase();
+          const bFio = (b?.fio || '').toLowerCase();
           
           // Приоритет 1: точное совпадение телефона
-          if (a.phone === query) return -1;
-          if (b.phone === query) return 1;
+          if (aPhone === query) return -1;
+          if (bPhone === query) return 1;
           
           // Приоритет 2: точное совпадение ФИО
-          if (a.fio.toLowerCase() === queryLower) return -1;
-          if (b.fio.toLowerCase() === queryLower) return 1;
+          if (aFio === queryLower) return -1;
+          if (bFio === queryLower) return 1;
           
           // Приоритет 3: частичное совпадение ФИО
-          const aMatch = a.fio.toLowerCase().includes(queryLower);
-          const bMatch = b.fio.toLowerCase().includes(queryLower);
+          const aMatch = aFio.includes(queryLower);
+          const bMatch = bFio.includes(queryLower);
           
           if (aMatch && !bMatch) return -1;
           if (!aMatch && bMatch) return 1;
@@ -243,17 +287,30 @@ const AppointmentWizardV2 = ({
   };
   
   const selectPatient = (patient) => {
-    // Парсинг ФИО
-    const nameParts = patient.fio.trim().split(' ');
-    const lastName = nameParts[0] || '';
-    const firstName = nameParts[1] || '';
-    const middleName = nameParts.slice(2).join(' ') || '';
+    // ✅ БЕЗОПАСНО: Формируем fio из отдельных полей, если его нет
+    let patientFio = patient.fio;
+    if (!patientFio && (patient.last_name || patient.first_name)) {
+      const parts = [
+        patient.last_name || '',
+        patient.first_name || '',
+        patient.middle_name || ''
+      ].filter(p => p);
+      patientFio = parts.join(' ').trim() || 'Без имени';
+    } else if (!patientFio) {
+      patientFio = 'Без имени';
+    }
+    
+    // Парсинг ФИО (безопасно)
+    const nameParts = (patientFio || '').trim().split(/\s+/).filter(p => p.length > 0);
+    const lastName = nameParts[0] || patient.last_name || '';
+    const firstName = nameParts[1] || patient.first_name || '';
+    const middleName = nameParts.slice(2).join(' ') || patient.middle_name || '';
     
     setWizardData(prev => ({
       ...prev,
       patient: {
         id: patient.id,
-        fio: patient.fio,
+        fio: patientFio,
         birth_date: patient.birth_date || '',
         phone: patient.phone || '',
         address: patient.address || '',
@@ -593,15 +650,55 @@ const AppointmentWizardV2 = ({
       // Если пациент новый, сначала создаём его
       if (!wizardData.patient.id) {
         // Разбиваем ФИО на отдельные поля
-        const fioParts = wizardData.patient.fio.trim().split(' ');
-        const lastName = fioParts[0] || '';
-        const firstName = fioParts[1] || '';
-        const middleName = fioParts.slice(2).join(' ') || null;
+        const fioParts = wizardData.patient.fio.trim().split(/\s+/).filter(part => part.length > 0);
+        
+        // ✅ УЛУЧШЕНО: Правильное разделение ФИО
+        // Если только одно слово - это фамилия, имя будет пустым (но мы используем фамилию как имя)
+        // Если два слова - фамилия и имя
+        // Если три и более - фамилия, имя, отчество
+        let lastName = '';
+        let firstName = '';
+        let middleName = null;
+        
+        if (fioParts.length === 1) {
+          // Только фамилия или одно слово - используем как фамилию и имя
+          lastName = fioParts[0];
+          firstName = fioParts[0]; // Дублируем для обязательного поля
+        } else if (fioParts.length >= 2) {
+          lastName = fioParts[0];
+          firstName = fioParts[1];
+          if (fioParts.length > 2) {
+            middleName = fioParts.slice(2).join(' ');
+          }
+        } else {
+          // Пустое ФИО - это ошибка валидации
+          throw new Error('ФИО пациента обязательно для заполнения');
+        }
+        
+        // Валидация обязательных полей
+        if (!lastName || !firstName) {
+          throw new Error('ФИО пациента должно содержать минимум фамилию и имя');
+        }
         
         const token = localStorage.getItem('auth_token');
         console.log('🔑 Токен для создания пациента:', token ? `${token.substring(0, 20)}...` : 'НЕТ ТОКЕНА');
-        console.log('🔍 Полный токен:', token);
         console.log('📊 Длина токена:', token ? token.length : 0);
+        
+        // Подготовка данных пациента
+        const patientData = {
+          last_name: lastName,
+          first_name: firstName,
+          middle_name: middleName,
+          phone: wizardData.patient.phone || null,
+          address: wizardData.patient.address || null
+        };
+        
+        // Добавляем дату рождения только если она есть
+        if (wizardData.patient.birth_date) {
+          patientData.birth_date = wizardData.patient.birth_date;
+        }
+        
+        console.log('📋 Данные для создания пациента:', patientData);
         
         const patientResponse = await fetch(`${API_BASE}/patients/`, {
           method: 'POST',
@@ -609,39 +706,51 @@ const AppointmentWizardV2 = ({
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json' 
           },
-          body: JSON.stringify({
-            last_name: lastName,
-            first_name: firstName,
-            middle_name: middleName,
-            birth_date: wizardData.patient.birth_date || null,  // ✅ Отправляем null вместо пустой строки
-            phone: wizardData.patient.phone,
-            address: wizardData.patient.address
-          })
+          body: JSON.stringify(patientData)
         });
         
         if (patientResponse.ok) {
           const patient = await patientResponse.json();
           cartData.patient_id = patient.id;
+          console.log('✅ Пациент создан успешно:', patient.id);
         } else if (patientResponse.status === 400) {
-          // Пациент уже существует, попробуем найти его по номеру телефона
-          console.log('⚠️ Пациент уже существует, ищем по номеру телефона...');
-          const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
-            headers: { 
-              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-              'Content-Type': 'application/json' 
-            }
-          });
+          // Получаем детальную информацию об ошибке
+          let errorDetail = 'Пациент с таким номером телефона уже существует';
+          try {
+            const errorData = await patientResponse.json();
+            errorDetail = errorData.detail || errorDetail;
+            console.log('⚠️ Ошибка 400 при создании пациента:', errorDetail);
+          } catch (e) {
+            const errorText = await patientResponse.text();
+            console.log('⚠️ Текст ошибки создания пациента:', errorText);
+            errorDetail = errorText || errorDetail;
+          }
           
-          if (searchResponse.ok) {
-            const patients = await searchResponse.json();
-            if (patients.length > 0) {
-              cartData.patient_id = patients[0].id;
-              console.log('✅ Найден существующий пациент:', patients[0].id);
+          // Пациент уже существует или другая ошибка валидации - ищем по номеру телефона
+          if (wizardData.patient.phone) {
+            console.log('⚠️ Ищем существующего пациента по номеру телефона...');
+            const searchResponse = await fetch(`${API_BASE}/patients/?phone=${encodeURIComponent(wizardData.patient.phone)}`, {
+              headers: { 
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                'Content-Type': 'application/json' 
+              }
+            });
+            
+            if (searchResponse.ok) {
+              const patients = await searchResponse.json();
+              if (patients.length > 0) {
+                cartData.patient_id = patients[0].id;
+                console.log('✅ Найден существующий пациент:', patients[0].id);
+              } else {
+                // Пациент не найден - возможно, ошибка валидации данных
+                throw new Error(`Ошибка создания пациента: ${errorDetail}`);
+              }
             } else {
-              throw new Error('Пациент не найден по номеру телефона');
+              throw new Error('Ошибка поиска пациента');
             }
           } else {
-            throw new Error('Ошибка поиска пациента');
+            // Нет телефона и ошибка создания - это проблема валидации
+            throw new Error(`Ошибка валидации данных пациента: ${errorDetail}`);
           }
         } else {
           const errorText = await patientResponse.text();
@@ -673,20 +782,44 @@ const AppointmentWizardV2 = ({
       } else {
         // Получаем детальную информацию об ошибке
         let errorMessage = `Ошибка создания записи (${cartResponse.status})`;
+        let isPermissionError = false;
 
         try {
           const errorData = await cartResponse.json();
           console.error('❌ Детали ошибки создания корзины:', errorData);
           errorMessage = errorData.detail || errorMessage;
+          
+          // Проверяем, является ли это ошибкой прав доступа
+          if (cartResponse.status === 403) {
+            isPermissionError = true;
+            if (errorMessage.includes('Not enough permissions')) {
+              errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
+            }
+          }
         } catch (parseError) {
           const errorText = await cartResponse.text();
           console.error('❌ Текст ошибки создания корзины:', errorText);
           errorMessage = errorText || errorMessage;
+          
+          if (cartResponse.status === 403) {
+            isPermissionError = true;
+            errorMessage = 'У вас нет прав для создания записей. Необходима роль Регистратора или Администратора.';
+          }
         }
 
         console.error('❌ Ошибка создания корзины:', cartResponse.status, errorMessage);
-        toast.error(`Ошибка создания записи: ${errorMessage}`);
-        return; // ❌ НЕ закрываем мастер при ошибке создания
+        
+        if (isPermissionError) {
+          toast.error(errorMessage, { 
+            duration: 5000,
+            style: { backgroundColor: '#fee', border: '1px solid #fcc' }
+          });
+          // Закрываем мастер при ошибке прав доступа
+          onClose();
+        } else {
+          toast.error(`Ошибка создания записи: ${errorMessage}`);
+        }
+        return; // ❌ НЕ закрываем мастер при других ошибках
       }
     } catch (error) {
       console.error('Ошибка завершения мастера:', error);
@@ -796,6 +929,54 @@ const AppointmentWizardV2 = ({
   
   // ===================== ОБРАБОТЧИКИ ОНЛАЙН ОПЛАТЫ УБРАНЫ =====================
 
+  // Проверка прав доступа перед рендерингом
+  if (!hasRegistrarAccess) {
+    return (
+      <ModernDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Доступ запрещен"
+        maxWidth="40rem"
+      >
+        <div style={{
+          padding: 'var(--mac-spacing-6)',
+          textAlign: 'center'
+        }}>
+          <AlertCircle 
+            size={48} 
+            style={{ 
+              color: 'var(--mac-danger)', 
+              marginBottom: 'var(--mac-spacing-4)' 
+            }} 
+          />
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            marginBottom: 'var(--mac-spacing-3)',
+            color: 'var(--mac-text-primary)'
+          }}>
+            Недостаточно прав доступа
+          </h3>
+          <p style={{
+            fontSize: 'var(--mac-font-size-md)',
+            color: 'var(--mac-text-secondary)',
+            marginBottom: 'var(--mac-spacing-4)',
+            lineHeight: 1.6
+          }}>
+            Для создания записей пациентов необходима роль Регистратора или Администратора.
+          </p>
+          <MacOSButton
+            onClick={onClose}
+            variant="primary"
+            style={{ marginTop: 'var(--mac-spacing-4)' }}
+          >
+            Закрыть
+          </MacOSButton>
+        </div>
+      </ModernDialog>
+    );
+  }
+
   return (
     <>
       <ModernDialog
@@ -890,131 +1071,361 @@ const PatientStepV2 = ({
   cart,
   onUpdateCart
 }) => (
-  <div className="step-content">
-    <div className="form-grid">
+  <div style={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--mac-spacing-6)',
+    animation: 'slideIn 0.3s ease-out'
+  }}>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 'var(--mac-spacing-5)',
+      alignItems: 'start'
+    }}>
       {/* ФИО с поиском */}
-      <div className="form-field full-width">
-        <label>ФИО пациента *</label>
-        <div className="search-field">
-          <input
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--mac-spacing-2)',
+        gridColumn: '1 / -1'
+      }}>
+        <label style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          ФИО пациента *
+        </label>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <MacOSInput
             ref={fioRef}
             type="text"
             value={data.fio}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Введите ФИО или телефон для поиска..."
-            className={errors.fio ? 'error' : ''}
+            error={!!errors.fio}
+            icon={Search}
+            iconPosition="right"
+            size="md"
           />
-          <Search size={16} className="search-icon" />
           
           {showSuggestions && suggestions.length > 0 && (
-            <div className="suggestions-dropdown">
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              zIndex: 1000,
+              background: 'var(--mac-bg-primary)',
+              border: '1px solid var(--mac-border)',
+              borderTop: 'none',
+              borderRadius: '0 0 var(--mac-radius-md) var(--mac-radius-md)',
+              boxShadow: 'var(--mac-shadow-md)',
+              maxHeight: '200px',
+              overflowY: 'auto'
+            }}>
               {suggestions.map((patient) => (
                 <div
                   key={patient.id}
-                  className="suggestion-item"
+                  style={{
+                    padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+                    cursor: 'pointer',
+                    transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                    borderBottom: '1px solid var(--mac-separator)'
+                  }}
                   onClick={() => onSelectPatient(patient)}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  <div className="suggestion-name">{patient.fio}</div>
-                  <div className="suggestion-details">
-                    <Phone size={12} /> {patient.phone} • 
-                    <Calendar size={12} /> {patient.birth_date}
+                  <div style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '4px'
+                  }}>
+                    {patient.fio}
+                  </div>
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--mac-spacing-2)'
+                  }}>
+                    <Phone size={12} />
+                    {patient.phone} •
+                    <Calendar size={12} />
+                    {patient.birth_date}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-        {errors.fio && <span className="error-text">{errors.fio}</span>}
+        {errors.fio && (
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <AlertCircle size={14} />
+            {errors.fio}
+          </span>
+        )}
       </div>
 
       {/* Телефон */}
-      <div className="form-field">
-        <label>Телефон *</label>
-        <input
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--mac-spacing-2)'
+      }}>
+        <label style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          Телефон *
+        </label>
+        <MacOSInput
           ref={phoneRef}
           type="tel"
           value={data.phone}
           onChange={(e) => onPhoneChange(e.target.value)}
           placeholder="+998 XX XXX XX XX"
-          className={errors.phone ? 'error' : ''}
+          error={!!errors.phone}
+          icon={Phone}
+          iconPosition="left"
+          size="md"
         />
-        {errors.phone && <span className="error-text">{errors.phone}</span>}
+        {errors.phone && (
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <AlertCircle size={14} />
+            {errors.phone}
+          </span>
+        )}
       </div>
 
       {/* Дата рождения */}
-      <div className="form-field">
-        <label>Дата рождения</label>
-        <input
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--mac-spacing-2)'
+      }}>
+        <label style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          Дата рождения
+        </label>
+        <MacOSInput
           type="text"
           value={formattedBirthDate}
           onChange={(e) => onBirthDateChange(e.target.value)}
           placeholder="ДД.ММ.ГГГГ"
-          maxLength="10"
-          className={errors.birth_date ? 'error' : ''}
+          maxLength={10}
+          error={!!errors.birth_date}
+          icon={Calendar}
+          iconPosition="left"
+          size="md"
         />
-        {errors.birth_date && <span className="error-text">{errors.birth_date}</span>}
+        {errors.birth_date && (
+          <span style={{
+            fontSize: 'var(--mac-font-size-xs)',
+            color: 'var(--mac-danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <AlertCircle size={14} />
+            {errors.birth_date}
+          </span>
+        )}
       </div>
 
       {/* Адрес */}
-      <div className="form-field full-width">
-        <label>Адрес</label>
-        <input
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--mac-spacing-2)',
+        gridColumn: '1 / -1'
+      }}>
+        <label style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          Адрес
+        </label>
+        <MacOSInput
           type="text"
           value={data.address}
           onChange={(e) => onUpdate('address', e.target.value)}
           placeholder="Адрес проживания"
+          size="md"
         />
       </div>
 
       {/* Тип визита - перенесено из PaymentStepV2 */}
-      <div className="form-field full-width">
-        <label>Тип визита</label>
-        <div className="visit-type-options">
-          <label className="radio-option">
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--mac-spacing-2)',
+        gridColumn: '1 / -1'
+      }}>
+        <label style={{
+          fontSize: 'var(--mac-font-size-sm)',
+          fontWeight: 'var(--mac-font-weight-medium)',
+          color: 'var(--mac-text-primary)'
+        }}>
+          Тип визита
+        </label>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--mac-spacing-2)'
+        }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-3)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            background: 'var(--mac-bg-primary)'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+          >
             <input
               type="radio"
               name="discount_mode"
               value="none"
               checked={cart?.discount_mode === 'none'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
+              style={{ margin: 0 }}
             />
-            <span>Платный</span>
+            <span style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Платный
+            </span>
           </label>
           
-          <label className="radio-option">
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-3)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            background: 'var(--mac-bg-primary)'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+          >
             <input
               type="radio"
               name="discount_mode"
               value="repeat"
               checked={cart?.discount_mode === 'repeat'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
+              style={{ margin: 0 }}
             />
-            <span>Повторный (бесплатная консультация)</span>
+            <span style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Повторный (бесплатная консультация)
+            </span>
           </label>
           
-          <label className="radio-option">
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-3)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            background: 'var(--mac-bg-primary)'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+          >
             <input
               type="radio"
               name="discount_mode"
               value="benefit"
               checked={cart?.discount_mode === 'benefit'}
               onChange={(e) => onUpdateCart('discount_mode', e.target.value)}
+              style={{ margin: 0 }}
             />
-            <span>Льготный (бесплатная консультация)</span>
+            <span style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              Льготный (бесплатная консультация)
+            </span>
           </label>
         </div>
         
-        <div className="all-free-option">
-          <label className="checkbox-option">
+        <div style={{ marginTop: 'var(--mac-spacing-2)' }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-2)',
+            padding: 'var(--mac-spacing-3)',
+            border: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md)',
+            cursor: 'pointer',
+            transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+            background: 'var(--mac-bg-primary)'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+          >
             <input
               type="checkbox"
               checked={cart?.all_free}
               onChange={(e) => onUpdateCart('all_free', e.target.checked)}
+              style={{ margin: 0 }}
             />
-            <span>All Free (требует одобрения администратора)</span>
+            <span style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
+              All Free (требует одобрения администратора)
+            </span>
           </label>
           {cart?.all_free && (
-            <div className="warning-message">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)',
+              padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+              background: 'var(--mac-warning)',
+              border: '1px solid var(--mac-warning-hover)',
+              borderRadius: 'var(--mac-radius-sm)',
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-xs)',
+              marginTop: 'var(--mac-spacing-2)'
+            }}>
               <AlertCircle size={16} />
               Заявка будет отправлена на одобрение администратору
             </div>
@@ -1126,40 +1537,135 @@ const CartStepV2 = ({
   }, [cart?.items, cart?.discount_mode, cart?.all_free, servicesData]);
   
   return (
-    <div className="step-content cart-step-compact">
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 'var(--mac-spacing-5)',
+      height: '100%',
+      padding: 'var(--mac-spacing-5)'
+    }}>
       {/* Заголовок */}
-      <div className="step-header">
-        <h3>Выберите услуги для пациента</h3>
-        <div className="cart-summary-inline">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingBottom: 'var(--mac-spacing-4)',
+        borderBottom: '2px solid var(--mac-border)'
+      }}>
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          color: 'var(--mac-text-primary)',
+          margin: 0
+        }}>
+          Выберите услуги для пациента
+        </h3>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-3)',
+          fontSize: 'var(--mac-font-size-sm)',
+          color: 'var(--mac-text-secondary)'
+        }}>
           <ShoppingCart size={18} />
           <span>Выбрано: {cart?.items?.length || 0} услуг</span>
-          <span className="divider">|</span>
-          <span className="total-sum">Сумма: {cartTotal.toLocaleString()} сум</span>
+          <span style={{ color: 'var(--mac-border)' }}>|</span>
+          <span style={{
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-success)'
+          }}>
+            Сумма: {cartTotal.toLocaleString()} сум
+          </span>
         </div>
       </div>
       
       {/* Основная сетка с тремя колонками */}
-      <div className="services-grid-compact">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 'var(--mac-spacing-5)',
+        flex: 1
+      }}>
         {/* Колонка 1: Специалисты */}
-        <div className="service-column">
-          <div className="column-header">
-            <h4>👨‍⚕️ Консультации специалистов</h4>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-md)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{
+            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+            background: 'var(--mac-bg-secondary)',
+            borderBottom: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md) var(--mac-radius-md) 0 0'
+          }}>
+            <h4 style={{
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)'
+            }}>
+              👨‍⚕️ Консультации специалистов
+            </h4>
           </div>
           
           {/* Специалисты - чекбоксы */}
-          <div className="specialists-list">
+          <div style={{
+            padding: 'var(--mac-spacing-3)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--mac-spacing-2)',
+            borderBottom: '1px solid var(--mac-border)'
+          }}>
             {groupedServices.specialists.map(service => {
               const isInCart = cart?.items?.some(item => item.service_id === service.id);
               return (
-                <label key={service.id} className="service-checkbox">
+                <label key={service.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--mac-spacing-2)',
+                  padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                  background: 'var(--mac-bg-primary)',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  cursor: 'pointer',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+                >
                   <input
                     type="checkbox"
                     checked={isInCart}
                     onChange={() => handleServiceToggle(service)}
+                    style={{ margin: 0, width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  <span className="service-label">
-                    <span className="service-name">{service.name}</span>
-                    <span className="service-price">{service.price?.toLocaleString()} сум</span>
+                  <span style={{
+                    flex: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 'var(--mac-spacing-2)'
+                  }}>
+                    <span style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-primary)',
+                      lineHeight: 1.3
+                    }}>
+                      {service.name}
+                    </span>
+                    <span style={{
+                      fontSize: 'var(--mac-font-size-xs)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      color: 'var(--mac-success)',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {service.price?.toLocaleString()} сум
+                    </span>
                   </span>
                 </label>
               );
@@ -1167,29 +1673,92 @@ const CartStepV2 = ({
           </div>
           
           {/* Лабораторные анализы - dropdown */}
-          <div className="dropdown-section">
+          <div style={{
+            borderBottom: '1px solid var(--mac-separator)'
+          }}>
             <button 
-              className={`dropdown-header ${expandedCategories.laboratory ? 'expanded' : ''}`}
+              style={{
+                width: '100%',
+                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+                background: expandedCategories.laboratory ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)',
+                border: 'none',
+                borderBottom: '1px solid var(--mac-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)'
+              }}
               onClick={() => toggleCategory('laboratory')}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = expandedCategories.laboratory ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)'}
             >
               <span>🧪 Лабораторные анализы ({groupedServices.laboratory.length})</span>
-              <ChevronDown size={18} className="dropdown-icon" />
+              <ChevronDown size={18} style={{
+                transition: 'transform var(--mac-duration-normal) var(--mac-ease)',
+                transform: expandedCategories.laboratory ? 'rotate(180deg)' : 'rotate(0deg)',
+                color: 'var(--mac-text-tertiary)'
+              }} />
             </button>
             
             {expandedCategories.laboratory && (
-              <div className="dropdown-content">
+              <div style={{
+                maxHeight: '300px',
+                overflowY: 'auto',
+                padding: 'var(--mac-spacing-3)',
+                background: 'var(--mac-bg-primary)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--mac-spacing-2)'
+              }}>
                 {groupedServices.laboratory.map(service => {
                   const isInCart = cart?.items?.some(item => item.service_id === service.id);
                   return (
-                    <label key={service.id} className="service-checkbox">
+                    <label key={service.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--mac-spacing-2)',
+                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                      background: 'var(--mac-bg-primary)',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+                    >
                       <input
                         type="checkbox"
                         checked={isInCart}
                         onChange={() => handleServiceToggle(service)}
+                        style={{ margin: 0, width: '18px', height: '18px', cursor: 'pointer' }}
                       />
-                      <span className="service-label">
-                        <span className="service-name">{service.name}</span>
-                        <span className="service-price">{service.price?.toLocaleString()} сум</span>
+                      <span style={{
+                        flex: 1,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 'var(--mac-spacing-2)'
+                      }}>
+                        <span style={{
+                          fontSize: 'var(--mac-font-size-sm)',
+                          color: 'var(--mac-text-primary)',
+                          lineHeight: 1.3
+                        }}>
+                          {service.name}
+                        </span>
+                        <span style={{
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-semibold)',
+                          color: 'var(--mac-success)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {service.price?.toLocaleString()} сум
+                        </span>
                       </span>
                     </label>
                   );
@@ -1200,34 +1769,118 @@ const CartStepV2 = ({
         </div>
         
         {/* Колонка 2: Косметология */}
-        <div className="service-column">
-          <div className="column-header">
-            <h4>✨ Косметологические процедуры</h4>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-md)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{
+            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+            background: 'var(--mac-bg-secondary)',
+            borderBottom: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md) var(--mac-radius-md) 0 0'
+          }}>
+            <h4 style={{
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)'
+            }}>
+              ✨ Косметологические процедуры
+            </h4>
           </div>
           
-          <div className="dropdown-section">
+          <div style={{
+            borderBottom: '1px solid var(--mac-separator)'
+          }}>
             <button 
-              className={`dropdown-header ${expandedCategories.cosmetology ? 'expanded' : ''}`}
+              style={{
+                width: '100%',
+                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+                background: expandedCategories.cosmetology ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)',
+                border: 'none',
+                borderBottom: '1px solid var(--mac-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)'
+              }}
               onClick={() => toggleCategory('cosmetology')}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = expandedCategories.cosmetology ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)'}
             >
               <span>Процедуры ({groupedServices.cosmetology.length})</span>
-              <ChevronDown size={18} className="dropdown-icon" />
+              <ChevronDown size={18} style={{
+                transition: 'transform var(--mac-duration-normal) var(--mac-ease)',
+                transform: expandedCategories.cosmetology ? 'rotate(180deg)' : 'rotate(0deg)',
+                color: 'var(--mac-text-tertiary)'
+              }} />
             </button>
             
             {expandedCategories.cosmetology && (
-              <div className="dropdown-content">
+              <div style={{
+                maxHeight: '300px',
+                overflowY: 'auto',
+                padding: 'var(--mac-spacing-3)',
+                background: 'var(--mac-bg-primary)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--mac-spacing-2)'
+              }}>
                 {groupedServices.cosmetology.map(service => {
                   const isInCart = cart?.items?.some(item => item.service_id === service.id);
                   return (
-                    <label key={service.id} className="service-checkbox">
+                    <label key={service.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--mac-spacing-2)',
+                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                      background: 'var(--mac-bg-primary)',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+                    >
                       <input
                         type="checkbox"
                         checked={isInCart}
                         onChange={() => handleServiceToggle(service)}
+                        style={{ margin: 0, width: '18px', height: '18px', cursor: 'pointer' }}
                       />
-                      <span className="service-label">
-                        <span className="service-name">{service.name}</span>
-                        <span className="service-price">{service.price?.toLocaleString()} сум</span>
+                      <span style={{
+                        flex: 1,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 'var(--mac-spacing-2)'
+                      }}>
+                        <span style={{
+                          fontSize: 'var(--mac-font-size-sm)',
+                          color: 'var(--mac-text-primary)',
+                          lineHeight: 1.3
+                        }}>
+                          {service.name}
+                        </span>
+                        <span style={{
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-semibold)',
+                          color: 'var(--mac-success)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {service.price?.toLocaleString()} сум
+                        </span>
                       </span>
                     </label>
                   );
@@ -1238,34 +1891,118 @@ const CartStepV2 = ({
         </div>
         
         {/* Колонка 3: Прочие услуги и корзина */}
-        <div className="service-column">
-          <div className="column-header">
-            <h4>📋 Дополнительные услуги</h4>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          border: '1px solid var(--mac-border)',
+          borderRadius: 'var(--mac-radius-md)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <div style={{
+            padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+            background: 'var(--mac-bg-secondary)',
+            borderBottom: '1px solid var(--mac-border)',
+            borderRadius: 'var(--mac-radius-md) var(--mac-radius-md) 0 0'
+          }}>
+            <h4 style={{
+              fontSize: 'var(--mac-font-size-base)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)'
+            }}>
+              📋 Дополнительные услуги
+            </h4>
           </div>
           
-          <div className="dropdown-section">
+          <div style={{
+            borderBottom: '1px solid var(--mac-separator)'
+          }}>
             <button 
-              className={`dropdown-header ${expandedCategories.other ? 'expanded' : ''}`}
+              style={{
+                width: '100%',
+                padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+                background: expandedCategories.other ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)',
+                border: 'none',
+                borderBottom: '1px solid var(--mac-border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)'
+              }}
               onClick={() => toggleCategory('other')}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = expandedCategories.other ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-primary)'}
             >
               <span>Прочие услуги ({groupedServices.other.length})</span>
-              <ChevronDown size={18} className="dropdown-icon" />
+              <ChevronDown size={18} style={{
+                transition: 'transform var(--mac-duration-normal) var(--mac-ease)',
+                transform: expandedCategories.other ? 'rotate(180deg)' : 'rotate(0deg)',
+                color: 'var(--mac-text-tertiary)'
+              }} />
             </button>
             
             {expandedCategories.other && (
-              <div className="dropdown-content">
+              <div style={{
+                maxHeight: '300px',
+                overflowY: 'auto',
+                padding: 'var(--mac-spacing-3)',
+                background: 'var(--mac-bg-primary)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--mac-spacing-2)'
+              }}>
                 {groupedServices.other.map(service => {
                   const isInCart = cart?.items?.some(item => item.service_id === service.id);
                   return (
-                    <label key={service.id} className="service-checkbox">
+                    <label key={service.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--mac-spacing-2)',
+                      padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                      background: 'var(--mac-bg-primary)',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-sm)',
+                      cursor: 'pointer',
+                      transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)'}
+                    >
                       <input
                         type="checkbox"
                         checked={isInCart}
                         onChange={() => handleServiceToggle(service)}
+                        style={{ margin: 0, width: '18px', height: '18px', cursor: 'pointer' }}
                       />
-                      <span className="service-label">
-                        <span className="service-name">{service.name}</span>
-                        <span className="service-price">{service.price?.toLocaleString()} сум</span>
+                      <span style={{
+                        flex: 1,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 'var(--mac-spacing-2)'
+                      }}>
+                        <span style={{
+                          fontSize: 'var(--mac-font-size-sm)',
+                          color: 'var(--mac-text-primary)',
+                          lineHeight: 1.3
+                        }}>
+                          {service.name}
+                        </span>
+                        <span style={{
+                          fontSize: 'var(--mac-font-size-xs)',
+                          fontWeight: 'var(--mac-font-weight-semibold)',
+                          color: 'var(--mac-success)',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {service.price?.toLocaleString()} сум
+                        </span>
                       </span>
                     </label>
                   );
@@ -1275,18 +2012,81 @@ const CartStepV2 = ({
           </div>
           
           {/* Мини-корзина */}
-          <div className="mini-cart">
-            <h5>🛒 Выбранные услуги</h5>
+          <div style={{
+            marginTop: 'auto',
+            padding: 'var(--mac-spacing-4)',
+            background: 'var(--mac-bg-secondary)',
+            borderTop: '1px solid var(--mac-border)',
+            borderRadius: '0 0 var(--mac-radius-md) var(--mac-radius-md)'
+          }}>
+            <h5 style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 var(--mac-spacing-3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)'
+            }}>
+              🛒 Выбранные услуги
+            </h5>
             {!cart?.items?.length ? (
-              <p className="empty-text">Услуги не выбраны</p>
+              <p style={{
+                fontSize: 'var(--mac-font-size-xs)',
+                color: 'var(--mac-text-tertiary)',
+                textAlign: 'center',
+                padding: 'var(--mac-spacing-5) 0',
+                margin: 0
+              }}>
+                Услуги не выбраны
+              </p>
             ) : (
-              <div className="selected-services">
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--mac-spacing-2)',
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
                 {cart.items.map(item => (
-                  <div key={item.id} className="selected-item">
-                    <span className="item-name">{item.service_name}</span>
+                  <div key={item.id} style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                    background: 'var(--mac-bg-primary)',
+                    border: '1px solid var(--mac-border)',
+                    borderRadius: 'var(--mac-radius-sm)',
+                    fontSize: 'var(--mac-font-size-xs)'
+                  }}>
+                    <span style={{
+                      color: 'var(--mac-text-primary)',
+                      flex: 1,
+                      marginRight: 'var(--mac-spacing-2)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {item.service_name}
+                    </span>
                     <button 
-                      className="remove-btn"
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'var(--mac-danger)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 'var(--mac-radius-sm)',
+                        cursor: 'pointer',
+                        transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                        flexShrink: 0
+                      }}
                       onClick={() => onRemoveFromCart(item.id)}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-danger-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-danger)'}
                       title="Удалить"
                     >
                       <X size={14} />
@@ -1301,15 +2101,39 @@ const CartStepV2 = ({
       
       {/* Ошибки валидации */}
       {(errors.cart || errors.doctors) && (
-        <div className="validation-errors">
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--mac-spacing-2)'
+        }}>
           {errors.cart && (
-            <div className="error-message">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+              background: '#fee2e2',
+              border: '1px solid #fecaca',
+              borderRadius: 'var(--mac-radius-md)',
+              color: '#991b1b',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
               <AlertCircle size={16} />
               {errors.cart}
             </div>
           )}
           {errors.doctors && (
-            <div className="error-message">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--mac-spacing-2)',
+              padding: 'var(--mac-spacing-3) var(--mac-spacing-4)',
+              background: '#fee2e2',
+              border: '1px solid #fecaca',
+              borderRadius: 'var(--mac-radius-md)',
+              color: '#991b1b',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
               <AlertCircle size={16} />
               {errors.doctors}
             </div>

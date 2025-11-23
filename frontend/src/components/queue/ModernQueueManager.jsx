@@ -1,29 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  QrCode, 
-  RefreshCw, 
-  Play, 
-  Pause, 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle,
-  Phone,
-  Calendar,
-  TrendingUp,
-  Download,
-  Printer,
-  Eye,
-  UserCheck,
-  X,
-  ChevronRight,
-  Activity
-} from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTheme } from '../../contexts/ThemeContext';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
-import './ModernQueueManager.css';
+import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Icon, Input } from '../ui/macos';
 
 const ModernQueueManager = ({
   selectedDate = new Date().toISOString().split('T')[0],
@@ -37,13 +17,12 @@ const ModernQueueManager = ({
   onDateChange,
   ...props
 }) => {
-  const { getColor } = useTheme();
+  const { theme: themeContext } = useTheme();
   const [loading, setLoading] = useState(false);
   const [queueData, setQueueData] = useState(null);
   const [statistics, setStatistics] = useState(null);
   const [qrData, setQrData] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  // Локальные значения если пропсы не переданы
   const [internalDoctor, setInternalDoctor] = useState('');
   const [internalDate, setInternalDate] = useState(new Date().toISOString().split('T')[0]);
   const effectiveDoctor = selectedDoctor || internalDoctor;
@@ -158,7 +137,6 @@ const ModernQueueManager = ({
     if (!effectiveDoctor) return;
     
     try {
-      // Мок данных для демонстрации
       const mockStats = {
         total_entries: 8,
         waiting: 3,
@@ -184,10 +162,8 @@ const ModernQueueManager = ({
     
     setLoading(true);
     try {
-      // Определяем отделение на основе врача
       const doctor = doctors.find(d => String(d.id) === String(effectiveDoctor));
       
-      // Используем админский эндпоинт (доступен Admin/Doctor/Registrar)
       const response = await fetch('/api/v1/admin/qr-tokens/generate', {
         method: 'POST',
         headers: {
@@ -238,7 +214,6 @@ const ModernQueueManager = ({
     
     setLoading(true);
     try {
-      // Мок для демонстрации
       await new Promise(resolve => setTimeout(resolve, 500));
       
       setQueueData(prev => prev ? { ...prev, is_open: true } : null);
@@ -280,7 +255,6 @@ const ModernQueueManager = ({
       
       if (result.success) {
         toast.success(`Вызван пациент: ${result.patient.name} (№${result.patient.number})`);
-        // Обновляем данные очереди
         await loadQueue();
       } else {
         toast.info(result.message || 'Нет пациентов в очереди');
@@ -293,7 +267,6 @@ const ModernQueueManager = ({
     }
   };
 
-  // Форматирование времени
   const formatTime = (dateString) => {
     return new Date(dateString).toLocaleTimeString('ru-RU', {
       hour: '2-digit',
@@ -301,18 +274,16 @@ const ModernQueueManager = ({
     });
   };
 
-  // Получение цвета статуса
   const getStatusColor = (status) => {
     switch (status) {
-      case 'waiting': return getColor('warning');
-      case 'called': return getColor('primary');
-      case 'completed': return getColor('success');
-      case 'cancelled': return getColor('danger');
-      default: return getColor('textSecondary');
+      case 'waiting': return 'var(--mac-warning)';
+      case 'called': return 'var(--mac-accent-blue)';
+      case 'completed': return 'var(--mac-success)';
+      case 'cancelled': return 'var(--mac-danger)';
+      default: return 'var(--mac-text-secondary)';
     }
   };
 
-  // Получение текста статуса
   const getStatusText = (status) => {
     switch (status) {
       case 'waiting': return 'Ожидает';
@@ -323,14 +294,12 @@ const ModernQueueManager = ({
     }
   };
 
-  // Скачивание QR кода
   const downloadQR = () => {
     if (!qrData || !qrData.qr_url) {
       toast.error('QR данные недоступны');
       return;
     }
     
-    // Создаем текстовый файл с информацией о QR коде
     const qrInfo = `
 QR код для онлайн-очереди
 
@@ -358,120 +327,182 @@ ${window.location.origin}${qrData.qr_url}
   };
 
   return (
-    <div className={`modern-queue-manager ${props.className || ''}`} {...props}>
-      {/* Заголовок */}
-      <div className="queue-header">
-        <h2 style={{ color: getColor('textPrimary') }}>
-          {t.title}
-        </h2>
-        
-        <div className="queue-actions">
-          <button
-            type="button"
-            className="queue-btn queue-btn--primary"
-            onClick={() => setShowStatsDialog(true)}
-            disabled={!statistics}
-            style={{
-              backgroundColor: getColor('primary'),
-              color: 'white'
-            }}
-          >
-            <TrendingUp size={18} />
-            <span>{t.statistics}</span>
-          </button>
-        </div>
-      </div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-5)' }}>
       {/* Статистические карточки */}
       {statistics && (
-        <div className="stats-grid">
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('primary') }}>
-              <Users size={24} />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 'var(--mac-spacing-4)'
+        }}>
+          <Card style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-4)',
+            padding: 'var(--mac-spacing-4)',
+            background: 'var(--surface)',
+            backdropFilter: 'var(--mac-blur-light)',
+            WebkitBackdropFilter: 'var(--mac-blur-light)',
+            border: '1px solid var(--mac-separator)',
+            boxShadow: 'var(--shadow)',
+            borderRadius: 'var(--mac-radius-lg)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Icon name="person" size="large" color="white" />
             </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
+            <div>
+              <div style={{
+                fontSize: 'var(--mac-font-size-2xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                lineHeight: 1
+              }}>
                 {statistics.total_entries}
               </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
+              <div style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
                 {t.totalEntries}
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('warning') }}>
-              <Clock size={24} />
+          <Card style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-4)',
+            padding: 'var(--mac-spacing-4)',
+            background: 'var(--surface)',
+            backdropFilter: 'var(--mac-blur-light)',
+            WebkitBackdropFilter: 'var(--mac-blur-light)',
+            border: '1px solid var(--mac-separator)',
+            boxShadow: 'var(--shadow)',
+            borderRadius: 'var(--mac-radius-lg)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--mac-warning)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Icon name="magnifyingglass" size="large" style={{ color: 'white' }} />
             </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
+            <div>
+              <div style={{
+                fontSize: 'var(--mac-font-size-2xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                lineHeight: 1
+              }}>
                 {statistics.waiting}
               </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
+              <div style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
                 {t.waiting}
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('success') }}>
-              <CheckCircle size={24} />
+          <Card style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--mac-spacing-4)',
+            padding: 'var(--mac-spacing-4)',
+            background: 'var(--surface)',
+            backdropFilter: 'var(--mac-blur-light)',
+            WebkitBackdropFilter: 'var(--mac-blur-light)',
+            border: '1px solid var(--mac-separator)',
+            boxShadow: 'var(--shadow)',
+            borderRadius: 'var(--mac-radius-lg)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--mac-radius-md)',
+              backgroundColor: 'var(--mac-success)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Icon name="checkmark.circle" size="large" style={{ color: 'white' }} />
             </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
+            <div>
+              <div style={{
+                fontSize: 'var(--mac-font-size-2xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                lineHeight: 1
+              }}>
                 {statistics.completed}
               </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
+              <div style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
                 {t.completed}
               </div>
             </div>
-          </div>
-
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('info') }}>
-              <Activity size={24} />
-            </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
-                {statistics.available_slots}
-              </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
-                {t.available}
-              </div>
-            </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* Панель управления */}
-      <div className="queue-controls" style={{ backgroundColor: getColor('cardBg') }}>
-        <div className="controls-section">
-          <h3 style={{ color: getColor('textPrimary') }}>Управление очередью</h3>
+      <Card style={{
+        padding: 'var(--mac-spacing-5)',
+        background: 'var(--surface)',
+        backdropFilter: 'var(--mac-blur-light)',
+        WebkitBackdropFilter: 'var(--mac-blur-light)',
+        border: '1px solid var(--mac-separator)',
+        boxShadow: 'var(--shadow)',
+        borderRadius: 'var(--mac-radius-lg)'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--mac-spacing-4)'
+        }}>
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-text-primary)',
+            margin: 0
+          }}>
+            Управление очередью
+          </h3>
           
-          <div className="controls-grid">
-            {/* Выбор даты */}
-            <div className="control-field">
-              <label style={{ color: getColor('textSecondary'), fontSize: '12px' }}>Дата</label>
-              <input
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 'var(--mac-spacing-3)',
+            alignItems: 'end'
+          }}>
+            <Input
                 type="date"
+              label="Дата"
                 value={effectiveDate}
                 onChange={(e) => {
                   setInternalDate(e.target.value);
                   onDateChange && onDateChange(e.target.value);
                 }}
-                style={{
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  border: '1px solid ' + getColor('border'),
-                  borderRadius: '6px',
-                  padding: '8px 10px'
-                }}
-              />
-            </div>
+            />
 
-            {/* Выбор врача */}
-            <div className="control-field">
-              <label style={{ color: getColor('textSecondary'), fontSize: '12px' }}>Специалист</label>
               <select
                 value={effectiveDoctor}
                 onChange={(e) => {
@@ -479,12 +510,14 @@ ${window.location.origin}${qrData.qr_url}
                   onDoctorChange && onDoctorChange(e.target.value);
                 }}
                 style={{
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  border: '1px solid ' + getColor('border'),
-                  borderRadius: '6px',
-                  padding: '8px 10px',
-                  minWidth: '14rem'
+                fontSize: 'var(--mac-font-size-base)',
+                padding: 'var(--mac-spacing-3)',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-md)',
+                minWidth: '200px',
+                fontFamily: 'inherit'
                 }}
               >
                 <option value="">Выберите врача</option>
@@ -494,234 +527,192 @@ ${window.location.origin}${qrData.qr_url}
                   </option>
                 ))}
               </select>
-            </div>
 
-            <button
-              type="button"
-              className="control-btn control-btn--primary"
+            <Button
+              variant="primary"
+              size="default"
               onClick={generateQR}
               disabled={!effectiveDoctor || loading}
-              style={{
-                backgroundColor: getColor('primary'),
-                color: 'white'
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
             >
-              <QrCode size={20} />
-              <span>{t.generateQr}</span>
-              {loading && <div className="btn-spinner" />}
-            </button>
+              <Icon name="magnifyingglass" size="small" style={{ color: 'white' }} />
+              {t.generateQr}
+            </Button>
 
-            <button
-              type="button"
-              className="control-btn control-btn--secondary"
+            <Button
+              variant="outline"
+              size="default"
               onClick={loadQueue}
-              disabled={!selectedDoctor || loading}
-              style={{
-                backgroundColor: getColor('cardBg'),
-                color: getColor('textPrimary'),
-                borderColor: getColor('border')
-              }}
+              disabled={!effectiveDoctor || loading}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
             >
-              <RefreshCw size={20} className={loading ? 'spinning' : ''} />
-              <span>{t.refreshQueue}</span>
-            </button>
-
-            <button
-              type="button"
-              className="control-btn control-btn--success"
-              onClick={openReception}
-              disabled={!selectedDoctor || loading || queueData?.is_open}
-              style={{
-                backgroundColor: queueData?.is_open ? getColor('success') : getColor('cardBg'),
-                color: queueData?.is_open ? 'white' : getColor('textPrimary'),
-                borderColor: getColor('success')
-              }}
-            >
-              {queueData?.is_open ? <CheckCircle size={20} /> : <Play size={20} />}
-              <span>{queueData?.is_open ? t.receptionOpen : t.openReception}</span>
-            </button>
-
-            <label className="auto-refresh-control">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                disabled={!selectedDoctor}
-              />
-              <div className="checkbox-custom" style={{ borderColor: getColor('border') }}>
-                {autoRefresh && <CheckCircle size={14} style={{ color: getColor('primary') }} />}
-              </div>
-              <span style={{ color: getColor('textPrimary') }}>{t.autoRefresh}</span>
-              {autoRefresh && <RefreshCw size={16} className="spinning" style={{ color: getColor('primary') }} />}
-            </label>
+              <Icon name="gear" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+              {t.refreshQueue}
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Текущая очередь */}
-      <div className="queue-list" style={{ backgroundColor: getColor('cardBg') }}>
-        <div className="queue-list-header">
-          <h3 style={{ color: getColor('textPrimary') }}>
+      <Card style={{
+        background: 'var(--surface)',
+        backdropFilter: 'var(--mac-blur-light)',
+        WebkitBackdropFilter: 'var(--mac-blur-light)',
+        border: '1px solid var(--mac-separator)',
+        boxShadow: 'var(--shadow)',
+        borderRadius: 'var(--mac-radius-lg)'
+      }}>
+        <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
+          <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              margin: 0,
+              marginBottom: 'var(--mac-spacing-3)'
+            }}>
             {t.currentQueue}
             {queueData && (
-              <div className="queue-status-container">
-                <span 
-                  className={`queue-status ${queueData.is_open ? 'open' : 'closed'}`}
-                  style={{ 
-                    backgroundColor: queueData.is_open ? getColor('success') : 
-                                   queueData.online_available ? getColor('primary') : getColor('warning'),
-                    color: 'white'
-                  }}
-                >
-                  {queueData.is_open ? t.receptionOpen : 
-                   queueData.online_available ? 'Онлайн-запись открыта' : 
-                   `Откроется в ${queueData.online_start_time}`}
-                </span>
-                {!queueData.is_open && (
-                  <div className="time-info" style={{ color: getColor('textSecondary'), fontSize: '12px', marginTop: '4px' }}>
-                    <Clock size={12} style={{ marginRight: '4px' }} />
-                    Сейчас: {queueData.current_time} | Запись: {queueData.online_start_time}-{queueData.online_end_time}
-                  </div>
-                )}
-              </div>
+                <Badge variant={queueData.is_open ? 'success' : 'secondary'} style={{ marginLeft: 'var(--mac-spacing-2)' }}>
+                  {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time}`}
+                </Badge>
             )}
           </h3>
-          
-          {queueData && (
-            <div className="queue-summary">
-              <span style={{ color: getColor('textSecondary') }}>
-                Всего: <strong style={{ color: getColor('textPrimary') }}>{queueData.total_entries}</strong>
-              </span>
-              <span style={{ color: getColor('textSecondary') }}>
-                Ожидают: <strong style={{ color: getColor('warning') }}>{queueData.waiting_entries}</strong>
-              </span>
-            </div>
-          )}
         </div>
 
-        <div className="queue-content">
-          {!selectedDoctor ? (
-            <div className="queue-message" style={{ color: getColor('textSecondary') }}>
-              <AlertCircle size={48} />
+          {!effectiveDoctor ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 'var(--mac-spacing-8)',
+              textAlign: 'center',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              <Icon name="magnifyingglass" size="xlarge" style={{ color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-4)' }} />
               <p>{t.selectDoctor}</p>
             </div>
           ) : !queueData ? (
-            <div className="queue-message" style={{ color: getColor('textSecondary') }}>
-              <QrCode size={48} />
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 'var(--mac-spacing-8)',
+              textAlign: 'center',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              <Icon name="magnifyingglass" size="xlarge" style={{ color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-4)' }} />
               <p>{t.queueNotFound}</p>
-              <button
-                type="button"
-                className="message-action-btn"
-                onClick={generateQR}
-                style={{
-                  backgroundColor: getColor('primary'),
-                  color: 'white'
-                }}
-              >
+              <Button variant="primary" onClick={generateQR} style={{ marginTop: 'var(--mac-spacing-4)' }}>
                 {t.generateQr}
-              </button>
+              </Button>
             </div>
           ) : queueData.entries.length === 0 ? (
-            <div className="queue-message" style={{ color: getColor('textSecondary') }}>
-              <Users size={48} />
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 'var(--mac-spacing-8)',
+              textAlign: 'center',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              <Icon name="person" size="xlarge" style={{ color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-4)' }} />
               <p>{t.queueEmpty}</p>
             </div>
           ) : (
-            <div className="queue-table">
-              <div className="queue-table-header">
-                <div className="queue-col queue-col--number">№</div>
-                <div className="queue-col queue-col--patient">{t.patient}</div>
-                <div className="queue-col queue-col--phone">{t.phone}</div>
-                <div className="queue-col queue-col--time">{t.time}</div>
-                <div className="queue-col queue-col--status">{t.status}</div>
-                <div className="queue-col queue-col--actions">{t.actions}</div>
+            <div style={{
+              display: 'table',
+              width: '100%',
+              borderCollapse: 'separate',
+              borderSpacing: 0
+            }}>
+              <div style={{
+                display: 'table-header-group'
+              }}>
+                <div style={{
+                  display: 'table-row',
+                  fontWeight: 'var(--mac-font-weight-semibold)',
+                  color: 'var(--mac-text-secondary)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  textTransform: 'uppercase'
+                }}>
+                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>№</div>
+                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.patient}</div>
+                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.phone}</div>
+                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.time}</div>
+                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.status}</div>
+                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.actions}</div>
+                </div>
               </div>
               
-              <div className="queue-table-body">
-                {queueData.entries.map((entry, index) => (
+              <div style={{ display: 'table-row-group' }}>
+                {queueData.entries.map((entry) => (
                   <div 
                     key={entry.id} 
-                    className={`queue-row ${entry.status === 'called' ? 'called' : ''}`}
                     style={{ 
-                      backgroundColor: getColor('cardBg'),
-                      borderColor: getColor('border')
+                      display: 'table-row',
+                      backgroundColor: entry.status === 'called' ? 'var(--mac-accent-blue-50)' : 'transparent',
+                      transition: 'background var(--mac-duration-normal)'
                     }}
                   >
-                    <div className="queue-col queue-col--number">
-                      <div 
-                        className={`queue-number ${entry.status === 'called' ? 'pulsing' : ''}`}
-                        style={{
-                          backgroundColor: entry.status === 'called' ? getColor('warning') : getColor('primary'),
-                          color: 'white'
-                        }}
-                      >
+                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
+                      <Badge variant={entry.status === 'called' ? 'warning' : 'primary'}>
                         {entry.number}
-                      </div>
+                      </Badge>
                     </div>
                     
-                    <div className="queue-col queue-col--patient">
-                      <div className="patient-info">
-                        <UserCheck size={16} style={{ color: getColor('textSecondary') }} />
-                        <span style={{ color: getColor('textPrimary') }}>
+                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                        <Icon name="person" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
+                        <span style={{ color: 'var(--mac-text-primary)' }}>
                           {entry.patient_name || 'Не указано'}
                         </span>
                       </div>
                     </div>
                     
-                    <div className="queue-col queue-col--phone">
-                      <div className="phone-info">
-                        <Phone size={16} style={{ color: getColor('textSecondary') }} />
-                        <span style={{ color: getColor('textSecondary') }}>
+                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                        <Icon name="phone" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
+                        <span style={{ color: 'var(--mac-text-secondary)' }}>
                           {entry.phone || 'Не указан'}
                         </span>
                       </div>
                     </div>
                     
-                    <div className="queue-col queue-col--time">
-                      <div className="time-info">
-                        <Clock size={16} style={{ color: getColor('textSecondary') }} />
-                        <span style={{ color: getColor('textSecondary') }}>
+                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+                        <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
+                        <span style={{ color: 'var(--mac-text-secondary)' }}>
                           {formatTime(entry.created_at)}
                         </span>
                       </div>
                     </div>
                     
-                    <div className="queue-col queue-col--status">
-                      <span 
-                        className={`status-badge status-${entry.status}`}
-                        style={{
-                          backgroundColor: getStatusColor(entry.status),
-                          color: 'white'
-                        }}
-                      >
+                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
+                      <Badge variant={entry.status === 'waiting' ? 'warning' : entry.status === 'called' ? 'primary' : entry.status === 'completed' ? 'success' : 'danger'}>
                         {getStatusText(entry.status)}
-                      </span>
+                      </Badge>
                     </div>
                     
-                    <div className="queue-col queue-col--actions">
+                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
                       {entry.status === 'waiting' && (
-                        <button
-                          type="button"
-                          className="action-btn action-btn--call"
+                        <Button
+                          variant="success"
+                          size="small"
                           onClick={() => callPatient(entry.id)}
                           disabled={loading}
-                          style={{
-                            backgroundColor: getColor('success'),
-                            color: 'white'
-                          }}
                           title={t.call}
                         >
-                          <Play size={16} />
-                        </button>
+                          <Icon name="checkmark" size="small" style={{ color: 'white' }} />
+                        </Button>
                       )}
                       {entry.status === 'called' && (
-                        <span 
-                          className="called-indicator"
-                          style={{ color: getColor('warning') }}
-                        >
-                          <Activity size={16} className="pulsing" />
+                        <Badge variant="warning">
                           {t.called}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -729,8 +720,8 @@ ${window.location.origin}${qrData.qr_url}
               </div>
             </div>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Диалог QR кода */}
       <ModernDialog
@@ -740,40 +731,25 @@ ${window.location.origin}${qrData.qr_url}
         maxWidth="32rem"
       >
         {qrData && (
-          <div className="qr-dialog-content">
-            <div className="qr-info" style={{ marginBottom: '16px' }}>
-              <p style={{ marginBottom: '8px' }}>
+          <div>
+            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
+              <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>
                 <strong>Специалист:</strong> {qrData.specialist_name}
               </p>
-              <p style={{ marginBottom: '8px' }}>
+              <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>
                 <strong>Дата приёма:</strong> {new Date(qrData.day).toLocaleDateString('ru-RU')}
               </p>
-              <p style={{ marginBottom: '8px' }}>
+              <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>
                 <strong>Окно онлайн-записи:</strong> {qrData.online_start_time} - {qrData.online_end_time}
-              </p>
-              <p style={{ marginBottom: '8px', fontSize: '0.875rem', color: getColor('textSecondary') }}>
-                ⏰ QR код действует с {qrData.online_start_time} до момента открытия приёма в регистратуре
-              </p>
-              <p style={{ fontSize: '0.875rem', color: getColor('textSecondary') }}>
-                📅 Токен истекает: {new Date(qrData.expires_at).toLocaleDateString('ru-RU')} в {formatTime(qrData.expires_at)}
               </p>
             </div>
             
-            <div className="qr-code-container" style={{ 
+            <div style={{
               textAlign: 'center', 
-              padding: '20px',
-              backgroundColor: getColor('cardBg'),
-              borderRadius: '8px',
-              marginBottom: '16px'
-            }}>
-              {qrData.qr_url ? (
-                <div>
-                  <div style={{
-                    display: 'inline-block',
-                    padding: '16px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    border: '2px solid ' + getColor('border')
+              padding: 'var(--mac-spacing-5)',
+              backgroundColor: 'var(--mac-bg-primary)',
+              borderRadius: 'var(--mac-radius-md)',
+              marginBottom: 'var(--mac-spacing-4)'
                   }}>
                     <QRCodeSVG
                       value={`${window.location.origin}${qrData.qr_url}`}
@@ -781,129 +757,17 @@ ${window.location.origin}${qrData.qr_url}
                       level="M"
                       includeMargin={true}
                     />
-                  </div>
-                  <p style={{ 
-                    marginTop: '12px', 
-                    fontSize: '0.75rem', 
-                    color: getColor('textSecondary'),
-                    wordBreak: 'break-all'
-                  }}>
-                    {window.location.origin}{qrData.qr_url}
-                  </p>
-                </div>
-              ) : (
-                <div className="qr-placeholder">
-                  <QrCode size={200} style={{ color: getColor('textSecondary') }} />
-                  <p style={{ color: getColor('textSecondary'), marginTop: '8px' }}>
-                    QR код загружается...
-                  </p>
-                </div>
-              )}
             </div>
             
-            <div className="qr-actions" style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="qr-action-btn"
-                onClick={downloadQR}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  border: '1px solid ' + getColor('border'),
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Download size={16} />
+            <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
+              <Button variant="outline" onClick={downloadQR} style={{ flex: 1 }}>
+                <Icon name="square.and.arrow.up" size="small" style={{ color: 'var(--mac-text-primary)' }} />
                 {t.download}
-              </button>
-              <button
-                type="button"
-                className="qr-action-btn"
-                onClick={() => window.print()}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: getColor('primary'),
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Printer size={16} />
+              </Button>
+              <Button variant="primary" onClick={() => window.print()} style={{ flex: 1 }}>
+                <Icon name="gear" size="small" style={{ color: 'white' }} />
                 {t.print}
-              </button>
-            </div>
-          </div>
-        )}
-      </ModernDialog>
-
-      {/* Диалог статистики */}
-      <ModernDialog
-        isOpen={showStatsDialog}
-        onClose={() => setShowStatsDialog(false)}
-        title="Детальная статистика очереди"
-        maxWidth="40rem"
-      >
-        {statistics && (
-          <div className="stats-dialog-content">
-            <div className="stats-detailed-grid">
-              <div className="stats-card">
-                <div className="stats-card-header">
-                  <Users size={20} />
-                  <span>Записи</span>
-                </div>
-                <div className="stats-card-body">
-                  <div className="stats-item">
-                    <span>Всего записей:</span>
-                    <strong>{statistics.total_entries}</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Ожидают:</span>
-                    <strong style={{ color: getColor('warning') }}>{statistics.waiting}</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Завершено:</span>
-                    <strong style={{ color: getColor('success') }}>{statistics.completed}</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Отменено:</span>
-                    <strong style={{ color: getColor('danger') }}>{statistics.cancelled}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="stats-card">
-                <div className="stats-card-header">
-                  <Clock size={20} />
-                  <span>Время ожидания</span>
-                </div>
-                <div className="stats-card-body">
-                  <div className="stats-item">
-                    <span>Среднее время:</span>
-                    <strong>{statistics.average_wait_time} мин</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Текущее ожидание:</span>
-                    <strong style={{ color: getColor('primary') }}>{statistics.current_wait_time} мин</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Свободных мест:</span>
-                    <strong style={{ color: getColor('info') }}>{statistics.available_slots}</strong>
-                  </div>
-                </div>
-              </div>
+              </Button>
             </div>
           </div>
         )}
@@ -913,5 +777,3 @@ ${window.location.origin}${qrData.qr_url}
 };
 
 export default ModernQueueManager;
-
-
