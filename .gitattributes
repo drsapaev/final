@@ -1,0 +1,38 @@
+# Установить поведение по умолчанию для всех файлов
+* text=auto
+
+# Явно указать текстовые файлы с LF окончаниями строк
+*.py text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.xml text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Бинарные файлы
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+
+# Игнорировать изменения окончаний строк для файлов настроек IDE
+.claude/** text eol=lf
+.vscode/** text eol=lf
+.idea/** text eol=lf
+

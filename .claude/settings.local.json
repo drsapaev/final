@@ -1,7 +1,35 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -X utf8:*)"
+      "Bash(python -X utf8:*)",
+      "Bash(python:*)",
+      "Bash(sqlite3:*)",
+      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(NUL)",
+      "Bash(start cmd:*)",
+      "Bash(timeout /t 3 /nobreak)",
+      "Bash(findstr:*)",
+      "Bash(ipconfig:*)",
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(ping:*)",
+      "Bash(dir \"C:\\Users\\Kompyuter-shop\\Pictures\\Screenshots\" /O-D)",
+      "Bash(echo:*)",
+      "Bash(QR_QUEUE_FIX_SUMMARY.md)",
+      "Bash(tasklist:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(git checkout:*)",
+      "Bash(copy clinic.db.backup_20251112_080658 clinic.db)",
+      "Bash(alembic upgrade:*)",
+      "Bash(alembic heads:*)",
+      "Bash(alembic stamp:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run lint:check:*)",
+      "Bash(npx eslint:*)",
+      "Bash(dir:*)",
+      "Bash(alembic revision:*)"
     ],
     "deny": [],
     "ask": []
