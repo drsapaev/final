@@ -1,3 +1,7 @@
+---
+alwaysApply: false
+---
+
 # Стандарты кодирования
 
 ## React/Frontend
@@ -71,3 +75,18 @@
 - **Проверяйте покрытие тестами** критических функций
 - **Выявляйте слабые тесты** и предлагайте улучшения
 - **Валидируйте интеграционные тесты** для API
+
+## Root-Cause Analysis (RCA) Requirements
+
+**MANDATORY:** Perform Root-Cause Analysis (RCA) before making any changes.
+
+**PROHIBITED:**
+
+- Adding checks "just in case"
+- Using try/catch as a workaround
+- Adding duplicate functions
+- Patching symptoms when the root cause is elsewhere
+
+**REQUIRED:**
+
+Each change must be a minimal, intentional diff that addresses the root cause.

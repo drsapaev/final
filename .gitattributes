@@ -33,6 +33,10 @@
 
 # Игнорировать изменения окончаний строк для файлов настроек IDE
 .claude/** text eol=lf
+.cursor/** text eol=lf
 .vscode/** text eol=lf
 .idea/** text eol=lf
+
+# Файлы Markdown с расширением .mdc
+*.mdc text eol=lf
 
