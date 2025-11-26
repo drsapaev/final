@@ -15,13 +15,13 @@ import { MacOSThemeProvider } from './theme/macosTheme';
 function initializeColorScheme() {
   const customScheme = localStorage.getItem('customColorScheme');
   const schemeId = localStorage.getItem('activeColorSchemeId');
-  
+
   if (customScheme === 'true' && schemeId) {
     const root = document.documentElement;
     // Полная нормализация: убираем светлую/тёмную тему и их атрибуты
     document.body.classList.remove('light-theme', 'dark-theme');
     document.documentElement.removeAttribute('data-theme');
-    
+
     if (schemeId === 'vibrant') {
       // Матовые приглушённые цвета
       root.style.setProperty('--mac-bg-primary', '#6b8db3'); /* Приглушённый синий */
@@ -101,6 +101,7 @@ import HeaderNew from './components/layout/HeaderNew.jsx';
 import Health from './pages/Health.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
+import ButtonShowcase from './components/buttons/ButtonShowcase.jsx';
 
 // Динамические импорты для больших страниц
 const CashierPanel = lazy(() => import('./pages/CashierPanel.jsx'));
@@ -123,12 +124,12 @@ const PatientPanel = lazy(() => import('./pages/PatientPanel.jsx'));
 const DisplayBoardUnified = lazy(() => import('./pages/DisplayBoardUnified.jsx'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage.jsx'));
 const MediLabDemo = lazy(() => import('./pages/MediLabDemo.jsx'));
-const QueueReorderDemo = lazy(() => import('./components/QueueReorderDemo'));
 const CSSTestPage = lazy(() => import('./pages/CSSTestPage'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess.jsx'));
 const PaymentCancel = lazy(() => import('./pages/PaymentCancel.jsx'));
 const PaymentTest = lazy(() => import('./pages/PaymentTest.jsx'));
 const MacOSDemoPage = lazy(() => import('./pages/MacOSDemoPage.jsx'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage.jsx'));
 
 // Стилизованные компоненты
 import LoginFormStyled from './components/auth/LoginFormStyled.jsx'; // Стилизованная версия в стиле системы
@@ -162,10 +163,44 @@ function hasRole(profile, roles) {
 
 function RequireAuth({ roles, children }) {
   const [st, setSt] = useState(auth.getState());
+  const [isChecking, setIsChecking] = useState(true);
   const loc = useLocation();
-  useEffect(() => auth.subscribe(setSt), []);
-  if (!st.token) return <Navigate to="/login" replace state={{ from: loc }} />;
-  if (!hasRole(st.profile, roles)) return <Navigate to="/" replace />;
+
+  useEffect(() => {
+    // Подписываемся на изменения auth
+    const unsubscribe = auth.subscribe(setSt);
+
+    // Проверяем токен при монтировании
+    const token = auth.getToken();
+    if (token && !st.profile) {
+      // Если есть токен, но нет профиля, пытаемся загрузить профиль
+      auth.getProfile().then(() => {
+        setIsChecking(false);
+      }).catch(() => {
+        setIsChecking(false);
+      });
+    } else {
+      setIsChecking(false);
+    }
+
+    return unsubscribe;
+  }, []);
+
+  // Показываем загрузку при проверке
+  if (isChecking) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Загрузка...</div>;
+  }
+
+  // Проверяем токен
+  if (!st.token) {
+    return <Navigate to="/login" replace state={{ from: loc }} />;
+  }
+
+  // Проверяем роли
+  if (!hasRole(st.profile, roles)) {
+    return <Navigate to="/" replace />;
+  }
+
   return children || <Outlet />;
 }
 
@@ -242,7 +277,7 @@ function getSidebarItems(path) {
       { id: 'settings', label: 'Settings', icon: 'gear' }
     ];
   }
-  
+
   // Doctor panel specific items (из старого DoctorPanel)
   if (path === '/doctor-panel') {
     return [
@@ -253,7 +288,7 @@ function getSidebarItems(path) {
       { id: 'reports', label: 'Reports', icon: 'doc.text' }
     ];
   }
-  
+
   // Patient panel specific items (из старого PatientPanel)
   if (path === '/patient-panel') {
     return [
@@ -262,7 +297,7 @@ function getSidebarItems(path) {
       { id: 'profile', label: 'Profile', icon: 'person' }
     ];
   }
-  
+
   // Registrar panel specific items (из старого RegistrarPanel)
   if (path === '/registrar-panel') {
     return [
@@ -277,7 +312,7 @@ function getSidebarItems(path) {
       { id: 'queue', label: 'Online Queue', icon: 'list' }
     ];
   }
-  
+
   // Dentist panel specific items (из старого DentistPanel)
   if (path === '/dentist') {
     return [
@@ -296,7 +331,7 @@ function getSidebarItems(path) {
       { id: 'ai-assistant', label: 'AI Assistant', icon: 'brain' }
     ];
   }
-  
+
   // Dermatologist panel specific items (из старого DermatologistPanel)
   if (path === '/dermatologist') {
     return [
@@ -312,7 +347,7 @@ function getSidebarItems(path) {
       { id: 'history', label: 'History', icon: 'doc.text' }
     ];
   }
-  
+
   // Cardiologist panel specific items (из старого CardiologistPanel)
   if (path === '/cardiologist') {
     return [
@@ -326,7 +361,7 @@ function getSidebarItems(path) {
       { id: 'history', label: 'History', icon: 'doc.text' }
     ];
   }
-  
+
   // Lab panel specific items (из LabPanel)
   if (path === '/lab-panel') {
     return [
@@ -337,7 +372,7 @@ function getSidebarItems(path) {
       { id: 'reports', label: 'Reports', icon: 'doc.text' }
     ];
   }
-  
+
   // Cashier panel specific items (из старого CashierPanel)
   if (path === '/cashier-panel') {
     return [
@@ -348,7 +383,7 @@ function getSidebarItems(path) {
       { id: 'settings', label: 'Settings', icon: 'gear' }
     ];
   }
-  
+
   // Default items for other panels
   const baseItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'house' },
@@ -357,72 +392,72 @@ function getSidebarItems(path) {
     { id: 'analytics', label: 'Analytics', icon: 'chart.bar' },
     { id: 'settings', label: 'Settings', icon: 'gear' }
   ];
-  
+
   return baseItems;
 }
 
 function getActiveItem(path) {
   if (path === '/') return 'dashboard';
-  
+
   // Admin panel - get from URL params
   if (path.startsWith('/admin')) {
     const urlParams = new URLSearchParams(window.location.search);
     const section = urlParams.get('section') || 'dashboard';
     return section;
   }
-  
+
   // Doctor panel - get from URL params
   if (path === '/doctor-panel') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'dashboard';
   }
-  
+
   // Patient panel - get from URL params
   if (path === '/patient-panel') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'appointments';
   }
-  
+
   // Registrar panel - get from URL params
   if (path === '/registrar-panel') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'welcome';
   }
-  
+
   // Dentist panel - get from URL params
   if (path === '/dentist') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'dashboard';
   }
-  
+
   // Dermatologist panel - get from URL params
   if (path === '/dermatologist') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'queue';
   }
-  
+
   // Cardiologist panel - get from URL params
   if (path === '/cardiologist') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'queue';
   }
-  
+
   // Cashier panel - get from URL params
   if (path === '/cashier-panel') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'dashboard';
   }
-  
+
   // Lab panel - get from URL params
   if (path === '/lab-panel') {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('tab') || 'tests';
   }
-  
+
   // Other panels
   if (path === '/settings') return 'settings';
   if (path === '/analytics') return 'analytics';
-  
+
   return 'dashboard';
 }
 
@@ -937,7 +972,7 @@ function AppShell() {
   const navigate = useNavigate();
   const path = location.pathname;
   const { theme } = useTheme(); // Добавляем доступ к теме
-  
+
   // Переприменяем кастомную схему при навигации между страницами
   useEffect(() => {
     const reapplyCustomScheme = () => {
@@ -947,10 +982,10 @@ function AppShell() {
         initializeColorScheme();
       }
     };
-    
+
     // Применить сразу при монтировании и при изменении location
     reapplyCustomScheme();
-    
+
     // Слушать события изменения цветовой схемы
     const handleSchemeChange = () => reapplyCustomScheme();
     window.addEventListener('colorSchemeChanged', handleSchemeChange);
@@ -959,7 +994,7 @@ function AppShell() {
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
     window.addEventListener('pageshow', handleVisibilityOrFocus);
-    
+
     return () => {
       window.removeEventListener('colorSchemeChanged', handleSchemeChange);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
@@ -967,14 +1002,14 @@ function AppShell() {
       window.removeEventListener('pageshow', handleVisibilityOrFocus);
     };
   }, [location.pathname]);
-  
-  const hideSidebar = path === '/registrar-panel' || 
-                     path === '/doctor-panel' || 
-                     path === '/cashier-panel';
-  
+
+  const hideSidebar = path === '/registrar-panel' ||
+    path === '/doctor-panel' ||
+    path === '/cashier-panel';
+
   // Полноэкранный режим для специализированных панелей
   const isFullscreen = path === '/cardiologist' || path === '/dermatologist' || path === '/dentist';
-  
+
   // Скрыть хедер для лендинга
   const hideHeader = path === '/';
 
@@ -990,8 +1025,8 @@ function AppShell() {
           <HeaderNew />
         </div>
       )}
-      
-      <div style={{ 
+
+      <div style={{
         display: 'grid', // Используем CSS Grid для правильного распределения пространства
         gridTemplateColumns: hideSidebar ? '1fr' : 'auto 1fr', // auto для сайдбара, 1fr для контента
         gap: '16px', // Возвращаем gap для правильных отступов между сайдбаром и контентом
@@ -1063,11 +1098,11 @@ function AppShell() {
             />
           </div>
         )}
-        
+
         <main style={{
           ...macOSMainStyle,
           marginTop: '0', // Убираем top margin, gap Grid обеспечит выравнивание
-          ...(theme === 'light' && { 
+          ...(theme === 'light' && {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' // Добавляем тень для светлой темы
           }),
           ...(hideSidebar && { maxWidth: 'none', margin: 0, padding: 0 }),
@@ -1091,7 +1126,7 @@ function AppShell() {
 function AppContent() {
   // Безопасный вызов PWA хука с fallback
   let shouldShowInstallPrompt = () => false;
-  
+
   try {
     const pwa = usePWA();
     shouldShowInstallPrompt = pwa.shouldShowInstallPrompt;
@@ -1104,83 +1139,84 @@ function AppContent() {
       {shouldShowInstallPrompt() && <PWAInstallPrompt />}
       <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '18px' }}>Загрузка...</div>}>
         <Routes>
-        <Route path="/login" element={<LoginFormStyled />} />
-        <Route path="/old-login" element={<Login />} />
-        <Route path="/health" element={<Health />} />
-        <Route path="/" element={<Landing />} />
-        <Route path="/medilab-demo" element={<MediLabDemo />} />
-        <Route path="/macos-demo" element={<MacOSDemoPage />} />
-        <Route path="/queue-reorder-demo" element={<QueueReorderDemo />} />
-        <Route path="/css-test" element={<CSSTestPage />} />
-        <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
-        <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
-        <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
-        <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
-        <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
-        <Route path="/queue/join" element={<QueueJoin />} />
-        <Route path="/queue/join/:token" element={<QueueJoin />} />
-        <Route path="/pwa/queue" element={<QueueJoin />} />
-        <Route path="/payment/success" element={<PaymentSuccess />} />
-        <Route path="/payment/cancel" element={<PaymentCancel />} />
-        <Route path="/payment/test" element={<PaymentTest />} />
-        <Route element={<RequireAuth />}>
-          <Route element={<AppShell />}>
-            <Route path="cashier-panel" element={<RequireAuth roles={['Admin','Cashier']}><CashierPanel /></RequireAuth>} />
-            <Route path="admin" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/analytics" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/users" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/doctors" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/services" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/patients" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/appointments" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/all-free" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/benefit-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/wizard-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/payment-providers" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/ai-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/telegram-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/display-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/activation" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/finance" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
-            <Route path="registrar-panel" element={<RequireAuth roles={['Admin','Registrar']}><RegistrarPanel /></RequireAuth>} />
-            <Route path="doctor-panel" element={<RequireAuth roles={['Admin','Doctor']}><DoctorPanel /></RequireAuth>} />
-            <Route path="cardiologist" element={<RequireAuth roles={['Admin','Doctor','cardio']}><CardiologistPanelUnified /></RequireAuth>} />
-            <Route path="dermatologist" element={<RequireAuth roles={['Admin','Doctor','derma']}><DermatologistPanelUnified /></RequireAuth>} />
-            <Route path="dentist" element={<RequireAuth roles={['Admin','Doctor','dentist']}><DentistPanelUnified /></RequireAuth>} />
-            <Route path="lab-panel" element={<RequireAuth roles={['Admin','Lab']}><LabPanel /></RequireAuth>} />
-            <Route path="patient-panel" element={<RequireAuth roles={['Admin','Patient','Registrar','Doctor']}><PatientPanel /></RequireAuth>} />
-            <Route path="queue-board" element={<DisplayBoardUnified />} />
-            <Route path="display-board" element={<DisplayBoardUnified />} />
-            <Route path="display-board/:role" element={<DisplayBoardUnified />} />
-            <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
-            <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
-            <Route path="scheduler" element={<RequireAuth roles={['Admin','Doctor','Registrar']}><Scheduler /></RequireAuth>} />
-            <Route path="appointments" element={<RequireAuth roles={['Admin','Registrar']}><Appointments /></RequireAuth>} />
-            <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
-            <Route path="visits/:id" element={<VisitDetails />} />
-            <Route path="search" element={<Search />} />
+          <Route path="/login" element={<LoginFormStyled />} />
+          <Route path="/old-login" element={<Login />} />
+          <Route path="/health" element={<Health />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/medilab-demo" element={<MediLabDemo />} />
+          <Route path="/macos-demo" element={<MacOSDemoPage />} />
+          <Route path="/css-test" element={<CSSTestPage />} />
+          <Route path="/buttons" element={<ButtonShowcase />} />
+          <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
+          <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
+          <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
+          <Route path="/medilab-demo/staff-schedule" element={<MediLabDemo />} />
+          <Route path="/user-select" element={<RequireAuth roles={['Admin']}><UserSelect /></RequireAuth>} />
+          <Route path="/queue/join" element={<QueueJoin />} />
+          <Route path="/queue/join/:token" element={<QueueJoin />} />
+          <Route path="/pwa/queue" element={<QueueJoin />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
+          <Route path="/payment/cancel" element={<PaymentCancel />} />
+          <Route path="/payment/test" element={<PaymentTest />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppShell />}>
+              <Route path="cashier-panel" element={<RequireAuth roles={['Admin', 'Cashier']}><CashierPanel /></RequireAuth>} />
+              <Route path="admin" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/analytics" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/users" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/doctors" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/services" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/patients" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/appointments" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/all-free" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/benefit-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/wizard-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/payment-providers" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/clinic-management" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/clinic-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/queue-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/ai-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/telegram-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/display-settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/activation" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/finance" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/reports" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/settings" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="admin/security" element={<RequireAuth roles={['Admin']}><AdminPanel /></RequireAuth>} />
+              <Route path="registrar-panel" element={<RequireAuth roles={['Admin', 'Registrar']}><RegistrarPanel /></RequireAuth>} />
+              <Route path="doctor-panel" element={<RequireAuth roles={['Admin', 'Doctor']}><DoctorPanel /></RequireAuth>} />
+              <Route path="cardiologist" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio']}><CardiologistPanelUnified /></RequireAuth>} />
+              <Route path="dermatologist" element={<RequireAuth roles={['Admin', 'Doctor', 'derma']}><DermatologistPanelUnified /></RequireAuth>} />
+              <Route path="dentist" element={<RequireAuth roles={['Admin', 'Doctor', 'dentist']}><DentistPanelUnified /></RequireAuth>} />
+              <Route path="lab-panel" element={<RequireAuth roles={['Admin', 'Lab']}><LabPanel /></RequireAuth>} />
+              <Route path="patient-panel" element={<RequireAuth roles={['Admin', 'Patient', 'Registrar', 'Doctor']}><PatientPanel /></RequireAuth>} />
+              <Route path="queue-board" element={<DisplayBoardUnified />} />
+              <Route path="display-board" element={<DisplayBoardUnified />} />
+              <Route path="display-board/:role" element={<DisplayBoardUnified />} />
+              <Route path="settings" element={<RequireAuth roles={['Admin']}><Settings /></RequireAuth>} />
+              <Route path="security" element={<RequireAuth><SecurityPage /></RequireAuth>} />
+              <Route path="audit" element={<RequireAuth roles={['Admin']}><Audit /></RequireAuth>} />
+              <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar']}><Scheduler /></RequireAuth>} />
+              <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar']}><Appointments /></RequireAuth>} />
+              <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
+              <Route path="visits/:id" element={<VisitDetails />} />
+              <Route path="search" element={<Search />} />
 
-            {/* Интегрированные скрытые компоненты */}
-            <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
-            <Route path="advanced-emr" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><EMRInterface /></RequireAuth>} />
-            <Route path="emr-demo" element={<EMRDemo />} />
-            <Route path="file-management" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><FileManager /></RequireAuth>} />
-            <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
-            <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
-            <Route path="security-settings" element={<RequireAuth roles={['Admin','Doctor','Nurse']}><TwoFactorManager /></RequireAuth>} />
+              {/* Интегрированные скрытые компоненты */}
+              <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
+              <Route path="advanced-emr" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><EMRInterface /></RequireAuth>} />
+              <Route path="emr-demo" element={<EMRDemo />} />
+              <Route path="file-management" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><FileManager /></RequireAuth>} />
+              <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
+              <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
+              <Route path="security-settings" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><TwoFactorManager /></RequireAuth>} />
 
-            {/* Демо интеграции */}
-            <Route path="integration-demo" element={<IntegrationDemo />} />
+              {/* Демо интеграции */}
+              <Route path="integration-demo" element={<IntegrationDemo />} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
           </Route>
-        </Route>
         </Routes>
       </Suspense>
     </>
@@ -1213,7 +1249,7 @@ const macOSWrapStyle = {
   flexDirection: 'column'
 };
 
-const macOSMainStyle = { 
+const macOSMainStyle = {
   flex: 1,
   maxWidth: '100%', // Убираем фиксированную ширину, позволяем CSS Grid управлять размером
   margin: '0', // Убираем центрирование, так как CSS Grid управляет позиционированием

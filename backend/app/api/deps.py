@@ -6,7 +6,7 @@ This module provides:
 - oauth2_scheme for extracting Bearer token
 - create_access_token(...) helper
 - get_current_user(...) which works with both async and sync SQLAlchemy sessions
-- require_roles(...) dependency factory
+- require_roles(...) dependency factory (алиас для security.require_roles)
 
 It is intentionally defensive: it supports get_db() returning either
 an AsyncSession or a regular (sync) Session / sessionmaker instance.
@@ -14,6 +14,7 @@ an AsyncSession or a regular (sync) Session / sessionmaker instance.
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
@@ -25,19 +26,11 @@ from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-# try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
-try:
-    from app.core.config import settings  # type: ignore
-except Exception:
-    # fallback if settings module is absent
-    class _Fallback:
-        SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
-        ALGORITHM = os.getenv("ALGORITHM", "HS256")
-        ACCESS_TOKEN_EXPIRE_MINUTES = int(
-            os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
-        )
+logger = logging.getLogger(__name__)
 
-    settings = _Fallback()
+# try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
+from app.core.config import settings  # type: ignore
+print(f"DEBUG: deps.py successfully imported settings. SECRET_KEY starts with: {settings.SECRET_KEY[:5]}")
 
 # import get_db lazily -- it may return AsyncSession or sync Session
 try:
@@ -54,11 +47,7 @@ except Exception:
     User = None  # type: ignore
 
 # import authentication service
-try:
-    from app.services.authentication_service import get_authentication_service  # type: ignore
-except Exception:
-    get_authentication_service = None  # type: ignore
-    User = Any  # type: ignore
+from app.services.authentication_service import get_authentication_service
 
 # Correct tokenUrl to point to our /auth/login
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/minimal-login")
@@ -96,34 +85,34 @@ def _username_from_token(token: str) -> Optional[str]:
             algorithms=[getattr(settings, "ALGORITHM", "HS256")],
         )
 
-        print(f"DEBUG _username_from_token: decoded payload={payload}")
+        logger.debug(f"_username_from_token: decoded payload={payload}")
 
         # Сначала пробуем поле 'username'
         username = payload.get("username")
         if isinstance(username, str):
-            print(f"DEBUG _username_from_token: found username={username}")
+            logger.debug(f"_username_from_token: found username={username}")
             return username
 
         # Fallback на 'sub' - может быть username или ID
         sub = payload.get("sub")
-        print(f"DEBUG _username_from_token: sub={sub}, type={type(sub)}")
+        logger.debug(f"_username_from_token: sub={sub}, type={type(sub)}")
         if isinstance(sub, str):
             # Если sub содержит @, то это username
             if '@' in sub:
-                print(f"DEBUG _username_from_token: sub contains @, returning as username")
+                logger.debug(f"_username_from_token: sub contains @, returning as username")
                 return sub
             # Если sub содержит только цифры, то это ID как строка - возвращаем для поиска по ID
             elif sub.isdigit():
-                print(f"DEBUG _username_from_token: sub is digit string, returning for ID search")
+                logger.debug(f"_username_from_token: sub is digit string, returning for ID search")
                 return sub
             else:
-                print(f"DEBUG _username_from_token: returning sub as username")
+                logger.debug(f"_username_from_token: returning sub as username")
                 return sub
 
-        print("DEBUG _username_from_token: no valid username found")
+        logger.debug("_username_from_token: no valid username found")
         return None
     except JWTError as e:
-        print(f"DEBUG _username_from_token: JWT decode error: {e}")
+        logger.debug(f"_username_from_token: JWT decode error: {e}")
         return None
 
 
@@ -136,9 +125,9 @@ async def _get_user_by_username(db, username: str) -> Optional[User]:
 
     Attempts to return a mapped User instance or None.
     """
-    print(f"DEBUG _get_user_by_username: looking for username={username}")
+    logger.debug(f"_get_user_by_username: looking for username={username}")
     if db is None:
-        print("DEBUG _get_user_by_username: db is None")
+        logger.debug("_get_user_by_username: db is None")
         return None
 
     execute_callable = getattr(db, "execute", None)
@@ -176,35 +165,35 @@ async def _get_user_by_id(db, user_id: int) -> Optional[User]:
     """
     Получить пользователя по числовому ID, поддерживая как AsyncSession, так и sync Session.
     """
-    print(f"DEBUG _get_user_by_id: looking for user_id={user_id}")
+    logger.debug(f"_get_user_by_id: looking for user_id={user_id}")
     if db is None:
-        print("DEBUG _get_user_by_id: db is None")
+        logger.debug("_get_user_by_id: db is None")
         return None
 
     execute_callable = getattr(db, "execute", None)
-    print(f"DEBUG _get_user_by_id: execute_callable type={type(execute_callable)}")
+    logger.debug(f"_get_user_by_id: execute_callable type={type(execute_callable)}")
     stmt = select(User).where(User.id == user_id)
-    print(f"DEBUG _get_user_by_id: stmt={stmt}")
+    logger.debug(f"_get_user_by_id: stmt={stmt}")
 
     if inspect.iscoroutinefunction(execute_callable):
-        print("DEBUG _get_user_by_id: using async execute")
+        logger.debug("_get_user_by_id: using async execute")
         result = await db.execute(stmt)
     else:
-        print("DEBUG _get_user_by_id: using sync execute")
+        logger.debug("_get_user_by_id: using sync execute")
         result = db.execute(stmt)
 
     try:
         user = result.scalar_one_or_none()
-        print(f"DEBUG _get_user_by_id: found user={user.username if user else 'None'}")
+        logger.debug(f"_get_user_by_id: found user={user.username if user else 'None'}")
         return user
     except Exception as e:
-        print(f"DEBUG _get_user_by_id: scalar_one_or_none error: {e}")
+        logger.debug(f"_get_user_by_id: scalar_one_or_none error: {e}")
         try:
             user = result.scalars().first()
-            print(f"DEBUG _get_user_by_id: found with scalars: {user.username if user else 'None'}")
+            logger.debug(f"_get_user_by_id: found with scalars: {user.username if user else 'None'}")
             return user
         except Exception as e2:
-            print(f"DEBUG _get_user_by_id: scalars error: {e2}")
+            logger.debug(f"_get_user_by_id: scalars error: {e2}")
             return None
 
 
@@ -217,26 +206,26 @@ async def get_current_user(
     Works with either async or sync DB sessions returned by get_db().
     Raises 401 on invalid token or missing user.
     """
-    print(f"DEBUG get_current_user: START with token={token[:30]}...")
+    logger.debug(f"get_current_user: START with token={token[:30]}...")
 
     # Пытаемся декодировать токен и поддержать оба варианта: username или числовой sub (user_id)
     username = _username_from_token(token)
-    print(f"DEBUG get_current_user: username from token={username}")
+    logger.debug(f"get_current_user: username from token={username}")
     user: Optional[User] = None
 
     try:
         if username:
-            print(f"DEBUG get_current_user: trying to find user by username={username}")
+            logger.debug(f"get_current_user: trying to find user by username={username}")
             # Если username содержит только цифры, то это ID
             if username.isdigit():
-                print(f"DEBUG get_current_user: username is digit, trying ID {int(username)}")
+                logger.debug(f"get_current_user: username is digit, trying ID {int(username)}")
                 user = await _get_user_by_id(db, int(username))
             else:
-                print(f"DEBUG get_current_user: username is not digit, trying username {username}")
+                logger.debug(f"get_current_user: username is not digit, trying username {username}")
                 user = await _get_user_by_username(db, username)
-            print(f"DEBUG get_current_user: user found={user.username if user else 'None'}")
+            logger.debug(f"get_current_user: user found={user.username if user else 'None'}")
         else:
-            print("DEBUG get_current_user: no username, trying payload fallback")
+            logger.debug("get_current_user: no username, trying payload fallback")
             # Падаем обратно на извлечение sub и поиск по ID
             try:
                 payload = jwt.decode(
@@ -244,24 +233,24 @@ async def get_current_user(
                     settings.SECRET_KEY,
                     algorithms=[getattr(settings, "ALGORITHM", "HS256")],
                 )
-                print(f"DEBUG get_current_user: payload={payload}")
+                logger.debug(f"get_current_user: payload={payload}")
                 sub = payload.get("sub")
-                print(f"DEBUG get_current_user: sub={sub}, type={type(sub)}")
+                logger.debug(f"get_current_user: sub={sub}, type={type(sub)}")
                 if isinstance(sub, str) and sub.isdigit():
-                    print(f"DEBUG get_current_user: sub is digit string, trying ID {int(sub)}")
+                    logger.debug(f"get_current_user: sub is digit string, trying ID {int(sub)}")
                     user = await _get_user_by_id(db, int(sub))
                 elif isinstance(sub, int):
-                    print(f"DEBUG get_current_user: sub is int, trying ID {sub}")
+                    logger.debug(f"get_current_user: sub is int, trying ID {sub}")
                     user = await _get_user_by_id(db, sub)
                 elif isinstance(sub, str):
-                    print(f"DEBUG get_current_user: sub is string, trying username {sub}")
+                    logger.debug(f"get_current_user: sub is string, trying username {sub}")
                     user = await _get_user_by_username(db, sub)
-                print(f"DEBUG get_current_user: user found by fallback={user.username if user else 'None'}")
+                logger.debug(f"get_current_user: user found by fallback={user.username if user else 'None'}")
             except JWTError:
-                print("DEBUG get_current_user: JWT decode error")
+                logger.debug("get_current_user: JWT decode error")
                 user = None
     except Exception as e:
-        print(f"DEBUG get_current_user: exception: {e}")
+        logger.debug(f"get_current_user: exception: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -270,7 +259,7 @@ async def get_current_user(
 
     if not user:
         try:
-            print("[deps.get_current_user] user not found")
+            logger.debug("[deps.get_current_user] user not found")
         except Exception:
             pass
         raise HTTPException(
@@ -279,45 +268,38 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        print(f"[deps.get_current_user] user ok id={getattr(user,'id',None)} username={getattr(user,'username',None)}")
+        logger.debug(f"[deps.get_current_user] user ok id={getattr(user,'id',None)} username={getattr(user,'username',None)}")
     except Exception:
         pass
     return user
 
 
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Dependency that returns the current authenticated and active User.
+    Raises 403 if user is not active.
+    """
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь деактивирован"
+        )
+    return current_user
+
+
+# require_roles() перемещена в app.core.security (SSOT)
+# Импортируем для обратной совместимости
 def require_roles(*roles: str) -> Callable[..., Any]:
     """
-    Dependency factory that enforces roles for the current user.
-    Usage:
-        @router.get("/secret")
-        def secret(user=Depends(require_roles("admin"))):
-            ...
-
-    If the user's attribute 'role' is not in roles and 'is_superuser' is False -> 403.
+    Dependency factory для проверки ролей (перенаправляет на SSOT).
+    
+    Эта функция теперь является алиасом для app.core.security.require_roles()
+    для обратной совместимости. Новый код должен использовать security.require_roles().
     """
-
-    def _dep(current_user: User = Depends(get_current_user)) -> User:
-        if not roles:
-            return current_user
-        role = getattr(current_user, "role", None)
-        is_super = bool(getattr(current_user, "is_superuser", False))
-        if is_super:
-            return current_user
-
-        # Проверяем роль с учетом регистра
-        role_lower = str(role).lower() if role else ""
-        roles_lower = [str(r).lower() for r in roles]
-
-        if role_lower not in roles_lower:
-            # Логирование для диагностики
-            print(f"[require_roles] Access denied - User: {current_user.username}, Role: '{role}' (lower: '{role_lower}'), Required: {roles} (lower: {roles_lower})")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail=f"Not enough permissions. User role: '{role}', Required roles: {roles}"
-            )
-        return current_user
-
-    return _dep
+    from app.core.security import require_roles as _require_roles
+    return _require_roles(*roles)
 
 
 def get_current_user_from_request(request: Request) -> Optional[User]:

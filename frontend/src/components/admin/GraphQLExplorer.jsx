@@ -59,12 +59,12 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "filter": {
-          "fullName": null
+        'filter': {
+          'fullName': null
         },
-        "pagination": {
-          "page": 1,
-          "perPage": 10
+        'pagination': {
+          'page': 1,
+          'perPage': 10
         }
       }
     },
@@ -92,8 +92,8 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "filter": {
-          "active": true
+        'filter': {
+          'active': true
         }
       }
     },
@@ -124,9 +124,9 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "filter": {
-          "dateFrom": new Date().toISOString().split('T')[0] + "T00:00:00Z",
-          "dateTo": new Date().toISOString().split('T')[0] + "T23:59:59Z"
+        'filter': {
+          'dateFrom': new Date().toISOString().split('T')[0] + 'T00:00:00Z',
+          'dateTo': new Date().toISOString().split('T')[0] + 'T23:59:59Z'
         }
       }
     },
@@ -152,8 +152,8 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "filter": {
-          "patientId": 1
+        'filter': {
+          'patientId': 1
         }
       }
     },
@@ -180,9 +180,9 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "filter": {
-          "category": "consultation",
-          "active": true
+        'filter': {
+          'category': 'consultation',
+          'active': true
         }
       }
     },
@@ -225,11 +225,11 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "input": {
-          "fullName": "Иванов Иван Иванович",
-          "phone": "+998901234567",
-          "email": "ivanov@example.com",
-          "birthDate": "1990-01-01"
+        'input': {
+          'fullName': 'Иванов Иван Иванович',
+          'phone': '+998901234567',
+          'email': 'ivanov@example.com',
+          'birthDate': '1990-01-01'
         }
       }
     },
@@ -260,12 +260,12 @@ const GraphQLExplorer = () => {
   }
 }`,
       variables: {
-        "input": {
-          "patientId": 1,
-          "doctorId": 1,
-          "serviceId": 1,
-          "appointmentDate": new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          "notes": "Первичная консультация"
+        'input': {
+          'patientId': 1,
+          'doctorId': 1,
+          'serviceId': 1,
+          'appointmentDate': new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          'notes': 'Первичная консультация'
         }
       }
     }

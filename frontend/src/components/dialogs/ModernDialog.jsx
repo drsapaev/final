@@ -3,18 +3,19 @@ import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import './ModernDialog.css';
 
-const ModernDialog = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children, 
+const ModernDialog = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  customHeader,
   actions,
   maxWidth = '28rem',
   showCloseButton = true,
   closeOnBackdrop = true,
   closeOnEscape = true,
   className = '',
-  ...props 
+  ...props
 }) => {
   const { theme, getColor } = useTheme();
   const dialogRef = useRef(null);
@@ -29,16 +30,16 @@ const ModernDialog = ({
         e.preventDefault();
         onClose();
       }
-      
+
       if (e.key === 'Tab') {
         const focusableElements = dialogRef.current?.querySelectorAll(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
-        
+
         if (focusableElements && focusableElements.length > 0) {
           const firstElement = focusableElements[0];
           const lastElement = focusableElements[focusableElements.length - 1];
-          
+
           if (e.shiftKey && document.activeElement === firstElement) {
             e.preventDefault();
             lastElement.focus();
@@ -51,7 +52,7 @@ const ModernDialog = ({
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    
+
     // Фокус на первый элемент
     setTimeout(() => {
       const firstFocusable = dialogRef.current?.querySelector(
@@ -64,7 +65,7 @@ const ModernDialog = ({
 
     // Блокируем скролл body
     document.body.style.overflow = 'hidden';
-    
+
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
@@ -80,54 +81,60 @@ const ModernDialog = ({
   };
 
   return (
-    <div 
+    <div
       className={`modern-dialog-backdrop ${className}`}
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? "dialog-title" : undefined}
+      aria-labelledby={title ? 'dialog-title' : undefined}
       style={{
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         backdropFilter: 'blur(4px)'
       }}
       {...props}
     >
-      <div 
+      <div
         ref={dialogRef}
         className="modern-dialog-container"
         style={{
           backgroundColor: getColor('cardBg'),
           maxWidth,
-          boxShadow: theme === 'dark' 
-            ? '0 25px 50px -12px rgba(0, 0, 0, 0.8)' 
+          boxShadow: theme === 'dark'
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
             : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
         }}
       >
         {/* Заголовок */}
-        {(title || showCloseButton) && (
+        {(customHeader || title || showCloseButton) && (
           <div className="modern-dialog-header">
-            {title && (
-              <h3 
-                id="dialog-title"
-                className="modern-dialog-title"
-                style={{ color: getColor('textPrimary') }}
-              >
-                {title}
-              </h3>
-            )}
-            {showCloseButton && (
-              <button
-                type="button"
-                className="modern-dialog-close"
-                onClick={onClose}
-                aria-label="Закрыть диалог"
-                style={{ 
-                  color: getColor('textSecondary'),
-                  backgroundColor: 'transparent'
-                }}
-              >
-                <X size={20} />
-              </button>
+            {customHeader ? (
+              customHeader
+            ) : (
+              <>
+                {title && (
+                  <h3
+                    id="dialog-title"
+                    className="modern-dialog-title"
+                    style={{ color: getColor('textPrimary') }}
+                  >
+                    {title}
+                  </h3>
+                )}
+                {showCloseButton && (
+                  <button
+                    type="button"
+                    className="modern-dialog-close"
+                    onClick={onClose}
+                    aria-label="Закрыть диалог"
+                    style={{
+                      color: getColor('textSecondary'),
+                      backgroundColor: 'transparent'
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -139,9 +146,9 @@ const ModernDialog = ({
 
         {/* Действия */}
         {actions && actions.length > 0 && (
-          <div 
+          <div
             className="modern-dialog-actions"
-            style={{ 
+            style={{
               backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb',
               borderTop: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`
             }}

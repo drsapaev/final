@@ -1,0 +1,363 @@
+/**
+ * ModernQueueManager Styles
+ * Modern, clean design for queue management interface
+ */
+
+.modern-queue-manager {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0;
+}
+
+/* Statistics Grid */
+.mqm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.mqm-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    transition: all var(--mac-duration-normal) var(--mac-ease);
+}
+
+.mqm-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--mac-shadow-lg);
+}
+
+.mqm-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--mac-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mqm-stat-icon.primary {
+    background: linear-gradient(135deg, var(--mac-accent-blue), #0066cc);
+}
+
+.mqm-stat-icon.warning {
+    background: linear-gradient(135deg, var(--mac-warning), #d97706);
+}
+
+.mqm-stat-icon.success {
+    background: linear-gradient(135deg, var(--mac-success), #059669);
+}
+
+.mqm-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--mac-text-primary);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.mqm-stat-label {
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    font-weight: 500;
+}
+
+/* Card Styles */
+.mqm-card {
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--mac-shadow-sm);
+}
+
+.mqm-controls-card {
+    padding: 24px;
+}
+
+.mqm-controls-header {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.mqm-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--mac-text-primary);
+    margin: 0;
+}
+
+/* Controls Grid */
+.mqm-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    align-items: end;
+}
+
+.mqm-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mqm-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mac-text-secondary);
+}
+
+.mqm-input,
+.mqm-select {
+    padding: 10px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-sm);
+    background: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    transition: all var(--mac-duration-fast) var(--mac-ease);
+    outline: none;
+}
+
+.mqm-input:focus,
+.mqm-select:focus {
+    border-color: var(--mac-accent-blue);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.mqm-input:hover,
+.mqm-select:hover {
+    border-color: var(--mac-border-secondary);
+}
+
+/* Actions */
+.mqm-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.mqm-button-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mqm-reception-btn {
+    min-width: 160px;
+}
+
+/* Queue Header */
+.mqm-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Queue Table Container */
+.queue-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.queue-table-container table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.queue-table-container th {
+    position: sticky;
+    top: 0;
+    background: var(--mac-bg-tertiary);
+    z-index: 10;
+}
+
+/* QR Modal */
+.mqm-qr-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 8px;
+}
+
+.mqm-qr-badge-container {
+    display: flex;
+    justify-content: center;
+}
+
+.mqm-qr-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: var(--mac-radius-full);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.mqm-qr-info-card {
+    background: var(--mac-bg-tertiary);
+    border-radius: var(--mac-radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mqm-qr-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.mqm-qr-label {
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    font-weight: 500;
+}
+
+.mqm-qr-value {
+    font-size: 14px;
+    color: var(--mac-text-primary);
+    font-weight: 600;
+    text-align: right;
+}
+
+.mqm-qr-value.highlight {
+    color: var(--mac-accent-blue);
+    font-size: 16px;
+}
+
+.mqm-qr-code-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: white;
+    border-radius: var(--mac-radius-lg);
+    min-height: 280px;
+}
+
+.mqm-qr-image,
+.mqm-qr-svg {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--mac-radius-sm);
+}
+
+.mqm-qr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--mac-text-secondary);
+}
+
+.mqm-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--mac-border);
+    border-top-color: var(--mac-accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.mqm-qr-footer-info {
+    text-align: center;
+    color: var(--mac-text-secondary);
+}
+
+.mqm-qr-instruction {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+    font-weight: 500;
+}
+
+.mqm-qr-expiry {
+    font-size: 12px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--mac-text-tertiary);
+}
+
+.mqm-qr-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.mqm-qr-action-btn {
+    min-width: 120px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .mqm-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mqm-controls-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mqm-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .mqm-actions button {
+        width: 100%;
+    }
+
+    .mqm-queue-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .mqm-qr-info-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .mqm-qr-value {
+        text-align: left;
+    }
+
+    .mqm-qr-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .mqm-qr-action-btn {
+        width: 100%;
+    }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .mqm-qr-code-container {
+        background: rgba(255, 255, 255, 0.95);
+    }
+}

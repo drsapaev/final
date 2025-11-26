@@ -123,6 +123,6 @@ const MacOSTextarea = React.forwardRef(({
   );
 });
 
-MacOSTextarea.displayName = "MacOSTextarea";
+MacOSTextarea.displayName = 'MacOSTextarea';
 
 export default MacOSTextarea;

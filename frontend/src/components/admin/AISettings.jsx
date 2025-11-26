@@ -21,6 +21,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { Card, Button, Badge, MacOSInput, MacOSCheckbox } from '../ui/macos';
+import { api } from '../../api/client';
 
 const AISettings = () => {
   const [loading, setLoading] = useState(true);
@@ -78,31 +79,22 @@ const AISettings = () => {
       setLoading(true);
       
       // Загружаем провайдеров, настройки и статистику
-      const [providersRes, settingsRes, statsRes] = await Promise.all([
-        fetch('/api/v1/admin/ai/providers', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        }),
-        fetch('/api/v1/admin/ai/settings', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        }),
-        fetch('/api/v1/admin/ai/stats?days_back=7', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        })
+      const [providersRes, settingsRes, statsRes] = await Promise.allSettled([
+        api.get('/admin/ai/providers'),
+        api.get('/admin/ai/settings'),
+        api.get('/admin/ai/stats?days_back=7')
       ]);
 
-      if (providersRes.ok) {
-        const providersData = await providersRes.json();
-        setProviders(providersData);
+      if (providersRes.status === 'fulfilled') {
+        setProviders(providersRes.value.data);
       }
 
-      if (settingsRes.ok) {
-        const settingsData = await settingsRes.json();
-        setSystemSettings(settingsData);
+      if (settingsRes.status === 'fulfilled') {
+        setSystemSettings(settingsRes.value.data);
       }
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
+      if (statsRes.status === 'fulfilled') {
+        setStats(statsRes.value.data);
       }
 
     } catch (error) {
@@ -115,35 +107,22 @@ const AISettings = () => {
 
   const handleSaveProvider = async (providerData) => {
     try {
-      const method = editingProvider ? 'PUT' : 'POST';
-      const url = editingProvider 
-        ? `/api/v1/admin/ai/providers/${editingProvider.id}`
-        : '/api/v1/admin/ai/providers';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(providerData)
-      });
-
-      if (response.ok) {
-        setMessage({ 
-          type: 'success', 
-          text: editingProvider ? 'Провайдер обновлен' : 'Провайдер создан' 
-        });
-        setEditingProvider(null);
-        setShowAddForm(false);
-        await loadData();
+      if (editingProvider) {
+        await api.put(`/admin/ai/providers/${editingProvider.id}`, providerData);
       } else {
-        const error = await response.json();
-        throw new Error(error.detail || 'Ошибка сохранения провайдера');
+        await api.post('/admin/ai/providers', providerData);
       }
+      
+      setMessage({ 
+        type: 'success', 
+        text: editingProvider ? 'Провайдер обновлен' : 'Провайдер создан' 
+      });
+      setEditingProvider(null);
+      setShowAddForm(false);
+      await loadData();
     } catch (error) {
       console.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: error.response?.data?.detail || error.message || 'Ошибка сохранения провайдера' });
     }
   };
 
@@ -151,26 +130,13 @@ const AISettings = () => {
     try {
       setTestResults(prev => ({ ...prev, [providerId]: { testing: true } }));
 
-      const response = await fetch(`/api/v1/admin/ai/providers/${providerId}/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          test_prompt: "Проверка подключения AI провайдера",
-          task_type: "text"
-        })
+      const response = await api.post(`/admin/ai/providers/${providerId}/test`, {
+        test_prompt: 'Проверка подключения AI провайдера',
+        task_type: 'text'
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setTestResults(prev => ({ ...prev, [providerId]: result }));
-        setMessage({ type: 'success', text: 'Тест провайдера выполнен успешно' });
-      } else {
-        const error = await response.json();
-        throw new Error(error.detail);
-      }
+      setTestResults(prev => ({ ...prev, [providerId]: response.data }));
+      setMessage({ type: 'success', text: 'Тест провайдера выполнен успешно' });
     } catch (error) {
       console.error('Ошибка тестирования:', error);
       setTestResults(prev => ({ 

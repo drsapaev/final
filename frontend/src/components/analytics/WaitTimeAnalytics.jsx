@@ -241,7 +241,7 @@ const WaitTimeAnalytics = () => {
           {summary.top_recommendations && summary.top_recommendations.length > 0 && (
             <div style={{ marginTop: '16px' }}>
               <h4 style={{ 
-                margin: `0 0 8px 0`,
+                margin: '0 0 8px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -396,7 +396,7 @@ const WaitTimeAnalytics = () => {
           {/* Общая статистика */}
           <MacOSCard style={{ padding: '24px' }}>
             <h3 style={{ 
-              margin: `0 0 16px 0`,
+              margin: '0 0 16px 0',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-lg)',
               fontWeight: 'var(--mac-font-weight-semibold)',
@@ -450,7 +450,7 @@ const WaitTimeAnalytics = () => {
           {Object.keys(analytics.department_breakdown).length > 0 && (
             <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -497,7 +497,7 @@ const WaitTimeAnalytics = () => {
           {analytics.recommendations && analytics.recommendations.length > 0 && (
             <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -597,7 +597,7 @@ const WaitTimeAnalytics = () => {
                   </div>
                   {data.service_efficiency && (
                     <MacOSBadge 
-                      variant={data.service_efficiency.efficiency_score > 80 ? "success" : "warning"}
+                      variant={data.service_efficiency.efficiency_score > 80 ? 'success' : 'warning'}
                     >
                       {data.service_efficiency.efficiency_score}% эффективность
                     </MacOSBadge>
@@ -679,7 +679,7 @@ const WaitTimeAnalytics = () => {
         <MacOSCard style={{ padding: '24px' }}>
           <div style={{ marginBottom: '16px' }}>
             <h4 style={{ 
-              margin: `0 0 8px 0`, 
+              margin: '0 0 8px 0', 
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-base)',
               fontWeight: 'var(--mac-font-weight-semibold)'
@@ -799,7 +799,7 @@ const WaitTimeAnalytics = () => {
             <MacOSInput
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
             />
           </div>
           <div>
@@ -815,7 +815,7 @@ const WaitTimeAnalytics = () => {
             <MacOSInput
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
             />
           </div>
           <div>
@@ -831,7 +831,7 @@ const WaitTimeAnalytics = () => {
             <MacOSInput
               placeholder="Фильтр по отделению"
               value={filters.department}
-              onChange={(e) => setFilters({...filters, department: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, department: e.target.value })}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'end' }}>

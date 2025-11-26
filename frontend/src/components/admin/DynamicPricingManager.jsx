@@ -501,7 +501,7 @@ const DynamicPricingManager = () => {
               <Label>Название</Label>
               <Input
                 value={ruleForm.name}
-                onChange={(e) => setRuleForm({...ruleForm, name: e.target.value})}
+                onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
                 placeholder="Название правила"
               />
             </div>
@@ -510,7 +510,7 @@ const DynamicPricingManager = () => {
               <Label>Тип правила</Label>
               <Select
                 value={ruleForm.rule_type}
-                onChange={(e) => setRuleForm({...ruleForm, rule_type: e.target.value})}
+                onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })}
               >
                 <option value="TIME_BASED">По времени</option>
                 <option value="VOLUME_BASED">По объему</option>
@@ -525,7 +525,7 @@ const DynamicPricingManager = () => {
               <Label>Тип скидки</Label>
               <Select
                 value={ruleForm.discount_type}
-                onChange={(e) => setRuleForm({...ruleForm, discount_type: e.target.value})}
+                onChange={(e) => setRuleForm({ ...ruleForm, discount_type: e.target.value })}
               >
                 <option value="PERCENTAGE">Процентная</option>
                 <option value="FIXED_AMOUNT">Фиксированная сумма</option>
@@ -539,7 +539,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="number"
                 value={ruleForm.discount_value}
-                onChange={(e) => setRuleForm({...ruleForm, discount_value: parseFloat(e.target.value)})}
+                onChange={(e) => setRuleForm({ ...ruleForm, discount_value: parseFloat(e.target.value) })}
                 placeholder="10"
               />
             </div>
@@ -549,7 +549,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="time"
                 value={ruleForm.start_time}
-                onChange={(e) => setRuleForm({...ruleForm, start_time: e.target.value + ':00'})}
+                onChange={(e) => setRuleForm({ ...ruleForm, start_time: e.target.value + ':00' })}
               />
             </div>
 
@@ -558,7 +558,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="time"
                 value={ruleForm.end_time}
-                onChange={(e) => setRuleForm({...ruleForm, end_time: e.target.value + ':00'})}
+                onChange={(e) => setRuleForm({ ...ruleForm, end_time: e.target.value + ':00' })}
               />
             </div>
 
@@ -567,7 +567,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="number"
                 value={ruleForm.min_quantity}
-                onChange={(e) => setRuleForm({...ruleForm, min_quantity: parseInt(e.target.value)})}
+                onChange={(e) => setRuleForm({ ...ruleForm, min_quantity: parseInt(e.target.value) })}
                 placeholder="1"
               />
             </div>
@@ -577,7 +577,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="number"
                 value={ruleForm.priority}
-                onChange={(e) => setRuleForm({...ruleForm, priority: parseInt(e.target.value)})}
+                onChange={(e) => setRuleForm({ ...ruleForm, priority: parseInt(e.target.value) })}
                 placeholder="0"
               />
             </div>
@@ -586,7 +586,7 @@ const DynamicPricingManager = () => {
               <Label>Описание</Label>
               <Textarea
                 value={ruleForm.description}
-                onChange={(e) => setRuleForm({...ruleForm, description: e.target.value})}
+                onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
                 placeholder="Описание правила"
               />
             </div>
@@ -598,7 +598,7 @@ const DynamicPricingManager = () => {
                 value={ruleForm.service_ids}
                 onChange={(e) => {
                   const values = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-                  setRuleForm({...ruleForm, service_ids: values});
+                  setRuleForm({ ...ruleForm, service_ids: values });
                 }}
               >
                 {services.map(service => (
@@ -818,7 +818,7 @@ const DynamicPricingManager = () => {
               <Label>Название</Label>
               <Input
                 value={packageForm.name}
-                onChange={(e) => setPackageForm({...packageForm, name: e.target.value})}
+                onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
                 placeholder="Название пакета"
               />
             </div>
@@ -828,7 +828,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="number"
                 value={packageForm.package_price}
-                onChange={(e) => setPackageForm({...packageForm, package_price: parseFloat(e.target.value)})}
+                onChange={(e) => setPackageForm({ ...packageForm, package_price: parseFloat(e.target.value) })}
                 placeholder="0"
               />
             </div>
@@ -838,7 +838,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="datetime-local"
                 value={packageForm.valid_from}
-                onChange={(e) => setPackageForm({...packageForm, valid_from: e.target.value})}
+                onChange={(e) => setPackageForm({ ...packageForm, valid_from: e.target.value })}
               />
             </div>
 
@@ -847,7 +847,7 @@ const DynamicPricingManager = () => {
               <Input
                 type="datetime-local"
                 value={packageForm.valid_to}
-                onChange={(e) => setPackageForm({...packageForm, valid_to: e.target.value})}
+                onChange={(e) => setPackageForm({ ...packageForm, valid_to: e.target.value })}
               />
             </div>
 
@@ -855,7 +855,7 @@ const DynamicPricingManager = () => {
               <Label>Описание</Label>
               <Textarea
                 value={packageForm.description}
-                onChange={(e) => setPackageForm({...packageForm, description: e.target.value})}
+                onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
                 placeholder="Описание пакета"
               />
             </div>
@@ -867,7 +867,7 @@ const DynamicPricingManager = () => {
                 value={packageForm.service_ids}
                 onChange={(e) => {
                   const values = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-                  setPackageForm({...packageForm, service_ids: values});
+                  setPackageForm({ ...packageForm, service_ids: values });
                 }}
               >
                 {services.map(service => (

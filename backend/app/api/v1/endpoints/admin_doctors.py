@@ -5,7 +5,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles
+from app.api.deps import get_db
+from app.core.security import require_roles
 from app.models.user import User
 from app.crud import clinic as crud_clinic
 from app.schemas.clinic import (
@@ -34,21 +35,42 @@ def get_doctors(
         if specialty:
             doctors = [d for d in doctors if d.specialty == specialty]
         
-        # Добавляем связанные данные
+        # Преобразуем в Pydantic модели с дополнительными данными
+        result = []
         for doctor in doctors:
-            # Загружаем пользователя
-            if doctor.user_id:
-                doctor.user = {
+            # Создаем базовый DoctorOut из объекта
+            doctor_dict = {
+                "id": doctor.id,
+                "user_id": doctor.user_id,
+                "specialty": doctor.specialty,
+                "cabinet": doctor.cabinet,
+                "price_default": doctor.price_default,
+                "start_number_online": doctor.start_number_online,
+                "max_online_per_day": doctor.max_online_per_day,
+                "auto_close_time": doctor.auto_close_time,
+                "active": doctor.active,
+                "created_at": doctor.created_at,
+                "updated_at": doctor.updated_at,
+            }
+            
+            # Добавляем данные пользователя
+            if doctor.user_id and doctor.user:
+                doctor_dict["user"] = {
                     "id": doctor.user.id,
                     "username": doctor.user.username,
                     "full_name": doctor.user.full_name,
                     "email": doctor.user.email
-                } if doctor.user else None
+                }
+            else:
+                doctor_dict["user"] = None
             
             # Загружаем расписания
-            doctor.schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
+            schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
+            doctor_dict["schedules"] = [ScheduleOut.model_validate(s) for s in schedules]
+            
+            result.append(DoctorOut(**doctor_dict))
         
-        return doctors
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,18 +92,37 @@ def get_doctor(
             detail=f"Врач с ID {doctor_id} не найден"
         )
     
-    # Добавляем связанные данные
-    if doctor.user_id:
-        doctor.user = {
+    # Создаем словарь для Pydantic модели
+    doctor_dict = {
+        "id": doctor.id,
+        "user_id": doctor.user_id,
+        "specialty": doctor.specialty,
+        "cabinet": doctor.cabinet,
+        "price_default": doctor.price_default,
+        "start_number_online": doctor.start_number_online,
+        "max_online_per_day": doctor.max_online_per_day,
+        "auto_close_time": doctor.auto_close_time,
+        "active": doctor.active,
+        "created_at": doctor.created_at,
+        "updated_at": doctor.updated_at,
+    }
+    
+    # Добавляем данные пользователя
+    if doctor.user_id and doctor.user:
+        doctor_dict["user"] = {
             "id": doctor.user.id,
             "username": doctor.user.username,
             "full_name": doctor.user.full_name,
             "email": doctor.user.email
-        } if doctor.user else None
+        }
+    else:
+        doctor_dict["user"] = None
     
-    doctor.schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
+    # Загружаем расписания
+    schedules = crud_clinic.get_doctor_schedules(db, doctor.id)
+    doctor_dict["schedules"] = [ScheduleOut.model_validate(s) for s in schedules]
     
-    return doctor
+    return DoctorOut(**doctor_dict)
 
 
 @router.post("/doctors", response_model=DoctorOut)
@@ -102,7 +143,38 @@ def create_doctor(
                 )
         
         new_doctor = crud_clinic.create_doctor(db, doctor)
-        return new_doctor
+        
+        # Преобразуем в DoctorOut с дополнительными данными
+        doctor_dict = {
+            "id": new_doctor.id,
+            "user_id": new_doctor.user_id,
+            "specialty": new_doctor.specialty,
+            "cabinet": new_doctor.cabinet,
+            "price_default": new_doctor.price_default,
+            "start_number_online": new_doctor.start_number_online,
+            "max_online_per_day": new_doctor.max_online_per_day,
+            "auto_close_time": new_doctor.auto_close_time,
+            "active": new_doctor.active,
+            "created_at": new_doctor.created_at,
+            "updated_at": new_doctor.updated_at,
+        }
+        
+        # Добавляем данные пользователя
+        if new_doctor.user_id and new_doctor.user:
+            doctor_dict["user"] = {
+                "id": new_doctor.user.id,
+                "username": new_doctor.user.username,
+                "full_name": new_doctor.user.full_name,
+                "email": new_doctor.user.email
+            }
+        else:
+            doctor_dict["user"] = None
+        
+        # Загружаем расписания
+        schedules = crud_clinic.get_doctor_schedules(db, new_doctor.id)
+        doctor_dict["schedules"] = [ScheduleOut.model_validate(s) for s in schedules]
+        
+        return DoctorOut(**doctor_dict)
     except HTTPException:
         raise
     except Exception as e:
@@ -139,7 +211,44 @@ def update_doctor(
                 )
         
         updated_doctor = crud_clinic.update_doctor(db, doctor_id, doctor)
-        return updated_doctor
+        
+        if not updated_doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Врач с ID {doctor_id} не найден"
+            )
+        
+        # Преобразуем в DoctorOut с дополнительными данными
+        doctor_dict = {
+            "id": updated_doctor.id,
+            "user_id": updated_doctor.user_id,
+            "specialty": updated_doctor.specialty,
+            "cabinet": updated_doctor.cabinet,
+            "price_default": updated_doctor.price_default,
+            "start_number_online": updated_doctor.start_number_online,
+            "max_online_per_day": updated_doctor.max_online_per_day,
+            "auto_close_time": updated_doctor.auto_close_time,
+            "active": updated_doctor.active,
+            "created_at": updated_doctor.created_at,
+            "updated_at": updated_doctor.updated_at,
+        }
+        
+        # Добавляем данные пользователя
+        if updated_doctor.user_id and updated_doctor.user:
+            doctor_dict["user"] = {
+                "id": updated_doctor.user.id,
+                "username": updated_doctor.user.username,
+                "full_name": updated_doctor.user.full_name,
+                "email": updated_doctor.user.email
+            }
+        else:
+            doctor_dict["user"] = None
+        
+        # Загружаем расписания
+        schedules = crud_clinic.get_doctor_schedules(db, updated_doctor.id)
+        doctor_dict["schedules"] = [ScheduleOut.model_validate(s) for s in schedules]
+        
+        return DoctorOut(**doctor_dict)
     except HTTPException:
         raise
     except Exception as e:

@@ -147,6 +147,6 @@ const MacOSRadio = React.forwardRef(({
   );
 });
 
-MacOSRadio.displayName = "MacOSRadio";
+MacOSRadio.displayName = 'MacOSRadio';
 
 export default MacOSRadio;

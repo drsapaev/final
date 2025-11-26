@@ -31,3 +31,29 @@ ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
 # CORS
 BACKEND_CORS_ORIGINS=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8080","http://127.0.0.1:8080"]
+
+# Firebase Cloud Messaging (FCM) для push уведомлений
+# Инструкция по получению ключа:
+# 1. Перейдите в Firebase Console: https://console.firebase.google.com/
+# 2. Создайте проект или выберите существующий
+# 3. Перейдите в Project Settings (⚙️) > Cloud Messaging
+# 4. В разделе "Cloud Messaging API (Legacy)" найдите "Server key"
+# 5. Скопируйте Server key и вставьте ниже
+# 
+# Альтернативный способ (для новых проектов):
+# 1. В Firebase Console: Project Settings > Service accounts
+# 2. Нажмите "Generate new private key" для создания service account
+# 3. Используйте этот JSON файл для аутентификации
+# 
+# FCM_SERVER_KEY - обязательный для работы push уведомлений
+FCM_SERVER_KEY=your_fcm_server_key_here
+
+# FCM_SENDER_ID - опциональный, используется для некоторых функций
+# Находится в Firebase Console > Project Settings > General > Your apps
+FCM_SENDER_ID=your_fcm_sender_id_here
+
+# FCM_PROJECT_ID - опциональный, ID вашего Firebase проекта
+FCM_PROJECT_ID=your_fcm_project_id_here
+
+# Включить/выключить FCM (по умолчанию false, активируется автоматически при наличии FCM_SERVER_KEY)
+FCM_ENABLED=true

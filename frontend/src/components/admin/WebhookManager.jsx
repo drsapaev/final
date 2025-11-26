@@ -39,7 +39,7 @@ import {
   MacOSModal
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const WebhookManager = () => {
   const [activeTab, setActiveTab] = useState('webhooks');
@@ -102,79 +102,42 @@ const WebhookManager = () => {
   // Действия с webhook'ами
   const handleActivateWebhook = async (webhookId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/webhooks/${webhookId}/activate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Webhook активирован');
-        loadWebhooks();
-      } else {
-        toast.error('Ошибка активации webhook\'а');
-      }
+      await api.post(`/webhooks/${webhookId}/activate`);
+      toast.success('Webhook активирован');
+      loadWebhooks();
     } catch (error) {
       console.error('Ошибка активации:', error);
-      toast.error('Ошибка активации webhook\'а');
+      toast.error(error.response?.data?.detail || 'Ошибка активации webhook\'а');
     }
   };
 
   const handleDeactivateWebhook = async (webhookId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/webhooks/${webhookId}/deactivate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Webhook деактивирован');
-        loadWebhooks();
-      } else {
-        toast.error('Ошибка деактивации webhook\'а');
-      }
+      await api.post(`/webhooks/${webhookId}/deactivate`);
+      toast.success('Webhook деактивирован');
+      loadWebhooks();
     } catch (error) {
       console.error('Ошибка деактивации:', error);
-      toast.error('Ошибка деактивации webhook\'а');
+      toast.error(error.response?.data?.detail || 'Ошибка деактивации webhook\'а');
     }
   };
 
   const handleTestWebhook = async (webhookId, eventType, testData) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/webhooks/${webhookId}/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          webhook_id: webhookId,
-          event_type: eventType,
-          test_data: testData
-        })
+      const result = await api.post(`/webhooks/${webhookId}/test`, {
+        webhook_id: webhookId,
+        event_type: eventType,
+        test_data: testData
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          toast.success('Тестовый webhook отправлен');
-        } else {
-          toast.error(`Ошибка тестирования: ${result.error_message}`);
-        }
+      if (result.data?.success) {
+        toast.success('Тестовый webhook отправлен');
       } else {
-        toast.error('Ошибка отправки тестового webhook\'а');
+        toast.error(`Ошибка тестирования: ${result.data?.error_message || 'Неизвестная ошибка'}`);
       }
     } catch (error) {
       console.error('Ошибка тестирования:', error);
-      toast.error('Ошибка тестирования webhook\'а');
+      toast.error(error.response?.data?.detail || 'Ошибка тестирования webhook\'а');
     }
   };
 
@@ -184,24 +147,12 @@ const WebhookManager = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/webhooks/${webhookId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Webhook удален');
-        loadWebhooks();
-      } else {
-        toast.error('Ошибка удаления webhook\'а');
-      }
+      await api.delete(`/webhooks/${webhookId}`);
+      toast.success('Webhook удален');
+      loadWebhooks();
     } catch (error) {
       console.error('Ошибка удаления:', error);
-      toast.error('Ошибка удаления webhook\'а');
+      toast.error(error.response?.data?.detail || 'Ошибка удаления webhook\'а');
     }
   };
 
@@ -362,7 +313,7 @@ const WebhookManager = () => {
                   type="text"
                   placeholder="Название или URL..."
                   value={filters.search}
-                  onChange={(e) => setFilters({...filters, search: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                   icon={Search}
                   iconPosition="left"
                 />
@@ -380,7 +331,7 @@ const WebhookManager = () => {
                 </label>
                 <MacOSSelect
                   value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                   options={[
                     { value: '', label: 'Все статусы' },
                     { value: 'active', label: 'Активен' },
@@ -403,7 +354,7 @@ const WebhookManager = () => {
                 </label>
                 <MacOSSelect
                   value={filters.event_type}
-                  onChange={(e) => setFilters({...filters, event_type: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, event_type: e.target.value })}
                   options={[
                     { value: '', label: 'Все события' },
                     { value: 'patient.created', label: 'Пациент создан' },
@@ -416,7 +367,7 @@ const WebhookManager = () => {
               
               <div style={{ display: 'flex', alignItems: 'end' }}>
                 <MacOSButton 
-                  onClick={() => setFilters({status: '', event_type: '', search: ''})}
+                  onClick={() => setFilters({ status: '', event_type: '', search: '' })}
                   variant="outline"
                   style={{ width: '100%' }}
                 >
@@ -633,7 +584,7 @@ const WebhookManager = () => {
                 </label>
                 <MacOSSelect
                   value={filters.call_status || ''}
-                  onChange={(e) => setFilters({...filters, call_status: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, call_status: e.target.value })}
                   options={[
                     { value: '', label: 'Все статусы' },
                     { value: 'success', label: 'Успешные' },
@@ -706,7 +657,7 @@ const WebhookManager = () => {
             <MacOSEmptyState
               icon={Activity}
               title="Вызовы не найдены"
-              description={selectedWebhook ? "Для этого webhook'а еще не было вызовов" : "Выберите webhook для просмотра его вызовов"}
+              description={selectedWebhook ? 'Для этого webhook\'а еще не было вызовов' : 'Выберите webhook для просмотра его вызовов'}
               iconStyle={{ width: '48px', height: '48px', color: 'var(--mac-text-tertiary)' }}
             />
           )}

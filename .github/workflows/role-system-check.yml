@@ -56,8 +56,7 @@ jobs:
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
         # Ensure Python can import 'app' package
-        echo "PYTHONPATH=${{ github.workspace }}/backend" >> $GITHUB_ENV
-        export PYTHONPATH="${{ github.workspace }}/backend:$PYTHONPATH"
+        export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
         
         echo "🔍 Диагностика окружения..."
         echo "Python version: $(python --version)"

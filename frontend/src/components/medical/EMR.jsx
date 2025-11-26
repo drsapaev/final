@@ -832,7 +832,7 @@ const EMRSystem = ({ appointment, onSave, onComplete }) => {
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 14, color: 'var(--mac-text-secondary)' }}>
-            {hasUnsavedChanges && "Есть несохраненные изменения"}
+            {hasUnsavedChanges && 'Есть несохраненные изменения'}
             {lastAutoSave && !hasUnsavedChanges && (
               <span style={{ marginLeft: 8 }}>
                 Последнее автосохранение: {lastAutoSave.toLocaleTimeString()}

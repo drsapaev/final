@@ -560,7 +560,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
           <textarea
             value={emrData.complaints}
             onChange={(e) => handleFieldChange('complaints', e.target.value)}
-            placeholder={isDentalSpecialty ? "Зубная боль, кровоточивость десен, неприятный запах изо рта..." : "Опишите жалобы пациента..."}
+            placeholder={isDentalSpecialty ? 'Зубная боль, кровоточивость десен, неприятный запах изо рта...' : 'Опишите жалобы пациента...'}
             style={{ width: '100%', height: 128, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, resize: 'none' }}
             disabled={!canSaveEMR}
           />
@@ -651,7 +651,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
           <textarea
             value={emrData.examination}
             onChange={(e) => handleFieldChange('examination', e.target.value)}
-            placeholder={isDentalSpecialty ? "Гигиена полости рта, состояние десен, состояние зубов, рентгенография..." : "Результаты осмотра..."}
+            placeholder={isDentalSpecialty ? 'Гигиена полости рта, состояние десен, состояние зубов, рентгенография...' : 'Результаты осмотра...'}
             style={{ width: '100%', height: 128, padding: 12, border: '1px solid var(--mac-border)', borderRadius: 8, resize: 'none' }}
             disabled={!canSaveEMR}
           />
@@ -1208,7 +1208,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 14, color: 'var(--mac-text-secondary)' }}>
-            {hasUnsavedChanges && "Есть несохраненные изменения"}
+            {hasUnsavedChanges && 'Есть несохраненные изменения'}
             {lastAutoSave && !hasUnsavedChanges && (
               <span style={{ marginLeft: 8 }}>
                 Последнее автосохранение: {lastAutoSave.toLocaleTimeString()}

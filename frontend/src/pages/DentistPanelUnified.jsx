@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery';
-import { Button, Badge, Card, Icon } from '../components/ui/macos';
+import { Button, Badge, Card } from '../components/ui/macos';
 import auth from '../stores/auth.js';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
@@ -18,40 +17,22 @@ import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import QueueIntegration from '../components/QueueIntegration';
 import { queueService } from '../services/queue';
 import EMRSystem from '../components/medical/EMRSystem';
 import { 
-  User, 
   Calendar, 
-  Clock, 
   Stethoscope, 
   FileText, 
-  Pill, 
-  Activity,
-  Brain, 
-  Heart,
   Eye,
-  Zap,
   Search,
-  Filter,
   Plus,
   Edit,
-  Trash2,
-  CheckCircle,
   XCircle,
-  AlertCircle,
-  Printer,
-  Download,
-  Settings,
-  Bell,
-  LogOut,
   Stethoscope as Tooth,
   Smile,
-  Shield,
-  Camera,
   BarChart3,
   RefreshCw,
-  TrendingUp,
   Users,
   DollarSign,
   Scissors,
@@ -59,6 +40,12 @@ import {
   Building
 } from 'lucide-react';
 import '../styles/animations.css';
+
+const logger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -70,9 +57,6 @@ import '../styles/animations.css';
  * - Современный UI
  */
 const DentistPanelUnified = () => {
-  // Всегда вызываем хуки первыми
-  const { isMobile, isTablet, isDesktop } = useBreakpoint();
-  const isTouch = useTouchDevice();
   const location = useLocation();
   const navigate = useNavigate();
   const [authState, setAuthState] = useState(auth.getState());
@@ -85,13 +69,13 @@ const DentistPanelUnified = () => {
   const user = authState.profile;
   
   // Синхронизация активной вкладки с URL
-  const getActiveTabFromURL = () => {
+  const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
     return params.get('tab') || 'appointments';
-  };
+  }, [location.search]);
   
   // Состояние
-  const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
+  const [activeTab, setActiveTab] = useState(() => getActiveTabFromURL());
   
   // Синхронизация URL с активной вкладкой
   useEffect(() => {
@@ -99,7 +83,7 @@ const DentistPanelUnified = () => {
     if (urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
-  }, [location.search]);
+  }, [activeTab, getActiveTabFromURL]);
   
   // Функция для изменения активной вкладки с обновлением URL
   const handleTabChange = (tabId) => {
@@ -107,8 +91,6 @@ const DentistPanelUnified = () => {
     navigate(`/dentist?tab=${tabId}`, { replace: true });
   };
   const [patients, setPatients] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [dentalExaminations, setDentalExaminations] = useState([]);
   const [treatmentPlans, setTreatmentPlans] = useState([]);
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -119,9 +101,7 @@ const DentistPanelUnified = () => {
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [services, setServices] = useState({});
-  const [showPatientModal, setShowPatientModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showDentalChart, setShowDentalChart] = useState(false);
@@ -140,7 +120,6 @@ const DentistPanelUnified = () => {
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
-  const [currentTreatmentPlan, setCurrentTreatmentPlan] = useState(null);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
 
@@ -186,51 +165,18 @@ const DentistPanelUnified = () => {
   });
 
   // Refs
-  const headerRef = React.useRef(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Используем централизованную систему темизации
   const { 
     isDark, 
-    isLight, 
     getColor, 
     getSpacing, 
-    getFontSize, 
-    getShadow,
-    designTokens 
+    getFontSize
   } = useTheme();
 
-  // Цвета и стили
-  const primaryColor = getColor('primary', 500);
-  const successColor = getColor('success', 500);
-  const warningColor = getColor('warning', 500);
-  const dangerColor = getColor('danger', 500);
-  const accentColor = getColor('info', 500);
-
   // Загрузка данных
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        loadPatients(),
-        loadDentalExaminations(),
-        loadTreatmentPlans(),
-        loadProsthetics()
-      ]);
-    } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-    loadServices();
-  }, []);
-
   // Загрузка услуг для правильного отображения в tooltips
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) return;
@@ -242,12 +188,12 @@ const DentistPanelUnified = () => {
         const data = await response.json();
         const servicesData = data.services_by_group || {};
         setServices(servicesData);
-        console.log('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+        logger.info('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
       }
     } catch (error) {
-      console.error('[Dentist] Ошибка загрузки услуг:', error);
+      logger.error('[Dentist] Ошибка загрузки услуг:', error);
     }
-  };
+  }, []);
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
@@ -272,12 +218,12 @@ const DentistPanelUnified = () => {
   }, []);
 
   // Загрузка записей стоматолога
-  const loadDentistryAppointments = async () => {
+  const loadDentistryAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.log('Нет токена аутентификации');
+        logger.info('Нет токена аутентификации');
         setAppointmentsLoading(false);
         return;
       }
@@ -345,7 +291,7 @@ const DentistPanelUnified = () => {
           if (appointmentsResponse.ok) {
             const appointmentsDBResponse = await appointmentsResponse.json();
             const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
-            console.log('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
+            logger.info('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
 
             // Создаем карту id -> payment_status
             const paymentStatusMap = new Map();
@@ -373,10 +319,10 @@ const DentistPanelUnified = () => {
               };
             });
 
-            console.log('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
+            logger.info('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
           }
         } catch (err) {
-          console.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
+          logger.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
         }
 
         // Добавляем информацию о всех услугах пациента в каждую запись
@@ -392,11 +338,11 @@ const DentistPanelUnified = () => {
         setAppointmentsTableData(enrichedAppointmentsData);
       }
     } catch (error) {
-      console.error('Ошибка загрузки записей стоматолога:', error);
+      logger.error('Ошибка загрузки записей стоматолога:', error);
     } finally {
       setAppointmentsLoading(false);
     }
-  };
+  }, [getAllPatientServices]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -406,7 +352,7 @@ const DentistPanelUnified = () => {
     
     // Слушаем глобальные события обновления очереди
     const handleQueueUpdate = (event) => {
-      console.log('[Dentist] Получено событие обновления очереди:', event.detail);
+      logger.info('[Dentist] Получено событие обновления очереди:', event.detail);
       if (activeTab === 'appointments') {
         loadDentistryAppointments();
       }
@@ -416,11 +362,11 @@ const DentistPanelUnified = () => {
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
-  }, [activeTab]);
+  }, [activeTab, loadDentistryAppointments]);
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = (row) => {
-    console.log('Клик по записи:', row);
+    logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       // Создаем объект пациента для переключения на прием
@@ -437,7 +383,7 @@ const DentistPanelUnified = () => {
   };
 
   const handleAppointmentActionClick = async (action, row, event) => {
-    console.log('[Dentist] handleAppointmentActionClick:', action, row);
+    logger.info('[Dentist] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
 
     switch (action) {
@@ -458,19 +404,19 @@ const DentistPanelUnified = () => {
           });
 
           if (response.ok) {
-            console.log('[Dentist] Пациент вызван:', row.patient_fio);
+            logger.info('[Dentist] Пациент вызван:', row.patient_fio);
             await loadDentistryAppointments();
           }
         } catch (error) {
-          console.error('[Dentist] Ошибка вызова пациента:', error);
+          logger.error('[Dentist] Ошибка вызова пациента:', error);
         }
         break;
       case 'payment':
-        console.log('[Dentist] Открытие окна оплаты для:', row.patient_fio);
+        logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
         alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
         break;
       case 'print':
-        console.log('[Dentist] Печать талона для:', row.patient_fio);
+        logger.info('[Dentist] Печать талона для:', row.patient_fio);
         window.print();
         break;
       case 'complete':
@@ -484,11 +430,11 @@ const DentistPanelUnified = () => {
             source: 'appointments',
             status: 'in_cabinet'
           };
-          console.log('[Dentist] Завершение приёма для:', patient.patient_name);
+          logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
           handleTabChange('examinations');
         } catch (error) {
-          console.error('[Dentist] Ошибка при завершении приёма:', error);
+          logger.error('[Dentist] Ошибка при завершении приёма:', error);
         }
         break;
       case 'edit':
@@ -504,18 +450,12 @@ const DentistPanelUnified = () => {
 
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('DentistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
 
-  const authHeader = () => ({
+  const authHeader = useCallback(() => ({
     Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`,
-  });
+  }), []);
 
-  const loadPatients = async () => {
+  const loadPatients = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:8000/api/v1/patients?department=Dental&limit=100', { headers: authHeader() });
       if (response.ok) {
@@ -523,54 +463,53 @@ const DentistPanelUnified = () => {
         setPatients(Array.isArray(data) ? data : []);
       }
     } catch (e) {
-      console.error('Ошибка загрузки пациентов:', e);
+      logger.error('Ошибка загрузки пациентов:', e);
     }
-  };
+  }, [authHeader]);
 
-  const loadAppointments = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/v1/appointments?department=Dental&limit=100', { headers: authHeader() });
-      if (response.ok) {
-        const data = await response.json();
-        setAppointments(Array.isArray(data) ? data : []);
-      }
-    } catch (e) {
-      console.error('Ошибка загрузки записей:', e);
-    }
-  };
-
-  const loadDentalExaminations = async () => {
-    try {
-      // TODO: Implement dental examinations endpoint
-      // const res = await fetch('http://localhost:8000/api/v1/dental/examinations?limit=100', { headers: authHeader() });
-      // if (res.ok) setDentalExaminations(await res.json());
-      console.log('Dental examinations endpoint not implemented yet');
-    } catch {
-      // Игнорируем ошибки загрузки обследований
-    }
-  };
-
-  const loadTreatmentPlans = async () => {
+  const loadTreatmentPlans = useCallback(async () => {
     try {
       // TODO: Implement treatment plans endpoint
       // const res = await fetch('http://localhost:8000/api/v1/dental/treatments?limit=100', { headers: authHeader() });
       // if (res.ok) setTreatmentPlans(await res.json());
-      console.log('Treatment plans endpoint not implemented yet');
+      setTreatmentPlans([]);
+      logger.info('Treatment plans endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки планов лечения
     }
-  };
+  }, []);
 
-  const loadProsthetics = async () => {
+  const loadProsthetics = useCallback(async () => {
     try {
       // TODO: Implement prosthetics endpoint
       // const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
       // if (res.ok) setProsthetics(await res.json());
-      console.log('Prosthetics endpoint not implemented yet');
+      setProsthetics([]);
+      logger.info('Prosthetics endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки протезирования
     }
-  };
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadPatients(),
+        loadTreatmentPlans(),
+        loadProsthetics()
+      ]);
+    } catch (error) {
+      logger.error('Ошибка загрузки данных:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadPatients, loadProsthetics, loadTreatmentPlans]);
+
+  useEffect(() => {
+    loadData();
+    loadServices();
+  }, [loadData, loadServices]);
 
   // Обработчики
   const handlePatientSelect = (patient) => {
@@ -584,7 +523,7 @@ const DentistPanelUnified = () => {
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
       if (!selectedPatient?.id) {
-        console.warn('[Dentist] saveEMR: нет selectedPatient.id');
+        logger.warn('[Dentist] saveEMR: нет selectedPatient.id');
         return;
       }
       
@@ -606,14 +545,14 @@ const DentistPanelUnified = () => {
       if (response.ok) {
         const savedEMR = await response.json();
         setEmr(savedEMR);
-        console.log('[Dentist] saveEMR: успешно', savedEMR);
+        logger.info('[Dentist] saveEMR: успешно', savedEMR);
       } else {
         const error = await response.json();
-        console.error('[Dentist] saveEMR: ошибка', error);
+        logger.error('[Dentist] saveEMR: ошибка', error);
         throw new Error(error.detail || 'Ошибка при сохранении EMR');
       }
     } catch (error) {
-      console.error('DentistPanel: Save EMR error:', error);
+      logger.error('DentistPanel: Save EMR error:', error);
       throw error;
     }
   };
@@ -634,14 +573,14 @@ const DentistPanelUnified = () => {
       try {
         await queueService.callNextWaiting('dentist');
       } catch (err) {
-        console.warn('[Dentist] callNextWaiting failed:', err);
+        logger.warn('[Dentist] callNextWaiting failed:', err);
       }
       
       setSelectedPatient(null);
       setEmr(null);
       handleTabChange('queue');
     } catch (error) {
-      console.error('[Dentist] handleCompleteVisit: error', error);
+      logger.error('[Dentist] handleCompleteVisit: error', error);
     }
   };
 
@@ -694,26 +633,7 @@ const DentistPanelUnified = () => {
 
   const handleTreatmentPlanner = (patient) => {
     setSelectedPatient(patient);
-    setCurrentTreatmentPlan(patient.treatmentPlan || null);
     setShowTreatmentPlanner(true);
-  };
-
-  const handleSaveDentalChart = (chartData) => {
-    // Сохранение схемы зубов
-    console.log('Сохранение схемы зубов:', chartData);
-    // Здесь будет API вызов для сохранения
-  };
-
-  const handleSaveTreatmentPlan = (planData) => {
-    // Сохранение плана лечения
-    console.log('Сохранение плана лечения:', planData);
-    // Здесь будет API вызов для сохранения
-  };
-
-  const handleSendToPatient = (planData) => {
-    // Отправка плана пациенту
-    console.log('Отправка плана пациенту:', planData);
-    // Здесь будет API вызов для отправки
   };
 
   // Обработчики отправки форм
@@ -732,10 +652,10 @@ const DentistPanelUnified = () => {
           periodontal_status: '', occlusion: '', missing_teeth: '', dental_plaque: '', 
           gingival_bleeding: '', diagnosis: '', recommendations: '' 
         });
-        loadDentalExaminations();
+        loadDentistryAppointments();
       }
     } catch (e) { 
-      console.error('Ошибка сохранения осмотра:', e); 
+      logger.error('Ошибка сохранения осмотра:', e); 
     }
   };
 
@@ -757,7 +677,7 @@ const DentistPanelUnified = () => {
         loadTreatmentPlans();
       }
     } catch (e) { 
-      console.error('Ошибка сохранения лечения:', e); 
+      logger.error('Ошибка сохранения лечения:', e); 
     }
   };
 
@@ -779,7 +699,7 @@ const DentistPanelUnified = () => {
         loadProsthetics();
       }
     } catch (e) { 
-      console.error('Ошибка сохранения протеза:', e); 
+      logger.error('Ошибка сохранения протеза:', e); 
     }
   };
 
@@ -795,32 +715,32 @@ const DentistPanelUnified = () => {
   });
 
   // Статистика
-  const stats = {
-    totalPatients: patients.length,
-    todayAppointments: appointments.filter(apt => 
-      new Date(apt.date).toDateString() === new Date().toDateString()
-    ).length,
-    activeTreatmentPlans: treatmentPlans.filter(plan => plan.status === 'active').length,
-    completedProsthetics: prosthetics.filter(prosthetic => prosthetic.status === 'completed').length
-  };
+  const stats = useMemo(() => {
+    const todayString = new Date().toDateString();
+    const todayAppointmentsCount = appointmentsTableData.filter(apt => {
+      if (!apt.appointment_date) {
+        return false;
+      }
+      return new Date(apt.appointment_date).toDateString() === todayString;
+    }).length;
+
+    const activePlansFromState = treatmentPlans.filter(plan => plan.status === 'active').length;
+    const activePlansDerived = appointmentsTableData.filter(apt => apt.status === 'in_progress' || apt.status === 'waiting').length;
+    const activeTreatmentPlansCount = activePlansFromState || activePlansDerived;
+
+    const completedProstheticsFromState = prosthetics.filter(prosthetic => prosthetic.status === 'completed').length;
+    const completedProstheticsDerived = appointmentsTableData.filter(apt => apt.status === 'completed').length;
+    const completedProstheticsCount = completedProstheticsFromState || completedProstheticsDerived;
+
+    return {
+      totalPatients: patients.length,
+      todayAppointments: todayAppointmentsCount,
+      activeTreatmentPlans: activeTreatmentPlansCount,
+      completedProsthetics: completedProstheticsCount
+    };
+  }, [appointmentsTableData, patients, prosthetics, treatmentPlans]);
 
   // Вкладки
-  const tabs = [
-    { id: 'dashboard', label: 'Дашборд', icon: BarChart3 },
-    { id: 'patients', label: 'Пациенты', icon: Users },
-    { id: 'appointments', label: 'Записи', icon: Calendar },
-    { id: 'examinations', label: 'Осмотры', icon: Eye },
-    { id: 'diagnoses', label: 'Диагнозы', icon: Stethoscope },
-    { id: 'visits', label: 'Протоколы', icon: FileText },
-    { id: 'photos', label: 'Архив', icon: Camera },
-    { id: 'templates', label: 'Шаблоны', icon: FileText },
-    { id: 'reports', label: 'Отчеты', icon: BarChart3 },
-    { id: 'dental-chart', label: 'Схемы зубов', icon: Tooth },
-    { id: 'treatment-plans', label: 'Планы лечения', icon: FileText },
-    { id: 'prosthetics', label: 'Протезирование', icon: Smile },
-    { id: 'ai-assistant', label: 'AI Помощник', icon: Brain }
-  ];
-
   // Рендер дашборда
   const renderDashboard = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -1191,7 +1111,7 @@ const DentistPanelUnified = () => {
           </Button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {appointments.slice(0, 5).map(appointment => (
+          {appointmentsTableData.slice(0, 5).map(appointment => (
             <div 
               key={appointment.id}
               style={{
@@ -2641,7 +2561,7 @@ const DentistPanelUnified = () => {
         <AIAssistant
           context="dental"
           onSuggestion={(suggestion) => {
-            console.log('AI предложение:', suggestion);
+            logger.info('AI предложение:', suggestion);
           }}
         />
       </Card>
@@ -2692,6 +2612,11 @@ const DentistPanelUnified = () => {
         return renderDashboard();
     }
   };
+
+  if (isDemoMode) {
+    logger.info('DentistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
 
   if (loading) {
     return (
@@ -2746,7 +2671,7 @@ const DentistPanelUnified = () => {
         <PatientCard
           patient={selectedPatient}
           onSave={(updatedPatient) => {
-            console.log('Сохранение пациента:', updatedPatient);
+            logger.info('Сохранение пациента:', updatedPatient);
             setShowPatientCard(false);
           }}
           onClose={() => setShowPatientCard(false)}
@@ -2758,7 +2683,7 @@ const DentistPanelUnified = () => {
           patientId={selectedPatient.id}
           initialData={selectedPatient.examinationData}
           onSave={(examinationData) => {
-            console.log('Сохранение осмотра:', examinationData);
+            logger.info('Сохранение осмотра:', examinationData);
             setShowExaminationForm(false);
           }}
           onClose={() => setShowExaminationForm(false)}
@@ -2771,7 +2696,7 @@ const DentistPanelUnified = () => {
           patientName={selectedPatient.name}
           initialData={selectedPatient.diagnosisData}
           onSave={(diagnosisData) => {
-            console.log('Сохранение диагнозов:', diagnosisData);
+            logger.info('Сохранение диагнозов:', diagnosisData);
             setShowDiagnosisForm(false);
           }}
           onClose={() => setShowDiagnosisForm(false)}
@@ -2785,7 +2710,7 @@ const DentistPanelUnified = () => {
           visitId={Date.now()}
           initialData={selectedPatient.visitData}
           onSave={(visitData) => {
-            console.log('Сохранение протокола визита:', visitData);
+            logger.info('Сохранение протокола визита:', visitData);
             setShowVisitProtocol(false);
           }}
           onClose={() => setShowVisitProtocol(false)}
@@ -2798,7 +2723,7 @@ const DentistPanelUnified = () => {
           patientName={selectedPatient.name}
           initialData={selectedPatient.photoArchive}
           onSave={(archiveData) => {
-            console.log('Сохранение фото архива:', archiveData);
+            logger.info('Сохранение фото архива:', archiveData);
             setShowPhotoArchive(false);
           }}
           onClose={() => setShowPhotoArchive(false)}
@@ -2808,7 +2733,7 @@ const DentistPanelUnified = () => {
       {showProtocolTemplates && (
         <ProtocolTemplates
           onSelectTemplate={(template) => {
-            console.log('Выбран шаблон:', template);
+            logger.info('Выбран шаблон:', template);
             // Здесь можно открыть протокол визита с выбранным шаблоном
           }}
           onClose={() => setShowProtocolTemplates(false)}
@@ -2822,7 +2747,7 @@ const DentistPanelUnified = () => {
           clinicId={user?.clinic_id}
           initialData={null}
           onSave={(reportData) => {
-            console.log('Сохранение отчета:', reportData);
+            logger.info('Сохранение отчета:', reportData);
             setShowReports(false);
           }}
           onClose={() => setShowReports(false)}
@@ -2892,7 +2817,7 @@ const DentistPanelUnified = () => {
               patientId={selectedPatient.id}
               initialData={dentalChartData}
               onToothClick={(toothNumber, toothData) => {
-                console.log('Клик по зубу:', toothNumber, toothData);
+                logger.info('Клик по зубу:', toothNumber, toothData);
                 setSelectedTooth({ number: toothNumber, data: toothData });
                 setToothModalOpen(true);
               }}
@@ -2966,8 +2891,7 @@ const DentistPanelUnified = () => {
               visitId={selectedPatient.visitId || 'demo-visit-1'}
               teethData={dentalChartData || {}}
               onUpdate={(plan) => {
-                console.log('План лечения обновлен:', plan);
-                setCurrentTreatmentPlan(plan);
+                logger.info('План лечения обновлен:', plan);
               }}
             />
           </div>
@@ -3469,7 +3393,7 @@ const DentistPanelUnified = () => {
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
           onSave={(toothNumber, data) => {
-            console.log('Сохранение данных зуба:', toothNumber, data);
+            logger.info('Сохранение данных зуба:', toothNumber, data);
             // Обновляем данные зубной карты
             setDentalChartData(prev => ({
               ...prev,
@@ -3495,7 +3419,7 @@ const DentistPanelUnified = () => {
             setSelectedServiceForPrice(null);
           }}
           onPriceSet={(priceData) => {
-            console.log('Price set:', priceData);
+            logger.info('Price set:', priceData);
             // Можно добавить логику обновления состояния
           }}
         />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../api/client';
 import {
   Box,
   Card,
@@ -78,19 +79,13 @@ const UserManagement = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/users/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.users || data);
-      } else {
-        setError('Ошибка загрузки пользователей');
-      }
+      const response = await api.get('/users/users');
+      setUsers(response.data.users || response.data || []);
+      setError('');
     } catch (err) {
-      setError('Ошибка подключения к серверу');
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка подключения к серверу';
+      setError(errorMessage);
+      console.error('Ошибка загрузки пользователей:', err);
     } finally {
       setLoading(false);
     }
@@ -98,98 +93,60 @@ const UserManagement = () => {
 
   const handleCreateUser = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/users/users', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(userForm)
-      });
-
-      if (response.ok) {
-        setSuccess('Пользователь успешно создан');
-        loadUsers();
-        setShowUserDialog(false);
-        resetForm();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка создания пользователя');
-      }
+      await api.post('/users/users', userForm);
+      setSuccess('Пользователь успешно создан');
+      setError('');
+      loadUsers();
+      setShowUserDialog(false);
+      resetForm();
     } catch (err) {
-      setError('Ошибка создания пользователя');
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка создания пользователя';
+      setError(errorMessage);
+      console.error('Ошибка создания пользователя:', err);
     }
   };
 
   const handleUpdateUser = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/users/users/${selectedUser.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(userForm)
-      });
-
-      if (response.ok) {
-        setSuccess('Пользователь успешно обновлен');
-        loadUsers();
-        setShowUserDialog(false);
-        setSelectedUser(null);
-        resetForm();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Ошибка обновления пользователя');
-      }
+      await api.put(`/users/users/${selectedUser.id}`, userForm);
+      setSuccess('Пользователь успешно обновлен');
+      setError('');
+      loadUsers();
+      setShowUserDialog(false);
+      setSelectedUser(null);
+      resetForm();
     } catch (err) {
-      setError('Ошибка обновления пользователя');
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обновления пользователя';
+      setError(errorMessage);
+      console.error('Ошибка обновления пользователя:', err);
     }
   };
 
   const handleDeleteUser = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/users/users/${selectedUser.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        setSuccess('Пользователь успешно удален');
-        loadUsers();
-        setShowDeleteDialog(false);
-        setSelectedUser(null);
-      } else {
-        setError('Ошибка удаления пользователя');
-      }
+      await api.delete(`/users/users/${selectedUser.id}`);
+      setSuccess('Пользователь успешно удален');
+      setError('');
+      loadUsers();
+      setShowDeleteDialog(false);
+      setSelectedUser(null);
     } catch (err) {
-      setError('Ошибка удаления пользователя');
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления пользователя';
+      setError(errorMessage);
+      console.error('Ошибка удаления пользователя:', err);
     }
   };
 
   const handleToggleUserStatus = async (userId, isActive) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/users/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ is_active: !isActive })
-      });
-
-      if (response.ok) {
-        setSuccess(`Пользователь ${!isActive ? 'активирован' : 'деактивирован'}`);
-        loadUsers();
-      } else {
-        setError('Ошибка изменения статуса пользователя');
-      }
+      await api.put(`/users/users/${userId}`, { is_active: !isActive });
+      setSuccess(`Пользователь ${!isActive ? 'активирован' : 'деактивирован'}`);
+      setError('');
+      loadUsers();
     } catch (err) {
-      setError('Ошибка изменения статуса пользователя');
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка изменения статуса пользователя';
+      setError(errorMessage);
+      console.error('Ошибка изменения статуса пользователя:', err);
     }
   };
 
@@ -263,7 +220,7 @@ const UserManagement = () => {
         </Typography>
         <Button
           variant="contained"
-          startIcon={<Add />}
+          startIcon={<Plus />}
           onClick={() => openUserDialog()}
         >
           Добавить пользователя
@@ -458,7 +415,7 @@ const UserManagement = () => {
                 fullWidth
                 label="Имя пользователя"
                 value={userForm.username}
-                onChange={(e) => setUserForm({...userForm, username: e.target.value})}
+                onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
                 required
               />
             </Grid>
@@ -467,7 +424,7 @@ const UserManagement = () => {
                 fullWidth
                 label="Полное имя"
                 value={userForm.full_name}
-                onChange={(e) => setUserForm({...userForm, full_name: e.target.value})}
+                onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -476,7 +433,7 @@ const UserManagement = () => {
                 label="Email"
                 type="email"
                 value={userForm.email}
-                onChange={(e) => setUserForm({...userForm, email: e.target.value})}
+                onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -484,7 +441,7 @@ const UserManagement = () => {
                 fullWidth
                 label="Телефон"
                 value={userForm.phone}
-                onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
+                onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -492,7 +449,7 @@ const UserManagement = () => {
                 <InputLabel>Роль</InputLabel>
                 <Select
                   value={userForm.role}
-                  onChange={(e) => setUserForm({...userForm, role: e.target.value})}
+                  onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
                   label="Роль"
                 >
                   {roles.map((role) => (
@@ -509,9 +466,9 @@ const UserManagement = () => {
                 label="Пароль"
                 type="password"
                 value={userForm.password}
-                onChange={(e) => setUserForm({...userForm, password: e.target.value})}
+                onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                 required={!selectedUser}
-                helperText={selectedUser ? "Оставьте пустым, чтобы не изменять" : "Обязательно для нового пользователя"}
+                helperText={selectedUser ? 'Оставьте пустым, чтобы не изменять' : 'Обязательно для нового пользователя'}
               />
             </Grid>
             <Grid item xs={12}>
@@ -519,7 +476,7 @@ const UserManagement = () => {
                 control={
                   <Switch
                     checked={userForm.is_active}
-                    onChange={(e) => setUserForm({...userForm, is_active: e.target.checked})}
+                    onChange={(e) => setUserForm({ ...userForm, is_active: e.target.checked })}
                   />
                 }
                 label="Активный пользователь"

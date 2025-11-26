@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../api/client';
 import { 
   Building2, 
   Wrench, 
@@ -30,6 +31,7 @@ import BranchManagement from './BranchManagement';
 import EquipmentManagement from './EquipmentManagement';
 import LicenseManagement from './LicenseManagement';
 import BackupManagement from './BackupManagement';
+import ClinicSettings from './ClinicSettings';
 
 const ClinicManagement = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -59,23 +61,16 @@ const ClinicManagement = () => {
       setLoading(true);
       
       // Загружаем статистику и состояние системы параллельно
-      const [statsResponse, healthResponse] = await Promise.all([
-        fetch('/api/v1/clinic/stats', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }),
-        fetch('/api/v1/clinic/health', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        })
+      // Эти эндпоинты помечены как некритичные в interceptor, чтобы не перенаправлять на login
+      const [statsResponse, healthResponse] = await Promise.allSettled([
+        api.get('/clinic/stats').catch(err => Promise.reject(err)),
+        api.get('/clinic/health').catch(err => Promise.reject(err))
       ]);
 
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats(statsData);
+      if (statsResponse.status === 'fulfilled') {
+        setStats(statsResponse.value.data);
       } else {
+        console.error('Ошибка загрузки статистики:', statsResponse.reason);
         // Fallback данные для статистики
         setStats({
           total_branches: 3,
@@ -89,10 +84,10 @@ const ClinicManagement = () => {
         });
       }
 
-      if (healthResponse.ok) {
-        const healthData = await healthResponse.json();
-        setSystemHealth(healthData);
+      if (healthResponse.status === 'fulfilled') {
+        setSystemHealth(healthResponse.value.data);
       } else {
+        console.error('Ошибка загрузки состояния системы:', healthResponse.reason);
         // Fallback данные для состояния системы
         setSystemHealth({
           status: 'healthy',
@@ -492,113 +487,6 @@ const ClinicManagement = () => {
     </div>
   );
 
-  const renderSettings = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <MacOSCard style={{ padding: '16px' }}>
-          <h3 style={{ 
-            fontSize: 'var(--mac-font-size-lg)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
-            color: 'var(--mac-text-primary)', 
-            marginBottom: '16px' 
-          }}>
-            Настройки системы
-          </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
-            }}>
-              Автоматическое резервное копирование
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MacOSCheckbox
-                defaultChecked={true}
-                onChange={(checked) => console.log('Backup enabled:', checked)}
-              />
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)' 
-              }}>
-                Включить ежедневное резервное копирование
-              </span>
-            </div>
-          </div>
-          
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
-            }}>
-              Уведомления о состоянии системы
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MacOSCheckbox
-                defaultChecked={true}
-                onChange={(checked) => console.log('Notifications enabled:', checked)}
-              />
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)' 
-              }}>
-                Получать уведомления о проблемах
-              </span>
-            </div>
-          </div>
-          
-          <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
-            }}>
-              Мониторинг оборудования
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <MacOSCheckbox
-                defaultChecked={true}
-                onChange={(checked) => console.log('Equipment monitoring enabled:', checked)}
-              />
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                color: 'var(--mac-text-secondary)' 
-              }}>
-                Отслеживать сроки обслуживания
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        <div style={{ 
-          marginTop: '24px', 
-          display: 'flex', 
-          justifyContent: 'flex-end' 
-        }}>
-          <MacOSButton
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              backgroundColor: 'var(--mac-accent-blue)',
-              border: 'none',
-              padding: '8px 16px'
-            }}
-          >
-            <Save style={{ width: '16px', height: '16px' }} />
-            Сохранить настройки
-          </MacOSButton>
-        </div>
-      </MacOSCard>
-    </div>
-  );
 
   // Состояние загрузки
   if (loading) {
@@ -728,7 +616,7 @@ const ClinicManagement = () => {
         {activeTab === 'equipment' && <EquipmentManagement />}
         {activeTab === 'licenses' && <LicenseManagement />}
         {activeTab === 'backups' && <BackupManagement />}
-        {activeTab === 'settings' && renderSettings()}
+        {activeTab === 'settings' && <ClinicSettings />}
         </div>
       </MacOSCard>
 

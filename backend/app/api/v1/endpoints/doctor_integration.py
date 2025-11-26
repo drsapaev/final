@@ -23,6 +23,7 @@ from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
 from app.crud import visit as crud_visit
 from app.services.notification_service import NotificationService
+from app.services.service_mapping import get_service_code
 
 router = APIRouter()
 
@@ -101,10 +102,14 @@ def get_doctor_queue_today(
         
         today = date.today()
         
-        # Получаем дневную очередь
-        daily_queue = db.query(DailyQueue).filter(
-            and_(DailyQueue.day == today, DailyQueue.specialist_id == doctor.id)
-        ).first()
+        # ⭐ ВАЖНО: DailyQueue.specialist_id - это user_id, а не doctor_id
+        # Получаем дневную очередь по user_id
+        doctor_user_id = doctor.user_id if doctor.user_id else None
+        daily_queue = None
+        if doctor_user_id:
+            daily_queue = db.query(DailyQueue).filter(
+                and_(DailyQueue.day == today, DailyQueue.specialist_id == doctor_user_id)
+            ).first()
         
         if not daily_queue:
             return {
@@ -216,9 +221,22 @@ def call_patient(
         
         # Проверяем что врач имеет право работать с этой очередью
         daily_queue = queue_entry.queue
+
+        if not daily_queue:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Очередь не найдена"
+            )
+
         doctor = daily_queue.specialist
-        
-        if current_user.role != "Admin" and doctor.user_id != current_user.id:
+
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Врач не найден для этой очереди"
+            )
+
+        if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для работы с этой очередью"
@@ -346,7 +364,7 @@ def complete_patient_visit(
             # Обновляем статус визита
             visit.status = "completed"
             
-            # ✅ Сохраняем discount_mode: если визит был оплачен, сохраняем 'paid'
+            # ✅ ИСПРАВЛЕНО: Сохраняем discount_mode и создаем платеж через SSOT
             # Проверяем через Payment или по существующему discount_mode
             from app.models.payment import Payment
             if not visit.discount_mode or visit.discount_mode == "none":
@@ -354,7 +372,31 @@ def complete_patient_visit(
                 if payment and (payment.status and payment.status.lower() == 'paid' or payment.paid_at):
                     visit.discount_mode = "paid"
                 elif visit.status in ("in_visit", "in_progress", "completed"):
-                    # Если визит был начат (в кабинете) или завершён, вероятно был оплачен
+                    # ✅ ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
+                    # Создаем платеж через SSOT
+                    from app.services.billing_service import BillingService
+                    billing_service = BillingService(db)
+                    
+                    # Проверяем, не создан ли уже платеж
+                    if not payment:
+                        # Рассчитываем сумму визита через SSOT
+                        total_info = billing_service.calculate_total(
+                            visit_id=visit.id,
+                            discount_mode=visit.discount_mode or "none"
+                        )
+                        payment_amount = float(total_info["total"])
+                        
+                        # Создаем платеж через SSOT
+                        payment = billing_service.create_payment(
+                            visit_id=visit.id,
+                            amount=payment_amount,
+                            currency=total_info.get("currency", "UZS"),
+                            method="cash",  # Предполагаем наличные для визитов в процессе
+                            status="paid",
+                            note=f"Автоматическое создание платежа при завершении приема (visit {visit.id})"
+                        )
+                        print(f"[complete_visit] ✅ Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                    
                     visit.discount_mode = "paid"
             
             db.commit()
@@ -433,7 +475,7 @@ def complete_patient_visit(
                 # ✅ Обновляем статус визита на completed
                 visit.status = "completed"
                 
-                # Проверяем и сохраняем информацию об оплате
+                # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT
                 # Если визит был оплачен (есть записи в Payment или статус указывает на оплату)
                 from app.models.payment import Payment
                 payment = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
@@ -443,9 +485,34 @@ def complete_patient_visit(
                     if hasattr(visit, 'payment_processed_at') and not visit.payment_processed_at:
                         visit.payment_processed_at = payment.paid_at or datetime.utcnow()
                 elif not visit.discount_mode or visit.discount_mode == "none":
-                    # Если нет информации об оплате, но был вызван в кабинет - считаем что оплачен
-                    # (так как пациент не мог быть вызван без оплаты)
+                    # ✅ ИСПРАВЛЕНО: Если нет информации об оплате, но был вызван в кабинет - считаем что оплачен
+                    # Создаем платеж через SSOT
+                    from app.services.billing_service import BillingService
+                    billing_service = BillingService(db)
+                    
+                    # Проверяем, не создан ли уже платеж
+                    if not payment:
+                        # Рассчитываем сумму визита через SSOT
+                        total_info = billing_service.calculate_total(
+                            visit_id=visit.id,
+                            discount_mode=visit.discount_mode or "none"
+                        )
+                        payment_amount = float(total_info["total"])
+                        
+                        # Создаем платеж через SSOT
+                        payment = billing_service.create_payment(
+                            visit_id=visit.id,
+                            amount=payment_amount,
+                            currency=total_info.get("currency", "UZS"),
+                            method="cash",  # Предполагаем наличные для визитов в процессе
+                            status="paid",
+                            note=f"Автоматическое создание платежа при завершении приема из очереди (visit {visit.id})"
+                        )
+                        print(f"[complete_queue_visit] ✅ Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                    
                     visit.discount_mode = "paid"
+                    if hasattr(visit, 'payment_processed_at') and not visit.payment_processed_at:
+                        visit.payment_processed_at = payment.paid_at or datetime.utcnow() if payment else datetime.utcnow()
                 
                 # ✅ Также обновляем соответствующий Appointment, если он существует
                 from app.models.appointment import Appointment
@@ -724,7 +791,7 @@ def get_doctor_stats(
         # Получаем очереди за период
         daily_queues = db.query(DailyQueue).filter(
             and_(
-                DailyQueue.specialist_id == doctor.id,
+                DailyQueue.specialist_id == doctor.user_id,  # ⭐ user_id, а не doctor.id
                 DailyQueue.day >= start_date
             )
         ).all()
@@ -871,7 +938,8 @@ async def schedule_next_visit(
                 visit_id=visit.id,
                 service_id=service.id,
                 name=service.name,
-                code=service.code or service.service_code,
+                # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
+                code=get_service_code(service.id, db) or service.code,
                 qty=service_req.quantity,
                 price=service_price,
                 currency="UZS"

@@ -12,6 +12,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import './ModernFilters.css';
 
 const ModernFilters = ({
@@ -193,15 +194,15 @@ const ModernFilters = ({
                   type="button"
                   className="quick-date-btn"
                   onClick={() => {
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = getLocalDateString();
                     setDateValue(today);
                     updateParam('date', today);
                   }}
                   style={{
-                    backgroundColor: dateValue === new Date().toISOString().split('T')[0] 
+                    backgroundColor: dateValue === getLocalDateString() 
                       ? getColor('primary') 
                       : getColor('cardBg'),
-                    color: dateValue === new Date().toISOString().split('T')[0] 
+                    color: dateValue === getLocalDateString() 
                       ? 'white' 
                       : getColor('textPrimary'),
                     borderColor: getColor('border')
@@ -213,9 +214,7 @@ const ModernFilters = ({
                   type="button"
                   className="quick-date-btn"
                   onClick={() => {
-                    const tomorrow = new Date();
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                    const tomorrowStr = getTomorrowDateString();
                     setDateValue(tomorrowStr);
                     updateParam('date', tomorrowStr);
                   }}

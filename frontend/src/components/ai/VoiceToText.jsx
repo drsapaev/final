@@ -489,7 +489,7 @@ const VoiceToText = () => {
             options={[
               { value: 'ru', label: 'Русский' },
               { value: 'en', label: 'English' },
-              { value: 'uz', label: "O'zbek" }
+              { value: 'uz', label: 'O\'zbek' }
             ]}
             style={{ width: '100%' }}
           />

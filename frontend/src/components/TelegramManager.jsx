@@ -157,15 +157,15 @@ const TelegramManager = () => {
               <List>
                 <ListItem>
                   <ListItemIcon>
-                    <Telegram color={botStatus?.bot_active ? "success" : "error"} />
+                    <Telegram color={botStatus?.bot_active ? 'success' : 'error'} />
                   </ListItemIcon>
                   <ListItemText
                     primary="Бот активен"
-                    secondary={botStatus?.bot_active ? "Да" : "Нет"}
+                    secondary={botStatus?.bot_active ? 'Да' : 'Нет'}
                   />
                   <Chip
-                    label={botStatus?.bot_active ? "Активен" : "Неактивен"}
-                    color={botStatus?.bot_active ? "success" : "error"}
+                    label={botStatus?.bot_active ? 'Активен' : 'Неактивен'}
+                    color={botStatus?.bot_active ? 'success' : 'error'}
                     size="small"
                   />
                 </ListItem>
@@ -175,11 +175,11 @@ const TelegramManager = () => {
                   </ListItemIcon>
                   <ListItemText
                     primary="Webhook настроен"
-                    secondary={botStatus?.webhook_configured ? "Да" : "Нет"}
+                    secondary={botStatus?.webhook_configured ? 'Да' : 'Нет'}
                   />
                   <Chip
-                    label={botStatus?.webhook_configured ? "Настроен" : "Не настроен"}
-                    color={botStatus?.webhook_configured ? "success" : "warning"}
+                    label={botStatus?.webhook_configured ? 'Настроен' : 'Не настроен'}
+                    color={botStatus?.webhook_configured ? 'success' : 'warning'}
                     size="small"
                   />
                 </ListItem>
@@ -295,7 +295,7 @@ const TelegramManager = () => {
                 fullWidth
                 label="Название шаблона"
                 value={templateForm.name}
-                onChange={(e) => setTemplateForm({...templateForm, name: e.target.value})}
+                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
                 required
               />
             </Grid>
@@ -304,7 +304,7 @@ const TelegramManager = () => {
                 <InputLabel>Тип сообщения</InputLabel>
                 <Select
                   value={templateForm.message_type}
-                  onChange={(e) => setTemplateForm({...templateForm, message_type: e.target.value})}
+                  onChange={(e) => setTemplateForm({ ...templateForm, message_type: e.target.value })}
                   label="Тип сообщения"
                 >
                   <MenuItem value="text">Текст</MenuItem>
@@ -320,7 +320,7 @@ const TelegramManager = () => {
                 multiline
                 rows={6}
                 value={templateForm.content}
-                onChange={(e) => setTemplateForm({...templateForm, content: e.target.value})}
+                onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
                 required
                 placeholder="Используйте переменные: {patient_name}, {appointment_date}, {doctor_name}"
               />
@@ -330,7 +330,7 @@ const TelegramManager = () => {
                 control={
                   <Switch
                     checked={templateForm.is_active}
-                    onChange={(e) => setTemplateForm({...templateForm, is_active: e.target.checked})}
+                    onChange={(e) => setTemplateForm({ ...templateForm, is_active: e.target.checked })}
                   />
                 }
                 label="Активный шаблон"

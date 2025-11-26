@@ -140,9 +140,18 @@ class InvoiceItem(Base):
 
 
 class BillingPayment(Base):
-    """Платежи"""
+    """Платежи (устаревшая модель - используйте Payment из app.models.payment)"""
     __tablename__ = "payments"
     __table_args__ = {'extend_existing': True}
+    # ✅ ИСПРАВЛЕНО: Явно указываем только нужные поля для BillingPayment, чтобы избежать конфликта с Payment
+    __mapper_args__ = {
+        'include_properties': [
+            'id', 'payment_number', 'invoice_id', 'patient_id', 'amount',
+            'payment_method', 'payment_date', 'reference_number', 'description',
+            'notes', 'is_confirmed', 'confirmed_at', 'confirmed_by',
+            'created_at', 'created_by'
+        ]
+    }
 
     id = Column(Integer, primary_key=True, index=True)
     payment_number = Column(String(50), unique=True, nullable=False, index=True)

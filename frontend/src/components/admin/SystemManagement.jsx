@@ -36,7 +36,7 @@ import {
   MacOSLoadingSkeleton
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const SystemManagement = () => {
   const [activeTab, setActiveTab] = useState('monitoring');
@@ -125,18 +125,8 @@ const SystemManagement = () => {
 
   const loadBackups = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/backup/list', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setBackups(data.backups || []);
-      }
+      const response = await api.get('/system/backup/list');
+      setBackups(response.data?.backups || []);
     } catch (error) {
       console.error('Ошибка загрузки бэкапов:', error);
     }
@@ -145,30 +135,16 @@ const SystemManagement = () => {
   const createBackup = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch('/api/v1/system/backup/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(backupForm)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          toast.success('Бэкап создается...');
-          setTimeout(() => loadBackups(), 2000); // Обновляем список через 2 секунды
-        } else {
-          toast.error(data.error || 'Ошибка создания бэкапа');
-        }
+      const response = await api.post('/system/backup/create', backupForm);
+      if (response.data?.success) {
+        toast.success('Бэкап создается...');
+        setTimeout(() => loadBackups(), 2000); // Обновляем список через 2 секунды
       } else {
-        toast.error('Ошибка создания бэкапа');
+        toast.error(response.data?.error || 'Ошибка создания бэкапа');
       }
     } catch (error) {
       console.error('Ошибка создания бэкапа:', error);
-      toast.error('Ошибка создания бэкапа');
+      toast.error(error.response?.data?.detail || 'Ошибка создания бэкапа');
     } finally {
       setLoading(false);
     }
@@ -180,25 +156,12 @@ const SystemManagement = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`/api/v1/system/backup/${backupName}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          toast.success('Бэкап удален');
-          loadBackups();
-        } else {
-          toast.error(data.error || 'Ошибка удаления бэкапа');
-        }
+      const response = await api.delete(`/system/backup/${backupName}`);
+      if (response.data?.success) {
+        toast.success('Бэкап удален');
+        loadBackups();
       } else {
-        toast.error('Ошибка удаления бэкапа');
+        toast.error(response.data?.error || 'Ошибка удаления бэкапа');
       }
     } catch (error) {
       console.error('Ошибка удаления бэкапа:', error);

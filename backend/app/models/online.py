@@ -8,6 +8,35 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base_class import Base  # Base декларативной модели
 
 
+# ============================================================================
+# DEPRECATED: OnlineDay model is legacy department-based queue system
+# ============================================================================
+#
+# ⚠️ WARNING: This model is DEPRECATED and should not be used for new features.
+#
+# Current Usage:
+#   - Used only by appointments endpoint (/api/v1/appointments)
+#   - Used by services/online_queue.py for simple ticket issuing
+#
+# Migration Path:
+#   - New queue features should use DailyQueue (specialist-based) instead
+#   - DailyQueue is the official SSOT for queue system
+#   - Plan to migrate appointments endpoint to DailyQueue in future
+#
+# Key Differences:
+#   - OnlineDay: department-based (string), uses Settings table for counters
+#   - DailyQueue: specialist-based (FK to doctors), uses queue_entries table
+#
+# DO NOT:
+#   - Add new features to this model
+#   - Create new endpoints using OnlineDay
+#   - Reference this model in new code
+#
+# SEE ALSO:
+#   - app/models/online_queue.py (DailyQueue - preferred)
+#   - docs/QUEUE_SYSTEM_ARCHITECTURE.md (migration guide)
+# ============================================================================
+
 class OnlineDay(Base):
     __tablename__ = "online_days"
     __table_args__ = (

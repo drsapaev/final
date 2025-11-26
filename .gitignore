@@ -36,3 +36,5 @@ alembic/**/__pycache__/
 .coverage
 htmlcov/
 pytest_cache/
+NUL
+nul

@@ -313,7 +313,7 @@ const AIAnalytics = () => {
           {usageSummary.recommendations && usageSummary.recommendations.length > 0 && (
             <div style={{ marginTop: '16px' }}>
               <h4 style={{ 
-                margin: `0 0 8px 0`,
+                margin: '0 0 8px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -349,7 +349,7 @@ const AIAnalytics = () => {
       {/* Быстрые действия */}
       <MacOSCard style={{ padding: '24px' }}>
         <h3 style={{ 
-          margin: `0 0 16px 0`,
+          margin: '0 0 16px 0',
           color: 'var(--mac-text-primary)',
           display: 'flex',
           alignItems: 'center',
@@ -433,7 +433,7 @@ const AIAnalytics = () => {
           {/* Общая статистика */}
           <MacOSCard style={{ padding: '24px' }}>
             <h3 style={{ 
-              margin: `0 0 16px 0`,
+              margin: '0 0 16px 0',
               color: 'var(--mac-text-primary)',
               display: 'flex',
               alignItems: 'center',
@@ -483,7 +483,7 @@ const AIAnalytics = () => {
           {Object.keys(usageAnalytics.function_breakdown).length > 0 && (
             <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -530,7 +530,7 @@ const AIAnalytics = () => {
           {usageAnalytics.recommendations && usageAnalytics.recommendations.length > 0 && (
             <MacOSCard style={{ padding: '24px' }}>
               <h3 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-lg)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -597,7 +597,7 @@ const AIAnalytics = () => {
           {learningInsights.medical_patterns && (
             <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -608,7 +608,7 @@ const AIAnalytics = () => {
               {learningInsights.medical_patterns.common_symptoms && Array.isArray(learningInsights.medical_patterns.common_symptoms) && (
                 <div style={{ marginBottom: '16px' }}>
                   <h5 style={{ 
-                    margin: `0 0 8px 0`, 
+                    margin: '0 0 8px 0', 
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: 'var(--mac-font-weight-medium)'
@@ -634,7 +634,7 @@ const AIAnalytics = () => {
               {learningInsights.medical_patterns.diagnosis_frequency && (
                 <div>
                   <h5 style={{ 
-                    margin: `0 0 8px 0`, 
+                    margin: '0 0 8px 0', 
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-sm)',
                     fontWeight: 'var(--mac-font-weight-medium)'
@@ -669,7 +669,7 @@ const AIAnalytics = () => {
           {learningInsights.diagnostic_accuracy && (
             <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -704,7 +704,7 @@ const AIAnalytics = () => {
           {learningInsights.learning_recommendations && (
             <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -770,7 +770,7 @@ const AIAnalytics = () => {
           {/* Сводка затрат */}
           <MacOSCard style={{ padding: '24px' }}>
             <h4 style={{ 
-              margin: `0 0 16px 0`,
+              margin: '0 0 16px 0',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-base)',
               fontWeight: 'var(--mac-font-weight-semibold)'
@@ -804,7 +804,7 @@ const AIAnalytics = () => {
           {costAnalysis.function_costs && Object.keys(costAnalysis.function_costs).length > 0 && (
             <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -851,7 +851,7 @@ const AIAnalytics = () => {
           {costAnalysis.cost_optimization?.recommendations && (
             <MacOSCard style={{ padding: '24px' }}>
               <h4 style={{ 
-                margin: `0 0 16px 0`,
+                margin: '0 0 16px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-base)',
                 fontWeight: 'var(--mac-font-weight-semibold)'
@@ -932,7 +932,7 @@ const AIAnalytics = () => {
           {/* Сравнительная таблица */}
           <MacOSCard style={{ padding: '24px' }}>
             <h4 style={{ 
-              margin: `0 0 16px 0`,
+              margin: '0 0 16px 0',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-base)',
               fontWeight: 'var(--mac-font-weight-semibold)'
@@ -970,7 +970,7 @@ const AIAnalytics = () => {
           {/* Рекомендации */}
           <MacOSCard style={{ padding: '24px' }}>
             <h4 style={{ 
-              margin: `0 0 16px 0`,
+              margin: '0 0 16px 0',
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-base)',
               fontWeight: 'var(--mac-font-weight-semibold)'
@@ -1071,7 +1071,7 @@ const AIAnalytics = () => {
             <MacOSInput
               type="date"
               value={dateRange.startDate}
-              onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
             />
           </div>
           <div>
@@ -1087,7 +1087,7 @@ const AIAnalytics = () => {
             <MacOSInput
               type="date"
               value={dateRange.endDate}
-              onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
             />
           </div>
           <div>
@@ -1102,7 +1102,7 @@ const AIAnalytics = () => {
             </label>
             <MacOSSelect
               value={filters.aiFunction}
-              onChange={(e) => setFilters({...filters, aiFunction: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, aiFunction: e.target.value })}
               options={[
                 { value: '', label: 'Все функции' },
                 { value: 'diagnose_symptoms', label: 'Диагностика симптомов' },

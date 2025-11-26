@@ -383,7 +383,7 @@ const ReportsManager = () => {
             icon={Clock}
             color="blue"
             trend={quickReports.daily ? `+${quickReports.daily.summary?.new_patients || 0}` : undefined}
-            trendType={quickReports.daily ? "positive" : "neutral"}
+            trendType={quickReports.daily ? 'positive' : 'neutral'}
             loading={!quickReports.daily}
           />
 
@@ -394,7 +394,7 @@ const ReportsManager = () => {
             icon={Calendar}
             color="green"
             trend={quickReports.weekly ? `+${quickReports.weekly.summary?.new_patients || 0}` : undefined}
-            trendType={quickReports.weekly ? "positive" : "neutral"}
+            trendType={quickReports.weekly ? 'positive' : 'neutral'}
             loading={!quickReports.weekly}
           />
 
@@ -405,7 +405,7 @@ const ReportsManager = () => {
             icon={BarChart3}
             color="purple"
             trend={quickReports.monthly ? `+${quickReports.monthly.summary?.new_patients || 0}` : undefined}
-            trendType={quickReports.monthly ? "positive" : "neutral"}
+            trendType={quickReports.monthly ? 'positive' : 'neutral'}
             loading={!quickReports.monthly}
           />
         </div>

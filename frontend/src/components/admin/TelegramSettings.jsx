@@ -381,7 +381,7 @@ const TelegramSettings = () => {
               </label>
               <div style={{ display: 'flex' }}>
                 <MacOSInput
-                  type={showToken ? "text" : "password"}
+                  type={showToken ? 'text' : 'password'}
                   value={settings.bot_token}
                   onChange={(e) => handleSettingChange('bot_token', e.target.value)}
                   placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
@@ -544,7 +544,7 @@ const TelegramSettings = () => {
                 onChange={(e) => handleSettingChange('default_language', e.target.value)}
                 options={[
                   { value: 'ru', label: 'Русский' },
-                  { value: 'uz', label: "O'zbekcha" },
+                  { value: 'uz', label: 'O\'zbekcha' },
                   { value: 'en', label: 'English' }
                 ]}
                 style={{ width: '100%' }}

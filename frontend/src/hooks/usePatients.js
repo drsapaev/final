@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
+const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+
 const usePatients = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -9,155 +11,124 @@ const usePatients = () => {
   const [filterAgeRange, setFilterAgeRange] = useState('');
   const [filterBloodType, setFilterBloodType] = useState('');
 
-  // Моковые данные для демонстрации
-  const mockPatients = [
-    {
-      id: 1,
-      firstName: 'Анна',
-      lastName: 'Иванова',
-      middleName: 'Сергеевна',
-      email: 'anna.ivanova@email.com',
-      phone: '+998 90 123 45 67',
-      birthDate: '1985-03-15',
-      gender: 'female',
-      address: 'г. Ташкент, ул. Навои, д. 15',
-      passport: 'AA1234567',
-      insuranceNumber: '12345678901234',
-      emergencyContact: 'Иванов Сергей Петрович',
-      emergencyPhone: '+998 91 234 56 78',
-      bloodType: 'A+',
-      allergies: 'Пенициллин',
-      chronicDiseases: 'Гипертония',
-      notes: 'Пациентка регулярно принимает лекарства от давления',
-      createdAt: '2024-01-10',
-      lastVisit: '2024-01-20',
-      visitsCount: 5
-    },
-    {
-      id: 2,
-      firstName: 'Дмитрий',
-      lastName: 'Петров',
-      middleName: 'Александрович',
-      email: 'dmitry.petrov@email.com',
-      phone: '+998 91 234 56 78',
-      birthDate: '1978-07-22',
-      gender: 'male',
-      address: 'г. Ташкент, ул. Амира Темура, д. 42',
-      passport: 'AB9876543',
-      insuranceNumber: '98765432109876',
-      emergencyContact: 'Петрова Елена Владимировна',
-      emergencyPhone: '+998 92 345 67 89',
-      bloodType: 'O+',
-      allergies: null,
-      chronicDiseases: null,
-      notes: 'Спортсмен, регулярно проходит медосмотры',
-      createdAt: '2024-01-12',
-      lastVisit: '2024-01-18',
-      visitsCount: 3
-    },
-    {
-      id: 3,
-      firstName: 'Мария',
-      lastName: 'Сидорова',
-      middleName: 'Ивановна',
-      email: 'maria.sidorova@email.com',
-      phone: '+998 92 345 67 89',
-      birthDate: '1992-11-08',
-      gender: 'female',
-      address: 'г. Ташкент, ул. Чилонзар, д. 8',
-      passport: 'AC4567890',
-      insuranceNumber: '45678901234567',
-      emergencyContact: 'Сидоров Иван Петрович',
-      emergencyPhone: '+998 93 456 78 90',
-      bloodType: 'B+',
-      allergies: 'Пыльца, шерсть животных',
-      chronicDiseases: 'Астма',
-      notes: 'Требует особого внимания к дыхательной системе',
-      createdAt: '2024-01-15',
-      lastVisit: '2024-01-22',
-      visitsCount: 8
-    },
-    {
-      id: 4,
-      firstName: 'Алексей',
-      lastName: 'Козлов',
-      middleName: 'Владимирович',
-      email: 'alexey.kozlov@email.com',
-      phone: '+998 93 456 78 90',
-      birthDate: '1965-05-30',
-      gender: 'male',
-      address: 'г. Ташкент, ул. Мирзо Улугбека, д. 25',
-      passport: 'AD7890123',
-      insuranceNumber: '78901234567890',
-      emergencyContact: 'Козлова Наталья Сергеевна',
-      emergencyPhone: '+998 94 567 89 01',
-      bloodType: 'AB+',
-      allergies: 'Морепродукты',
-      chronicDiseases: 'Диабет 2 типа',
-      notes: 'Инсулинозависимый диабет, регулярный контроль сахара',
-      createdAt: '2024-01-18',
-      lastVisit: '2024-01-25',
-      visitsCount: 12
-    },
-    {
-      id: 5,
-      firstName: 'Елена',
-      lastName: 'Новикова',
-      middleName: 'Дмитриевна',
-      email: 'elena.novikova@email.com',
-      phone: '+998 94 567 89 01',
-      birthDate: '1988-09-12',
-      gender: 'female',
-      address: 'г. Ташкент, ул. Шота Руставели, д. 33',
-      passport: 'AE0123456',
-      insuranceNumber: '01234567890123',
-      emergencyContact: 'Новиков Андрей Сергеевич',
-      emergencyPhone: '+998 95 678 90 12',
-      bloodType: 'O-',
-      allergies: null,
-      chronicDiseases: null,
-      notes: 'Беременность 24 недели, требует особого наблюдения',
-      createdAt: '2024-01-20',
-      lastVisit: '2024-01-28',
-      visitsCount: 6
-    }
-  ];
 
-  // Загрузка пациентов
+  // Загрузка пациентов - использует реальный API (Single Source of Truth)
   const loadPatients = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setPatients(mockPatients);
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
+      
+      const response = await fetch(`${API_BASE}/api/v1/patients/?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Ошибка загрузки пациентов' }));
+        throw new Error(errorData.detail || `Ошибка ${response.status}`);
+      }
+      
+      const data = await response.json();
+      // Преобразуем данные из формата API в формат компонента
+      const transformedPatients = data.map(patient => ({
+        id: patient.id,
+        firstName: patient.first_name,
+        lastName: patient.last_name,
+        middleName: patient.middle_name,
+        email: patient.email || '',
+        phone: patient.phone || '',
+        birthDate: patient.birth_date || '',
+        gender: patient.sex === 'M' ? 'male' : patient.sex === 'F' ? 'female' : '',
+        address: patient.address || '',
+        passport: patient.doc_number || '',
+        insuranceNumber: '', // Поле отсутствует в API
+        emergencyContact: '', // Поле отсутствует в API
+        emergencyPhone: '', // Поле отсутствует в API
+        bloodType: '', // Поле отсутствует в API
+        allergies: '', // Поле отсутствует в API
+        chronicDiseases: '', // Поле отсутствует в API
+        notes: '', // Поле отсутствует в API
+        createdAt: patient.created_at || new Date().toISOString().split('T')[0],
+        lastVisit: null, // Нужно получать отдельно
+        visitsCount: 0 // Нужно получать отдельно
+      }));
+      
+      setPatients(transformedPatients);
     } catch (err) {
       setError(err);
+      console.error('Ошибка загрузки пациентов:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Создание пациента
+  // Создание пациента - использует реальный API (Single Source of Truth)
   const createPatient = useCallback(async (patientData) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
       
-      const newPatient = {
-        id: Date.now(),
-        ...patientData,
-        createdAt: new Date().toISOString().split('T')[0],
+      // Преобразуем данные из формата компонента в формат API
+      // Backend принимает полное ФИО или отдельные поля - используем отдельные поля
+      const apiData = {
+        last_name: patientData.lastName || patientData.last_name,
+        first_name: patientData.firstName || patientData.first_name,
+        middle_name: patientData.middleName || patientData.middle_name || null,
+        birth_date: patientData.birthDate || patientData.birth_date || null,
+        sex: patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null,
+        phone: patientData.phone || null,
+        email: patientData.email || null,
+        doc_number: patientData.passport || patientData.doc_number || null,
+        address: patientData.address || null
+      };
+      
+      const response = await fetch(`${API_BASE}/api/v1/patients/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(apiData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Ошибка создания пациента' }));
+        throw new Error(errorData.detail || `Ошибка ${response.status}`);
+      }
+      
+      const newPatient = await response.json();
+      
+      // Преобразуем обратно в формат компонента
+      const transformedPatient = {
+        id: newPatient.id,
+        firstName: newPatient.first_name,
+        lastName: newPatient.last_name,
+        middleName: newPatient.middle_name,
+        email: newPatient.email || '',
+        phone: newPatient.phone || '',
+        birthDate: newPatient.birth_date || '',
+        gender: newPatient.sex === 'M' ? 'male' : newPatient.sex === 'F' ? 'female' : '',
+        address: newPatient.address || '',
+        passport: newPatient.doc_number || '',
+        createdAt: newPatient.created_at || new Date().toISOString().split('T')[0],
         lastVisit: null,
         visitsCount: 0
       };
       
-      setPatients(prev => [newPatient, ...prev]);
-      return newPatient;
+      setPatients(prev => [transformedPatient, ...prev]);
+      return transformedPatient;
     } catch (err) {
       setError(err);
       throw err;
@@ -166,22 +137,66 @@ const usePatients = () => {
     }
   }, []);
 
-  // Обновление пациента
+  // Обновление пациента - использует реальный API (Single Source of Truth)
   const updatePatient = useCallback(async (id, patientData) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
+      
+      // Преобразуем данные из формата компонента в формат API
+      const apiData = {};
+      if (patientData.lastName !== undefined) apiData.last_name = patientData.lastName;
+      if (patientData.firstName !== undefined) apiData.first_name = patientData.firstName;
+      if (patientData.middleName !== undefined) apiData.middle_name = patientData.middleName;
+      if (patientData.birthDate !== undefined) apiData.birth_date = patientData.birthDate;
+      if (patientData.gender !== undefined) apiData.sex = patientData.gender === 'male' ? 'M' : patientData.gender === 'female' ? 'F' : null;
+      if (patientData.phone !== undefined) apiData.phone = patientData.phone;
+      if (patientData.email !== undefined) apiData.email = patientData.email;
+      if (patientData.passport !== undefined) apiData.doc_number = patientData.passport;
+      if (patientData.address !== undefined) apiData.address = patientData.address;
+      
+      const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(apiData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Ошибка обновления пациента' }));
+        throw new Error(errorData.detail || `Ошибка ${response.status}`);
+      }
+      
+      const updatedPatient = await response.json();
+      
+      // Преобразуем обратно в формат компонента
+      const transformedPatient = {
+        id: updatedPatient.id,
+        firstName: updatedPatient.first_name,
+        lastName: updatedPatient.last_name,
+        middleName: updatedPatient.middle_name,
+        email: updatedPatient.email || '',
+        phone: updatedPatient.phone || '',
+        birthDate: updatedPatient.birth_date || '',
+        gender: updatedPatient.sex === 'M' ? 'male' : updatedPatient.sex === 'F' ? 'female' : '',
+        address: updatedPatient.address || '',
+        passport: updatedPatient.doc_number || ''
+      };
       
       setPatients(prev => prev.map(patient => 
         patient.id === id 
-          ? { ...patient, ...patientData }
+          ? { ...patient, ...transformedPatient }
           : patient
       ));
       
-      return { id, ...patientData };
+      return transformedPatient;
     } catch (err) {
       setError(err);
       throw err;
@@ -190,14 +205,29 @@ const usePatients = () => {
     }
   }, []);
 
-  // Удаление пациента
+  // Удаление пациента - использует реальный API (Single Source of Truth)
   const deletePatient = useCallback(async (id) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
+      
+      const response = await fetch(`${API_BASE}/api/v1/patients/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Ошибка удаления пациента' }));
+        throw new Error(errorData.detail || `Ошибка ${response.status}`);
+      }
       
       setPatients(prev => prev.filter(patient => patient.id !== id));
     } catch (err) {

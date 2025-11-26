@@ -437,6 +437,216 @@ class PrintService:
         except Exception as e:
             return {"status": "error", "message": f"Ошибка проверки: {str(e)}"}
 
+    async def generate_receipt(
+        self,
+        payment_id: Optional[int] = None,
+        visit_id: Optional[int] = None,
+        payment_data: Optional[Dict[str, Any]] = None,
+        printer_name: Optional[str] = None,
+        user: Optional[User] = None
+    ) -> Dict[str, Any]:
+        """
+        Генерация чека (SSOT).
+        
+        Args:
+            payment_id: ID платежа
+            visit_id: ID визита
+            payment_data: Данные платежа (если нет payment_id/visit_id)
+            printer_name: Имя принтера
+            user: Пользователь, выполняющий печать
+        
+        Returns:
+            Dict с результатом печати
+        """
+        from app.models.payment import Payment
+        from app.models.visit import Visit
+        from app.services.queue_service import queue_service
+        
+        # Получаем данные платежа
+        if payment_id:
+            payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+            if not payment:
+                raise ValueError(f"Платеж {payment_id} не найден")
+            visit_id = payment.visit_id
+        elif visit_id:
+            payment = self.db.query(Payment).filter(
+                Payment.visit_id == visit_id,
+                Payment.status == "paid"
+            ).order_by(Payment.created_at.desc()).first()
+        else:
+            payment = None
+        
+        # Получаем данные визита
+        if visit_id:
+            visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
+            if not visit:
+                raise ValueError(f"Визит {visit_id} не найден")
+        else:
+            visit = None
+        
+        # Формируем данные для чека
+        if payment_data:
+            receipt_data = payment_data.copy()
+        else:
+            receipt_data = {}
+        
+        # Дополняем данными из БД
+        if payment:
+            receipt_data.update({
+                "payment_id": payment.id,
+                "amount": float(payment.amount),
+                "currency": payment.currency or "UZS",
+                "method": payment.method or "cash",
+                "status": payment.status,
+                "receipt_no": payment.receipt_no or f"RCP-{payment.id}",
+                "paid_at": payment.paid_at or queue_service.get_local_timestamp(self.db),
+                "note": payment.note
+            })
+        
+        if visit:
+            receipt_data.update({
+                "visit_id": visit.id,
+                "patient_name": getattr(visit, 'patient_name', None) or "Не указано",
+                "patient_phone": getattr(visit, 'patient_phone', None),
+            })
+        
+        # Добавляем метаданные
+        now = queue_service.get_local_timestamp(self.db)
+        receipt_data.update({
+            "date": now,
+            "time": now,
+            "issued_by": user.full_name if user else "Система"
+        })
+        
+        # Печатаем чек
+        return await self.print_document(
+            document_type="receipt",
+            document_data=receipt_data,
+            printer_name=printer_name,
+            user=user
+        )
+    
+    async def generate_ticket(
+        self,
+        queue_entry_id: Optional[int] = None,
+        visit_id: Optional[int] = None,
+        ticket_data: Optional[Dict[str, Any]] = None,
+        printer_name: Optional[str] = None,
+        user: Optional[User] = None
+    ) -> Dict[str, Any]:
+        """
+        Генерация талона очереди (SSOT).
+        
+        Args:
+            queue_entry_id: ID записи в очереди
+            visit_id: ID визита
+            ticket_data: Данные талона (если нет queue_entry_id/visit_id)
+            printer_name: Имя принтера
+            user: Пользователь, выполняющий печать
+        
+        Returns:
+            Dict с результатом печати
+        """
+        from app.models.online_queue import OnlineQueueEntry
+        from app.models.visit import Visit
+        from app.services.queue_service import queue_service
+        
+        # Получаем данные из очереди
+        if queue_entry_id:
+            queue_entry = self.db.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.id == queue_entry_id
+            ).first()
+            if not queue_entry:
+                raise ValueError(f"Запись очереди {queue_entry_id} не найдена")
+        else:
+            queue_entry = None
+        
+        # Получаем данные визита
+        if visit_id:
+            visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
+            if not visit:
+                raise ValueError(f"Визит {visit_id} не найден")
+        else:
+            visit = None
+        
+        # Формируем данные для талона
+        if ticket_data:
+            ticket_data_final = ticket_data.copy()
+        else:
+            ticket_data_final = {}
+        
+        # Дополняем данными из БД
+        if queue_entry:
+            ticket_data_final.update({
+                "queue_number": queue_entry.number,
+                "queue_id": queue_entry.queue_id,
+                "patient_name": queue_entry.patient_name or "Не указано",
+                "patient_phone": queue_entry.phone,
+                "doctor_name": getattr(queue_entry, 'doctor_name', None),
+                "specialty_name": getattr(queue_entry, 'specialty_name', None),
+                "source": queue_entry.source or "manual"
+            })
+        
+        if visit:
+            ticket_data_final.update({
+                "visit_id": visit.id,
+                "patient_name": getattr(visit, 'patient_name', None) or ticket_data_final.get("patient_name", "Не указано"),
+                "patient_phone": getattr(visit, 'patient_phone', None) or ticket_data_final.get("patient_phone"),
+            })
+        
+        # Добавляем метаданные
+        now = queue_service.get_local_timestamp(self.db)
+        ticket_data_final.update({
+            "date": now,
+            "time": now,
+            "issued_by": user.full_name if user else "Система"
+        })
+        
+        # Печатаем талон
+        return await self.print_document(
+            document_type="ticket",
+            document_data=ticket_data_final,
+            printer_name=printer_name,
+            user=user
+        )
+    
+    def get_print_template(
+        self,
+        document_type: str,
+        printer_id: Optional[int] = None,
+        template_id: Optional[int] = None,
+        language: str = "ru"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить шаблон печати (SSOT).
+        
+        Args:
+            document_type: Тип документа (receipt, ticket, prescription, etc.)
+            printer_id: ID принтера
+            template_id: ID шаблона (если указан, используется он)
+            language: Язык шаблона
+        
+        Returns:
+            Dict с данными шаблона или None
+        """
+        # Находим шаблон
+        template = self._get_template(template_id, document_type, printer_id or 0)
+        
+        if not template:
+            return None
+        
+        return {
+            "id": template.id,
+            "name": template.name,
+            "document_type": template.document_type,
+            "printer_id": template.printer_id,
+            "template_content": template.template_content,
+            "language": template.language or language,
+            "is_active": template.is_active,
+            "created_at": template.created_at.isoformat() if template.created_at else None,
+            "updated_at": template.updated_at.isoformat() if template.updated_at else None
+        }
+    
     def test_print(self, printer_name: str) -> Dict[str, Any]:
         """Тестовая печать"""
         test_data = {

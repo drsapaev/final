@@ -187,7 +187,7 @@ const MacOSModal = ({
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? "modal-title" : undefined}
+      aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div style={modalStyle}>
         {title && (

@@ -144,6 +144,6 @@ const MacOSCheckbox = React.forwardRef(({
   );
 });
 
-MacOSCheckbox.displayName = "MacOSCheckbox";
+MacOSCheckbox.displayName = 'MacOSCheckbox';
 
 export default MacOSCheckbox;

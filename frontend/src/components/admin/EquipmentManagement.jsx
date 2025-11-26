@@ -30,7 +30,7 @@ import {
   MacOSAlert,
   MacOSModal
 } from '../ui/macos';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const EquipmentManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -446,7 +446,7 @@ const EquipmentManagement = () => {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Введите название оборудования"
                 />
               </div>
@@ -463,7 +463,7 @@ const EquipmentManagement = () => {
                 <MacOSSelect
                   required
                   value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 >
                   <option value="">Выберите тип</option>
                   {typeOptions.map(option => (
@@ -484,7 +484,7 @@ const EquipmentManagement = () => {
                 <MacOSInput
                   type="text"
                   value={formData.model}
-                  onChange={(e) => setFormData({...formData, model: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, model: e.target.value })}
                   placeholder="Введите модель"
                 />
               </div>
@@ -501,7 +501,7 @@ const EquipmentManagement = () => {
                 <MacOSInput
                   type="text"
                   value={formData.serial_number}
-                  onChange={(e) => setFormData({...formData, serial_number: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
                   placeholder="Введите серийный номер"
                 />
               </div>
@@ -518,7 +518,7 @@ const EquipmentManagement = () => {
                 <MacOSSelect
                   required
                   value={formData.branch_id || ''}
-                  onChange={(e) => setFormData({...formData, branch_id: parseInt(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, branch_id: parseInt(e.target.value) })}
                 >
                   <option value="">Выберите филиал</option>
                   {branches.map(branch => (
@@ -538,7 +538,7 @@ const EquipmentManagement = () => {
                 </label>
                 <MacOSSelect
                   value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   {statusOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -558,7 +558,7 @@ const EquipmentManagement = () => {
                 <MacOSInput
                   type="date"
                   value={formData.purchase_date}
-                  onChange={(e) => setFormData({...formData, purchase_date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                 />
               </div>
               <div>
@@ -574,7 +574,7 @@ const EquipmentManagement = () => {
                 <MacOSInput
                   type="date"
                   value={formData.warranty_expiry}
-                  onChange={(e) => setFormData({...formData, warranty_expiry: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, warranty_expiry: e.target.value })}
                 />
               </div>
               <div>
@@ -590,7 +590,7 @@ const EquipmentManagement = () => {
                 <MacOSInput
                   type="date"
                   value={formData.maintenance_date}
-                  onChange={(e) => setFormData({...formData, maintenance_date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, maintenance_date: e.target.value })}
                 />
               </div>
               <div>
@@ -606,7 +606,7 @@ const EquipmentManagement = () => {
                 <MacOSInput
                   type="number"
                   value={formData.cost}
-                  onChange={(e) => setFormData({...formData, cost: parseFloat(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
                   placeholder="Введите стоимость"
                 />
               </div>
@@ -624,7 +624,7 @@ const EquipmentManagement = () => {
               </label>
               <MacOSTextarea
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Введите описание оборудования"
                 rows={3}
               />

@@ -109,7 +109,7 @@ def get_queue_limits(
                 daily_queue = db.query(DailyQueue).filter(
                     and_(
                         DailyQueue.day == today,
-                        DailyQueue.specialist_id == doctor.id
+                        DailyQueue.specialist_id == doctor.user_id  # ⭐ user_id, а не doctor.id
                     )
                 ).first()
                 
@@ -227,7 +227,7 @@ def get_queue_status_with_limits(
             daily_queue = db.query(DailyQueue).filter(
                 and_(
                     DailyQueue.day == day,
-                    DailyQueue.specialist_id == doctor.id
+                    DailyQueue.specialist_id == doctor.user_id  # ⭐ user_id, а не doctor.id
                 )
             ).first()
             

@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Input,
-  Label
-} from '../ui/native';
-import {
   Mail,
   Phone,
   ArrowLeft,
@@ -242,7 +233,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
       if (response.data.success) {
         setStep('success');
         toast.success(t.success);
-        
+
         // Автоматически вернуться к логину через 3 секунды
         setTimeout(() => {
           if (onSuccess) {
@@ -259,45 +250,62 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   };
 
   const renderMethodSelection = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-xl font-semibold mb-2">{t.title}</h2>
-        <p className="text-gray-600">{t.subtitle}</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>{t.title}</h2>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>{t.subtitle}</p>
       </div>
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <button
             onClick={() => setMethod('phone')}
-            className={`p-4 border-2 rounded-lg transition-all ${
-              method === 'phone'
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
+            className="glass-panel"
+            style={{
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              background: method === 'phone' ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
+              borderColor: method === 'phone' ? '#007aff' : 'var(--glass-border)',
+              transition: 'all 0.2s ease',
+              borderRadius: '16px'
+            }}
           >
-            <Phone className="h-6 w-6 mx-auto mb-2" />
-            <div className="font-medium">{t.methodPhone}</div>
+            <Phone size={24} color={method === 'phone' ? '#007aff' : 'var(--mac-text-secondary)'} />
+            <span style={{ fontSize: '13px', fontWeight: '500', color: method === 'phone' ? '#007aff' : 'var(--mac-text-primary)' }}>{t.methodPhone}</span>
           </button>
 
           <button
             onClick={() => setMethod('email')}
-            className={`p-4 border-2 rounded-lg transition-all ${
-              method === 'email'
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
+            className="glass-panel"
+            style={{
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              background: method === 'email' ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
+              borderColor: method === 'email' ? '#007aff' : 'var(--glass-border)',
+              transition: 'all 0.2s ease',
+              borderRadius: '16px'
+            }}
           >
-            <Mail className="h-6 w-6 mx-auto mb-2" />
-            <div className="font-medium">{t.methodEmail}</div>
+            <Mail size={24} color={method === 'email' ? '#007aff' : 'var(--mac-text-secondary)'} />
+            <span style={{ fontSize: '13px', fontWeight: '500', color: method === 'email' ? '#007aff' : 'var(--mac-text-primary)' }}>{t.methodEmail}</span>
           </button>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="contact">
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
             {method === 'phone' ? t.phoneLabel : t.emailLabel}
-          </Label>
-          <Input
-            id="contact"
+          </label>
+          <input
             type={method === 'phone' ? 'tel' : 'email'}
             value={contact}
             onChange={(e) => {
@@ -306,232 +314,233 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
             }}
             placeholder={method === 'phone' ? '+998XXXXXXXXX' : 'example@domain.com'}
             disabled={loading}
+            className="glass-input"
           />
-          <p className="text-sm text-gray-500">
+          <p style={{ fontSize: '12px', color: 'var(--mac-text-tertiary)', marginTop: '6px', marginLeft: '4px' }}>
             {method === 'phone' ? t.phoneFormat : t.emailFormat}
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <Button
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
             onClick={onBack}
-            variant="outline"
-            className="flex-1"
+            className="btn-premium btn-glass"
+            style={{ flex: 1, justifyContent: 'center' }}
             disabled={loading}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft size={16} />
             {t.back}
-          </Button>
-          
-          <Button
+          </button>
+
+          <button
             onClick={handleMethodSelect}
-            className="flex-1"
+            className="btn-premium btn-primary"
+            style={{ flex: 1, justifyContent: 'center' }}
             disabled={loading || !contact.trim()}
           >
             {loading ? (
               <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw size={16} className="spin" />
                 {t.sending}
               </>
             ) : (
               <>
-                <Send className="h-4 w-4 mr-2" />
+                <Send size={16} />
                 {t.continue}
               </>
             )}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
   );
 
   const renderPhoneVerification = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-            <Phone className="h-8 w-8 text-blue-500" />
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: '64px', height: '64px', background: 'rgba(0, 122, 255, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <Phone size={32} color="#007aff" />
         </div>
-        <h3 className="text-lg font-semibold mb-2">Введите код подтверждения</h3>
-        <p className="text-gray-600">
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>Введите код подтверждения</h3>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
           Код отправлен на номер:
         </p>
-        <p className="font-medium text-blue-600 mt-1">{contact}</p>
+        <p style={{ color: '#007aff', fontWeight: '600', marginTop: '4px' }}>{contact}</p>
       </div>
 
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
-          <Label htmlFor="verificationCode">Код подтверждения</Label>
-          <Input
-            id="verificationCode"
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>Код подтверждения</label>
+          <input
             type="text"
             value={verificationCode}
             onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="000000"
             maxLength={6}
-            className="text-center text-lg tracking-widest"
+            className="glass-input"
+            style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '4px', fontWeight: '600' }}
             disabled={loading}
           />
         </div>
 
-        <div className="flex gap-3">
-          <Button
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
             onClick={() => setStep('method')}
-            variant="outline"
-            className="flex-1"
+            className="btn-premium btn-glass"
+            style={{ flex: 1, justifyContent: 'center' }}
             disabled={loading}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft size={16} />
             {t.back}
-          </Button>
-          
-          <Button
+          </button>
+
+          <button
             onClick={handleVerifyPhoneCode}
-            className="flex-1"
+            className="btn-premium btn-primary"
+            style={{ flex: 1, justifyContent: 'center' }}
             disabled={loading || !verificationCode || verificationCode.length !== 6}
           >
             {loading ? (
               <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw size={16} className="spin" />
                 Проверка...
               </>
             ) : (
               <>
-                <Shield className="h-4 w-4 mr-2" />
+                <Shield size={16} />
                 Подтвердить
               </>
             )}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
   );
 
   const renderEmailVerification = () => (
-    <div className="space-y-6 text-center">
-      <div className="flex justify-center">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-          <Mail className="h-8 w-8 text-blue-500" />
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '64px', height: '64px', background: 'rgba(0, 122, 255, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Mail size={32} color="#007aff" />
         </div>
       </div>
-      
+
       <div>
-        <h3 className="text-lg font-semibold mb-2">Проверьте ваш email</h3>
-        <p className="text-gray-600">
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>Проверьте ваш email</h3>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
           Мы отправили ссылку для сброса пароля на адрес:
         </p>
-        <p className="font-medium text-blue-600 mt-1">{contact}</p>
+        <p style={{ color: '#007aff', fontWeight: '600', marginTop: '4px' }}>{contact}</p>
       </div>
 
-      <div className="text-sm text-gray-500">
+      <div style={{ fontSize: '13px', color: 'var(--mac-text-tertiary)', lineHeight: '1.5' }}>
         <p>Перейдите по ссылке в письме для сброса пароля.</p>
         <p>Если письмо не пришло, проверьте папку "Спам".</p>
       </div>
 
-      <Button
+      <button
         onClick={() => setStep('method')}
-        variant="outline"
-        className="w-full"
+        className="btn-premium btn-glass"
+        style={{ width: '100%', justifyContent: 'center' }}
       >
-        <ArrowLeft className="h-4 w-4 mr-2" />
+        <ArrowLeft size={16} />
         {t.back}
-      </Button>
+      </button>
     </div>
   );
 
   const renderPasswordReset = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-            <Key className="h-8 w-8 text-green-500" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <div style={{ width: '64px', height: '64px', background: 'rgba(52, 199, 89, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Key size={32} color="#34c759" />
           </div>
         </div>
-        <h3 className="text-lg font-semibold mb-2">Создайте новый пароль</h3>
-        <p className="text-gray-600">Введите новый пароль для вашего аккаунта</p>
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>Создайте новый пароль</h3>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>Введите новый пароль для вашего аккаунта</p>
       </div>
 
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
-          <Label htmlFor="newPassword">{t.newPassword}</Label>
-          <Input
-            id="newPassword"
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>{t.newPassword}</label>
+          <input
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="••••••••"
             disabled={loading}
+            className="glass-input"
           />
         </div>
 
         <div>
-          <Label htmlFor="confirmPassword">{t.confirmPassword}</Label>
-          <Input
-            id="confirmPassword"
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>{t.confirmPassword}</label>
+          <input
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••"
             disabled={loading}
+            className="glass-input"
           />
         </div>
 
-        <Button
+        <button
           onClick={handlePasswordReset}
-          className="w-full"
+          className="btn-premium btn-primary"
+          style={{ width: '100%', justifyContent: 'center' }}
           disabled={loading || !newPassword || !confirmPassword}
         >
           {loading ? (
             <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              <RefreshCw size={16} className="spin" />
               {t.resetting}
             </>
           ) : (
             <>
-              <Shield className="h-4 w-4 mr-2" />
+              <Shield size={16} />
               {t.resetPassword}
             </>
           )}
-        </Button>
+        </button>
       </div>
     </div>
   );
 
   const renderSuccess = () => (
-    <div className="space-y-6 text-center">
-      <div className="flex justify-center">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-          <CheckCircle className="h-8 w-8 text-green-500" />
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '64px', height: '64px', background: 'rgba(52, 199, 89, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <CheckCircle size={32} color="#34c759" />
         </div>
       </div>
-      
+
       <div>
-        <h3 className="text-lg font-semibold mb-2">{t.success}</h3>
-        <p className="text-gray-600">
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>{t.success}</h3>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '14px' }}>
           Теперь вы можете войти в систему с новым паролем
         </p>
       </div>
 
-      <Button
+      <button
         onClick={onSuccess || onBack}
-        className="w-full"
+        className="btn-premium btn-primary"
+        style={{ width: '100%', justifyContent: 'center' }}
       >
         {t.backToLogin}
-      </Button>
+      </button>
     </div>
   );
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardContent className="p-6">
-        {step === 'method' && renderMethodSelection()}
-        {step === 'phone-verify' && renderPhoneVerification()}
-        {step === 'email-verify' && renderEmailVerification()}
-        {step === 'reset-password' && renderPasswordReset()}
-        {step === 'success' && renderSuccess()}
-      </CardContent>
-    </Card>
+    <div className="glass-panel spotlight-card" style={{ width: '100%', maxWidth: '450px', margin: '0 auto', padding: '40px' }}>
+      {step === 'method' && renderMethodSelection()}
+      {step === 'phone-verify' && renderPhoneVerification()}
+      {step === 'email-verify' && renderEmailVerification()}
+      {step === 'reset-password' && renderPasswordReset()}
+      {step === 'success' && renderSuccess()}
+    </div>
   );
 };
 

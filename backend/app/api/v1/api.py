@@ -3,18 +3,22 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+# CRUD departments endpoint registered
+
 # подключаем router из каждого модуля
 from app.api.v1.endpoints import (
     activation as activation_ep,
     admin_ai,
     admin_clinic,
     clinic_management,
+    admin_departments,  # CRUD для управления отделениями
     admin_display,
     admin_doctors,
     admin_providers,
     admin_stats,
     admin_telegram,
     admin_users,
+    departments,  # Управление отделениями/вкладками
     ai,  # Новый AI модуль
     analytics,
     telegram_bot,  # Telegram Bot
@@ -106,8 +110,6 @@ from app.api.v1.endpoints import (
 )
 # Импортируем новый queue endpoint
 from app.api.v1.endpoints.queue import router as queue_router
-from app.api.v1.endpoints.queue_simple import router as simple_queue_router
-# from app.api.v1.endpoints.queue_fixed import router as fixed_queue_router  # Временно отключено
 
 # Импортируем новые payment endpoints
 from app.api.v1.endpoints.payments import router as payments_new_router
@@ -140,6 +142,7 @@ api_router.include_router(minimal_auth.router, prefix="/auth", tags=["minimal-au
 api_router.include_router(patients.router, prefix="/patients", tags=["patients"])
 api_router.include_router(visits.router, prefix="/visits", tags=["visits"])
 api_router.include_router(services.router, prefix="/services")
+api_router.include_router(departments.router, prefix="/departments", tags=["departments"])
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(payments_new_router, prefix="/payments", tags=["payments-new"])
 api_router.include_router(payment_webhooks_router, prefix="/payments/webhook", tags=["payment-webhooks"])
@@ -158,7 +161,7 @@ api_router.include_router(migration_management_router, tags=["migration-manageme
 # Эндпоинты управления фича-флагами
 api_router.include_router(feature_flags.router, tags=["feature-flags"])
 # Эндпоинты QR очередей
-api_router.include_router(qr_queue.router, tags=["qr-queue"])
+api_router.include_router(qr_queue.router, prefix="/queue", tags=["qr-queue"])
 # Эндпоинты лимитов очередей
 api_router.include_router(queue_limits.router, prefix="/admin", tags=["queue-limits"])
 # Эндпоинты управления кабинетами в очередях
@@ -210,11 +213,12 @@ api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
 api_router.include_router(clinic_management.router, prefix="/clinic", tags=["clinic-management"])
 api_router.include_router(payment_settings.router, tags=["payment-settings"])
+api_router.include_router(admin_departments.router, prefix="/admin/departments", tags=["admin-departments"])
 api_router.include_router(admin_display.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_doctors.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_providers.router, tags=["admin"])
 api_router.include_router(admin_telegram.router, prefix="/admin", tags=["admin"])
-api_router.include_router(admin_stats.router, tags=["admin"])
+api_router.include_router(admin_stats.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_users.router)
 api_router.include_router(mobile_api.router, prefix="/mobile", tags=["mobile"])
 api_router.include_router(mobile_api_extended.router, prefix="/mobile", tags=["mobile-extended"])
@@ -248,10 +252,6 @@ api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(schedule.router, tags=["schedule"])
 # Основной queue router с онлайн-очередью
 api_router.include_router(queue_router, prefix="/queue", tags=["queue"])
-# Простой queue router для тестирования
-api_router.include_router(simple_queue_router, prefix="/queue", tags=["queue-simple"])
-# Исправленный queue router (временно отключено)
-# api_router.include_router(fixed_queue_router, prefix="/queue", tags=["queue-fixed"])
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])
@@ -277,9 +277,7 @@ api_router.include_router(activation_ep.router, tags=["activation"])
 api_router.include_router(authentication.router, prefix="/authentication", tags=["authentication"])
 api_router.include_router(user_management.router, prefix="/users", tags=["user-management"])
 
-# Legacy API для совместимости с документацией
-from app.api.v1.endpoints import online_queue_legacy
-api_router.include_router(online_queue_legacy.router, prefix="/online-queue", tags=["online-queue-legacy"])
+# Legacy API удалён - используйте /api/v1/queue/* endpoints
 
 # Автозакрытие очередей
 from app.api.v1.endpoints import queue_auto_close

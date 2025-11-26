@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
-  Save, 
+import { api } from '../../api/client';
+import {
+  Package,
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  Save,
   X,
   RefreshCw,
   Download,
@@ -18,11 +19,11 @@ import {
   Stethoscope,
   TestTube
 } from 'lucide-react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
+import {
+  MacOSCard,
+  MacOSButton,
   MacOSBadge,
-  MacOSInput, 
+  MacOSInput,
   MacOSSelect,
   MacOSTable,
   MacOSEmptyState,
@@ -31,15 +32,24 @@ import {
   MacOSModal,
   MacOSCheckbox
 } from '../ui/macos';
+import {
+  normalizeServiceCode,
+  normalizeCategoryCode,
+  formatServiceCodeInput,
+  isValidServiceCode,
+  isValidCategoryCode
+} from '../../utils/serviceCodeUtils';
 
 const ServiceCatalog = () => {
   const [loading, setLoading] = useState(true);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState('all');
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [editingService, setEditingService] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -68,33 +78,38 @@ const ServiceCatalog = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      
-      // Загружаем услуги, категории и врачей параллельно
-      const [servicesRes, categoriesRes, doctorsRes] = await Promise.all([
-        fetch('http://localhost:8000/api/v1/services', {
-          // headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-        }),
-        fetch('http://localhost:8000/api/v1/services/categories', {
-          // headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-        }),
-        fetch('http://localhost:8000/api/v1/services/admin/doctors', {
-          // headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-        })
+
+      // Загружаем услуги, категории, врачей и отделения параллельно
+      const [servicesRes, categoriesRes, doctorsRes, departmentsRes] = await Promise.allSettled([
+        api.get('/services'),
+        api.get('/services/categories'),
+        api.get('/services/admin/doctors'),
+        api.get('/departments/')
       ]);
 
-      if (servicesRes.ok) {
-        const servicesData = await servicesRes.json();
-        setServices(servicesData);
+      if (servicesRes.status === 'fulfilled') {
+        setServices(servicesRes.value.data);
+      } else {
+        console.error('Ошибка загрузки услуг:', servicesRes.reason);
       }
 
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        setCategories(categoriesData);
+      if (categoriesRes.status === 'fulfilled') {
+        setCategories(categoriesRes.value.data);
+      } else {
+        console.error('Ошибка загрузки категорий:', categoriesRes.reason);
       }
 
-      if (doctorsRes.ok) {
-        const doctorsData = await doctorsRes.json();
-        setDoctors(doctorsData);
+      if (doctorsRes.status === 'fulfilled') {
+        setDoctors(doctorsRes.value.data);
+      } else {
+        console.error('Ошибка загрузки врачей:', doctorsRes.reason);
+      }
+
+      if (departmentsRes.status === 'fulfilled') {
+        // Backend returns {success: true, data: [...], count: N}
+        setDepartments(departmentsRes.value.data?.data || []);
+      } else {
+        console.error('Ошибка загрузки отделений:', departmentsRes.reason);
       }
 
     } catch (error) {
@@ -108,46 +123,59 @@ const ServiceCatalog = () => {
   const filteredServices = services.filter(service => {
     const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || service.category_id === parseInt(selectedCategory);
-    const matchesSpecialty = selectedSpecialty === 'all' || 
+    const matchesSpecialty = selectedSpecialty === 'all' ||
       categories.find(cat => cat.id === service.category_id)?.specialty === selectedSpecialty;
-    
-    return matchesSearch && matchesCategory && matchesSpecialty;
+    const matchesDepartment = selectedDepartment === 'all' || service.department_key === selectedDepartment;
+
+    return matchesSearch && matchesCategory && matchesSpecialty && matchesDepartment;
   });
 
   const handleSaveService = async (serviceData) => {
     try {
       console.log('🔄 Отправляем данные услуги:', serviceData);
-      
-      const method = editingService ? 'PUT' : 'POST';
-      const url = editingService 
-        ? `http://localhost:8000/api/v1/services/${editingService.id}`
-        : 'http://localhost:8000/api/v1/services';
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          // 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(serviceData)
-      });
-
-      if (response.ok) {
-        setMessage({ 
-          type: 'success', 
-          text: editingService ? 'Услуга обновлена' : 'Услуга создана' 
-        });
-        setEditingService(null);
-        setShowAddForm(false);
-        await loadData();
+      if (editingService) {
+        await api.put(`/services/${editingService.id}`, serviceData);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Ошибка API:', response.status, errorData);
-        throw new Error(`Ошибка сохранения услуги: ${response.status}`);
+        await api.post('/services', serviceData);
       }
+
+      setMessage({
+        type: 'success',
+        text: editingService ? 'Услуга обновлена' : 'Услуга создана'
+      });
+      setEditingService(null);
+      setShowAddForm(false);
+      await loadData();
     } catch (error) {
       console.error('Ошибка сохранения:', error);
-      setMessage({ type: 'error', text: 'Ошибка сохранения услуги' });
+      
+      // ✅ ПАРСИНГ ДЕТАЛЬНЫХ ОШИБОК ОТ BACKEND
+      let errorMessage = 'Ошибка сохранения услуги';
+      const errorData = error.response?.data || {};
+
+      if (errorData.detail) {
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          // Pydantic validation errors
+          const errors = errorData.detail.map(err => {
+            const field = err.loc ? err.loc.join('.') : 'unknown';
+            return `${field}: ${err.msg}`;
+          }).join('; ');
+          errorMessage = `Ошибка валидации: ${errors}`;
+        } else if (errorData.detail.message) {
+          errorMessage = errorData.detail.message;
+        }
+      } else if (error.response?.status === 409) {
+        errorMessage = 'Услуга с таким кодом уже существует';
+      } else if (error.response?.status === 422) {
+        errorMessage = 'Неверный формат данных. Проверьте коды услуг';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setMessage({ type: 'error', text: errorMessage });
     }
   };
 
@@ -155,22 +183,12 @@ const ServiceCatalog = () => {
     if (!confirm('Удалить услугу?')) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/services/${serviceId}`, {
-        method: 'DELETE',
-        headers: {
-          // 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Услуга удалена' });
-        await loadData();
-      } else {
-        throw new Error('Ошибка удаления услуги');
-      }
+      await api.delete(`/services/${serviceId}`);
+      setMessage({ type: 'success', text: 'Услуга удалена' });
+      await loadData();
     } catch (error) {
       console.error('Ошибка удаления:', error);
-      setMessage({ type: 'error', text: 'Ошибка удаления услуги' });
+      setMessage({ type: 'error', text: error.response?.data?.detail || 'Ошибка удаления услуги' });
     }
   };
 
@@ -301,12 +319,12 @@ const ServiceCatalog = () => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Категория
             </label>
@@ -318,6 +336,29 @@ const ServiceCatalog = () => {
                 ...categories.map(category => ({
                   value: category.id,
                   label: category.name_ru
+                }))
+              ]}
+            />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
+            }}>
+              Отделение
+            </label>
+            <MacOSSelect
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              options={[
+                { value: 'all', label: 'Все отделения' },
+                ...departments.map(dept => ({
+                  value: dept.key,
+                  label: dept.name_ru
                 }))
               ]}
             />
@@ -553,19 +594,25 @@ const ServiceCatalog = () => {
               )
             };
           })}
-          emptyState={{
-            type: 'package',
-            title: 'Услуги не найдены',
-            description: searchTerm || selectedCategory !== 'all' || selectedSpecialty !== 'all'
-              ? 'Попробуйте изменить критерии поиска'
-              : 'Добавьте первую услугу в справочник',
-            action: (
-              <MacOSButton onClick={() => setShowAddForm(true)}>
-                <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-                Добавить услугу
-              </MacOSButton>
-            )
-          }}
+          emptyState={
+            <tr>
+              <td colSpan={7} style={{ padding: '48px 16px', textAlign: 'center' }}>
+                <MacOSEmptyState
+                  icon={Package}
+                  title="Услуги не найдены"
+                  description={searchTerm || selectedCategory !== 'all' || selectedSpecialty !== 'all' || selectedDepartment !== 'all'
+                    ? 'Попробуйте изменить критерии поиска'
+                    : 'Добавьте первую услугу в справочник'}
+                  action={
+                    <MacOSButton onClick={() => setShowAddForm(true)}>
+                      <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                      Добавить услугу
+                    </MacOSButton>
+                  }
+                />
+              </td>
+            </tr>
+          }
         />
       </MacOSCard>
 
@@ -575,6 +622,7 @@ const ServiceCatalog = () => {
           service={editingService}
           categories={categories}
           doctors={doctors}
+          departments={departments}
           onSave={handleSaveService}
           onCancel={() => {
             setShowAddForm(false);
@@ -587,7 +635,7 @@ const ServiceCatalog = () => {
 };
 
 // Компонент формы услуги
-const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
+const ServiceForm = ({ service, categories, doctors, departments, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     name: service?.name || '',
     code: service?.code || '',
@@ -597,6 +645,7 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
     duration_minutes: service?.duration_minutes || 30,
     doctor_id: service?.doctor_id || '',
     active: service?.active !== undefined ? service.active : true,
+    department_key: service?.department_key || '',
     // ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
     category_code: service?.category_code || '',
     service_code: service?.service_code || '',
@@ -606,9 +655,86 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
     allow_doctor_price_override: service?.allow_doctor_price_override || false
   });
 
+  // State для проверки дубликатов
+  const [codeWarning, setCodeWarning] = useState('');
+  const [serviceCodeWarning, setServiceCodeWarning] = useState('');
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+
+  // Async проверка дубликатов для code
+  useEffect(() => {
+    if (!formData.code || formData.code.length < 2) {
+      setCodeWarning('');
+      return;
+    }
+
+    const normalizedCode = normalizeServiceCode(formData.code);
+    if (!isValidServiceCode(normalizedCode)) {
+      setCodeWarning('');
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setCheckingDuplicates(true);
+        const response = await api.get('/services');
+        const services = response.data;
+        const duplicate = services.find(
+          s => s.code === normalizedCode && s.id !== service?.id
+        );
+        if (duplicate) {
+          setCodeWarning(`⚠️ Код "${normalizedCode}" уже используется: ${duplicate.name}`);
+        } else {
+          setCodeWarning('');
+        }
+      } catch (error) {
+        console.error('Ошибка проверки дубликатов:', error);
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.code, service?.id]);
+
+  // Async проверка дубликатов для service_code
+  useEffect(() => {
+    if (!formData.service_code || formData.service_code.length < 2) {
+      setServiceCodeWarning('');
+      return;
+    }
+
+    const normalizedCode = normalizeServiceCode(formData.service_code);
+    if (!isValidServiceCode(normalizedCode)) {
+      setServiceCodeWarning('');
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setCheckingDuplicates(true);
+        const response = await api.get('/services');
+        const services = response.data;
+        const duplicate = services.find(
+          s => s.service_code === normalizedCode && s.id !== service?.id
+        );
+        if (duplicate) {
+          setServiceCodeWarning(`⚠️ Код "${normalizedCode}" уже используется: ${duplicate.name}`);
+        } else {
+          setServiceCodeWarning('');
+        }
+      } catch (error) {
+        console.error('Ошибка проверки дубликатов:', error);
+      } finally {
+        setCheckingDuplicates(false);
+      }
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.service_code, service?.id]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     // Валидация
     if (!formData.name.trim()) {
       alert('Введите название услуги');
@@ -621,22 +747,49 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
       price: formData.price ? parseFloat(formData.price) : null,
       category_id: formData.category_id ? parseInt(formData.category_id) : null,
       doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
-      duration_minutes: parseInt(formData.duration_minutes) || 30
+      duration_minutes: parseInt(formData.duration_minutes) || 30,
+      // ✅ ФИНАЛЬНАЯ НОРМАЛИЗАЦИЯ перед отправкой
+      code: formData.code ? normalizeServiceCode(formData.code) : null,
+      service_code: formData.service_code ? normalizeServiceCode(formData.service_code) : null,
+      category_code: formData.category_code ? normalizeCategoryCode(formData.category_code) : null
     };
-    
+
     // Убираем пустые строки
     Object.keys(apiData).forEach(key => {
       if (apiData[key] === '' || apiData[key] === 'null') {
         apiData[key] = null;
       }
     });
-    
+
     console.log('📝 Подготовленные данные для API:', apiData);
     onSave(apiData);
   };
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Нормализация кодов перед обновлением состояния
+    let normalizedValue = value;
+
+    if (field === 'code' || field === 'service_code') {
+      // Применяем форматирование для кодов услуг
+      normalizedValue = formatServiceCodeInput(value, formData[field]);
+    } else if (field === 'category_code') {
+      // Нормализация для категории (только первая буква, uppercase)
+      normalizedValue = normalizeCategoryCode(value);
+    }
+
+    // ✅ Синхронизация queue_tag с department_key для динамических отделений
+    if (field === 'queue_tag') {
+      const standardQueueTags = ['ecg', 'cardiology_common', 'stomatology', 'dermatology', 'cosmetology', 'lab', 'physiotherapy', ''];
+      const isDynamicDepartment = !standardQueueTags.includes(normalizedValue);
+
+      if (isDynamicDepartment && normalizedValue) {
+        // Если выбрано динамическое отделение, синхронизируем с department_key
+        setFormData(prev => ({ ...prev, [field]: normalizedValue, department_key: normalizedValue }));
+        return;
+      }
+    }
+
+    setFormData(prev => ({ ...prev, [field]: normalizedValue }));
   };
 
   return (
@@ -679,29 +832,62 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
-              Код услуги
+              Код услуги (формат: K01, D02)
             </label>
             <MacOSInput
               type="text"
               value={formData.code}
               onChange={(e) => handleChange('code', e.target.value)}
+              placeholder="K01"
+              maxLength={3}
             />
+            {formData.code && !isValidServiceCode(formData.code) && (
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--mac-warning)',
+                marginTop: '4px'
+              }}>
+                Формат: 1 буква + 2 цифры (например: K01)
+              </div>
+            )}
+            {codeWarning && (
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--mac-error)',
+                marginTop: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <AlertCircle size={14} />
+                {codeWarning}
+              </div>
+            )}
+            {checkingDuplicates && formData.code && isValidServiceCode(formData.code) && !codeWarning && (
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--mac-text-tertiary)',
+                marginTop: '4px'
+              }}>
+                Проверка дубликатов...
+              </div>
+            )}
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Категория *
             </label>
@@ -720,12 +906,35 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
           </div>
 
           <div>
-            <label style={{ 
-              display: 'block', 
-              fontSize: '14px', 
-              fontWeight: '500', 
-              color: 'var(--mac-text-primary)', 
-              marginBottom: '8px' 
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
+            }}>
+              Отделение
+            </label>
+            <MacOSSelect
+              value={formData.department_key}
+              onChange={(e) => handleChange('department_key', e.target.value)}
+              options={[
+                { value: '', label: 'Не привязано' },
+                ...departments.map(dept => ({
+                  value: dept.key,
+                  label: dept.name_ru
+                }))
+              ]}
+            />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
             }}>
               Цена
             </label>
@@ -841,21 +1050,53 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: '14px', 
-                fontWeight: '500', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
-                Код услуги (например: K01, L002)
+                Код услуги (формат: K01, D02, L14)
               </label>
               <MacOSInput
                 type="text"
                 value={formData.service_code}
                 onChange={(e) => handleChange('service_code', e.target.value)}
                 placeholder="K01"
+                maxLength={3}
               />
+              {formData.service_code && !isValidServiceCode(formData.service_code) && (
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--mac-warning)',
+                  marginTop: '4px'
+                }}>
+                  Формат: 1 буква + 2 цифры (например: K01)
+                </div>
+              )}
+              {serviceCodeWarning && (
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle size={14} />
+                  {serviceCodeWarning}
+                </div>
+              )}
+              {checkingDuplicates && formData.service_code && isValidServiceCode(formData.service_code) && !serviceCodeWarning && (
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--mac-text-tertiary)',
+                  marginTop: '4px'
+                }}>
+                  Проверка дубликатов...
+                </div>
+              )}
             </div>
 
             <div>
@@ -879,7 +1120,14 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
                   { value: 'dermatology', label: 'Дерматология' },
                   { value: 'cosmetology', label: 'Косметология' },
                   { value: 'lab', label: 'Лаборатория' },
-                  { value: 'physiotherapy', label: 'Физиотерапия' }
+                  { value: 'physiotherapy', label: 'Физиотерапия' },
+                  // ✅ Динамические отделения из БД
+                  ...departments
+                    .filter(dept => !['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'].includes(dept.key))
+                    .map(dept => ({
+                      value: dept.key,
+                      label: dept.name_ru
+                    }))
                 ]}
               />
             </div>
@@ -888,21 +1136,21 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
               <MacOSCheckbox
                 id="requires_doctor"
                 checked={formData.requires_doctor}
-                onChange={(e) => handleChange('requires_doctor', e.target.checked)}
+                onChange={(checked) => handleChange('requires_doctor', checked)}
                 label="Требует врача"
               />
 
               <MacOSCheckbox
                 id="is_consultation"
                 checked={formData.is_consultation}
-                onChange={(e) => handleChange('is_consultation', e.target.checked)}
+                onChange={(checked) => handleChange('is_consultation', checked)}
                 label="Это консультация"
               />
 
               <MacOSCheckbox
                 id="allow_doctor_price_override"
                 checked={formData.allow_doctor_price_override}
-                onChange={(e) => handleChange('allow_doctor_price_override', e.target.checked)}
+                onChange={(checked) => handleChange('allow_doctor_price_override', checked)}
                 label="Врач может изменить цену"
               />
             </div>
@@ -929,7 +1177,7 @@ const ServiceForm = ({ service, categories, doctors, onSave, onCancel }) => {
         <MacOSCheckbox
           id="active"
           checked={formData.active}
-          onChange={(e) => handleChange('active', e.target.checked)}
+          onChange={(checked) => handleChange('active', checked)}
           label="Услуга активна"
         />
 

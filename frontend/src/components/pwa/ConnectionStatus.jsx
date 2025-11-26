@@ -102,7 +102,7 @@ const ConnectionStatus = ({ showOfflineAlert = true, position = 'top' }) => {
           label={getConnectionLabel()}
           color={getConnectionColor()}
           size="small"
-          variant={isOnline ? "filled" : "outlined"}
+          variant={isOnline ? 'filled' : 'outlined'}
         />
         
         {lastSyncTime && (

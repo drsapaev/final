@@ -681,7 +681,7 @@ const EMRInterface = () => {
                         label: patient.full_name || `ID: ${patient.id}`
                       }))}
                       value={recordForm.patient_id}
-                      onChange={(val) => setRecordForm({...recordForm, patient_id: val})}
+                      onChange={(val) => setRecordForm({ ...recordForm, patient_id: val })}
                       placeholder="Выберите пациента..."
                       style={{ width: '100%' }}
                     />
@@ -694,7 +694,7 @@ const EMRInterface = () => {
                         label: type.label
                       }))}
                       value={recordForm.record_type}
-                      onChange={(val) => setRecordForm({...recordForm, record_type: val})}
+                      onChange={(val) => setRecordForm({ ...recordForm, record_type: val })}
                       placeholder="Выберите тип записи..."
                       style={{ width: '100%' }}
                     />
@@ -721,7 +721,7 @@ const EMRInterface = () => {
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Жалобы пациента</label>
                   <textarea
                     value={recordForm.chief_complaint}
-                    onChange={(e) => setRecordForm({...recordForm, chief_complaint: e.target.value})}
+                    onChange={(e) => setRecordForm({ ...recordForm, chief_complaint: e.target.value })}
                     style={{
                       width: '100%',
                       minHeight: 80,
@@ -739,7 +739,7 @@ const EMRInterface = () => {
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Анамнез настоящего заболевания</label>
                   <textarea
                     value={recordForm.history_of_present_illness}
-                    onChange={(e) => setRecordForm({...recordForm, history_of_present_illness: e.target.value})}
+                    onChange={(e) => setRecordForm({ ...recordForm, history_of_present_illness: e.target.value })}
                     style={{
                       width: '100%',
                       minHeight: 80,
@@ -774,7 +774,7 @@ const EMRInterface = () => {
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Физикальное обследование</label>
                   <textarea
                     value={recordForm.physical_examination}
-                    onChange={(e) => setRecordForm({...recordForm, physical_examination: e.target.value})}
+                    onChange={(e) => setRecordForm({ ...recordForm, physical_examination: e.target.value })}
                     style={{
                       width: '100%',
                       minHeight: 80,
@@ -794,7 +794,7 @@ const EMRInterface = () => {
                     <input
                       type="text"
                       value={recordForm.diagnosis}
-                      onChange={(e) => setRecordForm({...recordForm, diagnosis: e.target.value})}
+                      onChange={(e) => setRecordForm({ ...recordForm, diagnosis: e.target.value })}
                       style={{
                         width: '100%',
                         padding: 12,
@@ -811,7 +811,7 @@ const EMRInterface = () => {
                     <input
                       type="text"
                       value={recordForm.plan}
-                      onChange={(e) => setRecordForm({...recordForm, plan: e.target.value})}
+                      onChange={(e) => setRecordForm({ ...recordForm, plan: e.target.value })}
                       style={{
                         width: '100%',
                         padding: 12,
@@ -845,7 +845,7 @@ const EMRInterface = () => {
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Лечебные назначения</label>
                   <textarea
                     value={recordForm.treatment_notes}
-                    onChange={(e) => setRecordForm({...recordForm, treatment_notes: e.target.value})}
+                    onChange={(e) => setRecordForm({ ...recordForm, treatment_notes: e.target.value })}
                     style={{
                       width: '100%',
                       minHeight: 80,
@@ -863,7 +863,7 @@ const EMRInterface = () => {
                   <label style={{ display: 'block', marginBottom: 8, color: 'var(--mac-text-primary)' }}>Рекомендации и дальнейшие действия</label>
                   <textarea
                     value={recordForm.follow_up_instructions}
-                    onChange={(e) => setRecordForm({...recordForm, follow_up_instructions: e.target.value})}
+                    onChange={(e) => setRecordForm({ ...recordForm, follow_up_instructions: e.target.value })}
                     style={{
                       width: '100%',
                       minHeight: 60,

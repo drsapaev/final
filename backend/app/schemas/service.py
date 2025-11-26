@@ -15,6 +15,7 @@ class ServiceCreate(ORMModel):
     unit: Optional[str] = Field(default=None, max_length=32)
     price: float = 0.0
     active: bool = True
+    department_key: Optional[str] = Field(default=None, max_length=50)
 
 
 class ServiceUpdate(ORMModel):
@@ -24,6 +25,7 @@ class ServiceUpdate(ORMModel):
     unit: Optional[str] = Field(default=None, max_length=32)
     price: Optional[float] = None
     active: Optional[bool] = None
+    department_key: Optional[str] = Field(default=None, max_length=50)
 
 
 class Service(ORMModel):
@@ -34,6 +36,7 @@ class Service(ORMModel):
     unit: Optional[str] = Field(default=None, max_length=32)
     price: float
     active: bool
+    department_key: Optional[str] = Field(default=None, max_length=50)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -46,5 +49,6 @@ class ServiceItem(ORMModel):
     unit: Optional[str] = Field(default=None, max_length=32)
     price: float
     active: bool
+    department_key: Optional[str] = Field(default=None, max_length=50)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

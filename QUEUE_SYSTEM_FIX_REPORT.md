@@ -3,6 +3,8 @@
 **Дата:** 05.10.2025  
 **Статус:** ✅ Исправлено и документировано
 
+> **Обновление 2025-11-15:** после миграции `assign_queue_token()` реализован в `queue_service.py`, а все вызовы `crud_queue.generate_qr_token()` удалены. Данный отчёт описывает оригинальный фикс, но текущая реализация использует SSOT и обновлённые эндпоинты.
+
 ---
 
 ## Проблема
@@ -318,7 +320,7 @@ python -m pytest test_online_queue_system.py -v
 2. **POST** `/api/v1/online-queue/qrcode` - legacy
 3. **POST** `/api/v1/registrar/generate-qr` - специфичный для регистратуры
 
-Все используют одну CRUD функцию: `crud_queue.generate_qr_token()`
+Все используют одну SSOT-функцию: `queue_service.assign_queue_token()`
 
 ---
 

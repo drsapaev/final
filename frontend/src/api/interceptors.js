@@ -92,15 +92,56 @@ export function setupInterceptors() {
           console.error('Ошибка обновления токена:', refreshError);
         }
 
+        // Проверяем, есть ли токен ДО удаления
+        const hadToken = !!localStorage.getItem('auth_token');
+        
+        // Перенаправляем на страницу входа только если запрос не помечен как некритичный
+        // или если это не некритичный эндпоинт (например, /clinic/stats, /clinic/health)
+        const requestUrl = originalRequest?.url || originalRequest?.baseURL + originalRequest?.url || '';
+        const isNonCriticalEndpoint = requestUrl.includes('/clinic/stats') || 
+                                      requestUrl.includes('/clinic/health') ||
+                                      originalRequest?.skipAuthRedirect;
+        
+        // Проверяем, не происходит ли это при начальной загрузке страницы
+        // Если мы на защищенной странице и токен есть, не редиректим сразу
+        const isProtectedRoute = !['/login', '/', '/health'].includes(window.location.pathname);
+        // Проверяем, является ли это начальной загрузкой (нет referrer или referrer совпадает с текущим URL)
+        const isInitialLoad = !document.referrer || document.referrer === window.location.href || 
+                             (performance.navigation && performance.navigation.type === 0);
+        
+        // Логируем для отладки
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 401 Error:', { 
+            url: requestUrl, 
+            isNonCritical: isNonCriticalEndpoint,
+            hadToken,
+            isProtectedRoute,
+            isInitialLoad,
+            currentPath: window.location.pathname,
+            willRedirect: !isNonCriticalEndpoint && hadToken && !isInitialLoad && window.location.pathname !== '/login'
+          });
+        }
+        
         // Если обновление токена не удалось, выходим
         localStorage.removeItem('auth_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
         delete api.defaults.headers.common['Authorization'];
         
-        // Перенаправляем на страницу входа
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
+        // Перенаправляем только если:
+        // 1. Это не некритичный эндпоинт
+        // 2. Был токен (значит пользователь был авторизован, но токен истек)
+        // 3. Мы не на странице логина
+        // 4. Это не начальная загрузка страницы (чтобы дать RequireAuth время проверить токен)
+        // НЕ перенаправляем для некритичных эндпоинтов или если токена не было (значит пользователь не был авторизован)
+        if (!isNonCriticalEndpoint && hadToken && window.location.pathname !== '/login' && !isInitialLoad) {
+          // Используем небольшую задержку, чтобы дать RequireAuth время проверить токен
+          setTimeout(() => {
+            // Проверяем еще раз, не был ли токен восстановлен
+            if (!localStorage.getItem('auth_token')) {
+              window.location.href = '/login';
+            }
+          }, 100);
         }
       }
 

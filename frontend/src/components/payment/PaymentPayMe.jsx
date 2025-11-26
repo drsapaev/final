@@ -208,27 +208,27 @@ const PaymentPayMe = ({
       const mockTickets = [
         {
           visit_id: 1,
-          queue_tag: "cardiology_common",
-          queue_name: "Кардиолог",
+          queue_tag: 'cardiology_common',
+          queue_name: 'Кардиолог',
           queue_number: 15,
           queue_id: 1,
           patient_id: 1,
-          patient_name: "Юля Михайловна",
-          doctor_name: "Д-р Петров",
-          department: "Кардиология",
+          patient_name: 'Юля Михайловна',
+          doctor_name: 'Д-р Петров',
+          department: 'Кардиология',
           visit_date: new Date().toISOString().split('T')[0],
           visit_time: '10:30'
         },
         {
           visit_id: 1,
-          queue_tag: "dermatology",
-          queue_name: "Дерматолог",
+          queue_tag: 'dermatology',
+          queue_name: 'Дерматолог',
           queue_number: 8,
           queue_id: 2,
           patient_id: 1,
-          patient_name: "Юля Михайловна",
-          doctor_name: "Д-р Смирнова",
-          department: "Дерматология",
+          patient_name: 'Юля Михайловна',
+          doctor_name: 'Д-р Смирнова',
+          department: 'Дерматология',
           visit_date: new Date().toISOString().split('T')[0],
           visit_time: '10:30'
         }

@@ -62,7 +62,7 @@ const MacOSSelect = React.forwardRef(({
     WebkitAppearance: 'none',
     MozAppearance: 'none',
     appearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\' fill=\'none\' stroke=\'%236B7280\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'right 12px center',
     backgroundSize: '12px',
@@ -88,6 +88,15 @@ const MacOSSelect = React.forwardRef(({
     e.target.style.boxShadow = 'none';
   };
 
+  // Извлекаем onChange из props, чтобы убедиться, что он передается
+  const { onChange, ...restProps } = props;
+
+  const handleChange = (e) => {
+    if (onChange) {
+      onChange(e);
+    }
+  };
+
   return (
     <select
       ref={ref}
@@ -96,26 +105,39 @@ const MacOSSelect = React.forwardRef(({
       disabled={disabled}
       onFocus={handleFocus}
       onBlur={handleBlur}
-      {...props}
+      onChange={handleChange}
+      {...restProps}
     >
       {placeholder && (
         <option value="" disabled>
           {placeholder}
         </option>
       )}
-      {options.map((option) => (
-        <option 
-          key={option.value || option} 
-          value={option.value || option}
-          disabled={option.disabled}
-        >
-          {option.label || option}
-        </option>
-      ))}
+      {options && options.length > 0 ? (
+        options.map((option) => (
+          <option
+            key={option.value || option}
+            value={option.value || option}
+            disabled={option.disabled}
+          >
+            {option.label || option}
+          </option>
+        ))
+      ) : (
+        // Поддержка children для совместимости с обычным select
+        props.children || (
+          <>
+            <option value="ru">RU</option>
+            <option value="uz">UZ</option>
+            <option value="en">EN</option>
+            <option value="kk">KK</option>
+          </>
+        )
+      )}
     </select>
   );
 });
 
-MacOSSelect.displayName = "MacOSSelect";
+MacOSSelect.displayName = 'MacOSSelect';
 
 export default MacOSSelect;

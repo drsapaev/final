@@ -148,9 +148,11 @@ const MacOSButton = ({
   const handleClick = (e) => {
     if (disabled || loading) {
       e.preventDefault();
+      e.stopPropagation();
       return;
     }
-    if (onClick) {
+    // Для кнопок типа submit не вызываем onClick, чтобы форма могла обработать submit
+    if (onClick && type !== 'submit') {
       onClick(e);
     }
   };

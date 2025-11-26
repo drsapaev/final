@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { api } from '../../api/client';
 
 const CloudPrintingManager = () => {
   const [activeTab, setActiveTab] = useState('printers');
@@ -71,39 +72,8 @@ const CloudPrintingManager = () => {
   const loadPrinters = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/cloud-printing/printers`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPrinters(data.printers || []);
-      } else {
-        // Fallback данные для демонстрации
-        setPrinters([
-          {
-            id: 'mock-printer-1',
-            name: 'Тестовый принтер',
-            description: 'Mock принтер для тестирования',
-            provider: 'mock',
-            status: 'online',
-            location: 'Кабинет 101'
-          },
-          {
-            id: 'mock-printer-2',
-            name: 'Принтер документов',
-            description: 'Основной принтер для документов',
-            provider: 'mock',
-            status: 'busy',
-            location: 'Регистратура'
-          }
-        ]);
-        toast.error('Ошибка загрузки принтеров, показаны тестовые данные');
-      }
+      const response = await api.get('/cloud-printing/printers');
+      setPrinters(response.data?.printers || []);
     } catch (error) {
       console.error('Ошибка загрузки принтеров:', error);
       // Fallback данные для демонстрации
@@ -133,26 +103,8 @@ const CloudPrintingManager = () => {
 
   const loadStatistics = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/cloud-printing/statistics`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setStatistics(data.statistics);
-      } else {
-        // Fallback данные для демонстрации
-        setStatistics({
-          total_printers: 2,
-          online_printers: 1,
-          offline_printers: 0,
-          providers_count: 1
-        });
-      }
+      const response = await api.get('/cloud-printing/statistics');
+      setStatistics(response.data?.statistics);
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
       // Fallback данные для демонстрации
@@ -167,24 +119,15 @@ const CloudPrintingManager = () => {
 
   const testPrinter = async (providerName, printerId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/cloud-printing/test/${providerName}/${printerId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const response = await api.post(`/cloud-printing/test/${providerName}/${printerId}`);
+      if (response.data?.success) {
         toast.success('Тестовая печать отправлена');
       } else {
-        toast.error(data.message || 'Ошибка тестовой печати');
+        toast.error(response.data?.message || 'Ошибка тестовой печати');
       }
     } catch (error) {
       console.error('Ошибка тестовой печати:', error);
-      toast.error('Ошибка тестовой печати');
+      toast.error(error.response?.data?.detail || 'Ошибка тестовой печати');
     }
   };
 
@@ -195,18 +138,8 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/cloud-printing/print`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(printForm)
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const response = await api.post('/cloud-printing/print', printForm);
+      if (response.data?.success) {
         toast.success('Документ отправлен на печать');
         setPrintForm({
           ...printForm,
@@ -214,11 +147,11 @@ const CloudPrintingManager = () => {
           content: ''
         });
       } else {
-        toast.error(data.message || 'Ошибка печати');
+        toast.error(response.data?.message || 'Ошибка печати');
       }
     } catch (error) {
       console.error('Ошибка печати:', error);
-      toast.error('Ошибка печати');
+      toast.error(error.response?.data?.detail || 'Ошибка печати медицинского документа');
     }
   };
 
@@ -229,21 +162,11 @@ const CloudPrintingManager = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/cloud-printing/print/medical`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(medicalForm)
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const response = await api.post('/cloud-printing/print/medical', medicalForm);
+      if (response.data?.success) {
         toast.success('Медицинский документ отправлен на печать');
       } else {
-        toast.error(data.message || 'Ошибка печати');
+        toast.error(response.data?.message || 'Ошибка печати');
       }
     } catch (error) {
       console.error('Ошибка печати медицинского документа:', error);
@@ -436,7 +359,7 @@ const CloudPrintingManager = () => {
               <MacOSSelect
                 id="provider"
                 value={printForm.provider_name}
-                onChange={(e) => setPrintForm({...printForm, provider_name: e.target.value})}
+                onChange={(e) => setPrintForm({ ...printForm, provider_name: e.target.value })}
                 options={[
                   { value: 'mock', label: 'Mock (Тестовый)' },
                   { value: 'microsoft', label: 'Microsoft Universal Print' }
@@ -455,7 +378,7 @@ const CloudPrintingManager = () => {
               <MacOSSelect
                 id="printer"
                 value={printForm.printer_id}
-                onChange={(e) => setPrintForm({...printForm, printer_id: e.target.value})}
+                onChange={(e) => setPrintForm({ ...printForm, printer_id: e.target.value })}
                 options={[
                   { value: '', label: 'Выберите принтер' },
                   ...printers
@@ -479,7 +402,7 @@ const CloudPrintingManager = () => {
               <MacOSInput
                 id="title"
                 value={printForm.title}
-                onChange={(e) => setPrintForm({...printForm, title: e.target.value})}
+                onChange={(e) => setPrintForm({ ...printForm, title: e.target.value })}
                 placeholder="Введите название документа"
               />
             </div>
@@ -495,7 +418,7 @@ const CloudPrintingManager = () => {
               <MacOSSelect
                 id="format"
                 value={printForm.format}
-                onChange={(e) => setPrintForm({...printForm, format: e.target.value})}
+                onChange={(e) => setPrintForm({ ...printForm, format: e.target.value })}
                 options={[
                   { value: 'html', label: 'HTML' },
                   { value: 'text', label: 'Текст' },
@@ -519,7 +442,7 @@ const CloudPrintingManager = () => {
                   min="1"
                   max="10"
                   value={printForm.copies}
-                  onChange={(e) => setPrintForm({...printForm, copies: parseInt(e.target.value)})}
+                  onChange={(e) => setPrintForm({ ...printForm, copies: parseInt(e.target.value) })}
                 />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -527,7 +450,7 @@ const CloudPrintingManager = () => {
                   type="checkbox"
                   id="color"
                   checked={printForm.color}
-                  onChange={(e) => setPrintForm({...printForm, color: e.target.checked})}
+                  onChange={(e) => setPrintForm({ ...printForm, color: e.target.checked })}
                   style={{ margin: 0 }}
                 />
                 <label style={{ 
@@ -541,7 +464,7 @@ const CloudPrintingManager = () => {
                   type="checkbox"
                   id="duplex"
                   checked={printForm.duplex}
-                  onChange={(e) => setPrintForm({...printForm, duplex: e.target.checked})}
+                  onChange={(e) => setPrintForm({ ...printForm, duplex: e.target.checked })}
                   style={{ margin: 0 }}
                 />
                 <label style={{ 
@@ -563,7 +486,7 @@ const CloudPrintingManager = () => {
           
           <MacOSTextarea
             value={printForm.content}
-            onChange={(e) => setPrintForm({...printForm, content: e.target.value})}
+            onChange={(e) => setPrintForm({ ...printForm, content: e.target.value })}
             placeholder="Введите содержимое документа (HTML, текст или base64 для PDF)"
             rows={15}
             style={{ width: '100%' }}
@@ -616,7 +539,7 @@ const CloudPrintingManager = () => {
               <MacOSSelect
                 id="med-provider"
                 value={medicalForm.provider_name}
-                onChange={(e) => setMedicalForm({...medicalForm, provider_name: e.target.value})}
+                onChange={(e) => setMedicalForm({ ...medicalForm, provider_name: e.target.value })}
               >
                 <option value="mock">Mock (Тестовый)</option>
                 <option value="microsoft">Microsoft Universal Print</option>
@@ -634,7 +557,7 @@ const CloudPrintingManager = () => {
               <MacOSSelect
                 id="med-printer"
                 value={medicalForm.printer_id}
-                onChange={(e) => setMedicalForm({...medicalForm, printer_id: e.target.value})}
+                onChange={(e) => setMedicalForm({ ...medicalForm, printer_id: e.target.value })}
               >
                 <option value="">Выберите принтер</option>
                 {printers
@@ -658,7 +581,7 @@ const CloudPrintingManager = () => {
               <MacOSSelect
                 id="doc-type"
                 value={medicalForm.document_type}
-                onChange={(e) => setMedicalForm({...medicalForm, document_type: e.target.value})}
+                onChange={(e) => setMedicalForm({ ...medicalForm, document_type: e.target.value })}
               >
                 <option value="prescription">Рецепт</option>
                 <option value="receipt">Чек</option>
@@ -687,7 +610,7 @@ const CloudPrintingManager = () => {
                 value={medicalForm.patient_data.patient_name}
                 onChange={(e) => setMedicalForm({
                   ...medicalForm,
-                  patient_data: {...medicalForm.patient_data, patient_name: e.target.value}
+                  patient_data: { ...medicalForm.patient_data, patient_name: e.target.value }
                 })}
                 placeholder="Введите ФИО пациента"
               />
@@ -707,7 +630,7 @@ const CloudPrintingManager = () => {
                   value={medicalForm.patient_data.age}
                   onChange={(e) => setMedicalForm({
                     ...medicalForm,
-                    patient_data: {...medicalForm.patient_data, age: e.target.value}
+                    patient_data: { ...medicalForm.patient_data, age: e.target.value }
                   })}
                   placeholder="Возраст"
                 />
@@ -725,7 +648,7 @@ const CloudPrintingManager = () => {
                   value={medicalForm.patient_data.phone}
                   onChange={(e) => setMedicalForm({
                     ...medicalForm,
-                    patient_data: {...medicalForm.patient_data, phone: e.target.value}
+                    patient_data: { ...medicalForm.patient_data, phone: e.target.value }
                   })}
                   placeholder="+998901234567"
                 />
@@ -758,7 +681,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.diagnosis}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, diagnosis: e.target.value}
+                      template_data: { ...medicalForm.template_data, diagnosis: e.target.value }
                     })}
                     placeholder="Введите диагноз"
                   />
@@ -776,7 +699,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.prescription_text}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, prescription_text: e.target.value}
+                      template_data: { ...medicalForm.template_data, prescription_text: e.target.value }
                     })}
                     placeholder="Введите назначение"
                     rows={4}
@@ -795,7 +718,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.doctor_name}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, doctor_name: e.target.value}
+                      template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                     })}
                     placeholder="ФИО врача"
                   />
@@ -818,7 +741,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.queue_number}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, queue_number: e.target.value}
+                      template_data: { ...medicalForm.template_data, queue_number: e.target.value }
                     })}
                     placeholder="A001"
                   />
@@ -836,7 +759,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.doctor_name}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, doctor_name: e.target.value}
+                      template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                     })}
                     placeholder="ФИО врача"
                   />
@@ -854,7 +777,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.cabinet}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, cabinet: e.target.value}
+                      template_data: { ...medicalForm.template_data, cabinet: e.target.value }
                     })}
                     placeholder="№ кабинета"
                   />
@@ -877,7 +800,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.examination_results}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, examination_results: e.target.value}
+                      template_data: { ...medicalForm.template_data, examination_results: e.target.value }
                     })}
                     placeholder="Введите результаты обследования"
                     rows={3}
@@ -896,7 +819,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.conclusion}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, conclusion: e.target.value}
+                      template_data: { ...medicalForm.template_data, conclusion: e.target.value }
                     })}
                     placeholder="Введите заключение"
                     rows={3}
@@ -915,7 +838,7 @@ const CloudPrintingManager = () => {
                     value={medicalForm.template_data.doctor_name}
                     onChange={(e) => setMedicalForm({
                       ...medicalForm,
-                      template_data: {...medicalForm.template_data, doctor_name: e.target.value}
+                      template_data: { ...medicalForm.template_data, doctor_name: e.target.value }
                     })}
                     placeholder="ФИО врача"
                   />

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
@@ -15,8 +15,10 @@ from app.db.session import get_db
 from app.models.payment import Payment
 from app.models.payment_webhook import PaymentWebhook, PaymentProvider, PaymentTransaction
 from app.models.visit import Visit
+from app.models.enums import PaymentStatus  # ✅ SSOT: Используем enum из app.models.enums
 from app.services.payment_providers.manager import PaymentProviderManager
-from app.services.payment_providers.base import PaymentResult, PaymentStatus
+from app.services.payment_providers.base import PaymentResult
+from app.services.billing_service import BillingService
 
 router = APIRouter()
 
@@ -112,7 +114,7 @@ class PaymentStatusResponse(BaseModel):
 
 class PaymentListResponse(BaseModel):
     """Список платежей"""
-    payments: List[PaymentStatusResponse]
+    payments: List[Dict[str, Any]]  # Используем Dict для гибкости формата данных
     total: int
 
 class ProviderInfo(BaseModel):
@@ -178,22 +180,23 @@ def init_payment(
                 error_message=f"Провайдер {payment_request.provider} не поддерживает валюту {payment_request.currency}"
             )
         
-        # Создаем запись платежа в БД
-        payment = Payment(
+        # Создаем запись платежа в БД через SSOT
+        billing_service = BillingService(db)
+        payment = billing_service.create_payment(
             visit_id=payment_request.visit_id,
-            amount=payment_request.amount,
+            amount=float(payment_request.amount),
             currency=payment_request.currency,
             method="online",
-            status="pending",
-            provider=payment_request.provider
+            status=PaymentStatus.PENDING.value,
+            provider=payment_request.provider,
+            commit=False,  # Не коммитим сразу, обновим после получения данных от провайдера
         )
         
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
-        
         # Генерируем order_id
-        order_id = f"clinic_{payment.id}_{int(datetime.now().timestamp())}"
+        # ✅ SSOT: Используем get_local_timestamp() вместо datetime.now()
+        from app.services.queue_service import queue_service
+        now = queue_service.get_local_timestamp(db)
+        order_id = f"clinic_{payment.id}_{int(now.timestamp())}"
         
         # Формируем URLs
         base_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
@@ -215,10 +218,15 @@ def init_payment(
             # Обновляем платеж данными от провайдера
             payment.provider_payment_id = result.payment_id
             payment.payment_url = result.payment_url
-            payment.status = result.status or "pending"
             payment.provider_data = result.provider_data
             
-            db.commit()
+            # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
+            billing_service = BillingService(db)
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status=result.status or "pending",
+                meta=result.provider_data
+            )
             
             return PaymentInitResponse(
                 success=True,
@@ -228,10 +236,13 @@ def init_payment(
                 status=result.status
             )
         else:
-            # Обновляем статус на failed
-            payment.status = "failed"
-            payment.provider_data = {"error": result.error_message}
-            db.commit()
+            # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
+            billing_service = BillingService(db)
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status="failed",
+                meta={"error": result.error_message}
+            )
             
             return PaymentInitResponse(
                 success=False,
@@ -246,6 +257,149 @@ def init_payment(
             success=False,
             error_message=f"Ошибка инициализации платежа: {str(e)}"
         )
+
+class PaymentCreateRequest(BaseModel):
+    """Запрос на создание платежа"""
+    visit_id: Optional[int] = Field(None, description="ID визита")
+    appointment_id: Optional[int] = Field(None, description="ID записи (appointment)")
+    amount: Decimal = Field(..., gt=0, description="Сумма платежа")
+    currency: str = Field(default="UZS", description="Валюта платежа")
+    method: str = Field(default="cash", description="Метод оплаты (cash, card)")
+    note: Optional[str] = Field(None, description="Примечание")
+
+@router.post("/", response_model=Dict[str, Any])
+def create_payment(
+    payment_request: PaymentCreateRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(deps.get_current_user)
+) -> Dict[str, Any]:
+    """Создание платежа (для кассы)"""
+    try:
+        billing_service = BillingService(db)
+        
+        # Определяем visit_id
+        visit_id = payment_request.visit_id
+        if not visit_id and payment_request.appointment_id:
+            # Если передан appointment_id, ищем связанный visit
+            from app.models.appointment import Appointment
+            appointment = db.query(Appointment).filter(Appointment.id == payment_request.appointment_id).first()
+            if appointment:
+                # Ищем visit по patient_id и дате
+                from datetime import date
+                visit = db.query(Visit).filter(
+                    Visit.patient_id == appointment.patient_id,
+                    Visit.visit_date == (appointment.appointment_date or date.today())
+                ).first()
+                if visit:
+                    visit_id = visit.id
+        
+        if not visit_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Не указан visit_id или appointment_id"
+            )
+        
+        # Создаем платеж через SSOT
+        payment = billing_service.create_payment(
+            visit_id=visit_id,
+            amount=float(payment_request.amount),
+            currency=payment_request.currency,
+            method=payment_request.method,
+            status=PaymentStatus.PAID.value,
+            note=payment_request.note
+        )
+        
+        # Формируем ответ в том же формате, что и get_payments_list
+        from app.models.visit import VisitService
+        from app.models.service import Service
+        from app.models.patient import Patient
+        
+        patient_name = None
+        service_name = None
+        appointment_time = None
+        
+        visit = db.query(Visit).filter(Visit.id == payment.visit_id).first()
+        if visit:
+            if visit.visit_time:
+                appointment_time = visit.visit_time.strftime('%H:%M')
+            elif visit.created_at:
+                appointment_time = visit.created_at.strftime('%H:%M')
+            
+            if visit.patient_id:
+                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                if patient:
+                    patient_name = patient.short_name() or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+            
+            first_service = db.query(VisitService).filter(
+                VisitService.visit_id == visit.id
+            ).first()
+            if first_service:
+                service = db.query(Service).filter(Service.id == first_service.service_id).first()
+                if service:
+                    service_name = service.name
+        
+        method = 'Наличные'
+        if payment.provider:
+            method = payment.provider.capitalize()
+        elif payment.method:
+            method = payment.method.capitalize()
+        
+        return {
+            'id': payment.id,
+            'payment_id': payment.id,
+            'time': appointment_time or (payment.created_at.strftime('%H:%M') if payment.created_at else '—'),
+            'patient': patient_name or 'Неизвестно',
+            'service': service_name or 'Услуга',
+            'amount': float(payment.amount),
+            'method': method,
+            'status': payment.status,
+            'currency': payment.currency,
+            'created_at': payment.created_at.isoformat() if payment.created_at else None,
+            'paid_at': payment.paid_at.isoformat() if payment.paid_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка создания платежа: {str(e)}"
+        )
+
+@router.get("/", response_model=PaymentListResponse)
+def list_payments(
+    db: Session = Depends(get_db),
+    visit_id: Optional[int] = Query(None, description="Фильтр по ID визита"),
+    date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    current_user = Depends(deps.get_current_user)
+) -> PaymentListResponse:
+    """Получение списка платежей с фильтрацией (использует SSOT)"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    billing_service = BillingService(db)
+    
+    # Получаем платежи через SSOT
+    payment_responses = billing_service.get_payments_list(
+        visit_id=visit_id,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset
+    )
+    
+    # ✅ ЛОГИРОВАНИЕ: Для отладки - проверяем, что возвращаются реальные данные из БД
+    logger.info(f"📊 Возвращено платежей: {len(payment_responses)}, фильтры: visit_id={visit_id}, date_from={date_from}, date_to={date_to}")
+    if payment_responses:
+        logger.info(f"📊 Первый платеж (пример): {payment_responses[0]}")
+    
+    return PaymentListResponse(
+        payments=payment_responses,
+        total=len(payment_responses)
+    )
 
 @router.get("/{payment_id}", response_model=PaymentStatusResponse)
 def get_payment_status(
@@ -266,7 +420,7 @@ def get_payment_status(
     # Если платеж онлайн и не завершен, проверяем статус у провайдера
     if (payment.provider and 
         payment.provider_payment_id and 
-        payment.status in ["pending", "processing"]):
+        payment.status in [PaymentStatus.PENDING.value, PaymentStatus.PROCESSING.value]):
         
         manager = get_payment_manager()
         result = manager.check_payment_status(
@@ -275,15 +429,17 @@ def get_payment_status(
         )
         
         if result.success and result.status != payment.status:
-            # Обновляем статус в БД
-            payment.status = result.status
-            if result.status == "completed":
-                payment.paid_at = datetime.utcnow()
-            payment.provider_data = {
+            # ✅ SSOT: Обновляем статус через update_payment_status()
+            billing_service = BillingService(db)
+            meta = {
                 **(payment.provider_data or {}),
                 **result.provider_data
             }
-            db.commit()
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status=result.status,
+                meta=meta
+            )
     
     return PaymentStatusResponse(
         payment_id=payment.id,
@@ -309,17 +465,19 @@ def get_visit_payments(
     
     payment_responses = []
     for payment in payments:
-        payment_responses.append(PaymentStatusResponse(
-            payment_id=payment.id,
-            status=payment.status,
-            amount=payment.amount,
-            currency=payment.currency,
-            provider=payment.provider,
-            provider_payment_id=payment.provider_payment_id,
-            created_at=payment.created_at,
-            paid_at=payment.paid_at,
-            provider_data=payment.provider_data
-        ))
+        payment_data = {
+            'payment_id': payment.id,
+            'id': payment.id,
+            'status': payment.status,
+            'amount': float(payment.amount),
+            'currency': payment.currency,
+            'provider': payment.provider,
+            'provider_payment_id': payment.provider_payment_id,
+            'created_at': payment.created_at.isoformat() if payment.created_at else None,
+            'paid_at': payment.paid_at.isoformat() if payment.paid_at else None,
+            'provider_data': payment.provider_data
+        }
+        payment_responses.append(payment_data)
     
     return PaymentListResponse(
         payments=payment_responses,
@@ -354,24 +512,35 @@ def cancel_payment(
         manager = get_payment_manager()
         result = manager.cancel_payment(payment.provider, payment.provider_payment_id)
         
+        # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
+        billing_service = BillingService(db)
+        
         if result.success:
-            payment.status = "cancelled"
-            payment.provider_data = {
-                **(payment.provider_data or {}),
-                **result.provider_data
-            }
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status=PaymentStatus.CANCELLED.value,
+                meta={
+                    **(payment.provider_data or {}),
+                    **result.provider_data
+                }
+            )
         else:
             # Даже если провайдер не смог отменить, отмечаем как отмененный в нашей системе
-            payment.status = "cancelled"
-            payment.provider_data = {
-                **(payment.provider_data or {}),
-                "cancel_error": result.error_message
-            }
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status=PaymentStatus.CANCELLED.value,
+                meta={
+                    **(payment.provider_data or {}),
+                    "cancel_error": result.error_message
+                }
+            )
     else:
-        # Обычный платеж
-        payment.status = "cancelled"
-    
-    db.commit()
+        # ✅ SSOT: Обычный платеж - используем update_payment_status()
+        billing_service = BillingService(db)
+        billing_service.update_payment_status(
+            payment_id=payment.id,
+            new_status=PaymentStatus.CANCELLED.value
+        )
     
     return {
         "success": True,
@@ -392,20 +561,17 @@ def test_init_payment(
         # Получаем менеджер провайдеров
         payment_manager = get_payment_manager()
         
-        # Создаем запись платежа в БД
-        payment = Payment(
+        # Создаем запись платежа в БД через SSOT
+        billing_service = BillingService(db)
+        payment = billing_service.create_payment(
             visit_id=payment_request.visit_id,
-            amount=payment_request.amount,
+            amount=float(payment_request.amount),
             currency=payment_request.currency,
             method="online",
-            status="pending",
+            status=PaymentStatus.PENDING.value,
             provider=payment_request.provider,
-            created_at=datetime.utcnow()
+            commit=False,  # Не коммитим сразу, обновим после получения данных от провайдера
         )
-        
-        db.add(payment)
-        db.commit()
-        db.refresh(payment)
         
         # Инициализируем платеж через провайдера
         result = payment_manager.create_payment(
@@ -422,9 +588,12 @@ def test_init_payment(
             # Обновляем данные платежа
             payment.provider_payment_id = result.payment_id
             payment.payment_url = result.payment_url
-            payment.status = "initialized"
-            
-            db.commit()
+            # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
+            billing_service = BillingService(db)
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status=PaymentStatus.PROCESSING.value  # initialized -> processing (более корректный статус)
+            )
             
             return PaymentInitResponse(
                 success=True,
@@ -438,9 +607,13 @@ def test_init_payment(
                 message="Тестовый платеж успешно инициализирован"
             )
         else:
-            # Ошибка инициализации
-            payment.status = "failed"
-            db.commit()
+            # ✅ SSOT: Ошибка инициализации - используем update_payment_status()
+            billing_service = BillingService(db)
+            billing_service.update_payment_status(
+                payment_id=payment.id,
+                new_status="failed",
+                meta={"error": result.error_message}
+            )
             
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -569,7 +742,7 @@ async def create_payment_invoice(
             amount=request.amount,
             currency=request.currency,
             provider=request.provider,
-            status="pending",
+            status=PaymentStatus.PENDING.value,
             description=request.description,
             payment_method=request.provider,
             created_by_id=current_user.id

@@ -18,8 +18,7 @@ import {
 import { Card, Badge, Button } from '../ui/macos';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
-
-const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
+import { api } from '../../api/client';
 
 /**
  * Компонент для одобрения/отклонения заявок All Free в админке
@@ -27,6 +26,7 @@ const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/
 const AllFreeApproval = () => {
   const { theme, getColor } = useTheme();
   const [allFreeRequests, setAllFreeRequests] = useState([]);
+  const [allRequestsForStats, setAllRequestsForStats] = useState([]); // ✅ Для статистики - все заявки
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -36,29 +36,33 @@ const AllFreeApproval = () => {
 
   useEffect(() => {
     loadAllFreeRequests();
+    // ✅ Загружаем все заявки для статистики
+    loadAllRequestsForStats();
   }, [statusFilter]);
+
+  // ✅ Отдельная функция для загрузки всех заявок для статистики
+  const loadAllRequestsForStats = async () => {
+    try {
+      // ✅ ИСПРАВЛЕНО: Используем лимит 100 (максимум на бэкенде)
+      // Если заявок больше 100, можно сделать несколько запросов, но обычно этого достаточно
+      const response = await api.get('/admin/all-free-requests?status_filter=all&limit=100');
+      const data = response.data;
+      setAllRequestsForStats(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('[AllFreeApproval] Ошибка загрузки всех заявок для статистики:', error);
+    }
+  };
 
   const loadAllFreeRequests = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE}/admin/all-free-requests?status_filter=${statusFilter}&limit=100`,
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setAllFreeRequests(data);
-      } else {
-        toast.error('Ошибка загрузки заявок All Free');
-      }
+      const response = await api.get(`/admin/all-free-requests?status_filter=${statusFilter}&limit=100`);
+      const data = response.data;
+      console.log('[AllFreeApproval] Получено заявок:', data.length, data);
+      setAllFreeRequests(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading all free requests:', error);
-      toast.error('Ошибка загрузки заявок All Free');
+      console.error('[AllFreeApproval] Ошибка при загрузке заявок All Free:', error);
+      toast.error(error.response?.data?.detail || 'Ошибка загрузки заявок All Free');
     } finally {
       setLoading(false);
     }
@@ -67,37 +71,25 @@ const AllFreeApproval = () => {
   const handleApproval = async (visitId, action, rejectionReason = null) => {
     setIsProcessing(true);
     try {
-      const response = await fetch(`${API_BASE}/admin/all-free-approve`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify({
-          visit_id: visitId,
-          action: action,
-          rejection_reason: rejectionReason
-        })
+      const response = await api.post('/admin/all-free-approve', {
+        visit_id: visitId,
+        action: action,
+        rejection_reason: rejectionReason
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(result.message);
-        
-        // Обновляем список
-        loadAllFreeRequests();
-        
-        // Закрываем модальное окно
-        setShowApprovalModal(false);
-        setSelectedRequest(null);
-        setRejectionReason('');
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка обработки запроса');
-      }
+      toast.success(response.data?.message || 'Заявка обработана');
+      
+      // ✅ ИСПРАВЛЕНО: Обновляем все заявки для статистики и список с текущим фильтром
+      await loadAllRequestsForStats();
+      loadAllFreeRequests();
+      
+      // Закрываем модальное окно
+      setShowApprovalModal(false);
+      setSelectedRequest(null);
+      setRejectionReason('');
     } catch (error) {
       console.error('Error processing approval:', error);
-      toast.error('Ошибка обработки запроса');
+      toast.error(error.response?.data?.detail || 'Ошибка обработки запроса');
     } finally {
       setIsProcessing(false);
     }
@@ -145,7 +137,13 @@ const AllFreeApproval = () => {
     }
   };
 
-  const pendingCount = allFreeRequests.filter(req => req.approval_status === 'pending').length;
+  // ✅ Используем allRequestsForStats для статистики, чтобы она была точной независимо от фильтра
+  const pendingCount = allRequestsForStats.filter(req => req.approval_status === 'pending').length;
+  const approvedCount = allRequestsForStats.filter(req => req.approval_status === 'approved').length;
+  const rejectedCount = allRequestsForStats.filter(req => req.approval_status === 'rejected').length;
+  const totalAmount = allRequestsForStats
+    .filter(req => req.approval_status === 'approved')
+    .reduce((sum, req) => sum + Number(req.total_original_amount || 0), 0);
 
   return (
     <Card 
@@ -253,7 +251,7 @@ const AllFreeApproval = () => {
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>
-                  {allFreeRequests.filter(req => req.approval_status === 'pending').length}
+                  {pendingCount}
                 </p>
               </div>
             </div>
@@ -285,7 +283,7 @@ const AllFreeApproval = () => {
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>
-                  {allFreeRequests.filter(req => req.approval_status === 'approved').length}
+                  {approvedCount}
                 </p>
               </div>
             </div>
@@ -317,7 +315,7 @@ const AllFreeApproval = () => {
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>
-                  {allFreeRequests.filter(req => req.approval_status === 'rejected').length}
+                  {rejectedCount}
                 </p>
               </div>
             </div>
@@ -349,11 +347,7 @@ const AllFreeApproval = () => {
                   color: 'var(--mac-text-primary)',
                   margin: '4px 0 0 0'
                 }}>
-                  {formatPrice(
-                    allFreeRequests
-                      .filter(req => req.approval_status === 'approved')
-                      .reduce((sum, req) => sum + Number(req.total_original_amount), 0)
-                  )}
+                  {formatPrice(totalAmount)}
                 </p>
               </div>
             </div>

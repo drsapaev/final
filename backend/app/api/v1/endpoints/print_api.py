@@ -29,20 +29,14 @@ async def print_queue_ticket(
     print_service: PrintService = Depends(get_print_service)
 ):
     """
-    Печать талона очереди
+    Печать талона очереди (использует SSOT)
     """
     try:
-        # Дополняем данные талона
-        ticket_data = request.dict()
-        ticket_data.update({
-            "date": datetime.now(),
-            "time": datetime.now(),
-            "issued_by": current_user.full_name
-        })
-        
-        result = await print_service.print_document(
-            document_type="ticket",
-            document_data=ticket_data,
+        # Используем SSOT для генерации талона
+        result = await print_service.generate_ticket(
+            queue_entry_id=request.queue_entry_id if hasattr(request, 'queue_entry_id') else None,
+            visit_id=request.visit_id if hasattr(request, 'visit_id') else None,
+            ticket_data=request.dict(),
             printer_name=request.printer_name,
             user=current_user
         )
@@ -149,26 +143,14 @@ async def print_payment_receipt(
     print_service: PrintService = Depends(get_print_service)
 ):
     """
-    Печать чека об оплате
+    Печать чека об оплате (использует SSOT)
     """
     try:
-        # Дополняем данные чека
-        payment_data = request.dict()
-        payment_data.update({
-            "payment": {
-                **payment_data.get("payment", {}),
-                "date": datetime.now(),
-                "time": datetime.now(),
-                "number": payment_data.get("payment", {}).get("number") or f"PAY-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-            },
-            "cashier": {
-                "full_name": current_user.full_name
-            }
-        })
-        
-        result = await print_service.print_document(
-            document_type="payment_receipt",
-            document_data=payment_data,
+        # Используем SSOT для генерации чека
+        result = await print_service.generate_receipt(
+            payment_id=request.payment_id if hasattr(request, 'payment_id') else None,
+            visit_id=request.visit_id if hasattr(request, 'visit_id') else None,
+            payment_data=request.dict(),
             printer_name=request.printer_name,
             user=current_user
         )

@@ -9,6 +9,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.crud import online_queue as crud_queue
+from app.services.queue_service import (
+    queue_service,
+    QueueValidationError,
+    QueueNotFoundError,
+    QueueConflictError,
+)
 from app.schemas.online_queue import (
     QRTokenRequest, QRTokenResponse,
     QueueJoinRequest, QueueJoinResponse, QueueJoinError,
@@ -32,8 +38,13 @@ def generate_qr_token(
     Из detail.md стр. 228: POST /api/online-queue/qrcode?day=YYYY-MM-DD&specialist_id=X → token
     """
     try:
-        token, token_data = crud_queue.generate_qr_token(
-            db, day, specialist_id, current_user.id
+        token, token_data = queue_service.assign_queue_token(
+            db,
+            specialist_id=specialist_id,
+            department=None,
+            generated_by_user_id=current_user.id,
+            target_date=day,
+            is_clinic_wide=False,
         )
         
         # Формируем URL для QR кода
@@ -74,26 +85,66 @@ def join_queue(
     Вступление в онлайн-очередь
     Из detail.md стр. 235: POST /api/online-queue/join { token, phone?, telegram_id? } → номер
     """
+    svc = queue_service
     try:
-        result = crud_queue.join_online_queue(
-            db=db,
-            token=request.token,
+        join_result = svc.join_queue_with_token(
+            db,
+            token_str=request.token,
+            patient_name=request.patient_name,
             phone=request.phone,
             telegram_id=request.telegram_id,
-            patient_name=request.patient_name
+            source="online",
         )
-        
-        if result.get("success"):
-            return QueueJoinResponse(**result)
-        else:
-            return QueueJoinError(**result)
-            
+    except QueueValidationError as exc:
+        return QueueJoinError(
+            success=False,
+            error_code="VALIDATION_ERROR",
+            message=str(exc),
+        )
+    except QueueConflictError as exc:
+        return QueueJoinError(
+            success=False,
+            error_code="QUEUE_FULL",
+            message=str(exc),
+            queue_full=True,
+        )
+    except QueueNotFoundError as exc:
+        return QueueJoinError(
+            success=False,
+            error_code="QUEUE_NOT_FOUND",
+            message=str(exc),
+        )
     except Exception as e:
         return QueueJoinError(
             success=False,
             error_code="INTERNAL_ERROR",
             message=f"Ошибка вступления в очередь: {str(e)}"
         )
+
+    entry = join_result["entry"]
+    specialist_name = join_result.get("specialist_name")
+    cabinet = join_result.get("cabinet")
+
+    if join_result["duplicate"]:
+        return QueueJoinResponse(
+            success=True,
+            number=entry.number,
+            duplicate=True,
+            message=f"✅ Вы уже записаны по {join_result['duplicate_reason']}. Ваш номер: {entry.number}",
+            specialist_name=specialist_name,
+            cabinet=cabinet,
+            estimated_time="Ожидайте вызова",
+        )
+
+    return QueueJoinResponse(
+        success=True,
+        number=entry.number,
+        duplicate=False,
+        message=f"Вы записаны в очередь. Ваш номер: {entry.number}",
+        specialist_name=specialist_name,
+        cabinet=cabinet,
+        estimated_time="Придите к открытию приема",
+    )
 
 
 # ===================== ОТКРЫТИЕ ПРИЕМА =====================

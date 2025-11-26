@@ -53,7 +53,7 @@ const MetricCard = ({
     <MedicalCard 
       className={`metric-card interactive-element hover-lift ripple-effect magnetic-hover focus-ring ${className}`}
       hover={true}
-      padding={compact ? "small" : "medium"}
+      padding={compact ? 'small' : 'medium'}
       {...props}
     >
       <div className={`flex items-center ${compact ? 'justify-between' : 'justify-between'}`}>

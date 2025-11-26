@@ -83,50 +83,26 @@ const DiscountBenefitsManager = () => {
     end_date: ''
   });
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-
-  // Получение токена авторизации
-  const getAuthToken = () => {
-    return localStorage.getItem('access_token');
-  };
-
-  // Заголовки для API запросов
-  const getHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${getAuthToken()}`
-  });
-
   // Загрузка данных
   const loadData = async () => {
     setLoading(true);
     try {
-      const token = getAuthToken();
-      if (!token) {
-        toast.error('Необходима авторизация');
-        return;
+      const [discountsResponse, benefitsResponse, loyaltyResponse] = await Promise.allSettled([
+        api.get('/discount-benefits/discounts'),
+        api.get('/discount-benefits/benefits'),
+        api.get('/discount-benefits/loyalty-programs')
+      ]);
+
+      if (discountsResponse.status === 'fulfilled') {
+        setDiscounts(discountsResponse.value.data?.discounts || discountsResponse.value.data || []);
       }
 
-      const headers = getHeaders();
-
-      // Загрузка скидок
-      const discountsResponse = await fetch(`${API_BASE}/discount-benefits/discounts`, { headers });
-      if (discountsResponse.ok) {
-        const discountsData = await discountsResponse.json();
-        setDiscounts(discountsData.discounts || []);
+      if (benefitsResponse.status === 'fulfilled') {
+        setBenefits(benefitsResponse.value.data?.benefits || benefitsResponse.value.data || []);
       }
 
-      // Загрузка льгот
-      const benefitsResponse = await fetch(`${API_BASE}/discount-benefits/benefits`, { headers });
-      if (benefitsResponse.ok) {
-        const benefitsData = await benefitsResponse.json();
-        setBenefits(benefitsData.benefits || []);
-      }
-
-      // Загрузка программ лояльности
-      const loyaltyResponse = await fetch(`${API_BASE}/discount-benefits/loyalty-programs`, { headers });
-      if (loyaltyResponse.ok) {
-        const loyaltyData = await loyaltyResponse.json();
-        setLoyaltyPrograms(loyaltyData.programs || []);
+      if (loyaltyResponse.status === 'fulfilled') {
+        setLoyaltyPrograms(loyaltyResponse.value.data?.programs || loyaltyResponse.value.data || []);
       }
 
     } catch (error) {
@@ -140,18 +116,16 @@ const DiscountBenefitsManager = () => {
   // Загрузка аналитики
   const loadAnalytics = async () => {
     try {
-      const headers = getHeaders();
-      
-      const [discountAnalytics, benefitAnalytics, loyaltyAnalytics] = await Promise.all([
-        fetch(`${API_BASE}/discount-benefits/analytics/discounts`, { headers }),
-        fetch(`${API_BASE}/discount-benefits/analytics/benefits`, { headers }),
-        fetch(`${API_BASE}/discount-benefits/analytics/loyalty`, { headers })
+      const [discountAnalytics, benefitAnalytics, loyaltyAnalytics] = await Promise.allSettled([
+        api.get('/discount-benefits/analytics/discounts'),
+        api.get('/discount-benefits/analytics/benefits'),
+        api.get('/discount-benefits/analytics/loyalty')
       ]);
 
       const analytics = {
-        discounts: discountAnalytics.ok ? (await discountAnalytics.json()).analytics : null,
-        benefits: benefitAnalytics.ok ? (await benefitAnalytics.json()).analytics : null,
-        loyalty: loyaltyAnalytics.ok ? (await loyaltyAnalytics.json()).analytics : null
+        discounts: discountAnalytics.status === 'fulfilled' ? discountAnalytics.value.data?.analytics : null,
+        benefits: benefitAnalytics.status === 'fulfilled' ? benefitAnalytics.value.data?.analytics : null,
+        loyalty: loyaltyAnalytics.status === 'fulfilled' ? loyaltyAnalytics.value.data?.analytics : null
       };
 
       setAnalytics(analytics);
@@ -168,111 +142,81 @@ const DiscountBenefitsManager = () => {
   // Создание скидки
   const createDiscount = async () => {
     try {
-      const response = await fetch(`${API_BASE}/discount-benefits/discounts`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(discountForm)
+      await api.post('/discount-benefits/discounts', discountForm);
+      toast.success('Скидка создана успешно');
+      setShowCreateForm(false);
+      setDiscountForm({
+        name: '',
+        description: '',
+        discount_type: 'percentage',
+        value: '',
+        min_amount: '0',
+        max_discount: '',
+        start_date: '',
+        end_date: '',
+        usage_limit: '',
+        applies_to_services: true,
+        applies_to_appointments: true,
+        applies_to_packages: true,
+        can_combine_with_others: false,
+        priority: '0'
       });
-
-      if (response.ok) {
-        toast.success('Скидка создана успешно');
-        setShowCreateForm(false);
-        setDiscountForm({
-          name: '',
-          description: '',
-          discount_type: 'percentage',
-          value: '',
-          min_amount: '0',
-          max_discount: '',
-          start_date: '',
-          end_date: '',
-          usage_limit: '',
-          applies_to_services: true,
-          applies_to_appointments: true,
-          applies_to_packages: true,
-          can_combine_with_others: false,
-          priority: '0'
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка создания скидки');
-      }
+      loadData();
     } catch (error) {
       console.error('Ошибка создания скидки:', error);
-      toast.error('Ошибка создания скидки');
+      toast.error(error.response?.data?.detail || 'Ошибка создания скидки');
     }
   };
 
   // Создание льготы
   const createBenefit = async () => {
     try {
-      const response = await fetch(`${API_BASE}/discount-benefits/benefits`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(benefitForm)
+      await api.post('/discount-benefits/benefits', benefitForm);
+      toast.success('Льгота создана успешно');
+      setShowCreateForm(false);
+      setBenefitForm({
+        name: '',
+        description: '',
+        benefit_type: 'veteran',
+        discount_percentage: '',
+        max_discount_amount: '',
+        requires_document: true,
+        document_types: '',
+        age_min: '',
+        age_max: '',
+        applies_to_services: true,
+        applies_to_appointments: true,
+        monthly_limit: '',
+        yearly_limit: ''
       });
-
-      if (response.ok) {
-        toast.success('Льгота создана успешно');
-        setShowCreateForm(false);
-        setBenefitForm({
-          name: '',
-          description: '',
-          benefit_type: 'veteran',
-          discount_percentage: '',
-          max_discount_amount: '',
-          requires_document: true,
-          document_types: '',
-          age_min: '',
-          age_max: '',
-          applies_to_services: true,
-          applies_to_appointments: true,
-          monthly_limit: '',
-          yearly_limit: ''
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка создания льготы');
-      }
+      loadData();
     } catch (error) {
       console.error('Ошибка создания льготы:', error);
-      toast.error('Ошибка создания льготы');
+      toast.error(error.response?.data?.detail || 'Ошибка создания льготы');
     }
   };
 
   // Создание программы лояльности
   const createLoyaltyProgram = async () => {
     try {
-      const response = await fetch(`${API_BASE}/discount-benefits/loyalty-programs`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(loyaltyForm)
+      await api.post('/discount-benefits/loyalty-programs', loyaltyForm);
+      toast.success('Программа лояльности создана успешно');
+      setShowCreateForm(false);
+      setLoyaltyForm({
+        name: '',
+        description: '',
+        points_per_ruble: '1.0',
+        min_purchase_for_points: '0',
+        ruble_per_point: '1.0',
+        min_points_to_redeem: '100',
+        max_points_per_purchase: '',
+        start_date: '',
+        end_date: ''
       });
-
-      if (response.ok) {
-        toast.success('Программа лояльности создана успешно');
-        setShowCreateForm(false);
-        setLoyaltyForm({
-          name: '',
-          description: '',
-          points_per_ruble: '1.0',
-          min_purchase_for_points: '0',
-          ruble_per_point: '1.0',
-          min_points_to_redeem: '100',
-          max_points_per_purchase: '',
-          start_date: '',
-          end_date: ''
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка создания программы лояльности');
-      }
+      loadData();
     } catch (error) {
       console.error('Ошибка создания программы лояльности:', error);
-      toast.error('Ошибка создания программы лояльности');
+      toast.error(error.response?.data?.detail || 'Ошибка создания программы лояльности');
     }
   };
 
@@ -306,7 +250,7 @@ const DiscountBenefitsManager = () => {
           <Label>Название скидки</Label>
           <Input
             value={discountForm.name}
-            onChange={(e) => setDiscountForm({...discountForm, name: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
             placeholder="Введите название скидки"
           />
         </div>
@@ -314,7 +258,7 @@ const DiscountBenefitsManager = () => {
           <Label>Тип скидки</Label>
           <Select
             value={discountForm.discount_type}
-            onChange={(e) => setDiscountForm({...discountForm, discount_type: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, discount_type: e.target.value })}
           >
             {Object.entries(discountTypes).map(([key, value]) => (
               <option key={key} value={key}>{value}</option>
@@ -326,7 +270,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={discountForm.value}
-            onChange={(e) => setDiscountForm({...discountForm, value: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
             placeholder="Введите значение"
           />
         </div>
@@ -335,7 +279,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={discountForm.min_amount}
-            onChange={(e) => setDiscountForm({...discountForm, min_amount: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, min_amount: e.target.value })}
             placeholder="0"
           />
         </div>
@@ -344,7 +288,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={discountForm.max_discount}
-            onChange={(e) => setDiscountForm({...discountForm, max_discount: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, max_discount: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -353,7 +297,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={discountForm.usage_limit}
-            onChange={(e) => setDiscountForm({...discountForm, usage_limit: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, usage_limit: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -362,7 +306,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="datetime-local"
             value={discountForm.start_date}
-            onChange={(e) => setDiscountForm({...discountForm, start_date: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, start_date: e.target.value })}
           />
         </div>
         <div>
@@ -370,7 +314,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="datetime-local"
             value={discountForm.end_date}
-            onChange={(e) => setDiscountForm({...discountForm, end_date: e.target.value})}
+            onChange={(e) => setDiscountForm({ ...discountForm, end_date: e.target.value })}
           />
         </div>
       </div>
@@ -378,7 +322,7 @@ const DiscountBenefitsManager = () => {
         <Label>Описание</Label>
         <Textarea
           value={discountForm.description}
-          onChange={(e) => setDiscountForm({...discountForm, description: e.target.value})}
+          onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
           placeholder="Введите описание скидки"
           rows={3}
         />
@@ -388,7 +332,7 @@ const DiscountBenefitsManager = () => {
           <input
             type="checkbox"
             checked={discountForm.applies_to_services}
-            onChange={(e) => setDiscountForm({...discountForm, applies_to_services: e.target.checked})}
+            onChange={(e) => setDiscountForm({ ...discountForm, applies_to_services: e.target.checked })}
             className="mr-2"
           />
           Применяется к услугам
@@ -397,7 +341,7 @@ const DiscountBenefitsManager = () => {
           <input
             type="checkbox"
             checked={discountForm.applies_to_appointments}
-            onChange={(e) => setDiscountForm({...discountForm, applies_to_appointments: e.target.checked})}
+            onChange={(e) => setDiscountForm({ ...discountForm, applies_to_appointments: e.target.checked })}
             className="mr-2"
           />
           Применяется к записям
@@ -406,7 +350,7 @@ const DiscountBenefitsManager = () => {
           <input
             type="checkbox"
             checked={discountForm.can_combine_with_others}
-            onChange={(e) => setDiscountForm({...discountForm, can_combine_with_others: e.target.checked})}
+            onChange={(e) => setDiscountForm({ ...discountForm, can_combine_with_others: e.target.checked })}
             className="mr-2"
           />
           Можно комбинировать с другими
@@ -431,7 +375,7 @@ const DiscountBenefitsManager = () => {
           <Label>Название льготы</Label>
           <Input
             value={benefitForm.name}
-            onChange={(e) => setBenefitForm({...benefitForm, name: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, name: e.target.value })}
             placeholder="Введите название льготы"
           />
         </div>
@@ -439,7 +383,7 @@ const DiscountBenefitsManager = () => {
           <Label>Тип льготы</Label>
           <Select
             value={benefitForm.benefit_type}
-            onChange={(e) => setBenefitForm({...benefitForm, benefit_type: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, benefit_type: e.target.value })}
           >
             {Object.entries(benefitTypes).map(([key, value]) => (
               <option key={key} value={key}>{value}</option>
@@ -451,7 +395,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={benefitForm.discount_percentage}
-            onChange={(e) => setBenefitForm({...benefitForm, discount_percentage: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, discount_percentage: e.target.value })}
             placeholder="Введите процент"
             max="100"
           />
@@ -461,7 +405,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={benefitForm.max_discount_amount}
-            onChange={(e) => setBenefitForm({...benefitForm, max_discount_amount: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, max_discount_amount: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -470,7 +414,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={benefitForm.age_min}
-            onChange={(e) => setBenefitForm({...benefitForm, age_min: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, age_min: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -479,7 +423,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={benefitForm.age_max}
-            onChange={(e) => setBenefitForm({...benefitForm, age_max: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, age_max: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -488,7 +432,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={benefitForm.monthly_limit}
-            onChange={(e) => setBenefitForm({...benefitForm, monthly_limit: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, monthly_limit: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -497,7 +441,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={benefitForm.yearly_limit}
-            onChange={(e) => setBenefitForm({...benefitForm, yearly_limit: e.target.value})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, yearly_limit: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -506,7 +450,7 @@ const DiscountBenefitsManager = () => {
         <Label>Описание</Label>
         <Textarea
           value={benefitForm.description}
-          onChange={(e) => setBenefitForm({...benefitForm, description: e.target.value})}
+          onChange={(e) => setBenefitForm({ ...benefitForm, description: e.target.value })}
           placeholder="Введите описание льготы"
           rows={3}
         />
@@ -515,7 +459,7 @@ const DiscountBenefitsManager = () => {
         <Label>Типы документов (JSON)</Label>
         <Input
           value={benefitForm.document_types}
-          onChange={(e) => setBenefitForm({...benefitForm, document_types: e.target.value})}
+          onChange={(e) => setBenefitForm({ ...benefitForm, document_types: e.target.value })}
           placeholder='["passport", "certificate"]'
         />
       </div>
@@ -524,7 +468,7 @@ const DiscountBenefitsManager = () => {
           <input
             type="checkbox"
             checked={benefitForm.requires_document}
-            onChange={(e) => setBenefitForm({...benefitForm, requires_document: e.target.checked})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, requires_document: e.target.checked })}
             className="mr-2"
           />
           Требует документы
@@ -533,7 +477,7 @@ const DiscountBenefitsManager = () => {
           <input
             type="checkbox"
             checked={benefitForm.applies_to_services}
-            onChange={(e) => setBenefitForm({...benefitForm, applies_to_services: e.target.checked})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_services: e.target.checked })}
             className="mr-2"
           />
           Применяется к услугам
@@ -542,7 +486,7 @@ const DiscountBenefitsManager = () => {
           <input
             type="checkbox"
             checked={benefitForm.applies_to_appointments}
-            onChange={(e) => setBenefitForm({...benefitForm, applies_to_appointments: e.target.checked})}
+            onChange={(e) => setBenefitForm({ ...benefitForm, applies_to_appointments: e.target.checked })}
             className="mr-2"
           />
           Применяется к записям
@@ -567,7 +511,7 @@ const DiscountBenefitsManager = () => {
           <Label>Название программы</Label>
           <Input
             value={loyaltyForm.name}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, name: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, name: e.target.value })}
             placeholder="Введите название программы"
           />
         </div>
@@ -577,7 +521,7 @@ const DiscountBenefitsManager = () => {
             type="number"
             step="0.1"
             value={loyaltyForm.points_per_ruble}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, points_per_ruble: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, points_per_ruble: e.target.value })}
             placeholder="1.0"
           />
         </div>
@@ -587,7 +531,7 @@ const DiscountBenefitsManager = () => {
             type="number"
             step="0.1"
             value={loyaltyForm.ruble_per_point}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, ruble_per_point: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, ruble_per_point: e.target.value })}
             placeholder="1.0"
           />
         </div>
@@ -596,7 +540,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={loyaltyForm.min_points_to_redeem}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, min_points_to_redeem: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, min_points_to_redeem: e.target.value })}
             placeholder="100"
           />
         </div>
@@ -605,7 +549,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={loyaltyForm.min_purchase_for_points}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, min_purchase_for_points: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, min_purchase_for_points: e.target.value })}
             placeholder="0"
           />
         </div>
@@ -614,7 +558,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="number"
             value={loyaltyForm.max_points_per_purchase}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, max_points_per_purchase: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, max_points_per_purchase: e.target.value })}
             placeholder="Не ограничено"
           />
         </div>
@@ -623,7 +567,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="datetime-local"
             value={loyaltyForm.start_date}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, start_date: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, start_date: e.target.value })}
           />
         </div>
         <div>
@@ -631,7 +575,7 @@ const DiscountBenefitsManager = () => {
           <Input
             type="datetime-local"
             value={loyaltyForm.end_date}
-            onChange={(e) => setLoyaltyForm({...loyaltyForm, end_date: e.target.value})}
+            onChange={(e) => setLoyaltyForm({ ...loyaltyForm, end_date: e.target.value })}
           />
         </div>
       </div>
@@ -639,7 +583,7 @@ const DiscountBenefitsManager = () => {
         <Label>Описание</Label>
         <Textarea
           value={loyaltyForm.description}
-          onChange={(e) => setLoyaltyForm({...loyaltyForm, description: e.target.value})}
+          onChange={(e) => setLoyaltyForm({ ...loyaltyForm, description: e.target.value })}
           placeholder="Введите описание программы"
           rows={3}
         />

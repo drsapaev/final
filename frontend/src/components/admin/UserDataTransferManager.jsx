@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
 import { Users, ArrowRight, Search, CheckCircle, XCircle, AlertTriangle, History, BarChart3 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const UserDataTransferManager = () => {
   const [activeTab, setActiveTab] = useState('transfer');

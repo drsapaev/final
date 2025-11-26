@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.api.deps import get_current_user
+from app.services.analytics import AnalyticsService
 from app.services.advanced_analytics import get_advanced_analytics_service, AdvancedAnalyticsService
 
 router = APIRouter()
@@ -39,7 +40,7 @@ async def get_kpi_metrics(
     kpi_data = {
         "metrics": {
             "revenue": {
-                "value": analytics_service.get_revenue_analytics(db, start, end, department).get("total_revenue", 0),
+                "value": AnalyticsService.calculate_revenue(db, start, end, department).get("total_revenue", 0),
                 "trend": analytics_service.get_revenue_trend(db, start, end, department),
                 "label": "Общая выручка",
                 "description": "Суммарная выручка за период",
@@ -201,12 +202,12 @@ async def get_kpi_comparison(
         "current_period": {
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
-            "metrics": analytics_service.get_kpi_metrics(db, start, end, department)
+            "metrics": AnalyticsService.calculate_statistics(db, start, end, department)
         },
         "comparison_period": {
             "start_date": compare_start.isoformat(),
             "end_date": compare_end.isoformat(),
-            "metrics": analytics_service.get_kpi_metrics(db, compare_start, compare_end, department)
+            "metrics": AnalyticsService.calculate_statistics(db, compare_start, compare_end, department)
         },
         "comparison_type": comparison_period,
         "changes": analytics_service.calculate_kpi_changes(

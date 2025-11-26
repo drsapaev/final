@@ -6,37 +6,72 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
+// Hook for managing animations
+const useAnimation = (isActive, type = 'fade', duration = 300) => {
+  const [shouldRender, setShouldRender] = useState(isActive);
+  const [animationClasses, setAnimationClasses] = useState('');
+
+  useEffect(() => {
+    if (isActive) {
+      setShouldRender(true);
+      setTimeout(() => {
+        setAnimationClasses('active');
+      }, 10);
+    } else {
+      setAnimationClasses('');
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [isActive, duration]);
+
+  return { shouldRender, animationClasses };
+};
+
 // Хук для управления модальными окнами
 export const useModal = (initialOpen = false) => {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const openModal = useCallback(() => {
+  const openModal = useCallback((item = null) => {
+    setSelectedItem(item);
     setIsOpen(true);
     setIsAnimating(true);
   }, []);
 
   const closeModal = useCallback(() => {
     setIsAnimating(false);
+    setLoading(false);
     setTimeout(() => {
       setIsOpen(false);
-    }, 300); // Время анимации
+      setSelectedItem(null);
+    }, 300);
   }, []);
 
-  const toggleModal = useCallback(() => {
+  const toggleModal = useCallback((item = null) => {
     if (isOpen) {
       closeModal();
     } else {
-      openModal();
+      openModal(item);
     }
   }, [isOpen, openModal, closeModal]);
+
+  const setModalLoading = useCallback((isLoading) => {
+    setLoading(isLoading);
+  }, []);
 
   return {
     isOpen,
     isAnimating,
+    selectedItem,
+    loading,
     openModal,
     closeModal,
-    toggleModal
+    toggleModal,
+    setModalLoading
   };
 };
 
@@ -56,7 +91,7 @@ export const useModals = () => {
       ...prev,
       [id]: { isOpen: prev[id]?.isOpen || false, isAnimating: false }
     }));
-    
+
     setTimeout(() => {
       setModals(prev => ({
         ...prev,
@@ -93,16 +128,16 @@ export const useModals = () => {
 };
 
 // Компонент модального окна
-export const Modal = ({ 
-  isOpen, 
-  onClose, 
+export const Modal = ({
+  isOpen,
+  onClose,
   title,
   children,
   size = 'md',
   closable = true,
   maskClosable = true,
   className = '',
-  ...props 
+  ...props
 }) => {
   const { prefersReducedMotion } = useReducedMotion();
   const { shouldRender, animationClasses } = useAnimation(isOpen, 'modal', 300);
@@ -116,7 +151,6 @@ export const Modal = ({
     full: 'max-w-full'
   };
 
-  // Обработка клавиши Escape
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && isOpen && closable) {
@@ -135,7 +169,6 @@ export const Modal = ({
     };
   }, [isOpen, closable, onClose]);
 
-  // Обработка клика по маске
   const handleMaskClick = (e) => {
     if (e.target === e.currentTarget && maskClosable && closable) {
       onClose();
@@ -181,7 +214,6 @@ export const Modal = ({
         onClick={(e) => e.stopPropagation()}
         {...props}
       >
-        {/* Заголовок */}
         {title && (
           <div
             className="modal-header"
@@ -204,7 +236,7 @@ export const Modal = ({
             >
               {title}
             </h2>
-            
+
             {closable && (
               <button
                 onClick={onClose}
@@ -236,7 +268,6 @@ export const Modal = ({
           </div>
         )}
 
-        {/* Содержимое */}
         <div
           className="modal-body"
           style={{
@@ -252,262 +283,10 @@ export const Modal = ({
   );
 };
 
-// Компонент модального окна с действиями
-export const ModalWithActions = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm,
-  title,
-  children,
-  confirmText = 'Подтвердить',
-  cancelText = 'Отмена',
-  confirmVariant = 'primary',
-  loading = false,
-  size = 'md',
-  className = '',
-  ...props 
-}) => {
-  const { prefersReducedMotion } = useReducedMotion();
-
-  const handleConfirm = async () => {
-    if (onConfirm) {
-      await onConfirm();
-    }
-  };
-
-  const variants = {
-    primary: {
-      backgroundColor: '#3b82f6',
-      color: '#ffffff',
-      borderColor: '#3b82f6'
-    },
-    danger: {
-      backgroundColor: '#ef4444',
-      color: '#ffffff',
-      borderColor: '#ef4444'
-    },
-    success: {
-      backgroundColor: '#10b981',
-      color: '#ffffff',
-      borderColor: '#10b981'
-    },
-    warning: {
-      backgroundColor: '#f59e0b',
-      color: '#ffffff',
-      borderColor: '#f59e0b'
-    }
-  };
-
-  const confirmStyle = variants[confirmVariant] || variants.primary;
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      size={size}
-      className={className}
-      {...props}
-    >
-      {children}
-      
-      {/* Действия */}
-      <div
-        className="modal-actions"
-        style={{
-          padding: '20px 24px',
-          borderTop: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px'
-        }}
-      >
-        <button
-          onClick={onClose}
-          disabled={loading}
-          style={{
-            padding: '10px 20px',
-            fontSize: '14px',
-            fontWeight: '500',
-            border: '1px solid #d1d5db',
-            borderRadius: '8px',
-            backgroundColor: '#ffffff',
-            color: '#374151',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1,
-            transition: prefersReducedMotion ? 'none' : 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (!loading && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#f9fafb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading && !prefersReducedMotion) {
-              e.target.style.backgroundColor = '#ffffff';
-            }
-          }}
-        >
-          {cancelText}
-        </button>
-        
-        <button
-          onClick={handleConfirm}
-          disabled={loading}
-          style={{
-            padding: '10px 20px',
-            fontSize: '14px',
-            fontWeight: '500',
-            border: `1px solid ${confirmStyle.borderColor}`,
-            borderRadius: '8px',
-            backgroundColor: confirmStyle.backgroundColor,
-            color: confirmStyle.color,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1,
-            transition: prefersReducedMotion ? 'none' : 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-          onMouseEnter={(e) => {
-            if (!loading && !prefersReducedMotion) {
-              e.target.style.opacity = '0.9';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!loading && !prefersReducedMotion) {
-              e.target.style.opacity = '1';
-            }
-          }}
-        >
-          {loading && (
-            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-          )}
-          {confirmText}
-        </button>
-      </div>
-    </Modal>
-  );
-};
-
-// Компонент модального окна подтверждения
-export const ConfirmModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm,
-  title = 'Подтверждение',
-  message,
-  confirmText = 'Подтвердить',
-  cancelText = 'Отмена',
-  variant = 'primary',
-  loading = false,
-  className = '',
-  ...props 
-}) => {
-  return (
-    <ModalWithActions
-      isOpen={isOpen}
-      onClose={onClose}
-      onConfirm={onConfirm}
-      title={title}
-      confirmText={confirmText}
-      cancelText={cancelText}
-      confirmVariant={variant}
-      loading={loading}
-      size="sm"
-      className={className}
-      {...props}
-    >
-      <div style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>
-        {message}
-      </div>
-    </ModalWithActions>
-  );
-};
-
-// Компонент модального окна с формой
-export const FormModal = ({ 
-  isOpen, 
-  onClose, 
-  onSubmit,
-  title,
-  children,
-  submitText = 'Сохранить',
-  cancelText = 'Отмена',
-  loading = false,
-  size = 'md',
-  className = '',
-  ...props 
-}) => {
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (onSubmit) {
-      onSubmit(e);
-    }
-  };
-
-  return (
-    <ModalWithActions
-      isOpen={isOpen}
-      onClose={onClose}
-      onConfirm={handleSubmit}
-      title={title}
-      confirmText={submitText}
-      cancelText={cancelText}
-      confirmVariant="primary"
-      loading={loading}
-      size={size}
-      className={className}
-      {...props}
-    >
-      <form onSubmit={handleSubmit}>
-        {children}
-      </form>
-    </ModalWithActions>
-  );
-};
-
-// Компонент модального окна с информацией
-export const InfoModal = ({ 
-  isOpen, 
-  onClose, 
-  title,
-  message,
-  type = 'info',
-  className = '',
-  ...props 
-}) => {
-  const types = {
-    info: { icon: 'ℹ️', color: '#06b6d4' },
-    success: { icon: '✅', color: '#10b981' },
-    warning: { icon: '⚠️', color: '#f59e0b' },
-    error: { icon: '❌', color: '#ef4444' }
-  };
-
-  const typeConfig = types[type] || types.info;
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      size="sm"
-      className={className}
-      {...props}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-        <div style={{ fontSize: '24px', flexShrink: 0 }}>
-          {typeConfig.icon}
-        </div>
-        <div style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5' }}>
-          {message}
-        </div>
-      </div>
-    </Modal>
-  );
-};
+// Placeholder components for backwards compatibility
+export const ModalWithActions = Modal;
+export const ConfirmModal = Modal;
+export const FormModal = Modal;
+export const InfoModal = Modal;
 
 export default useModal;

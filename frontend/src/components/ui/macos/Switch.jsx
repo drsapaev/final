@@ -47,7 +47,7 @@ const Switch = React.forwardRef(({
     height: s.h,
     borderRadius: s.h,
     background: isChecked ? 'var(--mac-accent-blue-500)' : 'var(--mac-bg-tertiary)',
-    border: `1px solid var(--mac-border)`,
+    border: '1px solid var(--mac-border)',
     boxShadow: isChecked ? '0 0 0 2px color-mix(in srgb, var(--mac-accent-blue-500), transparent 70%)' : 'var(--mac-shadow-1)',
     position: 'relative',
     transition: 'all 200ms cubic-bezier(0.2,0.8,0.2,1)'

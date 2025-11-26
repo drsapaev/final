@@ -15,7 +15,7 @@ import {
 } from '../ui/macos';
 import { Settings, ToggleLeft, ToggleRight, Save, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const WizardSettings = () => {
   const [settings, setSettings] = useState({
@@ -265,16 +265,16 @@ const WizardSettings = () => {
           }}>
             <MacOSStatCard
               title="Использование нового мастера"
-              value={settings.use_new_wizard ? "100%" : "0%"}
+              value={settings.use_new_wizard ? '100%' : '0%'}
               icon={settings.use_new_wizard ? CheckCircle : AlertCircle}
-              color={settings.use_new_wizard ? "var(--mac-success)" : "var(--mac-warning)"}
-              trend={settings.use_new_wizard ? "Активен" : "Неактивен"}
-              trendColor={settings.use_new_wizard ? "var(--mac-success)" : "var(--mac-warning)"}
+              color={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'}
+              trend={settings.use_new_wizard ? 'Активен' : 'Неактивен'}
+              trendColor={settings.use_new_wizard ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
             
             <MacOSStatCard
               title="Последнее обновление"
-              value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : "Неизвестно"}
+              value={settings.updated_at ? new Date(settings.updated_at).toLocaleDateString('ru-RU') : 'Неизвестно'}
               icon={RefreshCw}
               color="var(--mac-info)"
               trend="Настройки"
@@ -310,10 +310,10 @@ const WizardSettings = () => {
                   Классический мастер
                 </h4>
                 <MacOSBadge 
-                  variant={!settings.use_new_wizard ? "primary" : "secondary"}
+                  variant={!settings.use_new_wizard ? 'primary' : 'secondary'}
                   size="sm"
                 >
-                  {!settings.use_new_wizard ? "Активен" : "Неактивен"}
+                  {!settings.use_new_wizard ? 'Активен' : 'Неактивен'}
                 </MacOSBadge>
               </div>
               <ul style={{ 
@@ -354,10 +354,10 @@ const WizardSettings = () => {
                   Новый мастер
                 </h4>
                 <MacOSBadge 
-                  variant={settings.use_new_wizard ? "success" : "secondary"}
+                  variant={settings.use_new_wizard ? 'success' : 'secondary'}
                   size="sm"
                 >
-                  {settings.use_new_wizard ? "Активен" : "Неактивен"}
+                  {settings.use_new_wizard ? 'Активен' : 'Неактивен'}
                 </MacOSBadge>
               </div>
               <ul style={{ 

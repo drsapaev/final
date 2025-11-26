@@ -356,7 +356,7 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            {hasUnsavedChanges && "Есть несохраненные изменения"}
+            {hasUnsavedChanges && 'Есть несохраненные изменения'}
           </div>
           
           <div className="flex gap-3">

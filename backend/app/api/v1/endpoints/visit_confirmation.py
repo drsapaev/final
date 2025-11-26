@@ -14,8 +14,9 @@ from app.models.patient import Patient
 from app.models.visit import Visit, VisitService
 from app.models.service import Service
 from app.models.clinic import Doctor
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.online_queue import DailyQueue
 from app.crud import online_queue as crud_queue
+from app.services.queue_service import queue_service
 from app.services.confirmation_security import ConfirmationSecurityService
 
 router = APIRouter()
@@ -307,20 +308,19 @@ def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Di
         # Получаем или создаем дневную очередь
         daily_queue = crud_queue.get_or_create_daily_queue(db, today, doctor_id, queue_tag)
         
-        # Подсчитываем текущее количество записей в очереди
-        current_count = crud_queue.count_queue_entries(db, daily_queue.id)
-        start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
-        next_number = start_number + current_count
+        next_number = queue_service.get_next_queue_number(
+            db,
+            daily_queue=daily_queue,
+            queue_tag=queue_tag,
+        )
         
-        # Создаем запись в очереди
-        queue_entry = OnlineQueueEntry(
-            queue_id=daily_queue.id,
+        queue_entry = queue_service.create_queue_entry(
+            db,
+            daily_queue=daily_queue,
             patient_id=visit.patient_id,
             number=next_number,
-            status="waiting",
-            source="confirmation"  # Источник: подтверждение визита
+            source="confirmation",
         )
-        db.add(queue_entry)
         
         queue_numbers[queue_tag] = {
             "queue_tag": queue_tag,

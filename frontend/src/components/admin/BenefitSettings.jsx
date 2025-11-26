@@ -25,8 +25,7 @@ import {
   MacOSStatCard
 } from '../ui/macos';
 import { toast } from 'react-toastify';
-
-const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
+import { api } from '../../api/client';
 
 /**
  * Компонент для управления настройками льгот в админке
@@ -52,35 +51,14 @@ const BenefitSettings = () => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/admin/benefit-settings`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
-        setOriginalSettings(data);
-        setLastUpdated(new Date(data.updated_at));
-      } else {
-        setError('Не удалось загрузить настройки льгот. Проверьте подключение к серверу.');
-        // Fallback данные при ошибке
-        const fallbackData = {
-          repeat_visit_days: 21,
-          repeat_visit_discount: 0,
-          benefit_consultation_free: true,
-          all_free_auto_approve: false,
-          updated_at: new Date().toISOString()
-        };
-        setSettings(fallbackData);
-        setOriginalSettings(fallbackData);
-        setLastUpdated(new Date());
-        toast.error('Ошибка загрузки настроек льгот');
-      }
+      const response = await api.get('/admin/benefit-settings');
+      const data = response.data;
+      setSettings(data);
+      setOriginalSettings(data);
+      setLastUpdated(new Date(data.updated_at));
     } catch (error) {
       console.error('Error loading benefit settings:', error);
-      setError('Не удалось загрузить настройки льгот. Проверьте подключение к серверу.');
+      setError(error.response?.data?.detail || 'Не удалось загрузить настройки льгот. Проверьте подключение к серверу.');
       // Fallback данные при ошибке
       const fallbackData = {
         repeat_visit_days: 21,
@@ -106,27 +84,13 @@ const BenefitSettings = () => {
     setSaving(true);
     setShowConfirmModal(false);
     try {
-      const response = await fetch(`${API_BASE}/admin/benefit-settings`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify(settings)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(result.message);
-        setOriginalSettings(settings);
-        setLastUpdated(new Date());
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка сохранения настроек');
-      }
+      const response = await api.post('/admin/benefit-settings', settings);
+      toast.success(response.data?.message || 'Настройки сохранены');
+      setOriginalSettings(settings);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error saving benefit settings:', error);
-      toast.error('Ошибка сохранения настроек');
+      toast.error(error.response?.data?.detail || 'Ошибка сохранения настроек');
     } finally {
       setSaving(false);
     }
@@ -325,10 +289,10 @@ const BenefitSettings = () => {
                       Повторные визиты
                     </h3>
                     <MacOSBadge 
-                      variant={settings.repeat_visit_discount > 0 ? "success" : "secondary"}
+                      variant={settings.repeat_visit_discount > 0 ? 'success' : 'secondary'}
                       size="sm"
                     >
-                      {settings.repeat_visit_discount > 0 ? "Активны" : "Неактивны"}
+                      {settings.repeat_visit_discount > 0 ? 'Активны' : 'Неактивны'}
                     </MacOSBadge>
                   </div>
                   <p style={{ 
@@ -517,10 +481,10 @@ const BenefitSettings = () => {
                       Льготные визиты
                     </h3>
                     <MacOSBadge 
-                      variant={settings.benefit_consultation_free ? "success" : "warning"}
+                      variant={settings.benefit_consultation_free ? 'success' : 'warning'}
                       size="sm"
                     >
-                      {settings.benefit_consultation_free ? "Бесплатно" : "Платно"}
+                      {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
                     </MacOSBadge>
                   </div>
                   <p style={{ 
@@ -746,35 +710,35 @@ const BenefitSettings = () => {
               value={`${settings.repeat_visit_days} дней`}
               icon={Calendar}
               color="var(--mac-success)"
-              trend={settings.repeat_visit_discount > 0 ? "Скидка активна" : "Скидка неактивна"}
-              trendColor={settings.repeat_visit_discount > 0 ? "var(--mac-success)" : "var(--mac-text-secondary)"}
+              trend={settings.repeat_visit_discount > 0 ? 'Скидка активна' : 'Скидка неактивна'}
+              trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-text-secondary)'}
             />
             
             <MacOSStatCard
               title="Скидка на повторные визиты"
               value={`${settings.repeat_visit_discount}%`}
               icon={Percent}
-              color={settings.repeat_visit_discount > 0 ? "var(--mac-success)" : "var(--mac-warning)"}
-              trend={settings.repeat_visit_discount > 0 ? "Применяется" : "Не применяется"}
-              trendColor={settings.repeat_visit_discount > 0 ? "var(--mac-success)" : "var(--mac-warning)"}
+              color={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
+              trend={settings.repeat_visit_discount > 0 ? 'Применяется' : 'Не применяется'}
+              trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
             
             <MacOSStatCard
               title="Льготные консультации"
-              value={settings.benefit_consultation_free ? "Бесплатно" : "Платно"}
+              value={settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
               icon={Shield}
-              color={settings.benefit_consultation_free ? "var(--mac-success)" : "var(--mac-warning)"}
-              trend={settings.benefit_consultation_free ? "Активны" : "Неактивны"}
-              trendColor={settings.benefit_consultation_free ? "var(--mac-success)" : "var(--mac-warning)"}
+              color={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
+              trend={settings.benefit_consultation_free ? 'Активны' : 'Неактивны'}
+              trendColor={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
             
             <MacOSStatCard
               title="Автоодобрение All Free"
-              value={settings.all_free_auto_approve ? "Включено" : "Выключено"}
+              value={settings.all_free_auto_approve ? 'Включено' : 'Выключено'}
               icon={CheckCircle}
-              color={settings.all_free_auto_approve ? "var(--mac-warning)" : "var(--mac-info)"}
-              trend={settings.all_free_auto_approve ? "Автоматически" : "Вручную"}
-              trendColor={settings.all_free_auto_approve ? "var(--mac-warning)" : "var(--mac-info)"}
+              color={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
+              trend={settings.all_free_auto_approve ? 'Автоматически' : 'Вручную'}
+              trendColor={settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-info)'}
             />
           </div>
 

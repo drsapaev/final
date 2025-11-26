@@ -16,7 +16,8 @@ const MacOSTable = ({
   striped = false,
   hoverable = true,
   className,
-  style
+  style,
+  children // ✅ Добавляем поддержку children для legacy использования
 }) => {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
@@ -214,6 +215,17 @@ const MacOSTable = ({
           <tbody>
             {renderLoadingState()}
           </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // ✅ Если переданы children, рендерим их напрямую (legacy режим)
+  if (children) {
+    return (
+      <div style={{ overflowX: 'auto' }}>
+        <table className={className} style={tableStyle}>
+          {children}
         </table>
       </div>
     );

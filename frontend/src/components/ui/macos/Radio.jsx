@@ -45,7 +45,7 @@ const Radio = React.forwardRef(({
     width: dimension,
     height: dimension,
     borderRadius: '9999px',
-    border: `1px solid var(--mac-border)`,
+    border: '1px solid var(--mac-border)',
     background: 'var(--mac-bg-elev-1)',
     position: 'relative',
     boxShadow: 'var(--mac-shadow-1)',
