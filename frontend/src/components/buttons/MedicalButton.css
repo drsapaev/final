@@ -1,0 +1,218 @@
+/* Medical Button - специализированные стили для медицинских задач */
+
+.medical-button {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Приоритеты */
+.medical-button-priority-low {
+  opacity: 0.8;
+}
+
+.medical-button-priority-normal {
+  /* Стандартный вид */
+}
+
+.medical-button-priority-high {
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  border: 2px solid rgba(245, 158, 11, 0.2);
+}
+
+.medical-button-priority-urgent {
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+  border: 2px solid rgba(234, 88, 12, 0.3);
+  animation: urgent-pulse 2s infinite;
+}
+
+.medical-button-priority-critical {
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.5);
+  border: 2px solid rgba(220, 38, 38, 0.4);
+  animation: critical-pulse 1s infinite;
+}
+
+/* Статусы */
+.medical-button-status-active {
+  position: relative;
+}
+
+.medical-button-status-active::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
+}
+
+.medical-button-status-inactive {
+  opacity: 0.6;
+  filter: grayscale(20%);
+}
+
+.medical-button-status-loading {
+  position: relative;
+}
+
+.medical-button-status-loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.medical-button-status-success {
+  position: relative;
+}
+
+.medical-button-status-success::before {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  color: #10b981;
+  font-weight: bold;
+  font-size: 14px;
+  z-index: 1;
+}
+
+.medical-button-status-error {
+  position: relative;
+}
+
+.medical-button-status-error::before {
+  content: '⚠';
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  color: #ef4444;
+  font-size: 14px;
+  z-index: 1;
+}
+
+/* Специальные эффекты для медицинских кнопок */
+.medical-button:hover {
+  transform: translateY(-1px);
+}
+
+.medical-button-priority-high:hover {
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.medical-button-priority-urgent:hover {
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.5);
+}
+
+.medical-button-priority-critical:hover {
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.6);
+}
+
+/* Анимации приоритетов */
+@keyframes urgent-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(234, 88, 12, 0.6);
+  }
+}
+
+@keyframes critical-pulse {
+  0%, 100% {
+    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.7);
+    transform: scale(1.02);
+  }
+}
+
+/* Темная тема для медицинских кнопок */
+.dark .medical-button-priority-high {
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.dark .medical-button-priority-urgent {
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+  border-color: rgba(234, 88, 12, 0.4);
+}
+
+.dark .medical-button-priority-critical {
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+  border-color: rgba(220, 38, 38, 0.5);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .medical-button {
+    font-size: 14px;
+    padding: 8px 16px;
+  }
+
+  .medical-button-status-active::after {
+    width: 6px;
+    height: 6px;
+    top: 3px;
+    right: 3px;
+  }
+}
+
+/* Специальные эффекты для разных действий */
+.medical-button[action="emergency"] {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.medical-button[action="diagnose"] {
+  border-left: 4px solid currentColor;
+}
+
+.medical-button[action="treat"] {
+  border-radius: 8px 0 0 8px;
+}
+
+.medical-button[action="approve"] {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.medical-button[action="reject"] {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+/* Микро-анимации */
+.medical-button {
+  transition: all 0.2s ease;
+}
+
+.medical-button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.medical-button-priority-critical:active {
+  transform: scale(0.96);
+}
+
+/* Focus states для accessibility */
+.medical-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.medical-button-priority-critical:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 3px;
+}
