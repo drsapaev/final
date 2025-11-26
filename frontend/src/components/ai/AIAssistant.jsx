@@ -9,7 +9,7 @@ const AIAssistant = ({
   analysisType, 
   data, 
   onResult,
-  title = "AI Ассистент",
+  title = 'AI Ассистент',
   expanded = true,
   useMCP = true,
   providerOptions = ['deepseek', 'gemini', 'openai', 'default']

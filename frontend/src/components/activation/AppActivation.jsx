@@ -1,28 +1,21 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Key, 
-  Shield, 
-  CheckCircle, 
-  AlertCircle, 
+import {
+  Key,
+  Shield,
+  CheckCircle,
+  AlertCircle,
   RefreshCw,
   Smartphone,
-  Calendar,
-  Download,
-  Copy
+  Copy,
+  Lock
 } from 'lucide-react';
-import { Card, Button } from '../ui/native';
-import { useTheme } from '../../contexts/ThemeContext';
 
 const AppActivation = ({ onClose }) => {
-  const navigate = useNavigate();
-  const { theme, isDark, getColor, getSpacing } = useTheme();
-  
   const [activationKey, setActivationKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [step, setStep] = useState('input'); // input, success, error
+  const [step, setStep] = useState('input'); // input, success
 
   const handleActivate = async () => {
     if (!activationKey.trim()) {
@@ -35,7 +28,6 @@ const AppActivation = ({ onClose }) => {
     setSuccess('');
 
     try {
-      // Отправляем ключ активации на сервер
       const response = await fetch('/api/v1/activation/activate', {
         method: 'POST',
         headers: {
@@ -58,12 +50,10 @@ const AppActivation = ({ onClose }) => {
       if (response.ok) {
         setSuccess('Приложение успешно активировано!');
         setStep('success');
-        
-        // Сохраняем информацию об активации
+
         localStorage.setItem('app_activated', 'true');
         localStorage.setItem('activation_info', JSON.stringify(result));
-        
-        // Перезагружаем страницу через 2 секунды
+
         setTimeout(() => {
           window.location.reload();
         }, 2000);
@@ -72,17 +62,14 @@ const AppActivation = ({ onClose }) => {
       }
     } catch (err) {
       console.error('Ошибка активации:', err);
-      setError(err.message || 'Ошибка активации. Проверьте ключ и попробуйте снова.');
-      setStep('error');
+      setError(err.message || 'Ошибка активации. Проверьте ключ.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleActivate();
-    }
+    if (e.key === 'Enter') handleActivate();
   };
 
   const copyDeviceInfo = () => {
@@ -92,283 +79,144 @@ const AppActivation = ({ onClose }) => {
       language: navigator.language,
       timestamp: new Date().toISOString()
     };
-    
+
     navigator.clipboard.writeText(JSON.stringify(deviceInfo, null, 2));
     setSuccess('Информация об устройстве скопирована');
-  };
-
-  const cardStyle = {
-    background: isDark 
-      ? 'rgba(30, 41, 59, 0.95)' 
-      : 'rgba(255, 255, 255, 0.95)',
-    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.3)'}`,
-    borderRadius: '16px',
-    padding: getSpacing('2xl'),
-    boxShadow: isDark 
-      ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
-      : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.05)',
-    backdropFilter: 'blur(10px)',
-    maxWidth: '500px',
-    width: '100%',
-    margin: '0 auto'
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: getSpacing('md'),
-    border: `2px solid ${isDark ? getColor('gray', 600) : getColor('gray', 300)}`,
-    borderRadius: '8px',
-    background: isDark ? getColor('gray', 800) : 'white',
-    color: isDark ? 'white' : getColor('gray', 900),
-    fontSize: '16px',
-    fontFamily: 'monospace',
-    marginBottom: getSpacing('md'),
-    transition: 'border-color 0.2s'
-  };
-
-  const buttonStyle = {
-    width: '100%',
-    padding: `${getSpacing('md')} ${getSpacing('lg')}`,
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    marginBottom: getSpacing('sm')
-  };
-
-  const secondaryButtonStyle = {
-    ...buttonStyle,
-    background: `linear-gradient(135deg, ${getColor('secondary', 500)} 0%, ${getColor('secondary', 600)} 100%)`,
-    boxShadow: '0 4px 14px 0 rgba(107, 114, 128, 0.3)'
+    setTimeout(() => setSuccess(''), 3000);
   };
 
   if (step === 'success') {
     return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: getSpacing('lg')
-      }}>
-        <Card style={cardStyle}>
-          <div style={{ textAlign: 'center' }}>
-            <CheckCircle 
-              size={64} 
-              style={{ color: getColor('success', 500), marginBottom: getSpacing('lg') }} 
-            />
-            <h2 style={{ 
-              fontSize: '24px', 
-              fontWeight: 'bold', 
-              marginBottom: getSpacing('md'),
-              color: isDark ? 'white' : getColor('gray', 900)
-            }}>
-              Активация успешна!
-            </h2>
-            <p style={{ 
-              color: isDark ? getColor('gray', 300) : getColor('gray', 600),
-              marginBottom: getSpacing('lg')
-            }}>
-              Приложение активировано. Страница будет перезагружена...
-            </p>
-            <div style={{ 
-              background: isDark ? getColor('success', 900) : getColor('success', 50),
-              border: `1px solid ${isDark ? getColor('success', 700) : getColor('success', 200)}`,
-              borderRadius: '8px',
-              padding: getSpacing('md'),
-              marginBottom: getSpacing('lg')
-            }}>
-              <p style={{ 
-                color: isDark ? getColor('success', 300) : getColor('success', 700),
-                fontSize: '14px',
-                margin: 0
-              }}>
-                ✅ Полный доступ к системе<br/>
-                ✅ AI функции<br/>
-                ✅ Telegram интеграция<br/>
-                ✅ Система печати
-              </p>
-            </div>
+      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+        <div style={{
+          width: '80px',
+          height: '80px',
+          background: 'rgba(52, 199, 89, 0.1)',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 24px',
+          color: '#34c759'
+        }}>
+          <CheckCircle size={40} />
+        </div>
+
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>
+          Активация успешна!
+        </h2>
+
+        <p style={{ color: 'var(--mac-text-secondary)', marginBottom: '32px' }}>
+          Приложение активировано. Перезагрузка...
+        </p>
+
+        <div className="info-panel" style={{ textAlign: 'left', background: 'rgba(52, 199, 89, 0.05)', borderColor: 'rgba(52, 199, 89, 0.2)' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontWeight: 600, color: '#34c759' }}>
+            <CheckCircle size={16} /> Доступные функции:
           </div>
-        </Card>
+          <ul style={{ margin: 0, paddingLeft: '24px', color: 'var(--mac-text-primary)', lineHeight: '1.6' }}>
+            <li>Полный доступ к системе</li>
+            <li>AI функции и аналитика</li>
+            <li>Telegram интеграция</li>
+          </ul>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: getSpacing('lg')
-    }}>
-      <Card style={cardStyle}>
-        <div style={{ textAlign: 'center', marginBottom: getSpacing('lg') }}>
-          <Shield 
-            size={48} 
-            style={{ color: getColor('primary', 500), marginBottom: getSpacing('md') }} 
-          />
-          <h2 style={{ 
-            fontSize: '24px', 
-            fontWeight: 'bold', 
-            marginBottom: getSpacing('sm'),
-            color: isDark ? 'white' : getColor('gray', 900)
-          }}>
-            Активация приложения
-          </h2>
-          <p style={{ 
-            color: isDark ? getColor('gray', 300) : getColor('gray', 600),
-            fontSize: '14px'
-          }}>
-            Введите ключ активации для разблокировки всех функций
-          </p>
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{
+          width: '64px',
+          height: '64px',
+          background: 'rgba(0, 122, 255, 0.1)',
+          borderRadius: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 20px',
+          color: '#007aff',
+          boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)'
+        }}>
+          <Shield size={32} />
         </div>
+        <p style={{ color: 'var(--mac-text-secondary)', fontSize: '15px' }}>
+          Введите лицензионный ключ для разблокировки всех функций приложения
+        </p>
+      </div>
 
-        {error && (
-          <div style={{
-            background: isDark ? getColor('error', 900) : getColor('error', 50),
-            border: `1px solid ${isDark ? getColor('error', 700) : getColor('error', 200)}`,
-            borderRadius: '8px',
-            padding: getSpacing('md'),
-            marginBottom: getSpacing('md'),
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <AlertCircle 
-              size={20} 
-              style={{ color: isDark ? getColor('error', 300) : getColor('error', 600), marginRight: getSpacing('sm') }} 
-            />
-            <span style={{ 
-              color: isDark ? getColor('error', 300) : getColor('error', 600),
-              fontSize: '14px'
-            }}>
-              {error}
-            </span>
-          </div>
-        )}
+      {error && (
+        <div className="status-message status-error">
+          <AlertCircle size={18} />
+          {error}
+        </div>
+      )}
 
-        {success && (
-          <div style={{
-            background: isDark ? getColor('success', 900) : getColor('success', 50),
-            border: `1px solid ${isDark ? getColor('success', 700) : getColor('success', 200)}`,
-            borderRadius: '8px',
-            padding: getSpacing('md'),
-            marginBottom: getSpacing('md'),
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <CheckCircle 
-              size={20} 
-              style={{ color: isDark ? getColor('success', 300) : getColor('success', 600), marginRight: getSpacing('sm') }} 
-            />
-            <span style={{ 
-              color: isDark ? getColor('success', 300) : getColor('success', 600),
-              fontSize: '14px'
-            }}>
-              {success}
-            </span>
-          </div>
-        )}
+      {success && (
+        <div className="status-message status-success">
+          <CheckCircle size={18} />
+          {success}
+        </div>
+      )}
 
-        <div style={{ marginBottom: getSpacing('lg') }}>
-          <label style={{
-            display: 'block',
-            fontSize: '14px',
-            fontWeight: '600',
-            marginBottom: getSpacing('sm'),
-            color: isDark ? 'white' : getColor('gray', 700)
-          }}>
-            <Key size={16} style={{ marginRight: getSpacing('xs'), display: 'inline' }} />
-            Ключ активации
-          </label>
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{
+          display: 'block',
+          marginBottom: '8px',
+          fontSize: '13px',
+          fontWeight: 600,
+          color: 'var(--mac-text-secondary)',
+          marginLeft: '4px'
+        }}>
+          КЛЮЧ АКТИВАЦИИ
+        </label>
+        <div style={{ position: 'relative' }}>
+          <Key size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
           <input
             type="text"
+            className="glass-input"
+            style={{ paddingLeft: '44px' }}
             value={activationKey}
             onChange={(e) => setActivationKey(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Введите ключ активации..."
-            style={inputStyle}
+            placeholder="XXXX-XXXX-XXXX-XXXX"
             disabled={loading}
           />
         </div>
+      </div>
 
-        <div style={{ display: 'flex', gap: getSpacing('sm'), marginBottom: getSpacing('lg') }}>
-          <Button
-            onClick={handleActivate}
-            disabled={loading || !activationKey.trim()}
-            style={buttonStyle}
-          >
-            {loading ? (
-              <>
-                <RefreshCw size={16} style={{ marginRight: getSpacing('xs'), animation: 'spin 1s linear infinite' }} />
-                Активация...
-              </>
-            ) : (
-              <>
-                <Shield size={16} style={{ marginRight: getSpacing('xs') }} />
-                Активировать
-              </>
-            )}
-          </Button>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <button
+          className="btn-premium btn-primary"
+          onClick={handleActivate}
+          disabled={loading || !activationKey.trim()}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          {loading ? <RefreshCw size={20} className="spin" /> : <Lock size={20} />}
+          {loading ? 'Активация...' : 'Активировать'}
+        </button>
 
-        <div style={{ display: 'flex', gap: getSpacing('sm') }}>
-          <Button
-            onClick={copyDeviceInfo}
-            style={secondaryButtonStyle}
-          >
-            <Copy size={16} style={{ marginRight: getSpacing('xs') }} />
-            Скопировать ID устройства
-          </Button>
-          <Button
-            onClick={onClose}
-            style={secondaryButtonStyle}
-          >
-            Отмена
-          </Button>
-        </div>
+        <button
+          className="btn-premium btn-glass"
+          onClick={copyDeviceInfo}
+          style={{ width: '100%', justifyContent: 'center', fontSize: '14px', padding: '12px' }}
+        >
+          <Copy size={16} />
+          Скопировать ID устройства
+        </button>
+      </div>
 
-        <div style={{
-          marginTop: getSpacing('lg'),
-          padding: getSpacing('md'),
-          background: isDark ? getColor('gray', 800) : getColor('gray', 50),
-          borderRadius: '8px',
-          border: `1px solid ${isDark ? getColor('gray', 700) : getColor('gray', 200)}`
-        }}>
-          <h4 style={{
-            fontSize: '14px',
-            fontWeight: '600',
-            marginBottom: getSpacing('sm'),
-            color: isDark ? 'white' : getColor('gray', 700)
-          }}>
-            <Smartphone size={16} style={{ marginRight: getSpacing('xs'), display: 'inline' }} />
-            Информация об устройстве
-          </h4>
-          <div style={{ fontSize: '12px', color: isDark ? getColor('gray', 400) : getColor('gray', 600) }}>
-            <div>Платформа: {navigator.platform}</div>
-            <div>Язык: {navigator.language}</div>
-            <div>Время: {new Date().toLocaleString()}</div>
-          </div>
+      <div className="info-panel">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--mac-text-primary)' }}>
+          <Smartphone size={14} />
+          <span style={{ fontWeight: 600 }}>Device Info</span>
         </div>
-      </Card>
+        <div style={{ fontFamily: 'monospace', opacity: 0.7 }}>
+          <div>Platform: {navigator.platform}</div>
+          <div>Lang: {navigator.language}</div>
+        </div>
+      </div>
     </div>
   );
 };

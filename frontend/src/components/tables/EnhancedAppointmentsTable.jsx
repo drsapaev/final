@@ -144,6 +144,7 @@ const EnhancedAppointmentsTable = ({
       paid: 'Платный',
       repeat: 'Повторный',
       free: 'Льготный',
+      allfree: 'AllFree',
       // Виды оплаты
       cash: 'Наличные',
       card: 'Карта',
@@ -678,11 +679,21 @@ const EnhancedAppointmentsTable = ({
     const typeColors = {
       paid: 'var(--mac-accent-blue)',
       repeat: 'var(--mac-success)',
-      free: 'var(--mac-warning)'
+      free: 'var(--mac-warning)',
+      allfree: '#ff6b35' // ✅ Добавлено для AllFree (оранжевый цвет)
     };
 
     const typeText = t[visitType] || visitType;
     const color = typeColors[visitType] || 'var(--mac-text-secondary)';
+
+    // ✅ ИСПРАВЛЕНО: Для allfree используем rgba напрямую, так как withOpacity работает только с CSS переменными
+    const isAllFree = visitType === 'allfree';
+    const backgroundColor = isAllFree 
+      ? 'rgba(255, 107, 53, 0.08)' 
+      : withOpacity(color, 0.08);
+    const borderColor = isAllFree 
+      ? 'rgba(255, 107, 53, 0.2)' 
+      : withOpacity(color, 0.2);
 
     return (
       <span style={{
@@ -690,9 +701,9 @@ const EnhancedAppointmentsTable = ({
         borderRadius: '8px',
         fontSize: '11px',
         fontWeight: '600',
-          backgroundColor: withOpacity(color, 0.08),
-          color: color,
-          border: `1px solid ${withOpacity(color, 0.2)}`
+        backgroundColor: backgroundColor,
+        color: color,
+        border: `1px solid ${borderColor}`
       }}>
         {typeText}
       </span>
@@ -704,13 +715,15 @@ const EnhancedAppointmentsTable = ({
     const paymentIcons = {
       cash: '💵',
       card: '💳',
-      online: '🌐'
+      online: '🌐',
+      free: '🆓' // ✅ Добавлено для all_free
     };
 
     const paymentColors = {
       cash: 'var(--mac-success)',
       card: 'var(--mac-accent-blue)',
-      online: 'var(--mac-accent-blue)' // Используем accent вместо хардкоженного цвета
+      online: 'var(--mac-accent-blue)', // Используем accent вместо хардкоженного цвета
+      free: 'var(--mac-warning)' // ✅ Добавлено для all_free
     };
 
     const statusColors = {
@@ -719,7 +732,7 @@ const EnhancedAppointmentsTable = ({
       failed: 'var(--mac-error)'
     };
 
-    const typeText = t[paymentType] || paymentType;
+    const typeText = paymentType === 'free' ? (t.free || 'Бесплатно') : (t[paymentType] || paymentType);
     const icon = paymentIcons[paymentType] || '💰';
     const color = paymentColors[paymentType] || 'var(--mac-text-secondary)';
     const statusColor = statusColors[paymentStatus] || 'var(--mac-text-secondary)';
@@ -1456,7 +1469,41 @@ const EnhancedAppointmentsTable = ({
                   title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
                   >
                     <div>
-                      <div>{row.patient_fio || '—'}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span>{row.patient_fio || '—'}</span>
+                        {/* Ярлыки источника/приоритета */}
+                        {row.source === 'online' && (
+                          <span 
+                            style={{ 
+                              fontSize: '10px', 
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              color: 'white',
+                              fontWeight: '600',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="Приоритет: ранняя онлайн-регистрация"
+                          >
+                            QR
+                          </span>
+                        )}
+                        {row.source === 'desk' && (
+                          <span 
+                            style={{ 
+                              fontSize: '10px', 
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'var(--mac-separator)',
+                              color: 'var(--mac-text-secondary)',
+                              fontWeight: '600',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Manual
+                          </span>
+                        )}
+                      </div>
                       {row.patient_birth_year && (
                         <div style={{
                           fontSize: '12px',
@@ -1552,10 +1599,14 @@ const EnhancedAppointmentsTable = ({
                     minWidth: '80px'
                   }}>
                     {renderVisitType((() => {
+                      // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
                       const discountMode = row.discount_mode;
+                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
+                      
                       if (discountMode === 'benefit') return 'free';
                       if (discountMode === 'repeat') return 'repeat';
-                      if (discountMode === 'all_free') return 'free';
+                      // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
+                      if (isAllFreeApproved || discountMode === 'all_free') return 'allfree';
                       return 'paid';
                     })())}
                   </td>
@@ -1574,7 +1625,20 @@ const EnhancedAppointmentsTable = ({
                     textAlign: 'center',
                     minWidth: '100px'
                   }}>
-                    {renderPaymentType(row.payment_type || 'cash', row.payment_status)}
+                    {renderPaymentType(
+                      // ✅ ИСПРАВЛЕНО: Для all_free (одобренных или нет) используем 'free', иначе payment_type или 'cash'
+                      (() => {
+                        const discountMode = row.discount_mode;
+                        const approvalStatus = row.approval_status;
+                        // Если discount_mode = 'all_free', показываем как 'free' независимо от approval_status
+                        // (так как пользователь уже выбрал all_free при редактировании)
+                        if (discountMode === 'all_free') {
+                          return 'free';
+                        }
+                        return row.payment_type || 'cash';
+                      })(),
+                      row.payment_status
+                    )}
                   </td>
 
                   {/* Дата и время регистрации */}
@@ -1653,13 +1717,48 @@ const EnhancedAppointmentsTable = ({
                   <td style={{
                     padding: '12px 8px',
                     textAlign: 'right',
-                    color: 'var(--mac-success, #34c759)',
+                    color: (() => {
+                      // ✅ ИСПРАВЛЕНИЕ #3: Цвет зависит от реальной стоимости (cost из VisitService)
+                      const discountMode = row.discount_mode;
+                      const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
+                      if (isAllFreeApproved) return 'var(--mac-warning)';
+
+                      // ⭐ Используем ту же логику что и в отображении
+                      let amount = 0;
+                      if (row.has_shared_invoice) {
+                        amount = row.cost || 0;
+                      } else {
+                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                      }
+
+                      return amount > 0 ? 'var(--mac-success, #34c759)' : 'var(--mac-text-secondary)';
+                    })(),
                     fontSize: '14px',
                     fontWeight: '600',
                     minWidth: '90px'
                   }}>
                     {(() => {
-                      const amount = row.total_amount || row.cost || row.payment_amount || 0;
+                      // ✅ ИСПРАВЛЕНИЕ #3: Правильный приоритет отображения цен
+                      // 1. cost из VisitService (реальная цена с учётом скидок из wizard)
+                      // 2. invoice_amount (только если НЕ shared invoice)
+                      const discountMode = row.discount_mode;
+
+                      // Показываем "Бесплатно" если discount_mode = 'all_free'
+                      if (discountMode === 'all_free') {
+                        return 'Бесплатно';
+                      }
+
+                      // ⭐ НОВАЯ ЛОГИКА: Приоритет cost, затем invoice_amount (если не shared)
+                      let amount = 0;
+                      if (row.has_shared_invoice) {
+                        // Для shared invoice используем ТОЛЬКО cost (не показываем сумму всего invoice)
+                        amount = row.cost || 0;
+                      } else {
+                        // Для обычных случаев: приоритет cost, fallback invoice_amount
+                        amount = row.cost || row.invoice_amount || row.payment_amount || 0;
+                      }
+
+                      // Если есть сумма - показываем, иначе "—"
                       return amount > 0 ? `${amount.toLocaleString()} сум` : '—';
                     })()}
                   </td>

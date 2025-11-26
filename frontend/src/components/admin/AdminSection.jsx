@@ -13,7 +13,7 @@ const AdminSection = ({
   actions = null,
   loading = false,
   error = null,
-  className = "",
+  className = '',
   ...props 
 }) => {
   const { isDark } = useTheme();

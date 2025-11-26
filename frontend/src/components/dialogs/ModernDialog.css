@@ -15,24 +15,6 @@
 
 .modern-dialog-container {
   width: 100%;
-  border-radius: 12px;
-  overflow: hidden;
-  animation: dialogSlideIn 0.3s ease-out;
-  transform-origin: center;
-}
-
-.modern-dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 24px 0 24px;
-  min-height: 60px;
-}
-
-.modern-dialog-title {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0;
   line-height: 1.2;
 }
 
@@ -62,11 +44,16 @@
   padding: 24px;
 }
 
+/* Remove padding for wizard */
+.appointment-wizard-v2 .modern-dialog-content {
+  padding: 0;
+}
+
 .modern-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 16px 32px;
   border-radius: 0 0 12px 12px;
 }
 
@@ -151,6 +138,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -161,6 +149,7 @@
     opacity: 0;
     transform: scale(0.95) translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -187,26 +176,31 @@
   .modern-dialog-backdrop {
     padding: 0.5rem;
   }
-  
+
   .modern-dialog-header {
     padding: 16px 16px 0 16px;
     min-height: 48px;
   }
-  
+
   .modern-dialog-title {
     font-size: 18px;
   }
-  
+
   .modern-dialog-content {
     padding: 16px;
   }
-  
+
+  .appointment-wizard-v2 .modern-dialog-content {
+    padding: 0;
+  }
+
   .modern-dialog-actions {
     padding: 12px 16px;
     flex-direction: column-reverse;
   }
-  
+
   .modern-dialog-action {
     width: 100%;
     justify-content: center;
   }
+}

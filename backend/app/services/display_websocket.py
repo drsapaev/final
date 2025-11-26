@@ -257,7 +257,7 @@ class DisplayWebSocketManager:
                             "patient_name": self._format_patient_name(entry.patient_name or "Пациент"),
                             "status": entry.status,
                             "specialist_id": queue.specialist_id,
-                            "specialist_name": queue.specialist.full_name if queue.specialist else f"Врач #{queue.specialist_id}",
+                            "specialist_name": queue.specialist.user.full_name if (queue.specialist and queue.specialist.user) else f"Врач #{queue.specialist_id}",
                             "created_at": entry.created_at.isoformat() if entry.created_at else None,
                             "called_at": entry.called_at.isoformat() if entry.called_at else None
                         })

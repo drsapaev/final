@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge, MacOSInput, MacOSSelect, Skeleton } from '../ui/macos';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const GroupPermissionsManager = () => {
   // Состояние

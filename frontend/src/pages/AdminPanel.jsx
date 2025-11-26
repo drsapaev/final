@@ -1,6 +1,5 @@
 // AdminPanel.jsx - macOS UI/UX Compliant - Updated: 2025-01-26
-import React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Badge, 
@@ -77,7 +76,8 @@ import {
   Upload,
   TrendingDown,
   XCircle,
-  Palette
+  Palette,
+  FolderTree
 } from 'lucide-react';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
@@ -111,8 +111,8 @@ import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
 import ClinicSettings from '../components/admin/ClinicSettings';
 import QueueSettings from '../components/admin/QueueSettings';
 import ServiceCatalog from '../components/admin/ServiceCatalog';
+import DepartmentManagement from '../components/admin/DepartmentManagement';
 import AISettings from '../components/admin/AISettings';
-import TelegramSettings from '../components/admin/TelegramSettings';
 import DisplayBoardSettings from '../components/admin/DisplayBoardSettings';
 import ActivationSystem from '../components/admin/ActivationSystem';
 import SecuritySettings from '../components/admin/SecuritySettings';
@@ -131,7 +131,12 @@ import VoiceToText from '../components/ai/VoiceToText';
 import SmartScheduling from '../components/ai/SmartScheduling';
 import QualityControl from '../components/ai/QualityControl';
 import AnalyticsInsights from '../components/ai/AnalyticsInsights';
-import TelegramBotManager from '../components/admin/TelegramBotManager';
+import UnifiedTelegramManagement from '../components/admin/UnifiedTelegramManagement';
+import UnifiedSettings from '../components/admin/UnifiedSettings';
+import UnifiedFinance from '../components/admin/UnifiedFinance';
+import UnifiedNotifications from '../components/admin/UnifiedNotifications';
+import UnifiedAITools from '../components/admin/UnifiedAITools';
+import UnifiedUserManagement from '../components/admin/UnifiedUserManagement';
 import FCMManager from '../components/admin/FCMManager';
 import PhoneVerificationManager from '../components/admin/PhoneVerificationManager';
 import UserDataTransferManager from '../components/admin/UserDataTransferManager';
@@ -147,7 +152,7 @@ import WaitTimeAnalytics from '../components/analytics/WaitTimeAnalytics';
 import AIAnalytics from '../components/analytics/AIAnalytics'; 
 import GraphQLExplorer from '../components/admin/GraphQLExplorer'; 
 import WebhookManager from '../components/admin/WebhookManager';
-import ReportsManager from '../components/admin/ReportsManager';
+import UnifiedReports from '../components/admin/UnifiedReports';
 import SystemManagement from '../components/admin/SystemManagement';
 import CloudPrintingManager from '../components/admin/CloudPrintingManager';
 import MedicalEquipmentManager from '../components/admin/MedicalEquipmentManager';
@@ -204,26 +209,26 @@ const AdminPanel = () => {
     loading: statsLoading, 
     error: statsError, 
     refresh: refreshStats 
-  } = useAdminData('/api/v1/admin/stats', {
-    refreshInterval: 0, // Отключаем автообновление пока не исправим API
-    enabled: false, // Отключаем запросы пока API не готов
+  } = useAdminData('/admin/stats', {
+    refreshInterval: 0, // Автообновление отключено, можно включить при необходимости
+    enabled: true, // Включена загрузка реальных данных
     onError: (error) => {
       console.error('Ошибка загрузки статистики:', error);
     }
   });
 
-  // Статистика по умолчанию (fallback)
+  // Статистика по умолчанию (fallback только при ошибке)
   const defaultStats = {
-    totalUsers: 1247,
-    totalDoctors: 23,
-    totalPatients: 8921,
-    totalRevenue: 1250000,
-    appointmentsToday: 156,
-    pendingApprovals: 8
+    totalUsers: 0,
+    totalDoctors: 0,
+    totalPatients: 0,
+    totalRevenue: 0,
+    appointmentsToday: 0,
+    pendingApprovals: 0
   };
   
   const stats = statsData || defaultStats;
-  const isLoading = false; // Отключаем загрузку пока используем моковые данные
+  const isLoading = statsLoading;
   
   // Хук для управления пользователями
   const {
@@ -366,10 +371,6 @@ const AdminPanel = () => {
     formatDateRange
   } = useReports();
   
-  // Состояние для генератора отчетов
-  const [reportDateRange, setReportDateRange] = useState({ start: '', end: '' });
-  const [selectedReportType, setSelectedReportType] = useState('');
-  const [showReportGenerator, setShowReportGenerator] = useState(false);
   
   // Хук для управления настройками
   const {
@@ -396,11 +397,26 @@ const AdminPanel = () => {
     }
     return localStorage.getItem('settingsSubTab') || 'general';
   });
-  
+
   // Сохраняем выбранную вкладку
   useEffect(() => {
     localStorage.setItem('settingsSubTab', settingsSubTab);
   }, [settingsSubTab]);
+
+  // Состояние для вкладок секции Services
+  const [servicesTab, setServicesTab] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('servicesTab');
+    if (tabFromUrl) {
+      return tabFromUrl;
+    }
+    return localStorage.getItem('servicesTab') || 'catalog';
+  });
+
+  // Сохраняем выбранную вкладку services
+  useEffect(() => {
+    localStorage.setItem('servicesTab', servicesTab);
+  }, [servicesTab]);
   
   // Состояние для логотипа
   const [logoFile, setLogoFile] = useState(null);
@@ -476,58 +492,74 @@ const AdminPanel = () => {
     getSecurityTrends
   } = useSecurity();
   
-  // Моковые данные для демонстрации
-  const [recentActivities] = useState([
-    {
-      id: 1,
-      type: 'user_registration',
-      message: 'Новый пользователь зарегистрирован',
-      user: 'Ахмедов А.',
-      time: '2 минуты назад',
-      status: 'success'
-    },
-    {
-      id: 2,
-      type: 'appointment_created',
-      message: 'Создана новая запись',
-      user: 'Иванова М.',
-      time: '5 минут назад',
-      status: 'info'
-    },
-    {
-      id: 3,
-      type: 'payment_received',
-      message: 'Получен платеж',
-      user: 'Петров В.',
-      time: '12 минут назад',
-      status: 'success'
-    },
-    {
-      id: 4,
-      type: 'system_alert',
-      message: 'Системное предупреждение',
-      user: 'Система',
-      time: '1 час назад',
-      status: 'warning'
-    }
-  ]);
-  
-  const [systemAlerts] = useState([
-    {
-      id: 1,
-      type: 'warning',
-      message: 'База данных требует оптимизации',
-      priority: 'medium',
-      time: '2 часа назад'
-    },
-    {
-      id: 2,
-      type: 'info',
-      message: 'Обновление системы завершено',
-      priority: 'low',
-      time: '1 день назад'
-    }
-  ]);
+  // Загрузка последних действий с бэкенда
+  const { 
+    data: recentActivitiesData, 
+    loading: recentActivitiesLoading, 
+    error: recentActivitiesError 
+  } = useAdminData('/admin/recent-activities?limit=10', {
+    refreshInterval: 0,
+    enabled: true,
+    initialData: { activities: [] }
+  });
+
+  const recentActivities = recentActivitiesData?.activities || [];
+
+  // Загрузка системных уведомлений с бэкенда
+  const { 
+    data: systemAlertsData, 
+    loading: systemAlertsLoading, 
+    error: systemAlertsError 
+  } = useAdminData('/notifications/history/stats?days=7', {
+    refreshInterval: 0,
+    enabled: true,
+    initialData: { recent_activity: [] }
+  });
+
+  // Функция для форматирования времени "сколько времени назад"
+  const formatTimeAgo = React.useCallback((date) => {
+    if (!date) return 'Недавно';
+    // Если date - строка, преобразуем в Date
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return 'Недавно';
+    
+    const now = new Date();
+    const diff = now - dateObj;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'только что';
+    if (minutes < 60) return `${minutes} ${minutes === 1 ? 'минуту' : minutes < 5 ? 'минуты' : 'минут'} назад`;
+    if (hours < 24) return `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'} назад`;
+    if (days < 7) return `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} назад`;
+    return dateObj.toLocaleDateString('ru-RU');
+  }, []);
+
+  // Преобразуем данные уведомлений в формат для отображения
+  const systemAlerts = React.useMemo(() => {
+    if (!systemAlertsData?.recent_activity) return [];
+    
+    return systemAlertsData.recent_activity.slice(0, 5).map((alert, index) => ({
+      id: alert.id || index + 1,
+      type: alert.status === 'failed' ? 'error' : alert.status === 'pending' ? 'warning' : 'info',
+      message: alert.message || alert.notification_type || 'Системное уведомление',
+      priority: alert.status === 'failed' ? 'high' : alert.status === 'pending' ? 'medium' : 'low',
+      time: alert.created_at ? formatTimeAgo(new Date(alert.created_at)) : 'Недавно'
+    }));
+  }, [systemAlertsData, formatTimeAgo]);
+
+  // Загрузка данных для графика активности
+  const { 
+    data: activityChartData, 
+    loading: activityChartLoading, 
+    error: activityChartError 
+  } = useAdminData('/admin/activity-chart?days=7', {
+    refreshInterval: 0,
+    enabled: true,
+    initialData: { labels: [], data: [] }
+  });
   
   const { 
     designTokens,
@@ -566,63 +598,6 @@ const AdminPanel = () => {
   };
 
   // ✅ УЛУЧШЕНИЕ: Обработчики для отчетов с универсальным async хуком
-  const handleGenerateReport = (reportConfig) => {
-    return asyncAction.executeAction(
-      () => generateReport(reportConfig),
-      {
-        loadingMessage: 'Генерация отчета...',
-        successMessage: 'Отчет успешно сгенерирован',
-        errorMessage: 'Ошибка при генерации отчета',
-        onSuccess: () => setShowReportGenerator(false)
-      }
-    );
-  };
-
-  const handleDownloadReport = (reportId) => {
-    return asyncAction.executeAction(
-      () => downloadReport(reportId),
-      {
-        loadingMessage: 'Скачивание отчета...',
-        successMessage: 'Отчет успешно скачан',
-        errorMessage: 'Ошибка при скачивании отчета'
-      }
-    );
-  };
-
-  const handleDeleteReport = (reportId) => {
-    if (window.confirm('Вы уверены, что хотите удалить этот отчет?')) {
-      return asyncAction.executeAction(
-        () => deleteReport(reportId),
-        {
-          loadingMessage: 'Удаление отчета...',
-          successMessage: 'Отчет успешно удален',
-          errorMessage: 'Ошибка при удалении отчета'
-        }
-      );
-    }
-  };
-
-  const handleRegenerateReport = (reportId) => {
-    return asyncAction.executeAction(
-      () => regenerateReport(reportId),
-      {
-        loadingMessage: 'Повторная генерация отчета...',
-        successMessage: 'Отчет успешно регенерирован',
-        errorMessage: 'Ошибка при повторной генерации отчета'
-      }
-    );
-  };
-
-  const handleOpenReportGenerator = () => {
-    setShowReportGenerator(true);
-    // Устанавливаем период по умолчанию (последний месяц)
-    const today = new Date();
-    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-    setReportDateRange({
-      start: lastMonth.toISOString().split('T')[0],
-      end: today.toISOString().split('T')[0]
-    });
-  };
 
   // Обработчики для настроек
   const handleSaveSettings = async (settingsData) => {
@@ -792,9 +767,13 @@ const AdminPanel = () => {
     const roleMap = {
       Admin: 'Администратор',
       Doctor: 'Врач',
-      Nurse: 'Медсестра',
-      Receptionist: 'Регистратор',
-      Patient: 'Пациент'
+      Registrar: 'Регистратор',
+      Cashier: 'Кассир',
+      Lab: 'Лаборатория',
+      Patient: 'Пациент',
+      cardio: 'Кардиолог',
+      derma: 'Дерматолог',
+      dentist: 'Стоматолог'
     };
     return roleMap[role] || role;
   };
@@ -818,7 +797,8 @@ const AdminPanel = () => {
   };
 
   const handleDeleteDoctor = async (doctor) => {
-    if (window.confirm(`Вы уверены, что хотите удалить врача "${doctor.name}"?`)) {
+    const doctorName = doctor.user?.full_name || doctor.name || doctor.user?.username || 'этого врача';
+    if (window.confirm(`Вы уверены, что хотите удалить врача "${doctorName}"?`)) {
       try {
         await deleteDoctor(doctor.id);
       } catch (error) {
@@ -854,10 +834,13 @@ const AdminPanel = () => {
       cardiology: 'Кардиология',
       dermatology: 'Дерматология',
       dentistry: 'Стоматология',
-      general: 'Общее',
-      surgery: 'Хирургия',
-      pediatrics: 'Педиатрия',
-      neurology: 'Неврология'
+      stomatology: 'Стоматология',
+      laboratory: 'Лаборатория',
+      cosmetology: 'Косметология',
+      procedures: 'Процедуры',
+      physiotherapy: 'Физиотерапия',
+      functional_diagnostics: 'Функциональная диагностика',
+      general: 'Общее'
     };
     return departmentMap[department] || department;
   };
@@ -984,8 +967,9 @@ const AdminPanel = () => {
 
   const getAppointmentStatusLabel = (status) => {
     const statusMap = {
-      pending: 'Ожидает',
-      confirmed: 'Подтверждена',
+      pending: 'Ожидает оплаты',
+      scheduled: 'Запланирована', // Старый статус -> маппится на pending
+      confirmed: 'Подтверждена', // Старый статус -> маппится на paid
       paid: 'Оплачена',
       in_visit: 'На приеме',
       completed: 'Завершена',
@@ -998,7 +982,8 @@ const AdminPanel = () => {
   const getAppointmentStatusColor = (status) => {
     const colorMap = {
       pending: 'var(--mac-warning)',
-      confirmed: 'var(--mac-info)',
+      scheduled: 'var(--mac-warning)', // Старый статус -> маппится на pending
+      confirmed: 'var(--mac-info)', // Старый статус -> маппится на paid
       paid: 'var(--mac-success)',
       in_visit: 'var(--mac-accent-blue)',
       completed: 'var(--mac-success)',
@@ -1011,7 +996,8 @@ const AdminPanel = () => {
   const getAppointmentStatusVariant = (status) => {
     const variantMap = {
       pending: 'warning',
-      confirmed: 'info',
+      scheduled: 'warning', // Старый статус -> маппится на pending
+      confirmed: 'info', // Старый статус -> маппится на paid
       paid: 'success',
       in_visit: 'primary',
       completed: 'success',
@@ -1107,17 +1093,12 @@ const AdminPanel = () => {
       items: [
         { to: '/admin', label: 'Дашборд', icon: BarChart3 },
         { to: '/admin/analytics', label: 'Аналитика', icon: TrendingUp },
-        { to: '/admin/wait-time-analytics', label: 'Время ожидания', icon: Clock },
-        { to: '/admin/ai-analytics', label: 'AI Аналитика', icon: Brain },
         { to: '/admin/webhooks', label: 'Webhook\'и', icon: Globe },
         { to: '/admin/reports', label: 'Отчеты', icon: FileText },
         { to: '/admin/system', label: 'Система', icon: Server },
         { to: '/admin/cloud-printing', label: 'Облачная печать', icon: Printer },
-              { to: '/admin/medical-equipment', label: 'Медицинское оборудование', icon: Stethoscope },
-              { to: '/admin/dynamic-pricing', label: 'Динамическое ценообразование', icon: Package },
-              { to: '/admin/billing', label: 'Биллинг и счета', icon: Receipt },
-              { to: '/admin/discount-benefits', label: 'Скидки и льготы', icon: Percent },
-              { to: '/admin/graphql-explorer', label: 'GraphQL API', icon: Database }
+        { to: '/admin/medical-equipment', label: 'Медицинское оборудование', icon: Stethoscope },
+        { to: '/admin/graphql-explorer', label: 'GraphQL API', icon: Database }
       ]
     },
     {
@@ -1126,44 +1107,23 @@ const AdminPanel = () => {
         { to: '/admin/users', label: 'Пользователи', icon: Users },
         { to: '/admin/doctors', label: 'Врачи', icon: UserPlus },
         { to: '/admin/services', label: 'Услуги', icon: Package },
+        { to: '/admin/departments', label: 'Отделения', icon: FolderTree },
         { to: '/admin/patients', label: 'Пациенты', icon: Users },
         { to: '/admin/appointments', label: 'Записи', icon: Calendar },
-        { to: '/admin/all-free', label: 'Заявки All Free', icon: AlertTriangle },
-        { to: '/admin/benefit-settings', label: 'Настройки льгот', icon: Settings },
-        { to: '/admin/wizard-settings', label: 'Настройки мастера', icon: Monitor },
-        { to: '/admin/payment-providers', label: 'Платежные провайдеры', icon: CreditCard }
+        { to: '/admin/all-free', label: 'Заявки All Free', icon: AlertTriangle }
       ]
     },
     {
       title: 'Система',
       items: [
         { to: '/admin/clinic-management', label: 'Управление клиникой', icon: Building2 },
-        { to: '/admin/clinic-settings', label: 'Настройки клиники', icon: Settings },
-        { to: '/admin/queue-settings', label: 'Настройки очередей', icon: Clock },
-        { to: '/admin/queue-limits', label: 'Лимиты очередей', icon: Shield },
-        { to: '/admin/ai-imaging', label: 'AI Анализ изображений', icon: Brain },
-        { to: '/admin/treatment-recommendations', label: 'AI Рекомендации лечения', icon: Heart },
-        { to: '/admin/drug-interactions', label: 'AI Проверка взаимодействий', icon: Pill },
-        { to: '/admin/risk-assessment', label: 'AI Оценка рисков', icon: Shield },
-        { to: '/admin/voice-to-text', label: 'AI Голосовой ввод', icon: Mic },
-        { to: '/admin/smart-scheduling', label: 'AI Умное планирование', icon: Calendar },
-        { to: '/admin/quality-control', label: 'AI Контроль качества', icon: ClipboardCheck },
-        { to: '/admin/analytics-insights', label: 'AI Аналитические инсайты', icon: TrendingUp },
-        { to: '/admin/ai-settings', label: 'AI настройки', icon: Brain },
-        { to: '/admin/telegram-bot', label: 'Telegram бот', icon: Bot },
-        { to: '/admin/fcm-notifications', label: 'FCM Push уведомления', icon: Bell },
+        { to: '/admin/ai-imaging', label: 'AI Инструменты', icon: Brain },
+        { to: '/admin/telegram-bot', label: 'Telegram', icon: Bot },
+        { to: '/admin/fcm-notifications', label: 'Уведомления', icon: Bell },
         { to: '/admin/phone-verification', label: 'Верификация телефонов', icon: Phone },
-                { to: '/admin/user-data-transfer', label: 'Передача данных пользователей', icon: Users },
-                { to: '/admin/group-permissions', label: 'Разрешения групп', icon: Shield },
-                { to: '/admin/user-export', label: 'Экспорт пользователей', icon: Download },
-                { to: '/admin/registrar-notifications', label: 'Уведомления регистратуры', icon: Bell },
-        { to: '/admin/telegram-settings', label: 'Telegram', icon: MessageSquare },
-        { to: '/admin/display-settings', label: 'Управление табло', icon: Monitor },
         { to: '/admin/activation', label: 'Система активации', icon: Key },
         { to: '/admin/finance', label: 'Финансы', icon: CreditCard },
-        { to: '/admin/reports', label: 'Отчеты', icon: FileText },
-        { to: '/admin/settings', label: 'Настройки', icon: Settings },
-        { to: '/admin/security', label: 'Безопасность', icon: Shield }
+        { to: '/admin/settings', label: 'Настройки', icon: Settings }
       ]
     }
   ];
@@ -1177,9 +1137,21 @@ const AdminPanel = () => {
     }))
   );
 
-  // Вычисляем текущую вкладку из URL параметров
+  // Вычисляем текущую вкладку из URL параметров или пути
   const searchParams = new URLSearchParams(location.search);
-  const current = searchParams.get('section') || 'dashboard';
+  const sectionFromQuery = searchParams.get('section');
+  
+  // Если секция указана в query параметре, используем её
+  // Иначе пытаемся извлечь из пути URL
+  let current = sectionFromQuery;
+  if (!current) {
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    if (pathParts.length >= 2 && pathParts[0] === 'admin') {
+      current = pathParts[1] || 'dashboard';
+    } else {
+      current = 'dashboard';
+    }
+  }
 
   const renderDashboard = () => (
     <ErrorBoundary>
@@ -1212,63 +1184,51 @@ const AdminPanel = () => {
             gap: '24px' 
           }}>
             <MacOSStatCard
-              title="Total Users"
-              value={stats.totalUsers}
+              title="Всего пользователей"
+              value={stats.totalUsers || 0}
               icon={Users}
               color="blue"
-              trend="+5.2%"
-              trendType="positive"
-              loading={isLoading}
+              loading={statsLoading}
             />
         
             <MacOSStatCard
-              title="Doctors"
-              value={stats.totalDoctors}
+              title="Врачи"
+              value={stats.totalDoctors || 0}
               icon={Stethoscope}
               color="green"
-              trend="+2"
-              trendType="positive"
-              loading={isLoading}
+              loading={statsLoading}
             />
         
             <MacOSStatCard
-              title="Patients"
-              value={stats.totalPatients}
+              title="Пациенты"
+              value={stats.totalPatients || 0}
               icon={Users}
               color="purple"
-              trend="+12.3%"
-              trendType="positive"
-              loading={isLoading}
+              loading={statsLoading}
             />
             
             <MacOSStatCard
-              title="Revenue"
-              value={formatCurrency(stats.totalRevenue)}
+              title="Доход"
+              value={formatCurrency(stats.totalRevenue || 0)}
               icon={TrendingUp}
               color="green"
-              trend="+8.7%"
-              trendType="positive"
-              loading={isLoading}
+              loading={statsLoading}
             />
             
             <MacOSStatCard
-              title="Today's Appointments"
-              value={stats.appointmentsToday}
+              title="Записи сегодня"
+              value={stats.appointmentsToday || 0}
               icon={Calendar}
               color="orange"
-              trend="+15"
-              trendType="positive"
-              loading={isLoading}
+              loading={statsLoading}
             />
             
             <MacOSStatCard
-              title="Pending Approvals"
-              value={stats.pendingApprovals}
+              title="Ожидают подтверждения"
+              value={stats.pendingApprovals || 0}
               icon={Clock}
               color="red"
-              trend="-2"
-              trendType="negative"
-              loading={isLoading}
+              loading={statsLoading}
             />
           </div>
         )}
@@ -1292,24 +1252,112 @@ const AdminPanel = () => {
                 Экспорт
               </MacOSButton>
             </div>
-            <div style={{ 
-              height: '256px', 
-              borderRadius: 'var(--mac-radius-md)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              background: 'var(--mac-bg-secondary)' 
-            }}>
-              <div style={{ textAlign: 'center' }}>
-                <Activity style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  margin: '0 auto 16px auto', 
-                  color: 'var(--mac-text-tertiary)' 
-                }} />
-                <p style={{ color: 'var(--mac-text-secondary)' }}>График активности</p>
+            {activityChartLoading ? (
+              <div style={{ 
+                height: '256px', 
+                borderRadius: 'var(--mac-radius-md)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                background: 'var(--mac-bg-secondary)' 
+              }}>
+                <MacOSLoadingSkeleton type="text" count={3} />
               </div>
-            </div>
+            ) : activityChartError ? (
+              <div style={{ 
+                height: '256px', 
+                borderRadius: 'var(--mac-radius-md)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                background: 'var(--mac-bg-secondary)' 
+              }}>
+                <MacOSEmptyState
+                  icon={AlertTriangle}
+                  title="Ошибка загрузки графика"
+                  description="Не удалось загрузить данные активности"
+                />
+              </div>
+            ) : activityChartData?.data && activityChartData.data.length > 0 ? (
+              <div style={{ 
+                height: '256px', 
+                borderRadius: 'var(--mac-radius-md)', 
+                padding: '16px',
+                background: 'var(--mac-bg-secondary)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                {/* Простой график в виде столбцов */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-end', 
+                  justifyContent: 'space-around',
+                  height: '200px',
+                  gap: '4px'
+                }}>
+                  {activityChartData.data.map((item, index) => {
+                    const maxValue = Math.max(...activityChartData.data.map(d => d.total || 0));
+                    const height = maxValue > 0 ? (item.total / maxValue) * 180 : 0;
+                    return (
+                      <div key={index} style={{ 
+                        flex: 1, 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <div style={{
+                          width: '100%',
+                          height: `${height}px`,
+                          background: 'linear-gradient(to top, var(--mac-primary), var(--mac-primary-light))',
+                          borderRadius: '4px 4px 0 0',
+                          minHeight: '4px',
+                          transition: 'height 0.3s ease'
+                        }} />
+                        <span style={{ 
+                          fontSize: '10px', 
+                          color: 'var(--mac-text-tertiary)',
+                          textAlign: 'center'
+                        }}>
+                          {activityChartData.labels[index]}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-around', 
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: 'var(--mac-text-secondary)'
+                }}>
+                  <span>Записи: {activityChartData.data.reduce((sum, d) => sum + (d.appointments || 0), 0)}</span>
+                  <span>Платежи: {activityChartData.data.reduce((sum, d) => sum + (d.payments || 0), 0)}</span>
+                  <span>Пользователи: {activityChartData.data.reduce((sum, d) => sum + (d.users || 0), 0)}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ 
+                height: '256px', 
+                borderRadius: 'var(--mac-radius-md)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                background: 'var(--mac-bg-secondary)' 
+              }}>
+                <div style={{ textAlign: 'center' }}>
+                  <Activity style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    margin: '0 auto 16px auto', 
+                    color: 'var(--mac-text-tertiary)' 
+                  }} />
+                  <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных за выбранный период</p>
+                </div>
+              </div>
+            )}
           </MacOSCard>
 
           <MacOSCard 
@@ -1327,33 +1375,51 @@ const AdminPanel = () => {
                 Все
               </MacOSButton>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {recentActivities.map((activity) => (
-                <div key={activity.id} style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px', 
-                  padding: '12px', 
-                  borderRadius: 'var(--mac-radius-md)',
-                  background: 'var(--mac-bg-secondary)' 
-                }}>
-                  {getStatusIcon(activity.status)}
-                  <div style={{ flex: '1' }}>
-                    <p style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      color: 'var(--mac-text-primary)',
-                      margin: 0
-                    }}>{activity.message}</p>
-                    <p style={{ 
-                      fontSize: 'var(--mac-font-size-xs)', 
-                      color: 'var(--mac-text-secondary)',
-                      margin: '4px 0 0 0'
-                    }}>{activity.user} • {activity.time}</p>
+            {recentActivitiesLoading ? (
+              <div style={{ padding: '16px' }}>
+                <MacOSLoadingSkeleton type="text" count={4} />
+              </div>
+            ) : recentActivitiesError ? (
+              <div style={{ padding: '16px' }}>
+                <MacOSEmptyState
+                  icon={AlertTriangle}
+                  title="Ошибка загрузки"
+                  description="Не удалось загрузить последние действия"
+                />
+              </div>
+            ) : recentActivities.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет последних действий</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {recentActivities.map((activity) => (
+                  <div key={activity.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    padding: '12px', 
+                    borderRadius: 'var(--mac-radius-md)',
+                    background: 'var(--mac-bg-secondary)' 
+                  }}>
+                    {getStatusIcon(activity.status)}
+                    <div style={{ flex: '1' }}>
+                      <p style={{ 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        fontWeight: 'var(--mac-font-weight-medium)', 
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>{activity.message}</p>
+                      <p style={{ 
+                        fontSize: 'var(--mac-font-size-xs)', 
+                        color: 'var(--mac-text-secondary)',
+                        margin: '4px 0 0 0'
+                      }}>{activity.user} • {activity.time}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </MacOSCard>
         </div>
 
@@ -1370,36 +1436,54 @@ const AdminPanel = () => {
             }}>Системные уведомления</h3>
             <MacOSBadge variant="warning">{systemAlerts.length}</MacOSBadge>
           </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {systemAlerts.map((alert) => (
-                <div key={alert.id} style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '12px', 
-                  padding: '12px', 
-                  border: '1px solid var(--mac-border)', 
-                  borderRadius: 'var(--mac-radius-md)' 
-                }}>
-                  <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
-                  <div style={{ flex: '1' }}>
-                    <p style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      color: 'var(--mac-text-primary)',
-                      margin: 0
-                    }}>{alert.message}</p>
-                    <p style={{ 
-                      fontSize: '12px', 
-                      color: 'var(--mac-text-secondary)',
-                      margin: '4px 0 0 0'
-                    }}>{alert.time}</p>
+            {systemAlertsLoading ? (
+              <div style={{ padding: '16px' }}>
+                <MacOSLoadingSkeleton type="text" count={3} />
+              </div>
+            ) : systemAlertsError ? (
+              <div style={{ padding: '16px' }}>
+                <MacOSEmptyState
+                  icon={AlertTriangle}
+                  title="Ошибка загрузки"
+                  description="Не удалось загрузить системные уведомления"
+                />
+              </div>
+            ) : systemAlerts.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center' }}>
+                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет системных уведомлений</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {systemAlerts.map((alert) => (
+                  <div key={alert.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    padding: '12px', 
+                    border: '1px solid var(--mac-border)', 
+                    borderRadius: 'var(--mac-radius-md)' 
+                  }}>
+                    <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
+                    <div style={{ flex: '1' }}>
+                      <p style={{ 
+                        fontSize: 'var(--mac-font-size-sm)', 
+                        fontWeight: 'var(--mac-font-weight-medium)', 
+                        color: 'var(--mac-text-primary)',
+                        margin: 0
+                      }}>{alert.message}</p>
+                      <p style={{ 
+                        fontSize: '12px', 
+                        color: 'var(--mac-text-secondary)',
+                        margin: '4px 0 0 0'
+                      }}>{alert.time}</p>
+                    </div>
+                    <MacOSBadge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
+                      {alert.priority}
+                    </MacOSBadge>
                   </div>
-                  <MacOSBadge variant={alert.priority === 'high' ? 'error' : alert.priority === 'medium' ? 'warning' : 'info'}>
-                    {alert.priority}
-                  </MacOSBadge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </MacOSCard>
         </div>
     </ErrorBoundary>
@@ -1457,9 +1541,13 @@ const AdminPanel = () => {
               { value: '', label: 'Все роли' },
               { value: 'Admin', label: 'Администратор' },
               { value: 'Doctor', label: 'Врач' },
-              { value: 'Nurse', label: 'Медсестра' },
-              { value: 'Receptionist', label: 'Регистратор' },
-              { value: 'Patient', label: 'Пациент' }
+              { value: 'Registrar', label: 'Регистратор' },
+              { value: 'Cashier', label: 'Кассир' },
+              { value: 'Lab', label: 'Лаборатория' },
+              { value: 'Patient', label: 'Пациент' },
+              { value: 'cardio', label: 'Кардиолог' },
+              { value: 'derma', label: 'Дерматолог' },
+              { value: 'dentist', label: 'Стоматолог' }
             ]}
             style={{
               padding: '8px 12px',
@@ -1797,8 +1885,12 @@ const AdminPanel = () => {
       department: 'all',
       doctor: 'all'
     });
-    const [isLoading, setIsLoading] = useState(false);
-    const [hasData, setHasData] = useState(true); // Показываем данные по умолчанию
+    
+    // Загружаем список врачей для фильтра
+    const { data: doctorsList } = useAdminData('/doctors?limit=100&active_only=true', {
+      enabled: true,
+      initialData: []
+    });
 
     const handleFilterChange = (filterType, value) => {
       setAnalyticsFilters(prev => ({
@@ -1807,13 +1899,53 @@ const AdminPanel = () => {
       }));
     };
 
+    // Загрузка данных аналитики
+    const { 
+      data: analyticsData, 
+      loading: analyticsLoading, 
+      error: analyticsError,
+      refresh: refreshAnalytics
+    } = useAdminData(`/admin/analytics/overview?period=${analyticsFilters.period}&department=${analyticsFilters.department === 'all' ? '' : analyticsFilters.department}&doctor_id=${analyticsFilters.doctor === 'all' ? '' : analyticsFilters.doctor}`, {
+      refreshInterval: 0,
+      enabled: true,
+      initialData: {
+        metrics: {
+          totalAppointments: 0,
+          totalRevenue: 0,
+          totalPatients: 0,
+          averageCheck: 0
+        },
+        topDoctors: [],
+        appointmentsByStatus: []
+      }
+    });
+
+    // Загрузка данных для графиков
+    const { 
+      data: chartsData, 
+      loading: chartsLoading, 
+      error: chartsError,
+      refresh: refreshCharts
+    } = useAdminData(`/admin/analytics/charts?period=${analyticsFilters.period}&chart_type=appointments&department=${analyticsFilters.department === 'all' ? '' : analyticsFilters.department}&doctor_id=${analyticsFilters.doctor === 'all' ? '' : analyticsFilters.doctor}`, {
+      refreshInterval: 0,
+      enabled: true,
+      initialData: {
+        labels: [],
+        data: []
+      }
+    });
+
     const applyFilters = () => {
-      setIsLoading(true);
-      // Симуляция загрузки данных
-      setTimeout(() => {
-        setIsLoading(false);
-        setHasData(true); // Всегда показываем данные для демо
-      }, 1000);
+      refreshAnalytics();
+      refreshCharts();
+    };
+
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'UZS',
+        minimumFractionDigits: 0
+      }).format(amount);
     };
 
     return (
@@ -1833,16 +1965,33 @@ const AdminPanel = () => {
             <MacOSButton 
               variant="outline"
               onClick={() => {
-                // Экспорт данных в CSV
-                const csvData = "Период,Записи,Доходы,Пациенты\nСегодня,1,247,₽2.4M,892\nНеделя,8,729,₽16.8M,6,244\nМесяц,37,416,₽74.8M,29,792";
-                const blob = new Blob([csvData], { type: 'text/csv' });
+                // Экспорт реальных данных аналитики в CSV
+                if (!analyticsData) {
+                  alert('Нет данных для экспорта');
+                  return;
+                }
+                
+                const csvRows = [
+                  ['Период', 'Записи', 'Доходы', 'Пациенты', 'Средний чек'],
+                  [
+                    analyticsFilters.period,
+                    analyticsData.metrics?.totalAppointments || 0,
+                    analyticsData.metrics?.totalRevenue || 0,
+                    analyticsData.metrics?.totalPatients || 0,
+                    analyticsData.metrics?.averageCheck || 0
+                  ]
+                ];
+                
+                const csvData = csvRows.map(row => row.join(',')).join('\n');
+                const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'analytics-export.csv';
+                a.download = `analytics-export-${analyticsFilters.period}-${new Date().toISOString().split('T')[0]}.csv`;
                 a.click();
                 window.URL.revokeObjectURL(url);
               }}
+              disabled={!analyticsData || analyticsLoading}
             >
               <Download style={{ width: '16px', height: '16px', marginRight: '8px' }} />
               Экспорт
@@ -1850,7 +1999,7 @@ const AdminPanel = () => {
             <MacOSButton
               onClick={() => {
                 // Открыть генератор отчетов
-                setActiveSection('reports');
+                navigate('/admin/reports');
               }}
             >
               <BarChart3 style={{ width: '16px', height: '16px', marginRight: '8px' }} />
@@ -1906,6 +2055,12 @@ const AdminPanel = () => {
                 { value: 'cardiology', label: 'Кардиология' },
                 { value: 'dermatology', label: 'Дерматология' },
                 { value: 'stomatology', label: 'Стоматология' },
+                { value: 'dentistry', label: 'Стоматология' },
+                { value: 'laboratory', label: 'Лаборатория' },
+                { value: 'cosmetology', label: 'Косметология' },
+                { value: 'procedures', label: 'Процедуры' },
+                { value: 'physiotherapy', label: 'Физиотерапия' },
+                { value: 'functional_diagnostics', label: 'Функциональная диагностика' },
                 { value: 'general', label: 'Общее' }
               ]}
             />
@@ -1925,8 +2080,10 @@ const AdminPanel = () => {
               onChange={(value) => handleFilterChange('doctor', value)}
               options={[
                 { value: 'all', label: 'Все врачи' },
-                { value: 'ivanov', label: 'Иванов И.И.' },
-                { value: 'petrov', label: 'Петров П.П.' }
+                ...(Array.isArray(doctorsList) ? doctorsList : []).map(doctor => ({
+                  value: doctor.user_id?.toString() || doctor.id?.toString() || '',
+                  label: doctor.user?.full_name || doctor.user?.username || `Врач #${doctor.id || doctor.user_id}`
+                })).filter(opt => opt.value && opt.label)
               ]}
             />
           </div>
@@ -1943,48 +2100,67 @@ const AdminPanel = () => {
         </div>
 
         {/* Ключевые метрики */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '16px', 
-          marginBottom: '24px' 
-        }}>
-          <MacOSStatCard
-            title="Всего записей"
-            value="1,247"
-            icon={Calendar}
-            color="var(--mac-accent-blue)"
-            trend="+12% за месяц"
-            trendColor="var(--mac-accent-blue)"
+        {analyticsLoading ? (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px', 
+            marginBottom: '24px' 
+          }}>
+            <MacOSLoadingSkeleton type="card" count={4} />
+          </div>
+        ) : analyticsError ? (
+          <MacOSEmptyState
+            icon={AlertTriangle}
+            title="Ошибка загрузки аналитики"
+            description="Не удалось загрузить данные. Проверьте подключение к серверу."
+            action={
+              <MacOSButton onClick={refreshAnalytics} variant="primary">
+                <RefreshCw size={16} />
+                Повторить попытку
+              </MacOSButton>
+            }
           />
-          
-          <MacOSStatCard
-            title="Доходы"
-            value="₽2.4M"
-            icon={CreditCard}
-            color="var(--mac-success)"
-            trend="+8% за месяц"
-            trendColor="var(--mac-success)"
-          />
-          
-          <MacOSStatCard
-            title="Пациенты"
-            value="892"
-            icon={Users}
-            color="var(--mac-info)"
-            trend="+15% за месяц"
-            trendColor="var(--mac-info)"
-          />
-          
-          <MacOSStatCard
-            title="Средний чек"
-            value="₽1,925"
-            icon={TrendingUp}
-            color="var(--mac-warning)"
-            trend="+5% за месяц"
-            trendColor="var(--mac-warning)"
-          />
-        </div>
+        ) : (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px', 
+            marginBottom: '24px' 
+          }}>
+            <MacOSStatCard
+              title="Всего записей"
+              value={analyticsData?.metrics?.totalAppointments?.toLocaleString() || "0"}
+              icon={Calendar}
+              color="var(--mac-accent-blue)"
+              loading={analyticsLoading}
+            />
+            
+            <MacOSStatCard
+              title="Доходы"
+              value={formatCurrency(analyticsData?.metrics?.totalRevenue || 0)}
+              icon={CreditCard}
+              color="var(--mac-success)"
+              loading={analyticsLoading}
+            />
+            
+            <MacOSStatCard
+              title="Пациенты"
+              value={analyticsData?.metrics?.totalPatients?.toLocaleString() || "0"}
+              icon={Users}
+              color="var(--mac-info)"
+              loading={analyticsLoading}
+            />
+            
+            <MacOSStatCard
+              title="Средний чек"
+              value={formatCurrency(analyticsData?.metrics?.averageCheck || 0)}
+              icon={TrendingUp}
+              color="var(--mac-warning)"
+              loading={analyticsLoading}
+            />
+          </div>
+        )}
 
         {/* Графики */}
         <div style={{ 
@@ -2002,19 +2178,82 @@ const AdminPanel = () => {
               marginBottom: '16px',
               margin: 0
             }}>Динамика записей</h3>
-            {isLoading ? (
+            {chartsLoading ? (
               <MacOSLoadingSkeleton height="256px" />
+            ) : chartsError ? (
+              <MacOSEmptyState
+                icon={AlertTriangle}
+                title="Ошибка загрузки графика"
+                description="Не удалось загрузить данные графика"
+              />
+            ) : chartsData?.data && chartsData.data.length > 0 ? (
+              <div style={{ 
+                height: '256px', 
+                padding: '16px',
+                backgroundColor: 'var(--mac-bg-tertiary)', 
+                borderRadius: 'var(--mac-radius-md)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-end', 
+                  justifyContent: 'space-around',
+                  height: '200px',
+                  gap: '4px'
+                }}>
+                  {chartsData.data.map((item, index) => {
+                    const maxValue = Math.max(...chartsData.data.map(d => d.appointments || 0));
+                    const height = maxValue > 0 ? (item.appointments / maxValue) * 180 : 0;
+                    return (
+                      <div key={index} style={{ 
+                        flex: 1, 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <div style={{
+                          width: '100%',
+                          height: `${height}px`,
+                          background: 'linear-gradient(to top, var(--mac-primary), var(--mac-primary-light))',
+                          borderRadius: '4px 4px 0 0',
+                          minHeight: '4px',
+                          transition: 'height 0.3s ease'
+                        }} />
+                        <span style={{ 
+                          fontSize: '10px', 
+                          color: 'var(--mac-text-tertiary)',
+                          textAlign: 'center'
+                        }}>
+                          {chartsData.labels[index]}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: 'var(--mac-text-secondary)'
+                }}>
+                  <span>Всего записей: {chartsData.data.reduce((sum, d) => sum + (d.appointments || 0), 0)}</span>
+                </div>
+              </div>
             ) : (
-            <div style={{ 
-              height: '256px', 
-              backgroundColor: 'var(--mac-bg-tertiary)', 
-              borderRadius: 'var(--mac-radius-md)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <p style={{ color: 'var(--mac-text-secondary)' }}>График записей по дням</p>
-            </div>
+              <div style={{ 
+                height: '256px', 
+                backgroundColor: 'var(--mac-bg-tertiary)', 
+                borderRadius: 'var(--mac-radius-md)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных за выбранный период</p>
+              </div>
             )}
           </MacOSCard>
           
@@ -2027,20 +2266,76 @@ const AdminPanel = () => {
               color: 'var(--mac-text-primary)', 
               marginBottom: '16px',
               margin: 0
-            }}>Доходы по отделениям</h3>
-            {isLoading ? (
+            }}>Статусы записей</h3>
+            {analyticsLoading ? (
               <MacOSLoadingSkeleton height="256px" />
+            ) : analyticsError ? (
+              <MacOSEmptyState
+                icon={AlertTriangle}
+                title="Ошибка загрузки"
+                description="Не удалось загрузить данные"
+              />
+            ) : analyticsData?.appointmentsByStatus && analyticsData.appointmentsByStatus.length > 0 ? (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px',
+                padding: '16px'
+              }}>
+                {analyticsData.appointmentsByStatus.map((item, index) => {
+                  const total = analyticsData.appointmentsByStatus.reduce((sum, s) => sum + s.count, 0);
+                  const percentage = total > 0 ? (item.count / total) * 100 : 0;
+                  return (
+                    <div key={index} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div 
+                          style={{ 
+                            width: '12px', 
+                            height: '12px', 
+                            borderRadius: 'var(--mac-radius-full)',
+                            background: index === 0 ? 'var(--mac-success)' : 
+                                       index === 1 ? 'var(--mac-warning)' : 'var(--mac-danger)'
+                          }}
+                        ></div>
+                        <span style={{ 
+                          fontSize: 'var(--mac-font-size-sm)', 
+                          fontWeight: 'var(--mac-font-weight-medium)', 
+                          color: 'var(--mac-text-primary)' 
+                        }}>
+                          {item.status}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ 
+                          fontSize: 'var(--mac-font-size-sm)', 
+                          fontWeight: 'var(--mac-font-weight-medium)', 
+                          color: 'var(--mac-text-primary)' 
+                        }}>
+                          {item.count}
+                        </span>
+                        <span style={{ 
+                          fontSize: 'var(--mac-font-size-xs)', 
+                          marginLeft: '8px', 
+                          color: 'var(--mac-text-secondary)' 
+                        }}>
+                          ({percentage.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-            <div style={{ 
-              height: '256px', 
-              backgroundColor: 'var(--mac-bg-tertiary)', 
-              borderRadius: 'var(--mac-radius-md)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <p style={{ color: 'var(--mac-text-secondary)' }}>Круговая диаграмма доходов</p>
-            </div>
+              <div style={{ 
+                height: '256px', 
+                backgroundColor: 'var(--mac-bg-tertiary)', 
+                borderRadius: 'var(--mac-radius-md)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <p style={{ color: 'var(--mac-text-secondary)' }}>Нет данных</p>
+              </div>
             )}
           </MacOSCard>
         </div>
@@ -2057,22 +2352,23 @@ const AdminPanel = () => {
             margin: 0
           }}>Топ врачи по количеству приемов</h3>
           
-          {isLoading ? (
+          {analyticsLoading ? (
             <MacOSLoadingSkeleton height="200px" />
-          ) : !hasData ? (
+          ) : analyticsError ? (
+            <MacOSEmptyState
+              icon={Users}
+              title="Ошибка загрузки"
+              description="Не удалось загрузить данные о врачах"
+            />
+          ) : !analyticsData?.topDoctors || analyticsData.topDoctors.length === 0 ? (
             <MacOSEmptyState
               icon={Users}
               title="Нет данных о врачах"
-              description="Загрузите данные для отображения статистики по врачам"
+              description="За выбранный период нет данных о врачах"
             />
           ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { name: 'Иванов И.И.', department: 'Кардиология', patients: 156, revenue: '₽312,000' },
-              { name: 'Петров П.П.', department: 'Дерматология', patients: 134, revenue: '₽268,000' },
-              { name: 'Сидоров С.С.', department: 'Стоматология', patients: 98, revenue: '₽196,000' },
-              { name: 'Козлов К.К.', department: 'Общее', patients: 87, revenue: '₽174,000' }
-            ].map((doctor, index) => (
+            {analyticsData.topDoctors.map((doctor, index) => (
               <div key={index} style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -2102,12 +2398,12 @@ const AdminPanel = () => {
                       fontWeight: 'var(--mac-font-weight-medium)', 
                       color: 'var(--mac-text-primary)',
                       margin: 0
-                    }}>{doctor.name}</p>
+                    }}>{doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно'}</p>
                     <p style={{ 
                       fontSize: 'var(--mac-font-size-sm)', 
                       color: 'var(--mac-text-secondary)',
                       margin: 0
-                    }}>{doctor.department}</p>
+                    }}>{doctor.specialty || doctor.department || 'Неизвестно'}</p>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -2115,7 +2411,7 @@ const AdminPanel = () => {
                     fontWeight: 'var(--mac-font-weight-medium)', 
                     color: 'var(--mac-text-primary)',
                     margin: 0
-                  }}>{doctor.patients} пациентов</p>
+                  }}>{doctor.patients} записей</p>
                   <p style={{ 
                     fontSize: 'var(--mac-font-size-sm)', 
                     color: 'var(--mac-text-secondary)',
@@ -2137,9 +2433,18 @@ const AdminPanel = () => {
       case 'dashboard':
         return renderDashboard();
       case 'analytics':
-        return <AnalyticsSection />;
+        return <AnalyticsDashboard />;
+      case 'wait-time-analytics':
+        return <WaitTimeAnalytics />;
+      case 'ai-analytics':
+        return <AIAnalytics />;
+      case 'analytics-insights':
+        return <AnalyticsInsights />;
       case 'users':
-        return renderUsers();
+      case 'user-data-transfer':
+      case 'user-export':
+      case 'group-permissions':
+        return <UnifiedUserManagement renderUsersList={renderUsers} />;
       case 'doctors':
         return renderDoctors();
       case 'patients':
@@ -2149,57 +2454,39 @@ const AdminPanel = () => {
       case 'all-free':
         return <AllFreeApproval />;
       case 'benefit-settings':
-        return <BenefitSettings />;
+        return <UnifiedSettings />;
       case 'wizard-settings':
-        return <WizardSettings />;
+        return <UnifiedSettings />;
       case 'payment-providers':
-        return <PaymentProviderSettings />;
+        return <UnifiedSettings />;
       case 'finance':
-        return renderFinance();
+      case 'billing':
+      case 'dynamic-pricing':
+      case 'discount-benefits':
+        return <UnifiedFinance renderFinance={renderFinance} />;
       case 'reports':
-        return renderReports();
+        return <UnifiedReports />;
       case 'clinic-management':
         return <ClinicManagement />;
-      case 'clinic-settings':
-        return <ClinicSettings />;
       case 'queue-settings':
-        return <QueueSettings />;
       case 'queue-limits':
-        return <QueueLimitsManager />;
+        return <UnifiedSettings />;
       case 'ai-imaging':
-        return <MedicalImageAnalyzer />;
       case 'treatment-recommendations':
-        return <TreatmentRecommendations />;
       case 'drug-interactions':
-        return <DrugInteractionChecker />;
       case 'risk-assessment':
-        return <RiskAssessment />;
       case 'voice-to-text':
-        return <VoiceToText />;
-        case 'smart-scheduling':
-          return <SmartScheduling />;
-        case 'quality-control':
-          return <QualityControl />;
-      case 'analytics-insights':
-        return <AnalyticsInsights />;
+      case 'smart-scheduling':
+      case 'quality-control':
+        return <UnifiedAITools />;
       case 'telegram-bot':
-        return <TelegramBotManager />;
+      case 'telegram-settings':
+        return <UnifiedTelegramManagement />;
       case 'fcm-notifications':
-        return <FCMManager />;
+      case 'registrar-notifications':
+        return <UnifiedNotifications />;
       case 'phone-verification':
         return <PhoneVerificationManager />;
-      case 'user-data-transfer':
-        return <UserDataTransferManager />;
-      case 'group-permissions':
-        return <GroupPermissionsManager />;
-      case 'user-export':
-        return <UserExportManager />;
-      case 'registrar-notifications':
-        return <RegistrarNotificationManager />;
-      case 'wait-time-analytics':
-        return <WaitTimeAnalytics />;
-      case 'ai-analytics':
-        return <AIAnalytics />;
       case 'webhooks':
         return <WebhookManager />;
       case 'system':
@@ -2208,28 +2495,87 @@ const AdminPanel = () => {
         return <CloudPrintingManager />;
         case 'medical-equipment':
           return <MedicalEquipmentManager />;
-        case 'dynamic-pricing':
-          return <DynamicPricingManager />;
-        case 'billing':
-          return <BillingManager />;
-        case 'discount-benefits':
-          return <DiscountBenefitsManager />;
         case 'graphql-explorer':
           return <GraphQLExplorer />;
       case 'services':
-        return <ServiceCatalog />;
+        // Вкладки для секции Services
+        const serviceTabs = [
+          { key: 'catalog', label: 'Справочник услуг', icon: Package },
+          { key: 'departments', label: 'Управление отделениями', icon: Building2 }
+        ];
+
+        return (
+          <div>
+            {/* Вкладки */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '24px',
+              borderBottom: '1px solid var(--mac-border)',
+              paddingBottom: '0'
+            }}>
+              {serviceTabs.map(tab => {
+                const TabIcon = tab.icon;
+                const isActive = servicesTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setServicesTab(tab.key);
+                      // Обновляем URL
+                      const params = new URLSearchParams(location.search);
+                      params.set('servicesTab', tab.key);
+                      navigate(`?${params.toString()}`, { replace: true });
+                    }}
+                    style={{
+                      padding: '12px 20px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: isActive ? '2px solid var(--mac-accent)' : '2px solid transparent',
+                      color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '14px',
+                      fontWeight: isActive ? '600' : '500',
+                      transition: 'all 0.2s ease',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.color = 'var(--mac-text-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.color = 'var(--mac-text-secondary)';
+                      }
+                    }}
+                  >
+                    <TabIcon size={18} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Содержимое вкладок */}
+            {servicesTab === 'catalog' && <ServiceCatalog />}
+            {servicesTab === 'departments' && <DepartmentManagement />}
+          </div>
+        );
+      case 'departments':
+        return <DepartmentManagement />;
       case 'ai-settings':
-        return <AISettings />;
-      case 'telegram-settings':
-        return <TelegramSettings />;
+        return <UnifiedSettings />;
       case 'display-settings':
-        return <DisplayBoardSettings />;
+        return <UnifiedSettings />;
       case 'activation':
         return <ActivationSystem />;
       case 'settings':
-        return renderSettings();
       case 'security':
-        return renderSecurity();
+        return <UnifiedSettings />;
       default:
         return (
           <MacOSCard style={{ padding: '48px' }}>
@@ -2296,10 +2642,13 @@ const AdminPanel = () => {
               { value: 'cardiology', label: 'Кардиология' },
               { value: 'dermatology', label: 'Дерматология' },
               { value: 'dentistry', label: 'Стоматология' },
-              { value: 'general', label: 'Общее' },
-              { value: 'surgery', label: 'Хирургия' },
-              { value: 'pediatrics', label: 'Педиатрия' },
-              { value: 'neurology', label: 'Неврология' }
+              { value: 'stomatology', label: 'Стоматология' },
+              { value: 'laboratory', label: 'Лаборатория' },
+              { value: 'cosmetology', label: 'Косметология' },
+              { value: 'procedures', label: 'Процедуры' },
+              { value: 'physiotherapy', label: 'Физиотерапия' },
+              { value: 'functional_diagnostics', label: 'Функциональная диагностика' },
+              { value: 'general', label: 'Общее' }
             ]}
             style={{
               padding: '8px 12px',
@@ -2445,7 +2794,10 @@ const AdminPanel = () => {
                           fontWeight: '500'
                         }}>
                           <span>
-                            {doctor.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            {(() => {
+                              const name = doctor.user?.full_name || doctor.name || doctor.user?.username || 'Д';
+                              return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                            })()}
                           </span>
                         </div>
                         <div>
@@ -2454,30 +2806,30 @@ const AdminPanel = () => {
                             color: 'var(--mac-text-primary)',
                             fontSize: 'var(--mac-font-size-sm)',
                             margin: 0
-                          }}>{doctor.name}</p>
+                          }}>{doctor.user?.full_name || doctor.name || doctor.user?.username || 'Неизвестно'}</p>
                           <p style={{ 
                             fontSize: '12px', 
                             color: 'var(--mac-text-secondary)',
                             margin: '4px 0 0 0'
-                          }}>{doctor.email}</p>
-                          {doctor.phone && (
+                          }}>{doctor.user?.email || doctor.email || 'Нет email'}</p>
+                          {doctor.user?.phone && (
                             <p style={{ 
                               fontSize: '11px', 
                               color: 'var(--mac-text-tertiary)',
                               margin: '2px 0 0 0'
-                            }}>{doctor.phone}</p>
+                            }}>{doctor.user.phone}</p>
                           )}
                         </div>
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <MacOSBadge variant="info">
-                        {doctor.specialization}
+                        {doctor.specialty || doctor.specialization || 'Не указано'}
                       </MacOSBadge>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <MacOSBadge variant="success">
-                        {getDepartmentLabel(doctor.department)}
+                        {doctor.specialty ? getDepartmentLabel(doctor.specialty) : (doctor.department ? getDepartmentLabel(doctor.department) : 'Не указано')}
                       </MacOSBadge>
                     </td>
                     <td style={{ 
@@ -2485,13 +2837,13 @@ const AdminPanel = () => {
                       fontSize: 'var(--mac-font-size-sm)', 
                       color: 'var(--mac-text-secondary)' 
                     }}>
-                      {doctor.experience} лет
+                      {doctor.experience ? `${doctor.experience} лет` : 'Не указано'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <MacOSBadge 
-                        variant={doctor.status === 'active' ? 'success' : doctor.status === 'inactive' ? 'warning' : 'info'}
+                        variant={doctor.active ? 'success' : 'warning'}
                       >
-                        {getDoctorStatusLabel(doctor.status)}
+                        {doctor.active ? 'Активен' : 'Неактивен'}
                       </MacOSBadge>
                     </td>
                     <td style={{ 
@@ -2499,7 +2851,7 @@ const AdminPanel = () => {
                       fontSize: 'var(--mac-font-size-sm)', 
                       color: 'var(--mac-text-secondary)' 
                     }}>
-                      {doctor.patientsCount} пациентов
+                      {doctor.patientsCount || 0} пациентов
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3033,7 +3385,7 @@ const AdminPanel = () => {
                 { value: '', label: 'Все врачи' },
                 ...doctors.map(doctor => ({
                   value: doctor.id,
-                  label: doctor.name
+                  label: doctor.user?.full_name || doctor.name || doctor.user?.username || `Врач #${doctor.id}`
                 }))
               ]}
               style={{ minWidth: '140px' }}
@@ -3603,446 +3955,6 @@ const AdminPanel = () => {
     );
   };
 
-  const renderReports = () => {
-    const reportStats = getReportStats();
-    const reportTypes = getReportTypes();
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {/* Статистика отчетов */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-          gap: '16px' 
-        }}>
-          <MacOSStatCard
-            title="Всего отчетов"
-            value={reportStats.total}
-            icon={FileText}
-            color="blue"
-          />
-          <MacOSStatCard
-            title="Завершено"
-            value={reportStats.completed}
-            icon={CheckCircle}
-            color="green"
-          />
-          <MacOSStatCard
-            title="Генерируется"
-            value={reportStats.generating}
-            icon={Clock}
-            color="orange"
-          />
-          <MacOSStatCard
-            title="Ошибки"
-            value={reportStats.failed}
-            icon={AlertCircle}
-            color="red"
-          />
-          <MacOSStatCard
-            title="Скачиваний"
-            value={reportStats.totalDownloads}
-            icon={Download}
-            color="blue"
-          />
-        </div>
-
-        {/* Кнопки действий */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <MacOSButton variant="primary" onClick={handleOpenReportGenerator}>
-              <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-              Создать отчет
-            </MacOSButton>
-            <MacOSButton variant="outline" onClick={() => window.location.reload()}>
-              <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-              Обновить
-            </MacOSButton>
-          </div>
-        </div>
-
-        {/* Аналитическая панель */}
-           <MacOSCard style={{ padding: '24px' }}>
-          <h3 style={{ 
-            fontSize: 'var(--mac-font-size-lg)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
-            marginBottom: '16px',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
-            Аналитическая панель
-          </h3>
-          <AnalyticsDashboard 
-            data={{}}
-            loading={false}
-            dateRange={reportDateRange}
-          />
-        </MacOSCard>
-
-        {/* Список отчетов */}
-           <MacOSCard style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2 style={{ 
-              fontSize: 'var(--mac-font-size-xl)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)',
-              margin: 0
-            }}>Отчеты</h2>
-          </div>
-          
-          {/* Поиск и фильтры */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <Search style={{ 
-                position: 'absolute', 
-                left: '12px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                width: '16px', 
-                height: '16px', 
-                color: 'var(--mac-text-tertiary)' 
-              }} />
-              <MacOSInput
-                type="text"
-                placeholder="Поиск отчетов..."
-                value={reportsSearchTerm}
-                onChange={(e) => setReportsSearchTerm(e.target.value)}
-                icon={Search}
-                iconPosition="left"
-                style={{ 
-                  width: '100%',
-                  paddingLeft: '40px',
-                  paddingRight: '16px',
-                  paddingTop: '8px',
-                  paddingBottom: '8px',
-                  borderRadius: 'var(--mac-radius-md)',
-                  border: '1px solid var(--mac-border)', 
-                  background: 'var(--mac-bg-primary)', 
-                  color: 'var(--mac-text-primary)',
-                  fontSize: 'var(--mac-font-size-base)',
-                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                }}
-              />
-            </div>
-            <MacOSSelect
-              value={reportFilterType}
-              onChange={(e) => setReportFilterType(e.target.value)}
-              options={[
-                { value: '', label: 'Все типы' },
-                ...reportTypes.map(type => ({
-                  value: type.value,
-                  label: type.label
-                }))
-              ]}
-              style={{ 
-                padding: '8px 12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)', 
-                background: 'var(--mac-bg-primary)', 
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-            />
-            <MacOSSelect
-              value={reportFilterStatus}
-              onChange={(e) => setReportFilterStatus(e.target.value)}
-              options={[
-                { value: '', label: 'Все статусы' },
-                { value: 'completed', label: 'Завершен' },
-                { value: 'generating', label: 'Генерируется' },
-                { value: 'failed', label: 'Ошибка' },
-                { value: 'pending', label: 'Ожидает' }
-              ]}
-              style={{ 
-                padding: '8px 12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)', 
-                background: 'var(--mac-bg-primary)', 
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-            />
-            <MacOSSelect
-              value={reportFilterDateRange}
-              onChange={(e) => setReportFilterDateRange(e.target.value)}
-              options={[
-                { value: '', label: 'Все время' },
-                { value: 'today', label: 'Сегодня' },
-                { value: 'week', label: 'Неделя' },
-                { value: 'month', label: 'Месяц' }
-              ]}
-              style={{ 
-                padding: '8px 12px',
-                borderRadius: 'var(--mac-radius-md)',
-                border: '1px solid var(--mac-border)', 
-                background: 'var(--mac-bg-primary)', 
-                color: 'var(--mac-text-primary)',
-                fontSize: 'var(--mac-font-size-base)',
-                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-              }}
-            />
-          </div>
-
-          {/* Таблица отчетов */}
-          <div style={{ overflowX: 'auto' }}>
-            {reportsLoading ? (
-              <MacOSLoadingSkeleton type="table" count={5} />
-            ) : reportsError ? (
-              <EmptyState
-                type="error"
-                title="Ошибка загрузки отчетов"
-                description="Не удалось загрузить список отчетов"
-                action={
-                  <MacOSButton onClick={() => window.location.reload()}>
-                    <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-                    Обновить
-                  </MacOSButton>
-                }
-              />
-            ) : reports.length === 0 ? (
-              <EmptyState
-                type="filetext"
-                title="Отчеты не найдены"
-                description={reportsSearchTerm || reportFilterType || reportFilterStatus || reportFilterDateRange 
-                  ? 'Попробуйте изменить параметры поиска' 
-                  : 'В системе пока нет отчетов'
-                }
-                action={
-                  <MacOSButton onClick={handleOpenReportGenerator}>
-                    <Plus style={{ width: '16px', height: '16px', marginRight: '8px' }} />
-                    Создать первый отчет
-                  </MacOSButton>
-                }
-              />
-            ) : (
-              <table style={{ width: '100%' }} role="table" aria-label="Таблица отчетов">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--mac-separator)' }}>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Название</th>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Тип</th>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Статус</th>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Период</th>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Размер</th>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Скачиваний</th>
-                    <th scope="col" style={{ 
-                      textAlign: 'left', 
-                      padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)',
-                      fontSize: 'var(--mac-font-size-sm)',
-                      color: 'var(--mac-text-secondary)'
-                    }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((report) => (
-                    <tr 
-                      key={report.id} 
-                      style={{ 
-                        borderBottom: '1px solid var(--mac-separator)',
-                        transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                        <div>
-                          <p style={{ 
-                            fontWeight: 'var(--mac-font-weight-medium)', 
-                            fontSize: 'var(--mac-font-size-base)',
-                            color: 'var(--mac-text-primary)',
-                            margin: 0
-                          }}>{report.name}</p>
-                          <p style={{ 
-                            fontSize: 'var(--mac-font-size-sm)', 
-                            color: 'var(--mac-text-secondary)',
-                            margin: '4px 0 0 0'
-                          }}>{report.description}</p>
-                        </div>
-                      </td>
-                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                        <MacOSBadge variant="info">
-                          {getReportTypeLabel(report.type)}
-                        </MacOSBadge>
-                      </td>
-                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                        <MacOSBadge variant={getStatusVariant(report.status)}>
-                          {getStatusLabel(report.status)}
-                        </MacOSBadge>
-                      </td>
-                      <td style={{ 
-                        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        color: 'var(--mac-text-secondary)' 
-                      }}>
-                        {formatDateRange(report.dateRange)}
-                      </td>
-                      <td style={{ 
-                        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        color: 'var(--mac-text-secondary)' 
-                      }}>
-                        {report.fileSize || '-'}
-                      </td>
-                      <td style={{ 
-                        padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        color: 'var(--mac-text-secondary)' 
-                      }}>
-                        {report.downloadCount}
-                      </td>
-                      <td style={{ padding: 'var(--mac-spacing-3) var(--mac-spacing-4)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-                          {report.status === 'completed' && (
-                            <button 
-                              onClick={() => handleDownloadReport(report.id)}
-                              style={{ 
-                                padding: 'var(--mac-spacing-2)',
-                                borderRadius: 'var(--mac-radius-sm)',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--mac-text-secondary)',
-                                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                              title="Скачать"
-                            >
-                              <Download style={{ width: '16px', height: '16px' }} />
-                            </button>
-                          )}
-                          {report.status === 'failed' && (
-                            <button 
-                              onClick={() => handleRegenerateReport(report.id)}
-                              style={{ 
-                                padding: 'var(--mac-spacing-2)',
-                                borderRadius: 'var(--mac-radius-sm)',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--mac-warning)',
-                                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                              title="Повторить генерацию"
-                            >
-                              <RefreshCw style={{ width: '16px', height: '16px' }} />
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleDeleteReport(report.id)}
-                            style={{ 
-                              padding: 'var(--mac-spacing-2)',
-                              borderRadius: 'var(--mac-radius-sm)',
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: 'var(--mac-danger)',
-                              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                            title="Удалить"
-                          >
-                            <Trash2 style={{ width: '16px', height: '16px' }} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </MacOSCard>
-
-        {/* Генератор отчетов */}
-        {showReportGenerator && (
-           <MacOSCard style={{ padding: '24px' }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              marginBottom: '24px' 
-            }}>
-              <h2 style={{ 
-                fontSize: 'var(--mac-font-size-xl)', 
-                fontWeight: 'var(--mac-font-weight-semibold)', 
-                color: 'var(--mac-text-primary)',
-                margin: 0
-              }}>
-                Генератор отчетов
-              </h2>
-              <button
-                onClick={() => setShowReportGenerator(false)}
-                style={{ 
-                  padding: 'var(--mac-spacing-2)',
-                  borderRadius: 'var(--mac-radius-lg)',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--mac-text-secondary)',
-                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <X style={{ width: '20px', height: '20px' }} />
-              </button>
-            </div>
-            <ReportGenerator
-              onGenerateReport={handleGenerateReport}
-              loading={reportsLoading}
-              reportTypes={reportTypes.map(t => t.value)}
-              dateRange={reportDateRange}
-              onDateRangeChange={setReportDateRange}
-              selectedReportType={selectedReportType}
-              onReportTypeChange={setSelectedReportType}
-            />
-          </MacOSCard>
-        )}
-      </div>
-    );
-  };
 
   const renderSettings = () => {
     const settingsStats = getSettingsStats();
@@ -4657,7 +4569,7 @@ const AdminPanel = () => {
           transition: 'opacity 0.3s ease, transform 0.4s ease'
         }}>
           <div style={{ 
-            padding: current === 'analytics' || current === 'payment-providers' || current === 'clinic-management' || current === 'clinic-settings' || current === 'queue-settings' || current === 'queue-limits' || current === 'ai-imaging' || current === 'treatment-recommendations' ? '0' : '12px'
+            padding: current === 'analytics' || current === 'clinic-management' || current === 'ai-imaging' || current === 'settings' || current === 'finance' || current === 'reports' || current === 'telegram-bot' || current === 'fcm-notifications' ? '0' : '12px'
         }}>
           {renderContent()}
           </div>

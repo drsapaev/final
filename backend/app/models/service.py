@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    pass  # Department model doesn't exist
+    # from app.models.department import Department
 
 
 class Service(Base):
@@ -48,11 +52,18 @@ class Service(Base):
     queue_tag: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     is_consultation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     allow_doctor_price_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    
+
+    # ✅ СВЯЗЬ С ОТДЕЛЕНИЕМ
+    # NOTE: ForeignKey temporarily disabled - departments table doesn't exist
+    department_key: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, index=True
+    )
+
     # Relationships
     category = relationship("ServiceCategory", back_populates="services")
     doctor = relationship("Doctor", back_populates="services")
     price_overrides = relationship("DoctorPriceOverride", back_populates="service")
+    # department_rel = relationship("Department", back_populates="services")  # Disabled: Department model missing
 
 
 class ServiceCatalog(Base):

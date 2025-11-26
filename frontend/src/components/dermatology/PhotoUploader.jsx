@@ -95,7 +95,7 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
 
   // Обработка загрузки файлов
   const handleFileDrop = useCallback(async (acceptedFiles, fileType) => {
-    for (let file of acceptedFiles) {
+    for (const file of acceptedFiles) {
       setUploadProgress(0);
       
       try {

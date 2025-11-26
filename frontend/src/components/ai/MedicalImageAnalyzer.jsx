@@ -544,7 +544,7 @@ const MedicalImageAnalyzer = () => {
                     <MacOSButton
                       key={type.value}
                       onClick={() => setImageType(type.value)}
-                      variant={imageType === type.value ? "primary" : "outline"}
+                      variant={imageType === type.value ? 'primary' : 'outline'}
                       style={{ 
                         display: 'flex', 
                         alignItems: 'center', 

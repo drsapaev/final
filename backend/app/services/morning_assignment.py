@@ -15,6 +15,7 @@ from app.models.patient import Patient
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.crud import online_queue as crud_queue
+from app.services.queue_service import queue_service
 
 import logging
 
@@ -155,6 +156,8 @@ class MorningAssignmentService:
     
     def _get_visit_queue_tags(self, visit: Visit) -> set:
         """Получает все queue_tag для услуг визита"""
+        # ✅ ИСПРАВЛЕНО: Явный импорт для избежания проблем с циклическими зависимостями
+        from app.models.visit import VisitService
         visit_services = self.db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
         
         queue_tags = set()
@@ -189,10 +192,10 @@ class MorningAssignmentService:
     
     def _assign_single_queue(self, visit: Visit, queue_tag: str, target_date: date) -> Optional[Dict[str, any]]:
         """Присваивает номер в конкретной очереди"""
-        
+
         # Определяем врача для очереди
         doctor_id = visit.doctor_id
-        
+
         # Для очередей без конкретного врача используем ресурс-врачей
         if not doctor_id:
             # Маппинг queue_tag → resource_username
@@ -203,28 +206,49 @@ class MorningAssignmentService:
                 "general": "general_resource",
                 "cardiology_common": "general_resource",  # Используем общий ресурс
                 "dermatology": "general_resource",  # Используем общий ресурс
+                "procedures": "general_resource",  # Используем общий ресурс
             }
-            
+
             resource_username = resource_mapping.get(queue_tag, "general_resource")  # Fallback на general_resource
-            
+
+            # ✅ ИСПРАВЛЕНИЕ: Ищем doctor_id через связь User → Doctor
             resource_user = self.db.query(User).filter(
                 User.username == resource_username,
                 User.is_active == True
             ).first()
-            
+
             if resource_user:
-                doctor_id = resource_user.id
-                logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (ID: {doctor_id})")
+                # Находим запись врача по user_id
+                resource_doctor = self.db.query(Doctor).filter(
+                    Doctor.user_id == resource_user.id
+                ).first()
+
+                if resource_doctor:
+                    doctor_id = resource_doctor.id  # Используем doctor_id, а не user_id
+                    logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: {resource_username} (Doctor ID: {doctor_id})")
+                else:
+                    logger.warning(f"У ресурс-пользователя {resource_username} (User ID: {resource_user.id}) нет записи в таблице doctors")
+                    return None
             else:
                 logger.warning(f"Ресурс-врач {resource_username} не найден для queue_tag={queue_tag}")
                 return None
-        
+
         if not doctor_id:
             logger.warning(f"Не найден врач для queue_tag={queue_tag}, visit_id={visit.id}")
             return None
         
-        # Получаем или создаем дневную очередь
-        daily_queue = crud_queue.get_or_create_daily_queue(self.db, target_date, doctor_id, queue_tag)
+        # ⭐ ВАЖНО: Конвертируем doctor_id → user_id для DailyQueue.specialist_id
+        # DailyQueue.specialist_id - это ForeignKey на users.id, а не doctors.id
+        doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
+        if not doctor or not doctor.user_id:
+            logger.warning(f"У врача {doctor_id} нет user_id для queue_tag={queue_tag}, visit_id={visit.id}")
+            return None
+        
+        user_id = doctor.user_id
+        logger.info(f"Конвертация: doctor_id={doctor_id} → user_id={user_id} для queue_tag={queue_tag}")
+        
+        # Получаем или создаем дневную очередь с user_id
+        daily_queue = crud_queue.get_or_create_daily_queue(self.db, target_date, user_id, queue_tag)
         
         # Проверяем нет ли уже записи для этого пациента в этой очереди
         existing_entry = self.db.query(OnlineQueueEntry).filter(
@@ -243,18 +267,29 @@ class MorningAssignmentService:
                 "status": "existing"
             }
         
-        # Подсчитываем текущее количество записей в очереди
-        current_count = crud_queue.count_queue_entries(self.db, daily_queue.id)
-        next_number = 1 + current_count  # Начинаем с 1
+        next_number = queue_service.get_next_queue_number(
+            self.db,
+            daily_queue=daily_queue,
+            queue_tag=queue_tag,
+        )
         
         # Создаем запись в очереди
+        # queue_time - бизнес-время регистрации
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from app.crud.clinic import get_queue_settings
+        queue_settings = get_queue_settings(self.db)
+        timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+        queue_time = datetime.now(timezone)
+        
         queue_entry = OnlineQueueEntry(
             queue_id=daily_queue.id,
             patient_id=visit.patient_id,
             number=next_number,
             status="waiting",
             source="morning_assignment",  # Источник: утренняя сборка
-            visit_id=visit.id  # Связываем с визитом
+            visit_id=visit.id,  # Связываем с визитом
+            queue_time=queue_time  # Устанавливаем время регистрации
         )
         self.db.add(queue_entry)
         

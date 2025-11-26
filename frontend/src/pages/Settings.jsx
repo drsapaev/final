@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import RoleGate from '../components/RoleGate.jsx';
 import { api } from '../api/client.js';
 import { useTheme } from '../contexts/ThemeContext';
+import TwoFactorManager from '../components/security/TwoFactorManager';
+import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
+import PhoneVerification from '../components/auth/PhoneVerification';
 
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
@@ -202,6 +205,7 @@ export default function Settings() {
             <TabButton active={tab==='online_queue'} onClick={()=>setTab('online_queue')}>Онлайн-очередь</TabButton>
             <TabButton active={tab==='display_board'} onClick={()=>setTab('display_board')}>Табло очереди</TabButton>
             <TabButton active={tab==='payment_providers'} onClick={()=>setTab('payment_providers')}>Провайдеры оплаты</TabButton>
+            <TabButton active={tab==='security'} onClick={()=>setTab('security')}>Безопасность</TabButton>
           </div>
 
           {tab === 'license' && (
@@ -346,6 +350,24 @@ export default function Settings() {
               )}
             </div>
           )}
+
+          {tab === 'security' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={card}>
+                <div style={{ fontWeight: 700, marginBottom: 12 }}>Двухфакторная аутентификация (2FA)</div>
+                <TwoFactorManager />
+              </div>
+
+              <div style={card}>
+                <div style={{ fontWeight: 700, marginBottom: 12 }}>Верификация телефона</div>
+                <PhoneVerification
+                  showPhoneInput={true}
+                  title="Верификация телефона"
+                  onVerified={() => alert('Телефон успешно подтверждён!')}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </RoleGate>
     </div>
@@ -470,7 +492,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -488,7 +510,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <input
               type="text"
               value={formData.code}
-              onChange={(e) => setFormData({...formData, code: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -505,7 +527,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <label style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Описание</label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
               style={{
                 width: '100%',
@@ -524,7 +546,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <input
               type="password"
               value={formData.secret_key}
-              onChange={(e) => setFormData({...formData, secret_key: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, secret_key: e.target.value })}
               required
               style={{
                 width: '100%',
@@ -542,7 +564,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <input
               type="url"
               value={formData.webhook_url}
-              onChange={(e) => setFormData({...formData, webhook_url: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, webhook_url: e.target.value })}
               style={{
                 width: '100%',
                 padding: 8,
@@ -559,7 +581,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
             <input
               type="url"
               value={formData.api_url}
-              onChange={(e) => setFormData({...formData, api_url: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
               style={{
                 width: '100%',
                 padding: 8,
@@ -576,7 +598,7 @@ function ProviderModal({ provider, onClose, onSave, title }) {
               type="checkbox"
               id="is_active"
               checked={formData.is_active}
-              onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
             />
             <label htmlFor="is_active" style={{ fontWeight: 600 }}>Активен</label>
           </div>

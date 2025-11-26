@@ -18,7 +18,7 @@ import {
   Activity
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const RegistrarNotificationManager = () => {
   const [activeTab, setActiveTab] = useState('send');
@@ -169,7 +169,7 @@ const RegistrarNotificationManager = () => {
             </label>
             <MacOSSelect
               value={notificationForm.alert_type}
-              onChange={(e) => setNotificationForm({...notificationForm, alert_type: e.target.value})}
+              onChange={(e) => setNotificationForm({ ...notificationForm, alert_type: e.target.value })}
               options={[
                 { value: 'system_error', label: 'Системная ошибка' },
                 { value: 'payment_issue', label: 'Проблема с оплатой' },
@@ -194,7 +194,7 @@ const RegistrarNotificationManager = () => {
             </label>
             <MacOSSelect
               value={notificationForm.priority}
-              onChange={(e) => setNotificationForm({...notificationForm, priority: e.target.value})}
+              onChange={(e) => setNotificationForm({ ...notificationForm, priority: e.target.value })}
               options={[
                 { value: 'normal', label: 'Обычный' },
                 { value: 'warning', label: 'Предупреждение' },
@@ -218,7 +218,7 @@ const RegistrarNotificationManager = () => {
           <MacOSInput
             placeholder="Например: Кардиология, Стоматология"
             value={notificationForm.department}
-            onChange={(e) => setNotificationForm({...notificationForm, department: e.target.value})}
+            onChange={(e) => setNotificationForm({ ...notificationForm, department: e.target.value })}
             style={{ width: '100%' }}
           />
         </div>
@@ -236,7 +236,7 @@ const RegistrarNotificationManager = () => {
           <MacOSTextarea
             placeholder="Введите текст уведомления для регистраторов..."
             value={notificationForm.message}
-            onChange={(e) => setNotificationForm({...notificationForm, message: e.target.value})}
+            onChange={(e) => setNotificationForm({ ...notificationForm, message: e.target.value })}
             rows={4}
             style={{ width: '100%' }}
           />

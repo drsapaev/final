@@ -43,10 +43,10 @@ function contrastRatio(fgHex, bgHex) {
 
 function adjustForContrast(colorHex, bgHex, min = 4.5) {
   // Try mixing towards black or white to reach min contrast
-  let c = colorHex.replace('#', '');
-  let r = parseInt(c.substring(0, 2), 16);
-  let g = parseInt(c.substring(2, 4), 16);
-  let b = parseInt(c.substring(4, 6), 16);
+  const c = colorHex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
   const bg = bgHex.replace('#', '');
   const bgIsDark = getLuminance('#' + bg) < 0.5;
   for (let i = 0; i <= 20; i++) {

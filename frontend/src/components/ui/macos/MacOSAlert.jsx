@@ -11,7 +11,8 @@ const MacOSAlert = ({
   size = 'md',
   variant = 'default',
   className,
-  style
+  style,
+  children
 }) => {
   const sizeStyles = {
     sm: {
@@ -84,8 +85,8 @@ const MacOSAlert = ({
   };
 
   const currentSize = sizeStyles[size];
-  const currentType = typeStyles[type];
-  const currentVariant = variantStyles[variant];
+  const currentType = typeStyles[type] || typeStyles.info;
+  const currentVariant = variantStyles[variant] || variantStyles.default;
   const IconComponent = currentType.icon;
 
   const alertStyle = {
@@ -94,7 +95,7 @@ const MacOSAlert = ({
     padding: currentSize.padding,
     background: currentVariant.background || currentType.background,
     border: currentVariant.border || currentType.border,
-    borderRadius: currentVariant.borderRadius,
+    borderRadius: currentVariant.borderRadius || 'var(--mac-radius-md)',
     gap: currentSize.gap,
     position: 'relative',
     ...style

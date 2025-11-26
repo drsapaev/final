@@ -1,19 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Heart,
-  Activity,
   FileText,
   User,
-  Users,
   Settings,
   Save,
   RefreshCw,
-  AlertCircle,
-  CheckCircle,
-  Stethoscope,
   Calendar,
-  Brain,
   Phone,
   Plus,
   TestTube
@@ -24,10 +17,8 @@ import {
   MacOSBadge, 
   MacOSLoadingSkeleton,
   MacOSEmptyState,
-  MacOSInput,
   MacOSTextarea,
-  MacOSCheckbox,
-  Icon 
+  MacOSCheckbox
 } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import DoctorServiceSelector from '../components/doctor/DoctorServiceSelector';
@@ -35,6 +26,7 @@ import AIAssistant from '../components/ai/AIAssistant';
 import ECGViewer from '../components/cardiology/ECGViewer';
 import EchoForm from '../components/cardiology/EchoForm';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
+import EditPatientModal from '../components/common/EditPatientModal';
 import { queueService } from '../services/queue';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import EMRSystem from '../components/medical/EMRSystem';
@@ -45,7 +37,7 @@ import EMRSystem from '../components/medical/EMRSystem';
  */
 const MacOSCardiologistPanelUnified = () => {
   // Всегда вызываем хуки первыми
-  const { theme, isDark, getColor, getSpacing, getFontSize, getShadow } = useTheme();
+  const { isDark, getColor, getSpacing, getFontSize, getShadow } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -65,8 +57,9 @@ const MacOSCardiologistPanelUnified = () => {
     notes: ''
   });
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [, setMessage] = useState({ type: '', text: '' });
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({ ldlThreshold: 100, showEcgEchoTogether: true });
   const [emr, setEmr] = useState(null);
@@ -80,20 +73,6 @@ const MacOSCardiologistPanelUnified = () => {
   const [services, setServices] = useState({});  // ✅ Добавлено: состояние для услуг
 
   // Специализированные данные кардиолога
-  const [ecgForm, setEcgForm] = useState({
-    patient_id: '',
-    ecg_date: '',
-    rhythm: '',
-    heart_rate: '',
-    pr_interval: '',
-    qrs_duration: '',
-    qt_interval: '',
-    st_segment: '',
-    t_wave: '',
-    interpretation: '',
-    recommendations: ''
-  });
-
   const [bloodTestForm, setBloodTestForm] = useState({
     patient_id: '',
     test_date: '',
@@ -111,17 +90,36 @@ const MacOSCardiologistPanelUnified = () => {
   const [ecgResults, setEcgResults] = useState([]);
   const [bloodTests, setBloodTests] = useState([]);
 
-  // Вкладки панели
-  const tabs = [
-    { id: 'queue', label: 'Очередь', icon: Users, color: 'text-blue-600' },
-    { id: 'appointments', label: 'Записи', icon: Calendar, color: 'text-green-600' },
-    { id: 'visit', label: 'Прием', icon: Heart, color: 'text-red-600' },
-    { id: 'ecg', label: 'ЭКГ', icon: Activity, color: 'text-green-600' },
-    { id: 'blood', label: 'Анализы', icon: TestTube, color: 'text-purple-600' },
-    { id: 'ai', label: 'AI Помощник', icon: Brain, color: 'text-indigo-600' },
-    { id: 'services', label: 'Услуги', icon: Stethoscope, color: 'text-orange-600' },
-    { id: 'history', label: 'История', icon: FileText, color: 'text-gray-600' }
-  ];
+  // ✅ Функция загрузки данных пациента (объявлена до использования)
+  const loadPatientData = useCallback(async () => {
+    if (!selectedPatient?.patient?.id && !selectedPatient?.patient_id) return;
+    
+    try {
+      const patientId = selectedPatient?.patient?.id || selectedPatient?.patient_id;
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      
+      // Загружаем ЭКГ пациента
+      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+      const ecgResponse = await fetch(`${API_BASE}/api/v1/cardio/ecg?patient_id=${patientId}&limit=10`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (ecgResponse.ok) {
+        const ecgData = await ecgResponse.json();
+        setEcgResults(ecgData);
+      }
+
+      // Загружаем анализы крови пациента
+      const bloodResponse = await fetch(`${API_BASE}/api/v1/cardio/blood-tests?patient_id=${patientId}&limit=10`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (bloodResponse.ok) {
+        const bloodData = await bloodResponse.json();
+        setBloodTests(bloodData);
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Не удалось обновить данные пациента: ${error.message || ''}`.trim() });
+    }
+  }, [selectedPatient, setMessage]);
 
   // ✅ Очистка EMR и visitData при смене пациента
   useEffect(() => {
@@ -131,10 +129,6 @@ const MacOSCardiologistPanelUnified = () => {
       
       // Если это новый пациент (не просто обновление того же)
       if (previousPatientId !== null && previousPatientId !== currentPatientId) {
-        console.log('[Cardiology] Смена пациента, очищаем EMR и visitData', {
-          previousPatientId,
-          currentPatientId
-        });
         // Очищаем EMR и visitData при смене пациента
         setEmr(null);
         setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
@@ -151,7 +145,7 @@ const MacOSCardiologistPanelUnified = () => {
       setEmr(null);
       setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
     }
-  }, [selectedPatient]);
+  }, [selectedPatient, loadPatientData]);
 
   // Отслеживаем изменения URL для синхронизации активной вкладки
   useEffect(() => {
@@ -178,10 +172,9 @@ const MacOSCardiologistPanelUnified = () => {
           const data = await response.json();
           const servicesData = data.services_by_group || {};
           setServices(servicesData);
-          console.log('[Cardiology] Услуги загружены:', servicesData);
         }
       } catch (error) {
-        console.error('[Cardiology] Ошибка загрузки услуг:', error);
+        setMessage({ type: 'error', text: `Не удалось загрузить список услуг: ${error.message || ''}`.trim() });
       }
     };
 
@@ -220,12 +213,11 @@ const MacOSCardiologistPanelUnified = () => {
   }, []);
 
   // Загрузка записей кардиолога
-  const loadMacOSCardiologyAppointments = async () => {
+  const loadMacOSCardiologyAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.log('Нет токена аутентификации');
         setAppointmentsLoading(false);
         return;
       }
@@ -254,7 +246,6 @@ const MacOSCardiologistPanelUnified = () => {
                 
                 // Пропускаем дубликаты (один и тот же пациент с одним и тем же appointment_id в одной специальности)
                 if (seenIds.has(recordKey)) {
-                  console.log('[Cardiology] Пропущен дубликат записи:', recordKey);
                   return;
                 }
                 seenIds.add(recordKey);
@@ -335,7 +326,6 @@ const MacOSCardiologistPanelUnified = () => {
           if (appointmentsResponse.ok) {
             const appointmentsDBResponse = await appointmentsResponse.json();
             const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
-            console.log('[Cardiology] Получены appointments из БД:', appointmentsDBData.length);
 
             // Создаем карту id -> payment_status (используем id без смещения, так как бэкенд добавляет +20000 для Visit)
             const paymentStatusMap = new Map();
@@ -366,11 +356,9 @@ const MacOSCardiologistPanelUnified = () => {
                 payment_type: paymentStatus || apt.payment_type
               };
             });
-
-            console.log('[Cardiology] Обновлены payment_status для', allAppointments.length, 'записей');
           }
         } catch (err) {
-          console.warn('[Cardiology] Не удалось загрузить payment_status из БД:', err);
+          setMessage({ type: 'warning', text: `Не удалось обновить статусы оплат, показаны данные очереди: ${err.message || ''}`.trim() });
         }
 
         // Добавляем информацию о всех услугах пациента в каждую запись
@@ -386,11 +374,11 @@ const MacOSCardiologistPanelUnified = () => {
         setAppointments(enrichedAppointmentsData);
       }
     } catch (error) {
-      console.error('Ошибка загрузки записей кардиолога:', error);
+      setMessage({ type: 'error', text: `Не удалось загрузить записи кардиолога: ${error.message || ''}`.trim() });
     } finally {
       setAppointmentsLoading(false);
     }
-  };
+  }, [getAllPatientServices, setMessage]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -400,13 +388,11 @@ const MacOSCardiologistPanelUnified = () => {
     
     // Слушаем глобальные события обновления очереди
     const handleQueueUpdate = (event) => {
-      console.log('[Cardiology] Получено событие обновления очереди:', event.detail);
-      const { action, specialty } = event.detail || {};
+      const { action } = event.detail || {};
 
       // Автоматически обновляем список appointments после завершения приёма
       if (action === 'visitCompleted' || action === 'nextPatientCalled') {
         if (activeTab === 'appointments') {
-          console.log('[Cardiology] Автообновление списка appointments после', action);
           loadMacOSCardiologyAppointments();
         }
       }
@@ -424,11 +410,112 @@ const MacOSCardiologistPanelUnified = () => {
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
-  }, [activeTab]);
+  }, [activeTab, loadMacOSCardiologyAppointments]);
+
+  // Функция для получения данных пациента по ID
+  const fetchPatientData = useCallback(async (patientId) => {
+    // Проверяем, является ли это демо-пациентом (ID >= 1000)
+    if (patientId >= 1000) {
+      return null;
+    }
+    
+    const token = localStorage.getItem('auth_token');
+    if (!token) return null;
+    
+    const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Не удалось загрузить данные пациента: ${error.message || ''}`.trim() });
+    }
+    return null;
+  }, [setMessage]);
+
+  // Функция для преобразования данных пациента из формата API в формат PatientModal
+  const transformPatientData = useCallback((apiPatient) => {
+    if (!apiPatient) return null;
+    
+    return {
+      id: apiPatient.id,
+      firstName: apiPatient.first_name || '',
+      lastName: apiPatient.last_name || '',
+      middleName: apiPatient.middle_name || '',
+      email: apiPatient.email || '',
+      phone: apiPatient.phone || '',
+      birthDate: apiPatient.birth_date || '',
+      gender: apiPatient.sex === 'M' ? 'male' : apiPatient.sex === 'F' ? 'female' : '',
+      address: apiPatient.address || '',
+      passport: apiPatient.doc_number || '',
+      insuranceNumber: '', // Это поле может отсутствовать в API
+      emergencyContact: '', // Это поле может отсутствовать в API
+      emergencyPhone: '', // Это поле может отсутствовать в API
+      bloodType: '', // Это поле может отсутствовать в API
+      allergies: '', // Это поле может отсутствовать в API
+      chronicDiseases: '', // Это поле может отсутствовать в API
+      notes: '' // Это поле может отсутствовать в API
+    };
+  }, []);
+
+  // Функция для создания частичного объекта пациента из данных row (для QR-пациентов)
+  // УПРОЩЕНО: Не нормализуем ФИО здесь - это делает backend (Single Source of Truth)
+  // Просто преобразуем данные для отображения
+  const createPartialPatientFromRow = useCallback((row) => {
+    return {
+      // Используем полное ФИО как есть, без нормализации
+      fullName: row.patient_fio || '',
+      firstName: '', // Будет заполнено через API при необходимости
+      lastName: '', // Будет заполнено через API при необходимости
+      middleName: '', // Будет заполнено через API при необходимости
+      phone: row.patient_phone || '',
+      address: row.address || '',
+      birthDate: row.patient_birth_year ? `${row.patient_birth_year}-01-01` : ''
+    };
+  }, []);
+
+  // Обработчик редактирования пациента
+  const handleEditPatient = useCallback(async (row) => {
+    // Если нет patient_id (QR-пациент), используем частичные данные из row
+    if (!row.patient_id) {
+      const partialPatient = createPartialPatientFromRow(row);
+      setEditPatientModal({ open: true, patient: partialPatient, loading: false });
+      return;
+    }
+    
+    try {
+      // Показываем индикатор загрузки
+      setEditPatientModal({ open: true, patient: null, loading: true });
+      
+      // Загружаем полные данные пациента
+      const apiPatient = await fetchPatientData(row.patient_id);
+      
+      if (!apiPatient) {
+        // Если не удалось загрузить, используем данные из row (частичные)
+        const partialPatient = createPartialPatientFromRow(row);
+        setEditPatientModal({ open: true, patient: partialPatient, loading: false });
+        setMessage({ type: 'warning', text: 'Не удалось загрузить карточку пациента, показаны данные из очереди' });
+        return;
+      }
+      
+      // Преобразуем данные в формат PatientModal
+      const transformedPatient = transformPatientData(apiPatient);
+      setEditPatientModal({ open: true, patient: transformedPatient, loading: false });
+      
+    } catch (error) {
+      const partialPatient = createPartialPatientFromRow(row);
+      setEditPatientModal({ open: true, patient: partialPatient, loading: false });
+      setMessage({ type: 'error', text: `Не удалось загрузить карточку пациента: ${error.message || ''}`.trim() });
+    }
+  }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = async (row) => {
-    console.log('[Cardiology] handleAppointmentRowClick: клик по записи', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       // Создаем объект пациента для переключения на прием
@@ -447,13 +534,11 @@ const MacOSCardiologistPanelUnified = () => {
         discount_mode: row.discount_mode,
         specialty: row.specialty || 'cardiology'
       };
-      console.log('[Cardiology] handleAppointmentRowClick: patientData', patientData);
       setSelectedPatient(patientData);
       
       // Если запись завершена - загружаем EMR для просмотра
       const isCompleted = row.status === 'served' || row.status === 'completed' || row.status === 'done';
       if (isCompleted) {
-        console.log('[Cardiology] handleAppointmentRowClick: запись завершена, загружаем EMR');
         await loadEMR(appointmentId);
       } else {
         // Для незавершённых записей очищаем EMR
@@ -465,17 +550,15 @@ const MacOSCardiologistPanelUnified = () => {
   };
 
   const handleAppointmentActionClick = async (action, row, event) => {
-    console.log('[Cardiology] handleAppointmentActionClick: действие', action, row);
     event.stopPropagation();
 
     switch (action) {
       case 'view':
         await handleAppointmentRowClick(row);
         break;
-      case 'view_emr':
+      case 'view_emr': {
         // Просмотр EMR для завершённой записи
         const appointmentId = row.appointment_id || row.id;
-        console.log('[Cardiology] handleAppointmentActionClick: просмотр EMR для appointment_id', appointmentId);
 
         // Создаем объект пациента
         const patientData = {
@@ -500,6 +583,7 @@ const MacOSCardiologistPanelUnified = () => {
         // Переходим на вкладку visit
         goToTab('visit');
         break;
+      }
       case 'call':
         // Вызвать пациента
         try {
@@ -514,30 +598,28 @@ const MacOSCardiologistPanelUnified = () => {
           });
 
           if (response.ok) {
-            console.log('[Cardiology] Пациент вызван:', row.patient_fio);
             // Обновляем статус в локальном состоянии
             setAppointments(prev => prev.map(a =>
               a.id === row.id ? { ...a, status: 'called' } : a
             ));
             // Вызываем обновление списка
-            await handleRefreshAppointments();
+            await loadMacOSCardiologyAppointments();
+            setMessage({ type: 'success', text: `Пациент ${row.patient_fio} вызван` });
           }
         } catch (error) {
-          console.error('[Cardiology] Ошибка вызова пациента:', error);
+          setMessage({ type: 'error', text: `Не удалось вызвать пациента: ${error.message || ''}`.trim() });
         }
         break;
       case 'payment':
         // Открыть окно оплаты
-        console.log('[Cardiology] Открытие окна оплаты для:', row.patient_fio);
         // Здесь можно добавить модальное окно оплаты
         alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
         break;
       case 'print':
         // Печать талона
-        console.log('[Cardiology] Печать талона для:', row.patient_fio);
         window.print();
         break;
-      case 'complete':
+      case 'complete': {
         // Завершить приём
         try {
           // Переходим на вкладку визита для завершения
@@ -555,7 +637,6 @@ const MacOSCardiologistPanelUnified = () => {
             specialty: row.specialty || 'cardiology'
           };
 
-          console.log('[Cardiology] Завершение приёма для:', patient.patient_name);
           setSelectedPatient(patient);
 
           // Загружаем EMR если есть
@@ -564,11 +645,13 @@ const MacOSCardiologistPanelUnified = () => {
           // Переходим на вкладку visit для завершения
           goToTab('visit');
         } catch (error) {
-          console.error('[Cardiology] Ошибка при завершении приёма:', error);
+          setMessage({ type: 'error', text: `Не удалось завершить приём: ${error.message || ''}`.trim() });
         }
         break;
+      }
       case 'edit':
-        // Логика редактирования записи
+        // Загружаем полные данные пациента перед открытием модального окна
+        await handleEditPatient(row);
         break;
       case 'cancel':
         // Логика отмены записи
@@ -587,46 +670,8 @@ const MacOSCardiologistPanelUnified = () => {
   
   // В демо-режиме не рендерим компонент
   if (isDemoMode) {
-    console.log('MacOSCardiologistPanelUnified: Skipping render in demo mode');
     return null;
   }
-
-  const loadPatientData = async () => {
-    if (!selectedPatient?.patient?.id) return;
-    
-    try {
-      // Загружаем ЭКГ пациента
-      const ecgResponse = await fetch(`/api/v1/cardio/ecg?patient_id=${selectedPatient.patient.id}&limit=10`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (ecgResponse.ok) {
-        const ecgData = await ecgResponse.json();
-        setEcgResults(ecgData);
-      }
-
-      // Загружаем анализы крови пациента
-      const bloodResponse = await fetch(`/api/v1/cardio/blood-tests?patient_id=${selectedPatient.patient.id}&limit=10`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (bloodResponse.ok) {
-        const bloodData = await bloodResponse.json();
-        setBloodTests(bloodData);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки данных пациента:', error);
-    }
-  };
-
-  // Обработка выбора пациента из очереди
-  const handlePatientSelect = (patient) => {
-    console.log('[Cardiology] onPatientSelect:', patient);
-    // ✅ Очищаем EMR и visitData перед выбором нового пациента
-    setEmr(null);
-    setVisitData({ complaint: '', diagnosis: '', icd10: '', notes: '' });
-    setSelectedPatient(patient);
-    goToTab('visit');
-    setMessage({ type: 'info', text: `Выбран пациент: ${patient.patient_name}` });
-  };
 
   // Обработка AI предложений
   const handleAISuggestion = (type, suggestion) => {
@@ -645,7 +690,6 @@ const MacOSCardiologistPanelUnified = () => {
 
     try {
       setLoading(true);
-      console.log('[Cardiology] handleSaveVisit: start', { selectedEntryId: selectedPatient.id, selectedPatient });
       
       const visitPayload = {
         patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
@@ -655,9 +699,7 @@ const MacOSCardiologistPanelUnified = () => {
         services: selectedServices,
         notes: visitData.notes
       };
-      console.log('[Cardiology] handleSaveVisit: payload', visitPayload);
       await queueService.completeVisit(selectedPatient.id, visitPayload);
-      console.log('[Cardiology] handleSaveVisit: completeVisit OK');
       setMessage({ type: 'success', text: 'Прием завершен успешно' });
       
       // Очищаем форму и возвращаемся в очередь
@@ -668,21 +710,17 @@ const MacOSCardiologistPanelUnified = () => {
       
       // Автоматически вызвать следующего пациента для кардиолога
       try {
-        console.log('[Cardiology] callNextWaiting(cardiology): start');
         const next = await queueService.callNextWaiting('cardiology');
-        console.log('[Cardiology] callNextWaiting(cardiology): result', next);
         if (next?.success) {
           setMessage({ type: 'success', text: `Вызван следующий пациент №${next.entry.number}` });
         }
       } catch (err) {
-        console.warn('[Cardiology] callNextWaiting(cardiology): failed', err);
+        setMessage({ type: 'warning', text: `Следующий пациент не вызван автоматически: ${err?.message || ''}`.trim() });
       }
 
     } catch (error) {
-      console.error('Ошибка сохранения визита:', error);
       setMessage({ type: 'error', text: error.message });
     } finally {
-      console.log('[Cardiology] handleSaveVisit: finish');
       setLoading(false);
     }
   };
@@ -692,12 +730,11 @@ const MacOSCardiologistPanelUnified = () => {
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
       if (!appointmentId) {
-        console.warn('[Cardiology] loadEMR: нет appointmentId');
+        setMessage({ type: 'error', text: 'Не указан идентификатор записи для EMR' });
         return null;
       }
 
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-      console.log('[Cardiology] loadEMR: загрузка EMR для appointment_id', appointmentId);
 
       const response = await fetch(`${API_BASE}/api/v1/appointments/${appointmentId}/emr`, {
         method: 'GET',
@@ -709,22 +746,18 @@ const MacOSCardiologistPanelUnified = () => {
 
       if (response.ok) {
         const emrData = await response.json();
-        console.log('[Cardiology] loadEMR: успешно загружена EMR', emrData);
         setEmr(emrData);
         return emrData;
       } else if (response.status === 404) {
         // EMR ещё не создана - это нормально
-        console.log('[Cardiology] loadEMR: EMR не найдена для appointment_id', appointmentId);
         setEmr(null);
         return null;
       } else {
         const error = await response.json().catch(() => ({ detail: 'Ошибка при загрузке EMR' }));
-        console.error('[Cardiology] loadEMR: ошибка', { status: response.status, error });
         setMessage({ type: 'error', text: error.detail || 'Ошибка при загрузке EMR' });
         return null;
       }
     } catch (error) {
-      console.error('[Cardiology] loadEMR: исключение', error);
       setMessage({ type: 'error', text: error.message || 'Ошибка при загрузке EMR' });
       return null;
     }
@@ -735,7 +768,6 @@ const MacOSCardiologistPanelUnified = () => {
     try {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
       if (!selectedPatient?.id) {
-        console.warn('[Cardiology] saveEMR: нет selectedPatient.id', { selectedPatient });
         setMessage({ type: 'error', text: 'Не выбран пациент для сохранения EMR' });
         return;
       }
@@ -743,27 +775,11 @@ const MacOSCardiologistPanelUnified = () => {
       // appointmentId - это ID записи (appointment), а не ID пациента или записи из очереди
       // Приоритет: appointment_id (из очереди) > id (если это уже appointment)
       const appointmentId = selectedPatient.appointment_id || selectedPatient.id;
-      const patientId = selectedPatient.patient?.id || selectedPatient.patient_id;
-      
-      console.log('[Cardiology] saveEMR: проверка appointmentId', {
-        appointment_id: selectedPatient.appointment_id,
-        id: selectedPatient.id,
-        selectedPatient_keys: Object.keys(selectedPatient || {}),
-        calculated_appointmentId: appointmentId
-      });
       
       if (!appointmentId || appointmentId <= 0) {
-        console.error('[Cardiology] saveEMR: некорректный appointmentId', { 
-          appointmentId, 
-          selectedPatient,
-          has_appointment_id: !!selectedPatient.appointment_id,
-          has_id: !!selectedPatient.id
-        });
-        setMessage({ type: 'error', text: `Некорректный ID записи. Проверьте наличие appointment_id или id в данных пациента.` });
+        setMessage({ type: 'error', text: 'Некорректный ID записи. Проверьте наличие appointment_id или id в данных пациента.' });
         return;
       }
-      
-      console.log('[Cardiology] saveEMR: start', { appointmentId, patientId, emrDataKeys: Object.keys(emrData || {}) });
       
       // Используем правильный URL с backend
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
@@ -796,9 +812,6 @@ const MacOSCardiologistPanelUnified = () => {
       if (emrData.dentalData) {
         emrPayload.dentalData = emrData.dentalData;
       }
-      
-      console.log('[Cardiology] saveEMR: отправляем данные', { appointmentId, is_draft: emrPayload.is_draft, payloadKeys: Object.keys(emrPayload) });
-      
       // Используем эндпоинт для сохранения EMR для appointment
       // appointment_id передается в URL, не в body
       const response = await fetch(`${API_BASE}/api/v1/appointments/${appointmentId}/emr`, {
@@ -814,11 +827,9 @@ const MacOSCardiologistPanelUnified = () => {
         const savedEMR = await response.json();
         setEmr(savedEMR);
         setMessage({ type: 'success', text: 'EMR сохранена успешно!' });
-        console.log('[Cardiology] saveEMR: успешно', savedEMR);
         return savedEMR;
       } else {
         const error = await response.json().catch(() => ({ detail: 'Ошибка при сохранении EMR' }));
-        console.error('[Cardiology] saveEMR: ошибка', { status: response.status, error });
         
         // Формируем читаемое сообщение об ошибке
         let errorMessage = 'Ошибка при сохранении EMR';
@@ -843,7 +854,6 @@ const MacOSCardiologistPanelUnified = () => {
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error('[Cardiology] saveEMR: исключение', error);
       setMessage({ type: 'error', text: error.message || 'Ошибка при сохранении EMR' });
       throw error;
     }
@@ -854,47 +864,9 @@ const MacOSCardiologistPanelUnified = () => {
     if (!selectedPatient) return;
     
     try {
-      console.log('[Cardiology] handleCompleteVisitFromEMR: start');
       await handleSaveVisit();
     } catch (error) {
-      console.error('[Cardiology] handleCompleteVisitFromEMR: ошибка', error);
-    }
-  };
-
-  // Обработка ЭКГ
-  const handleEcgSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('/api/v1/cardio/ecg', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(ecgForm)
-      });
-
-      if (response.ok) {
-        setShowForm({ open: false, type: 'ecg' });
-        setEcgForm({
-          patient_id: '',
-          ecg_date: '',
-          rhythm: '',
-          heart_rate: '',
-          pr_interval: '',
-          qrs_duration: '',
-          qt_interval: '',
-          st_segment: '',
-          t_wave: '',
-          interpretation: '',
-          recommendations: ''
-        });
-        loadPatientData();
-        setMessage({ type: 'success', text: 'ЭКГ сохранено успешно' });
-      }
-    } catch (error) {
-      console.error('Ошибка сохранения ЭКГ:', error);
-      setMessage({ type: 'error', text: 'Ошибка сохранения ЭКГ' });
+      setMessage({ type: 'error', text: `Не удалось завершить приём через EMR: ${error.message || ''}`.trim() });
     }
   };
 
@@ -929,8 +901,7 @@ const MacOSCardiologistPanelUnified = () => {
         setMessage({ type: 'success', text: 'Анализ крови сохранен успешно' });
       }
     } catch (error) {
-      console.error('Ошибка сохранения анализа:', error);
-      setMessage({ type: 'error', text: 'Ошибка сохранения анализа' });
+      setMessage({ type: 'error', text: `Ошибка сохранения анализа: ${error.message || ''}`.trim() });
     }
   };
 
@@ -942,37 +913,6 @@ const MacOSCardiologistPanelUnified = () => {
     background: getColor('background'),
     color: getColor('text'),
     overflow: 'visible'
-  };
-
-  const headerStyle = {
-    marginBottom: getSpacing('xl'),
-    padding: getSpacing('lg'),
-    background: getColor('surface'),
-    borderRadius: '12px',
-    border: `1px solid ${getColor('border')}`,
-    boxShadow: getShadow('sm')
-  };
-
-  const tabStyle = {
-    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    border: 'none',
-    background: 'transparent',
-    cursor: 'pointer',
-    fontSize: getFontSize('sm'),
-    fontWeight: '500',
-    color: getColor('textSecondary'),
-    borderRadius: '8px',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    gap: getSpacing('sm')
-  };
-
-  const activeTabStyle = {
-    ...tabStyle,
-    background: getColor('danger', 500),
-    color: 'white',
-    boxShadow: `0 2px 4px ${getColor('danger', 500)}30`
   };
 
   return (
@@ -1272,7 +1212,6 @@ const MacOSCardiologistPanelUnified = () => {
               visitId={selectedPatient?.visitId || 'demo-visit-1'}
               patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
               onDataUpdate={() => {
-                console.log('ЭКГ данные обновлены');
                 loadPatientData();
               }}
             />
@@ -1281,7 +1220,6 @@ const MacOSCardiologistPanelUnified = () => {
               visitId={selectedPatient?.visitId || 'demo-visit-1'}
               patientId={selectedPatient?.patient?.id || 'demo-patient-1'}
               onDataUpdate={() => {
-                console.log('ЭхоКГ данные обновлены');
                 loadPatientData();
               }}
             />
@@ -1910,6 +1848,21 @@ const MacOSCardiologistPanelUnified = () => {
           patient={scheduleNextModal.patient}
           theme={{ isDark, getColor, getSpacing, getFontSize }}
           specialtyFilter="cardiology"
+        />
+      )}
+
+      {/* Модальное окно редактирования пациента */}
+      {editPatientModal.open && (
+        <EditPatientModal
+          isOpen={editPatientModal.open}
+          onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
+          patient={editPatientModal.patient}
+          onSave={async () => {
+            await loadMacOSCardiologyAppointments();
+            setEditPatientModal({ open: false, patient: null, loading: false });
+          }}
+          loading={editPatientModal.loading}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
         />
       )}
 

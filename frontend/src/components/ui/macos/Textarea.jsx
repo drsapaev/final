@@ -86,7 +86,7 @@ const Textarea = React.forwardRef(({
     fontSize: `${s.fontSize}px`,
     padding: s.padding,
     borderRadius: s.borderRadius,
-    border: `1px solid var(--mac-border)`,
+    border: '1px solid var(--mac-border)',
     background: disabled ? 'var(--mac-bg-tertiary)' : 'var(--mac-bg-elev-1)',
     color: 'var(--mac-text-primary)',
     fontFamily: 'inherit',

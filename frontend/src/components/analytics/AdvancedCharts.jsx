@@ -28,7 +28,7 @@ const AdvancedCharts = ({
   loading = false, 
   onRefresh,
   onExport,
-  title = "Продвинутая аналитика",
+  title = 'Продвинутая аналитика',
   showFilters = true
 }) => {
   const chartRefs = useRef({});

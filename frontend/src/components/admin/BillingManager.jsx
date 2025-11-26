@@ -78,44 +78,18 @@ const BillingManager = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
       if (activeTab === 'invoices') {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/invoices`, {
-          headers
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setInvoices(data);
-        }
+        const response = await api.get('/billing/invoices');
+        setInvoices(response.data);
       } else if (activeTab === 'payments') {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/payments`, {
-          headers
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setPayments(data);
-        }
+        const response = await api.get('/billing/payments');
+        setPayments(response.data);
       } else if (activeTab === 'analytics') {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/analytics`, {
-          headers
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setAnalytics(data);
-        }
+        const response = await api.get('/billing/analytics');
+        setAnalytics(response.data);
       } else if (activeTab === 'settings') {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/settings`, {
-          headers
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSettings(data);
-        }
+        const response = await api.get('/billing/settings');
+        setSettings(response.data);
       }
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
@@ -127,121 +101,71 @@ const BillingManager = () => {
 
   const handleCreateInvoice = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/invoices`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(invoiceForm)
+      await api.post('/billing/invoices', invoiceForm);
+      toast.success('Счет создан успешно');
+      setShowCreateInvoice(false);
+      setInvoiceForm({
+        patient_id: '',
+        visit_id: '',
+        appointment_id: '',
+        invoice_type: 'STANDARD',
+        items: [{ description: '', quantity: 1, unit_price: 0 }],
+        description: '',
+        notes: '',
+        due_days: 30,
+        auto_send: false,
+        send_reminders: true,
+        is_recurring: false,
+        recurrence_type: 'MONTHLY',
+        recurrence_interval: 1
       });
-
-      if (response.ok) {
-        toast.success('Счет создан успешно');
-        setShowCreateInvoice(false);
-        setInvoiceForm({
-          patient_id: '',
-          visit_id: '',
-          appointment_id: '',
-          invoice_type: 'STANDARD',
-          items: [{ description: '', quantity: 1, unit_price: 0 }],
-          description: '',
-          notes: '',
-          due_days: 30,
-          auto_send: false,
-          send_reminders: true,
-          is_recurring: false,
-          recurrence_type: 'MONTHLY',
-          recurrence_interval: 1
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка создания счета');
-      }
+      loadData();
     } catch (error) {
       console.error('Ошибка создания счета:', error);
-      toast.error('Ошибка создания счета');
+      toast.error(error.response?.data?.detail || 'Ошибка создания счета');
     }
   };
 
   const handleRecordPayment = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/payments`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(paymentForm)
+      await api.post('/billing/payments', paymentForm);
+      toast.success('Платеж записан успешно');
+      setShowRecordPayment(false);
+      setPaymentForm({
+        invoice_id: '',
+        amount: 0,
+        payment_method: 'CASH',
+        reference_number: '',
+        description: '',
+        notes: ''
       });
-
-      if (response.ok) {
-        toast.success('Платеж записан успешно');
-        setShowRecordPayment(false);
-        setPaymentForm({
-          invoice_id: '',
-          amount: 0,
-          payment_method: 'CASH',
-          reference_number: '',
-          description: '',
-          notes: ''
-        });
-        loadData();
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || 'Ошибка записи платежа');
-      }
+      loadData();
     } catch (error) {
       console.error('Ошибка записи платежа:', error);
-      toast.error('Ошибка записи платежа');
+      toast.error(error.response?.data?.detail || 'Ошибка записи платежа');
     }
   };
 
   const handleSendInvoice = async (invoiceId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/invoices/${invoiceId}/send`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        toast.success('Счет отправлен');
-      } else {
-        toast.error('Ошибка отправки счета');
-      }
+      await api.post(`/billing/invoices/${invoiceId}/send`);
+      toast.success('Счет отправлен');
     } catch (error) {
       console.error('Ошибка отправки счета:', error);
-      toast.error('Ошибка отправки счета');
+      toast.error(error.response?.data?.detail || 'Ошибка отправки счета');
     }
   };
 
   const handleViewInvoiceHTML = async (invoiceId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/billing/invoices/${invoiceId}/html`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Открываем HTML в новом окне
-        const newWindow = window.open('', '_blank');
-        newWindow.document.write(data.html);
-        newWindow.document.close();
-      } else {
-        toast.error('Ошибка получения HTML счета');
-      }
+      const response = await api.get(`/billing/invoices/${invoiceId}/html`);
+      // Открываем HTML в новом окне
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(response.data.html);
+      newWindow.document.close();
     } catch (error) {
       console.error('Ошибка получения HTML счета:', error);
-      toast.error('Ошибка получения HTML счета');
+      toast.error(error.response?.data?.detail || 'Ошибка получения HTML счета');
     }
   };
 
@@ -495,7 +419,7 @@ const BillingManager = () => {
               <MacOSInput
                 type="number"
                 value={invoiceForm.patient_id}
-                onChange={(e) => setInvoiceForm({...invoiceForm, patient_id: e.target.value})}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, patient_id: e.target.value })}
                 placeholder="ID пациента"
               />
             </div>
@@ -512,7 +436,7 @@ const BillingManager = () => {
               </label>
               <MacOSSelect
                 value={invoiceForm.invoice_type}
-                onChange={(e) => setInvoiceForm({...invoiceForm, invoice_type: e.target.value})}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_type: e.target.value })}
                 options={[
                   { value: 'STANDARD', label: 'Обычный' },
                   { value: 'RECURRING', label: 'Периодический' },
@@ -535,7 +459,7 @@ const BillingManager = () => {
               <MacOSInput
                 type="number"
                 value={invoiceForm.due_days}
-                onChange={(e) => setInvoiceForm({...invoiceForm, due_days: parseInt(e.target.value)})}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, due_days: parseInt(e.target.value) })}
                 placeholder="30"
               />
             </div>
@@ -545,7 +469,7 @@ const BillingManager = () => {
                 <input
                   type="checkbox"
                   checked={invoiceForm.auto_send}
-                  onChange={(e) => setInvoiceForm({...invoiceForm, auto_send: e.target.checked})}
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, auto_send: e.target.checked })}
                   style={{ margin: 0 }}
                 />
                 Автоотправка
@@ -554,7 +478,7 @@ const BillingManager = () => {
                 <input
                   type="checkbox"
                   checked={invoiceForm.send_reminders}
-                  onChange={(e) => setInvoiceForm({...invoiceForm, send_reminders: e.target.checked})}
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, send_reminders: e.target.checked })}
                   style={{ margin: 0 }}
                 />
                 Напоминания
@@ -653,7 +577,7 @@ const BillingManager = () => {
               </label>
               <MacOSTextarea
                 value={invoiceForm.description}
-                onChange={(e) => setInvoiceForm({...invoiceForm, description: e.target.value})}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
                 placeholder="Описание счета"
                 rows={3}
               />
@@ -730,7 +654,7 @@ const BillingManager = () => {
               <MacOSInput
                 type="number"
                 value={paymentForm.invoice_id}
-                onChange={(e) => setPaymentForm({...paymentForm, invoice_id: e.target.value})}
+                onChange={(e) => setPaymentForm({ ...paymentForm, invoice_id: e.target.value })}
                 placeholder="ID счета"
               />
             </div>
@@ -748,7 +672,7 @@ const BillingManager = () => {
               <MacOSInput
                 type="number"
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({...paymentForm, amount: parseFloat(e.target.value)})}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
                 placeholder="0"
               />
             </div>
@@ -765,7 +689,7 @@ const BillingManager = () => {
               </label>
               <MacOSSelect
                 value={paymentForm.payment_method}
-                onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
                 options={[
                   { value: 'CASH', label: 'Наличные' },
                   { value: 'CARD', label: 'Банковская карта' },
@@ -789,7 +713,7 @@ const BillingManager = () => {
               </label>
               <MacOSInput
                 value={paymentForm.reference_number}
-                onChange={(e) => setPaymentForm({...paymentForm, reference_number: e.target.value})}
+                onChange={(e) => setPaymentForm({ ...paymentForm, reference_number: e.target.value })}
                 placeholder="Номер транзакции"
               />
             </div>
@@ -806,7 +730,7 @@ const BillingManager = () => {
               </label>
               <MacOSTextarea
                 value={paymentForm.description}
-                onChange={(e) => setPaymentForm({...paymentForm, description: e.target.value})}
+                onChange={(e) => setPaymentForm({ ...paymentForm, description: e.target.value })}
                 placeholder="Описание платежа"
                 rows={3}
               />

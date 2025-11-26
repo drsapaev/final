@@ -97,6 +97,7 @@ GET/POST /lab — заявки и результаты
 GET/POST /payments — платежи
 
 GET /services — каталог услуг
+GET /services/resolve — разрешение услуги (SSOT маппинг) — см. docs/services_mapping.md
 
 GET/PUT/DELETE /settings — произвольные настройки
 

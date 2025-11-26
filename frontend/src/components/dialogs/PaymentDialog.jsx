@@ -121,7 +121,7 @@ const PaymentDialog = ({
     <ModernDialog
       isOpen={isOpen}
       onClose={onClose}
-      title={isPaid ? "✅ Оплата завершена" : "💳 Оплата услуг"}
+      title={isPaid ? '✅ Оплата завершена' : '💳 Оплата услуг'}
       actions={actions}
       closeOnBackdrop={!isProcessing}
       closeOnEscape={!isProcessing}

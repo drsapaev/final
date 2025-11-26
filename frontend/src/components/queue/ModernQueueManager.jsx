@@ -1,36 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useTheme } from '../../contexts/ThemeContext';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
-import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Icon, Input } from '../ui/macos';
+import PropTypes from 'prop-types';
+import { Button, Card, CardContent, Badge, Icon } from '../ui/macos';
+import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
+import { useQueueManager } from '../../hooks/useQueueManager';
+import QueueTable from './QueueTable';
+import './ModernQueueManager.css';
 
 const ModernQueueManager = ({
-  selectedDate = new Date().toISOString().split('T')[0],
+  selectedDate = getLocalDateString(),
   selectedDoctor = '',
-  searchQuery = '',
   onQueueUpdate,
   language = 'ru',
-  theme = 'light',
   doctors = [],
   onDoctorChange,
   onDateChange,
-  ...props
+  searchQuery,
 }) => {
-  const { theme: themeContext } = useTheme();
-  const [loading, setLoading] = useState(false);
-  const [queueData, setQueueData] = useState(null);
-  const [statistics, setStatistics] = useState(null);
-  const [qrData, setQrData] = useState(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const {
+    loading,
+    queueData,
+    statistics,
+    qrData,
+    loadQueueSnapshot,
+    generateDoctorQRCode,
+    generateClinicQRCode,
+    openReceptionForDoctor,
+    callNextPatientInQueue,
+    setQrData,
+  } = useQueueManager();
+
   const [internalDoctor, setInternalDoctor] = useState('');
-  const [internalDate, setInternalDate] = useState(new Date().toISOString().split('T')[0]);
-  const effectiveDoctor = selectedDoctor || internalDoctor;
-  const effectiveDate = selectedDate || internalDate;
+  const [internalDate, setInternalDate] = useState(getLocalDateString());
+  const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor;
+  const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
-  const [showStatsDialog, setShowStatsDialog] = useState(false);
-  
-  const refreshIntervalRef = useRef(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Переводы
   const t = {
@@ -59,149 +66,104 @@ const ModernQueueManager = ({
       called: 'Вызван',
       cancel: 'Отмена',
       download: 'Скачать',
-      print: 'Печать'
+      print: 'Печать',
+      clinicQr: 'Общий QR клиники',
+      doctorQr: 'QR для специалиста'
     }
   }[language] || {};
 
-  // Автообновление
-  useEffect(() => {
-    if (autoRefresh && effectiveDoctor) {
-      refreshIntervalRef.current = setInterval(() => {
-        loadQueue();
-        loadStatistics();
-      }, 10000);
-    } else {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
+  // Загрузка данных очереди
+  const loadQueue = useCallback(async () => {
+    if (!effectiveDoctor) {
+      return;
     }
 
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
+    const doctor = doctors.find(
+      (candidate) => String(candidate.id) === String(effectiveDoctor)
+    );
+
+    try {
+      await loadQueueSnapshot({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
+        doctor,
+      });
+    } catch (error) {
+      // Не показываем тост при автообновлении, чтобы не спамить
+      console.error('Ошибка загрузки очереди:', error);
+    }
+  }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot]);
+
+  // Автоматическая загрузка при изменении врача или даты
+  useEffect(() => {
+    if (effectiveDoctor) {
+      loadQueue();
+    }
+  }, [effectiveDoctor, effectiveDate, loadQueue]);
+
+  // Polling для автообновления
+  useEffect(() => {
+    let interval;
+    if (autoRefresh && effectiveDoctor && effectiveDate) {
+      interval = setInterval(() => {
+        loadQueue();
+      }, 30000); // 30 секунд
+    }
+    return () => clearInterval(interval);
+  }, [autoRefresh, effectiveDoctor, effectiveDate, loadQueue]);
+
+  // Слушатель событий от QueueJoin для мгновенного обновления
+  useEffect(() => {
+    const handleQueueUpdate = (event) => {
+      console.log('[ModernQueueManager] Получено событие queueUpdated:', event.detail);
+      // Обновляем очередь при любом событии добавления
+      if (event.detail?.action === 'refreshAll' || event.detail?.action === 'entryAdded') {
+        loadQueue();
       }
     };
-  }, [autoRefresh, effectiveDoctor]);
 
-  // Загрузка данных очереди
-  const loadQueue = async () => {
-    if (!effectiveDoctor) return;
-    
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/v1/queue/status/${effectiveDoctor}?target_date=${effectiveDate}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    return () => window.removeEventListener('queueUpdated', handleQueueUpdate);
+  }, [loadQueue]);
 
-      if (!response.ok) {
-        throw new Error('Ошибка загрузки статуса очереди');
-      }
-
-      const queueStatus = await response.json();
-      
-      const queueData = {
-        id: effectiveDoctor,
-        is_open: queueStatus.active,
-        total_entries: queueStatus.entries.length,
-        waiting_entries: queueStatus.queue_length,
-        current_number: queueStatus.current_number,
-        online_start_time: queueStatus.online_start_time || '07:00',
-        online_end_time: queueStatus.online_end_time || '09:00',
-        current_time: queueStatus.current_time,
-        online_available: queueStatus.online_available,
-        entries: queueStatus.entries.map(entry => ({
-          id: entry.number,
-          number: entry.number,
-          patient_name: entry.patient_name,
-          phone: entry.phone || '',
-          status: entry.status,
-          source: entry.source,
-          created_at: entry.created_at
-        }))
-      };
-      
-      setQueueData(queueData);
-    } catch (error) {
-      console.error('Error loading queue:', error);
-      toast.error(error.message || 'Ошибка загрузки очереди');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Загрузка статистики
-  const loadStatistics = async () => {
-    if (!effectiveDoctor) return;
-    
-    try {
-      const mockStats = {
-        total_entries: 8,
-        waiting: 3,
-        completed: 4,
-        cancelled: 1,
-        available_slots: 12,
-        average_wait_time: 15,
-        current_wait_time: 8
-      };
-      
-      setStatistics(mockStats);
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-    }
-  };
-
-  // Генерация QR кода
+  // Генерация QR кода для одного специалиста
   const generateQR = async () => {
     if (!effectiveDoctor || !effectiveDate) {
       toast.error('Выберите врача и дату');
       return;
     }
-    
-    setLoading(true);
+
+    const doctor = doctors.find(
+      (item) => String(item.id) === String(effectiveDoctor)
+    );
+
     try {
-      const doctor = doctors.find(d => String(d.id) === String(effectiveDoctor));
-      
-      const response = await fetch('/api/v1/admin/qr-tokens/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({
-          specialist_id: parseInt(effectiveDoctor),
-          department: doctor?.department || 'general',
-          expires_hours: 24
-        })
+      await generateDoctorQRCode({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
+        department: doctor?.department || doctor?.specialty || 'general',
+        specialistName: doctor?.full_name || doctor?.name,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка генерации QR токена');
-      }
-
-      const qrTokenData = await response.json();
-      
-      const qrData = {
-        token: qrTokenData.token,
-        specialist_name: doctor?.full_name || doctor?.name || 'Врач',
-        day: effectiveDate,
-        expires_at: qrTokenData.expires_at,
-        qr_url: qrTokenData.qr_url,
-        online_start_time: '07:00',
-        online_end_time: '09:00'
-      };
-      
-      setQrData(qrData);
       setShowQrDialog(true);
       toast.success('QR код сгенерирован');
     } catch (error) {
-      console.error('Error generating QR:', error);
       toast.error(error.message || 'Ошибка генерации QR кода');
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Генерация общего QR кода клиники
+  const generateClinicQR = async () => {
+    if (!effectiveDate) {
+      toast.error('Выберите дату');
+      return;
+    }
+
+    try {
+      await generateClinicQRCode({ targetDate: effectiveDate });
+      setShowQrDialog(true);
+      toast.success('Общий QR код клиники сгенерирован');
+    } catch (error) {
+      toast.error(error.message || 'Ошибка генерации общего QR кода');
     }
   };
 
@@ -211,569 +173,454 @@ const ModernQueueManager = ({
       toast.error('Выберите врача');
       return;
     }
-    
-    setLoading(true);
+
+    if (queueData?.is_open) {
+      toast.info('Прием уже открыт');
+      return;
+    }
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setQueueData(prev => prev ? { ...prev, is_open: true } : null);
-      toast.success('Прием открыт');
-      
+      const result = await openReceptionForDoctor({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
+      });
+
+      toast.success(result?.message || 'Прием открыт. Онлайн-набор закрыт.');
+      await loadQueue();
+
       if (onQueueUpdate) {
         onQueueUpdate();
       }
     } catch (error) {
-      console.error('Error opening reception:', error);
-      toast.error('Ошибка открытия приема');
-    } finally {
-      setLoading(false);
+      toast.error(error.message || 'Ошибка открытия приема');
     }
   };
 
   // Вызов пациента
-  const callPatient = async (entryId) => {
-    if (!selectedDoctor) {
+  const callPatient = async () => {
+    if (!effectiveDoctor) {
       toast.error('Выберите врача');
       return;
     }
 
-    setLoading(true);
     try {
-      const response = await fetch(`/api/v1/queue/${effectiveDoctor}/call-next`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+      const result = await callNextPatientInQueue({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка вызова пациента');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success(`Вызван пациент: ${result.patient.name} (№${result.patient.number})`);
-        await loadQueue();
+      if (result?.success && result?.patient) {
+        toast.success(
+          `Вызван пациент: ${result.patient.name} (№${result.patient.number})`
+        );
       } else {
-        toast.info(result.message || 'Нет пациентов в очереди');
+        toast.info(result?.message || 'Нет пациентов в очереди');
       }
+
+      await loadQueue();
     } catch (error) {
-      console.error('Error calling patient:', error);
       toast.error(error.message || 'Ошибка вызова пациента');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'waiting': return 'var(--mac-warning)';
-      case 'called': return 'var(--mac-accent-blue)';
-      case 'completed': return 'var(--mac-success)';
-      case 'cancelled': return 'var(--mac-danger)';
-      default: return 'var(--mac-text-secondary)';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'waiting': return 'Ожидает';
-      case 'called': return 'Вызван';
-      case 'completed': return 'Завершен';
-      case 'cancelled': return 'Отменен';
-      default: return status;
     }
   };
 
   const downloadQR = () => {
-    if (!qrData || !qrData.qr_url) {
+    if (!qrData) {
       toast.error('QR данные недоступны');
       return;
     }
-    
-    const qrInfo = `
-QR код для онлайн-очереди
 
-Специалист: ${qrData.specialist_name}
-Дата приёма: ${new Date(qrData.day).toLocaleDateString('ru-RU')}
-Окно онлайн-записи: ${qrData.online_start_time} - ${qrData.online_end_time}
-
-Ссылка для записи:
-${window.location.origin}${qrData.qr_url}
-
-Токен: ${qrData.token}
-
-⏰ QR код действует с ${qrData.online_start_time} до момента открытия приёма в регистратуре
-📅 Токен истекает: ${new Date(qrData.expires_at).toLocaleString('ru-RU')}
-    `.trim();
-    
-    const blob = new Blob([qrInfo], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.download = `qr-queue-${selectedDate}-${qrData.specialist_name.replace(/\s+/g, '_')}.txt`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
-    
-    toast.success('Информация о QR коде скачана');
+    if (qrData.qr_code_base64) {
+      const link = document.createElement('a');
+      link.download = `qr-queue-${qrData.day}-${qrData.specialist_name.replace(/\s+/g, '_')}.png`;
+      link.href = qrData.qr_code_base64;
+      link.click();
+      toast.success('QR код скачан');
+    } else {
+      toast.error('QR изображение недоступно');
+    }
   };
 
+  // Мемоизация списка врачей для выпадающего списка
+  const doctorOptions = useMemo(() => {
+    if (!doctors || doctors.length === 0) return [];
+
+    // Группируем врачей по специальности, чтобы избежать дубликатов в списке выбора очереди
+    // (если очередь привязана к специальности, а не к конкретному врачу)
+    const seenSpecialties = new Set();
+
+    // Маппинг специальностей на русские названия (можно расширить)
+    const specialtyNames = {
+      'cardiology': 'Кардиолог',
+      'cardio': 'Кардиолог',
+      'dermatology': 'Дерматолог',
+      'derma': 'Дерматолог',
+      'stomatology': 'Стоматолог',
+      'dentist': 'Стоматолог',
+      'dentistry': 'Стоматолог',
+      'laboratory': 'Лаборатория',
+      'lab': 'Лаборатория',
+      'neurology': 'Невролог',
+      'pediatrics': 'Педиатр',
+      'therapy': 'Терапевт',
+      'surgery': 'Хирург',
+      'ophthalmology': 'Окулист',
+      'ent': 'ЛОР',
+      'gynecology': 'Гинеколог',
+      'urology': 'Уролог',
+      'endocrinology': 'Эндокринолог',
+      'traumatology': 'Травматолог',
+      'ultrasound': 'УЗИ'
+    };
+
+    const normalizeSpecialty = (spec) => {
+      const s = spec?.toLowerCase();
+      if (s === 'cardio') return 'cardiology';
+      if (s === 'derma') return 'dermatology';
+      if (s === 'dentist' || s === 'dentistry') return 'stomatology';
+      if (s === 'lab') return 'laboratory';
+      return s;
+    };
+
+    return doctors
+      .filter(d => d.specialty) // Только врачи со специальностью
+      .reduce((acc, d) => {
+        const normalizedSpec = normalizeSpecialty(d.specialty);
+
+        // Если специальность уже была, пропускаем (для группировки очередей)
+        // Если нужно показывать всех врачей, уберите эту проверку
+        if (seenSpecialties.has(normalizedSpec)) {
+          return acc;
+        }
+        seenSpecialties.add(normalizedSpec);
+
+        const specialtyLabel = specialtyNames[normalizedSpec] || d.specialty;
+        const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
+
+        acc.push({
+          id: d.id,
+          label: `${specialtyLabel}${cabinetInfo}`,
+          specialty: normalizedSpec
+        });
+        return acc;
+      }, [])
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [doctors]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-5)' }}>
+    <div className="modern-queue-manager">
       {/* Статистические карточки */}
       {statistics && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 'var(--mac-spacing-4)'
-        }}>
-          <Card style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-4)',
-            padding: 'var(--mac-spacing-4)',
-            background: 'var(--surface)',
-            backdropFilter: 'var(--mac-blur-light)',
-            WebkitBackdropFilter: 'var(--mac-blur-light)',
-            border: '1px solid var(--mac-separator)',
-            boxShadow: 'var(--shadow)',
-            borderRadius: 'var(--mac-radius-lg)'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: 'var(--mac-radius-md)',
-              backgroundColor: 'var(--accent)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
+        <div className="mqm-stats-grid">
+          <div className="mqm-card mqm-stat-card">
+            <div className="mqm-stat-icon primary">
               <Icon name="person" size="large" color="white" />
             </div>
             <div>
-              <div style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                lineHeight: 1
-              }}>
-                {statistics.total_entries}
-              </div>
-              <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>
-                {t.totalEntries}
-              </div>
+              <div className="mqm-stat-value">{statistics.total_entries}</div>
+              <div className="mqm-stat-label">{t.totalEntries}</div>
             </div>
-          </Card>
+          </div>
 
-          <Card style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-4)',
-            padding: 'var(--mac-spacing-4)',
-            background: 'var(--surface)',
-            backdropFilter: 'var(--mac-blur-light)',
-            WebkitBackdropFilter: 'var(--mac-blur-light)',
-            border: '1px solid var(--mac-separator)',
-            boxShadow: 'var(--shadow)',
-            borderRadius: 'var(--mac-radius-lg)'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: 'var(--mac-radius-md)',
-              backgroundColor: 'var(--mac-warning)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
+          <div className="mqm-card mqm-stat-card">
+            <div className="mqm-stat-icon warning">
               <Icon name="magnifyingglass" size="large" style={{ color: 'white' }} />
             </div>
             <div>
-              <div style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                lineHeight: 1
-              }}>
-                {statistics.waiting}
-              </div>
-              <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>
-                {t.waiting}
-              </div>
+              <div className="mqm-stat-value">{statistics.waiting}</div>
+              <div className="mqm-stat-label">{t.waiting}</div>
             </div>
-          </Card>
+          </div>
 
-          <Card style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--mac-spacing-4)',
-            padding: 'var(--mac-spacing-4)',
-            background: 'var(--surface)',
-            backdropFilter: 'var(--mac-blur-light)',
-            WebkitBackdropFilter: 'var(--mac-blur-light)',
-            border: '1px solid var(--mac-separator)',
-            boxShadow: 'var(--shadow)',
-            borderRadius: 'var(--mac-radius-lg)'
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: 'var(--mac-radius-md)',
-              backgroundColor: 'var(--mac-success)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
+          <div className="mqm-card mqm-stat-card">
+            <div className="mqm-stat-icon success">
               <Icon name="checkmark.circle" size="large" style={{ color: 'white' }} />
             </div>
             <div>
-              <div style={{
-                fontSize: 'var(--mac-font-size-2xl)',
-                fontWeight: 'var(--mac-font-weight-semibold)',
-                color: 'var(--mac-text-primary)',
-                lineHeight: 1
-              }}>
-                {statistics.completed}
-              </div>
-              <div style={{
-                fontSize: 'var(--mac-font-size-sm)',
-                color: 'var(--mac-text-secondary)'
-              }}>
-                {t.completed}
-              </div>
+              <div className="mqm-stat-value">{statistics.completed}</div>
+              <div className="mqm-stat-label">{t.completed}</div>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
       {/* Панель управления */}
-      <Card style={{
-        padding: 'var(--mac-spacing-5)',
-        background: 'var(--surface)',
-        backdropFilter: 'var(--mac-blur-light)',
-        WebkitBackdropFilter: 'var(--mac-blur-light)',
-        border: '1px solid var(--mac-separator)',
-        boxShadow: 'var(--shadow)',
-        borderRadius: 'var(--mac-radius-lg)'
-      }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--mac-spacing-4)'
-        }}>
-          <h3 style={{
-            fontSize: 'var(--mac-font-size-lg)',
-            fontWeight: 'var(--mac-font-weight-semibold)',
-            color: 'var(--mac-text-primary)',
-            margin: 0
-          }}>
-            Управление очередью
+      <div className="mqm-card mqm-controls-card">
+        <div className="mqm-controls-header">
+          <h3 className="mqm-title">
+            {t.title}
           </h3>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: 'var(--mac-spacing-3)',
-            alignItems: 'end'
-          }}>
-            <Input
-                type="date"
-              label="Дата"
-                value={effectiveDate}
-                onChange={(e) => {
-                  setInternalDate(e.target.value);
-                  onDateChange && onDateChange(e.target.value);
-                }}
-            />
 
+          <div className="mqm-controls-grid">
+            <div className="mqm-input-group">
+              <label className="mqm-label">
+                Дата
+              </label>
+              <input
+                type="date"
+                value={effectiveDate}
+                // Min удален, чтобы можно было смотреть историю и текущий день в любое время
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  setInternalDate(newDate);
+                  if (onDateChange) {
+                    onDateChange(newDate);
+                  }
+                }}
+                className="mqm-input"
+              />
+            </div>
+
+            <div className="mqm-input-group">
+              <label className="mqm-label">
+                Врач
+              </label>
               <select
                 value={effectiveDoctor}
                 onChange={(e) => {
-                  setInternalDoctor(e.target.value);
-                  onDoctorChange && onDoctorChange(e.target.value);
+                  const newDoctor = e.target.value;
+                  setInternalDoctor(newDoctor);
+                  if (onDoctorChange) {
+                    onDoctorChange(newDoctor);
+                  }
                 }}
-                style={{
-                fontSize: 'var(--mac-font-size-base)',
-                padding: 'var(--mac-spacing-3)',
-                backgroundColor: 'var(--mac-bg-primary)',
-                color: 'var(--mac-text-primary)',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-md)',
-                minWidth: '200px',
-                fontFamily: 'inherit'
-                }}
+                className="mqm-select"
               >
-                <option value="">Выберите врача</option>
-                {doctors.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.full_name || d.name || d.username || `ID ${d.id}`}
-                  </option>
-                ))}
+                <option value="">Выберите специалиста</option>
+                {doctorOptions.length > 0 ? (
+                  doctorOptions.map(opt => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>Загрузка специалистов...</option>
+                )}
               </select>
-
-            <Button
-              variant="primary"
-              size="default"
-              onClick={generateQR}
-              disabled={!effectiveDoctor || loading}
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
-            >
-              <Icon name="magnifyingglass" size="small" style={{ color: 'white' }} />
-              {t.generateQr}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="default"
-              onClick={loadQueue}
-              disabled={!effectiveDoctor || loading}
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
-            >
-              <Icon name="gear" size="small" style={{ color: 'var(--mac-text-primary)' }} />
-              {t.refreshQueue}
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Текущая очередь */}
-      <Card style={{
-        background: 'var(--surface)',
-        backdropFilter: 'var(--mac-blur-light)',
-        WebkitBackdropFilter: 'var(--mac-blur-light)',
-        border: '1px solid var(--mac-separator)',
-        boxShadow: 'var(--shadow)',
-        borderRadius: 'var(--mac-radius-lg)'
-      }}>
-        <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
-          <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-            <h3 style={{
-              fontSize: 'var(--mac-font-size-lg)',
-              fontWeight: 'var(--mac-font-weight-semibold)',
-              color: 'var(--mac-text-primary)',
-              margin: 0,
-              marginBottom: 'var(--mac-spacing-3)'
-            }}>
-            {t.currentQueue}
-            {queueData && (
-                <Badge variant={queueData.is_open ? 'success' : 'secondary'} style={{ marginLeft: 'var(--mac-spacing-2)' }}>
-                  {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time}`}
-                </Badge>
-            )}
-          </h3>
-        </div>
-
-          {!effectiveDoctor ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'var(--mac-spacing-8)',
-              textAlign: 'center',
-              color: 'var(--mac-text-secondary)'
-            }}>
-              <Icon name="magnifyingglass" size="xlarge" style={{ color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-4)' }} />
-              <p>{t.selectDoctor}</p>
             </div>
-          ) : !queueData ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'var(--mac-spacing-8)',
-              textAlign: 'center',
-              color: 'var(--mac-text-secondary)'
-            }}>
-              <Icon name="magnifyingglass" size="xlarge" style={{ color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-4)' }} />
-              <p>{t.queueNotFound}</p>
-              <Button variant="primary" onClick={generateQR} style={{ marginTop: 'var(--mac-spacing-4)' }}>
-                {t.generateQr}
+
+            <div className="mqm-actions">
+              <Button
+                variant="primary"
+                size="default"
+                onClick={generateQR}
+                disabled={!effectiveDoctor || loading}
+                className="mqm-button-icon"
+                title="Генерировать QR для выбранного специалиста"
+              >
+                <Icon name="magnifyingglass" size="small" style={{ color: 'white' }} />
+                {t.doctorQr}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="default"
+                onClick={generateClinicQR}
+                disabled={loading}
+                className="mqm-button-icon"
+                title="Генерировать общий QR код для всех специалистов клиники"
+              >
+                <Icon name="square.grid.2x2" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+                {t.clinicQr}
               </Button>
             </div>
-          ) : queueData.entries.length === 0 ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 'var(--mac-spacing-8)',
-              textAlign: 'center',
-              color: 'var(--mac-text-secondary)'
-            }}>
-              <Icon name="person" size="xlarge" style={{ color: 'var(--mac-text-tertiary)', marginBottom: 'var(--mac-spacing-4)' }} />
-              <p>{t.queueEmpty}</p>
-            </div>
-          ) : (
-            <div style={{
-              display: 'table',
-              width: '100%',
-              borderCollapse: 'separate',
-              borderSpacing: 0
-            }}>
-              <div style={{
-                display: 'table-header-group'
-              }}>
-                <div style={{
-                  display: 'table-row',
-                  fontWeight: 'var(--mac-font-weight-semibold)',
-                  color: 'var(--mac-text-secondary)',
-                  fontSize: 'var(--mac-font-size-sm)',
-                  textTransform: 'uppercase'
-                }}>
-                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>№</div>
-                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.patient}</div>
-                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.phone}</div>
-                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.time}</div>
-                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.status}</div>
-                  <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>{t.actions}</div>
-                </div>
-              </div>
-              
-              <div style={{ display: 'table-row-group' }}>
-                {queueData.entries.map((entry) => (
-                  <div 
-                    key={entry.id} 
-                    style={{ 
-                      display: 'table-row',
-                      backgroundColor: entry.status === 'called' ? 'var(--mac-accent-blue-50)' : 'transparent',
-                      transition: 'background var(--mac-duration-normal)'
-                    }}
-                  >
-                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
-                      <Badge variant={entry.status === 'called' ? 'warning' : 'primary'}>
-                        {entry.number}
-                      </Badge>
-                    </div>
-                    
-                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-                        <Icon name="person" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
-                        <span style={{ color: 'var(--mac-text-primary)' }}>
-                          {entry.patient_name || 'Не указано'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-                        <Icon name="phone" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>
-                          {entry.phone || 'Не указан'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
-                        <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
-                        <span style={{ color: 'var(--mac-text-secondary)' }}>
-                          {formatTime(entry.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
-                      <Badge variant={entry.status === 'waiting' ? 'warning' : entry.status === 'called' ? 'primary' : entry.status === 'completed' ? 'success' : 'danger'}>
-                        {getStatusText(entry.status)}
-                      </Badge>
-                    </div>
-                    
-                    <div style={{ display: 'table-cell', padding: 'var(--mac-spacing-3) var(--mac-spacing-4)', borderBottom: '1px solid var(--mac-separator)' }}>
-                      {entry.status === 'waiting' && (
-                        <Button
-                          variant="success"
-                          size="small"
-                          onClick={() => callPatient(entry.id)}
-                          disabled={loading}
-                          title={t.call}
-                        >
-                          <Icon name="checkmark" size="small" style={{ color: 'white' }} />
-                        </Button>
-                      )}
-                      {entry.status === 'called' && (
-                        <Badge variant="warning">
-                          {t.called}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
+
+            {(() => {
+              const isDisabled = !effectiveDoctor || loading || queueData?.is_open;
+              return (
+                <Button
+                  variant="success"
+                  size="default"
+                  className="mqm-reception-btn"
+                  onClick={openReception}
+                  disabled={isDisabled}
+                  title={
+                    !effectiveDoctor
+                      ? 'Выберите врача'
+                      : queueData?.is_open
+                        ? 'Прием уже открыт'
+                        : 'Открыть прием и закрыть онлайн-запись'
+                  }
+                >
+                  <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
+                  {t.openReception}
+                </Button>
+              );
+            })()}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+              <Button
+                variant="outline"
+                size="default"
+                onClick={loadQueue}
+                disabled={!effectiveDoctor || loading}
+                className="mqm-button-icon"
+              >
+                <Icon name="gear" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+                {t.refreshQueue}
+              </Button>
+
+              <div
+                style={{ cursor: 'pointer' }}
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                title={autoRefresh ? "Автообновление включено" : "Автообновление выключено"}
+              >
+                <Icon
+                  name={autoRefresh ? "arrow.clockwise.circle.fill" : "arrow.clockwise.circle"}
+                  size="medium"
+                  style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }}
+                />
               </div>
             </div>
-          )}
+          </div>
+        </div>
+      </div>
+
+      {/* Текущая очередь */}
+      <div className="mqm-card">
+        <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
+          <div className="mqm-queue-header">
+            <h3 className="mqm-title">
+              {t.currentQueue}
+            </h3>
+            {queueData && (
+              <Badge variant={queueData.is_open ? 'success' : 'secondary'}>
+                {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time || '09:00'}`}
+              </Badge>
+            )}
+          </div>
+
+          <QueueTable
+            queueData={queueData}
+            effectiveDoctor={effectiveDoctor}
+            onGenerateQR={generateQR}
+            onCallPatient={callPatient}
+            loading={loading}
+            t={t}
+          />
         </CardContent>
-      </Card>
+      </div>
 
       {/* Диалог QR кода */}
       <ModernDialog
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
-        title="QR код для онлайн-очереди"
+        title={qrData?.is_clinic_wide ? "Общий QR код клиники" : "QR код для записи"}
         maxWidth="32rem"
       >
-        {qrData && (
-          <div>
-            <div style={{ marginBottom: 'var(--mac-spacing-4)' }}>
-              <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>
-                <strong>Специалист:</strong> {qrData.specialist_name}
-              </p>
-              <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>
-                <strong>Дата приёма:</strong> {new Date(qrData.day).toLocaleDateString('ru-RU')}
-              </p>
-              <p style={{ marginBottom: 'var(--mac-spacing-2)' }}>
-                <strong>Окно онлайн-записи:</strong> {qrData.online_start_time} - {qrData.online_end_time}
-              </p>
-            </div>
-            
-            <div style={{
-              textAlign: 'center', 
-              padding: 'var(--mac-spacing-5)',
-              backgroundColor: 'var(--mac-bg-primary)',
-              borderRadius: 'var(--mac-radius-md)',
-              marginBottom: 'var(--mac-spacing-4)'
-                  }}>
-                    <QRCodeSVG
-                      value={`${window.location.origin}${qrData.qr_url}`}
-                      size={200}
-                      level="M"
-                      includeMargin={true}
-                    />
-            </div>
-            
-            <div style={{ display: 'flex', gap: 'var(--mac-spacing-3)' }}>
-              <Button variant="outline" onClick={downloadQR} style={{ flex: 1 }}>
-                <Icon name="square.and.arrow.up" size="small" style={{ color: 'var(--mac-text-primary)' }} />
-                {t.download}
-              </Button>
-              <Button variant="primary" onClick={() => window.print()} style={{ flex: 1 }}>
-                <Icon name="gear" size="small" style={{ color: 'white' }} />
-                {t.print}
-              </Button>
-            </div>
+        <div className="mqm-qr-modal-content">
+          {/* Badge для типа QR */}
+          <div className="mqm-qr-badge-container">
+            {qrData?.is_clinic_wide ? (
+              <Badge variant="primary" className="mqm-qr-badge">
+                <Icon name="building.2.fill" size="small" style={{ marginRight: '6px' }} />
+                Общий QR код клиники
+              </Badge>
+            ) : (
+              <Badge variant="success" className="mqm-qr-badge">
+                <Icon name="person.fill" size="small" style={{ marginRight: '6px' }} />
+                QR код специалиста
+              </Badge>
+            )}
           </div>
-        )}
+
+          {/* Информация о враче/отделении */}
+          <div className="mqm-qr-info-card">
+            <div className="mqm-qr-info-row">
+              <span className="mqm-qr-label">Специалист:</span>
+              <span className="mqm-qr-value highlight">
+                {qrData?.specialist_name || (qrData?.is_clinic_wide ? "Все специалисты" : "Не указан")}
+              </span>
+            </div>
+            <div className="mqm-qr-info-row">
+              <span className="mqm-qr-label">Отделение:</span>
+              <span className="mqm-qr-value">
+                {qrData?.department_name || (qrData?.is_clinic_wide ? "Клиника" : qrData?.department)}
+              </span>
+            </div>
+            {qrData?.target_date && (
+              <div className="mqm-qr-info-row">
+                <span className="mqm-qr-label">Дата приема:</span>
+                <span className="mqm-qr-value">
+                  {new Date(qrData.target_date).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* QR Код */}
+          <div className="mqm-qr-code-container">
+            {qrData?.qr_code_base64 ? (
+              <img
+                src={qrData.qr_code_base64}
+                alt="QR Code"
+                className="mqm-qr-image"
+              />
+            ) : qrData?.token ? (
+              <QRCodeSVG
+                value={`https://med-queue.uz/queue/join?token=${qrData.token}`}
+                size={240}
+                level="H"
+                includeMargin={true}
+                className="mqm-qr-svg"
+              />
+            ) : (
+              <div className="mqm-qr-loading">
+                <div className="mqm-spinner"></div>
+                <span>Генерация QR кода...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Инструкция и срок действия */}
+          <div className="mqm-qr-footer-info">
+            <p className="mqm-qr-instruction">
+              Отсканируйте камеру телефона для записи в очередь
+            </p>
+            <p className="mqm-qr-expiry">
+              <Icon name="clock" size="small" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+              Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
+                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+              }) : '—'}
+            </p>
+          </div>
+
+          {/* Кнопки действий */}
+          <div className="mqm-qr-actions">
+            <Button
+              variant="primary"
+              onClick={downloadQR}
+              className="mqm-qr-action-btn"
+            >
+              <Icon name="arrow.down.circle" size="small" style={{ marginRight: '8px' }} />
+              {t.download}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowQrDialog(false)}
+              className="mqm-qr-action-btn"
+            >
+              {t.close || 'Закрыть'}
+            </Button>
+          </div>
+        </div>
       </ModernDialog>
     </div>
   );
+};
+
+ModernQueueManager.propTypes = {
+  selectedDate: PropTypes.string,
+  selectedDoctor: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onQueueUpdate: PropTypes.func,
+  language: PropTypes.string,
+  doctors: PropTypes.array,
+  onDoctorChange: PropTypes.func,
+  onDateChange: PropTypes.func,
+  searchQuery: PropTypes.string,
 };
 
 export default ModernQueueManager;

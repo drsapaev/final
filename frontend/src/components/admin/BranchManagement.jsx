@@ -24,7 +24,7 @@ import {
   MacOSEmptyState,
   MacOSAlert
 } from '../ui/macos';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const BranchManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -383,7 +383,7 @@ const BranchManagement = () => {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Введите название филиала"
                 />
               </div>
@@ -401,7 +401,7 @@ const BranchManagement = () => {
                   type="text"
                   required
                   value={formData.code}
-                  onChange={(e) => setFormData({...formData, code: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   placeholder="Введите код филиала"
                 />
               </div>
@@ -418,7 +418,7 @@ const BranchManagement = () => {
                 <MacOSInput
                   type="text"
                   value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="Введите адрес филиала"
                 />
               </div>
@@ -435,7 +435,7 @@ const BranchManagement = () => {
                 <MacOSInput
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="Введите номер телефона"
                 />
               </div>
@@ -452,7 +452,7 @@ const BranchManagement = () => {
                 <MacOSInput
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="Введите email филиала"
                 />
               </div>
@@ -468,7 +468,7 @@ const BranchManagement = () => {
                 </label>
                 <MacOSSelect
                   value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   {statusOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -488,7 +488,7 @@ const BranchManagement = () => {
                 <MacOSInput
                   type="number"
                   value={formData.capacity}
-                  onChange={(e) => setFormData({...formData, capacity: parseInt(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
                   placeholder="Введите вместимость"
                 />
               </div>

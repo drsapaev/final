@@ -47,7 +47,7 @@ const DisplayBoardSettings = () => {
   // Языки озвучки
   const voiceLanguages = [
     { value: 'ru', label: 'Русский' },
-    { value: 'uz', label: "O'zbekcha" },
+    { value: 'uz', label: 'O\'zbekcha' },
     { value: 'en', label: 'English' }
   ];
 

@@ -118,6 +118,12 @@ class UserManagementService:
             self._log_user_action(db, user.id, "create", "Пользователь создан", created_by)
             
             db.commit()
+            # Обновляем объекты, чтобы получить все поля (id, created_at, updated_at)
+            db.refresh(user)
+            db.refresh(profile)
+            db.refresh(preferences)
+            db.refresh(notification_settings)
+            
             return True, "Пользователь успешно создан", user
             
         except Exception as e:
@@ -243,6 +249,9 @@ class UserManagementService:
             # Добавляем настройки
             if user.preferences:
                 profile_data["preferences"] = {
+                    "id": user.preferences.id,
+                    "user_id": user.preferences.user_id,
+                    "profile_id": user.preferences.profile_id,
                     "theme": user.preferences.theme,
                     "language": user.preferences.language,
                     "timezone": user.preferences.timezone,
@@ -262,12 +271,17 @@ class UserManagementService:
                     "show_tooltips": user.preferences.show_tooltips,
                     "session_timeout": user.preferences.session_timeout,
                     "require_2fa": user.preferences.require_2fa,
-                    "auto_logout": user.preferences.auto_logout
+                    "auto_logout": user.preferences.auto_logout,
+                    "created_at": getattr(user.preferences, 'created_at', None),
+                    "updated_at": getattr(user.preferences, 'updated_at', None)
                 }
             
             # Добавляем настройки уведомлений
             if user.notification_settings:
                 profile_data["notification_settings"] = {
+                    "id": user.notification_settings.id,
+                    "user_id": user.notification_settings.user_id,
+                    "profile_id": user.notification_settings.profile_id,
                     "email_appointment_reminder": user.notification_settings.email_appointment_reminder,
                     "email_appointment_cancellation": user.notification_settings.email_appointment_cancellation,
                     "email_appointment_confirmation": user.notification_settings.email_appointment_confirmation,
@@ -290,7 +304,9 @@ class UserManagementService:
                     "reminder_time_before": user.notification_settings.reminder_time_before,
                     "quiet_hours_start": user.notification_settings.quiet_hours_start,
                     "quiet_hours_end": user.notification_settings.quiet_hours_end,
-                    "weekend_notifications": user.notification_settings.weekend_notifications
+                    "weekend_notifications": user.notification_settings.weekend_notifications,
+                    "created_at": getattr(user.notification_settings, 'created_at', None),
+                    "updated_at": getattr(user.notification_settings, 'updated_at', None)
                 }
             
             return profile_data

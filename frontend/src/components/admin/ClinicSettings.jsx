@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../api/client';
 import { 
   Building2, 
   MapPin, 
@@ -52,23 +53,20 @@ const ClinicSettings = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/admin/clinic/settings?category=clinic', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await api.get('/admin/clinic/settings', {
+        params: { category: 'clinic' }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const settingsObj = {};
-        
+      const data = response.data;
+      const settingsObj = {};
+      
+      if (Array.isArray(data)) {
         data.forEach(setting => {
           settingsObj[setting.key] = setting.value;
         });
-        
-        setSettings(prev => ({ ...prev, ...settingsObj }));
       }
+      
+      setSettings(prev => ({ ...prev, ...settingsObj }));
     } catch (error) {
       console.error('Ошибка загрузки настроек:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки настроек' });
@@ -114,20 +112,13 @@ const ClinicSettings = () => {
       const formData = new FormData();
       formData.append('file', logoFile);
 
-      const response = await fetch('/api/v1/admin/clinic/logo', {
-        method: 'POST',
+      const response = await api.post('/admin/clinic/logo', formData, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
+          'Content-Type': 'multipart/form-data'
+        }
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        return result.logo_url;
-      } else {
-        throw new Error('Ошибка загрузки логотипа');
-      }
+      return response.data.logo_url;
     } catch (error) {
       console.error('Ошибка загрузки логотипа:', error);
       throw error;
@@ -151,28 +142,17 @@ const ClinicSettings = () => {
         logo_url: logoUrl
       };
 
-      const response = await fetch('/api/v1/admin/clinic/settings', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          settings: settingsToSave
-        })
+      await api.put('/admin/clinic/settings', {
+        settings: settingsToSave
       });
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Настройки успешно сохранены' });
-        setLogoFile(null);
-        setLogoPreview(null);
-        
-        // Обновляем логотип в настройках
-        if (logoUrl !== settings.logo_url) {
-          setSettings(prev => ({ ...prev, logo_url: logoUrl }));
-        }
-      } else {
-        throw new Error('Ошибка сохранения настроек');
+      setMessage({ type: 'success', text: 'Настройки успешно сохранены' });
+      setLogoFile(null);
+      setLogoPreview(null);
+      
+      // Обновляем логотип в настройках
+      if (logoUrl !== settings.logo_url) {
+        setSettings(prev => ({ ...prev, logo_url: logoUrl }));
       }
     } catch (error) {
       console.error('Ошибка сохранения:', error);

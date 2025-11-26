@@ -1,105 +1,90 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSSelect, 
-  MacOSModal,
-  MacOSBadge,
-  MacOSEmptyState,
-  MacOSLoadingSkeleton
+import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from '../hooks/useTranslation';
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSSelect,
+  MacOSModal
 } from '../components/ui/macos';
-import { 
-  Sun, 
-  Moon, 
-  User, 
-  Key, 
-  MapPin, 
-  Phone, 
-  Clock, 
+import {
+  Sun,
+  Moon,
+  User,
+  Key,
+  MapPin,
+  Phone,
+  Clock,
   MessageSquare,
-  Globe
+  Activity,
+  Calendar,
+  Stethoscope
 } from 'lucide-react';
 import AppActivation from '../components/activation/AppActivation';
 
-// macOS-стиль анимации для декоративных элементов
-const floatingAnimation = `
-  @keyframes float {
-    0%, 100% { transform: translateY(0px) rotate(0deg); }
-    50% { transform: translateY(-20px) rotate(180deg); }
-  }
-`;
+// Компонент для карточки возможности
+const FeatureCard = ({ icon, title, description, color, bgColor }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
 
-// Добавляем стили в head
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = floatingAnimation;
-  document.head.appendChild(style);
-}
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '16px',
+        background: bgColor,
+        borderRadius: '12px',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        border: `1px solid ${isHovered ? color : 'transparent'}`,
+        transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: isHovered ? `0 8px 25px rgba(0, 0, 0, 0.1)` : 'none'
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => {
+        // Можно добавить логику для показа деталей или перехода
+        console.log(`Clicked on ${title}`);
+      }}
+    >
+      <div style={{
+        color: color,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{
+          fontSize: '14px',
+          fontWeight: '600',
+          color: 'var(--mac-text-primary)',
+          marginBottom: '4px'
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontSize: '12px',
+          color: 'var(--mac-text-secondary)',
+          lineHeight: '1.4',
+          opacity: isHovered ? 1 : 0.8
+        }}>
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function Landing() {
   const navigate = useNavigate();
-  const [language, setLanguage] = useState('RU');
+  const { isDark, toggleTheme } = useTheme();
+  const { language, setLanguage, t, availableLanguages } = useTranslation();
   const [showActivation, setShowActivation] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Detect system theme preference
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const systemIsDark = mediaQuery.matches;
-    setIsDarkMode(systemIsDark);
-    
-    // Initialize theme classes
-    document.documentElement.style.colorScheme = systemIsDark ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', systemIsDark ? 'dark' : 'light');
-    
-    if (systemIsDark) {
-      document.documentElement.classList.add('dark-theme');
-      document.documentElement.classList.remove('light-theme');
-    } else {
-      document.documentElement.classList.add('light-theme');
-      document.documentElement.classList.remove('dark-theme');
-    }
-    
-    const handleChange = (e) => {
-      const newIsDark = e.matches;
-      setIsDarkMode(newIsDark);
-      
-      document.documentElement.style.colorScheme = newIsDark ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', newIsDark ? 'dark' : 'light');
-      
-      if (newIsDark) {
-        document.documentElement.classList.add('dark-theme');
-        document.documentElement.classList.remove('light-theme');
-      } else {
-        document.documentElement.classList.add('light-theme');
-        document.documentElement.classList.remove('dark-theme');
-      }
-    };
-    
-    mediaQuery.addEventListener('change', handleChange);
-    
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
-  // Toggle dark mode with system integration
-  const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode;
-    setIsDarkMode(newDarkMode);
-    
-    // Update system color scheme and theme class
-    document.documentElement.style.colorScheme = newDarkMode ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', newDarkMode ? 'dark' : 'light');
-    
-    // Force CSS variables update
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark-theme');
-      document.documentElement.classList.remove('light-theme');
-    } else {
-      document.documentElement.classList.add('light-theme');
-      document.documentElement.classList.remove('dark-theme');
-    }
-  };
 
   const pageStyle = {
     minHeight: '100vh',
@@ -162,72 +147,32 @@ export default function Landing() {
     minHeight: '200px'
   };
 
-  const translations = {
-    RU: {
-      title: 'Clinic Manager',
-      subtitle: 'Добро пожаловать в современную систему управления клиникой',
-      login: 'Войти',
-      activate: 'Активировать аккаунт',
-      contacts: 'Контакты',
-      address: 'Адрес: г. Турткул, ул. Беруний',
-      phone: 'Телефон: +998 (95) 104-34-34',
-      schedule: 'График: Пн–Сб 9:00–17:00',
-      telegram: 'Telegram: @doktor_cosmed_clinic',
-      footer: 'v1.0.0 · Политика конфиденциальности · Условия использования'
-    },
-    UZ: {
-      title: 'Klinika Menejeri',
-      subtitle: 'Zamonaviy klinika boshqaruv tizimiga xush kelibsiz',
-      login: 'Kirish',
-      activate: 'Akkauntni faollashtirish',
-      contacts: 'Kontaktlar',
-      address: 'Manzil: Tortkul sh., Beruniy k.',
-      phone: 'Telefon: +998 (95) 104-34-34',
-      schedule: 'Ish vaqti: Du–Sha 9:00–17:00',
-      telegram: 'Telegram: @doktor_cosmed_clinic',
-      footer: 'v1.0.0 · Maxfiylik siyosati · Foydalanish shartlari'
-    },
-    EN: {
-      title: 'Clinic Manager',
-      subtitle: 'Welcome to the modern clinic management system',
-      login: 'Login',
-      activate: 'Activate Account',
-      contacts: 'Contacts',
-      address: 'Address: Tortkul, Beruniy St.',
-      phone: 'Phone: +998 (95) 104-34-34',
-      schedule: 'Schedule: Mon–Sat 9:00–17:00',
-      telegram: 'Telegram: @doktor_cosmed_clinic',
-      footer: 'v1.0.0 · Privacy Policy · Terms of Use'
-    }
-  };
-
-  const t = translations[language];
+  // Используем глобальные переводы из контекста
 
   return (
     <div style={pageStyle}>
-      {/* Главная карточка (macOS UI) */}
-      <MacOSCard style={cardStyle}>
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={headerStyle}>
-            {t.title}
-          </div>
-          <div style={subtitleStyle}>{t.subtitle}</div>
-        </div>
-        
-        {/* Кнопки темы и языка */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '12px', 
-          justifyContent: 'center', 
-          marginBottom: '32px',
-          alignItems: 'center'
+      {/* Основная карточка */}
+      <MacOSCard style={{
+        ...cardStyle,
+        position: 'relative',
+        paddingTop: '80px', // Место для кнопок управления
+        paddingBottom: '40px' // Дополнительное место для кнопок действий
+      }}>
+
+        {/* Кнопки управления внутри карточки */}
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          zIndex: 10
         }}>
-          {/* Theme Toggle */}
-          <MacOSButton 
-            variant="ghost" 
-            onClick={toggleDarkMode}
+          <MacOSButton
+            variant="ghost"
+            onClick={toggleTheme}
             style={{
-              minWidth: '32px',
               width: '32px',
               height: '32px',
               padding: '0',
@@ -235,145 +180,232 @@ export default function Landing() {
               alignItems: 'center',
               justifyContent: 'center'
             }}
-            title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
           >
-            {isDarkMode ? <Sun style={{ width: '16px', height: '16px' }} /> : <Moon style={{ width: '16px', height: '16px' }} />}
+            {isDark ? <Sun style={{ width: '16px', height: '16px' }} /> : <Moon style={{ width: '16px', height: '16px' }} />}
           </MacOSButton>
-          
-          {/* Language Selector */}
-          <MacOSSelect
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            style={{
-              width: '60px',
-              height: '32px',
-              padding: '0 var(--mac-spacing-xs)'
+
+          <MacOSButton
+            variant="ghost"
+            onClick={() => {
+              const languages = ['ru', 'uz', 'en', 'kk'];
+              const currentIndex = languages.indexOf(language);
+              const nextIndex = (currentIndex + 1) % languages.length;
+              setLanguage(languages[nextIndex]);
             }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              height: '32px',
+              fontSize: '12px',
+              minWidth: '60px'
+            }}
+            title={`Switch language - current: ${language.toUpperCase()}`}
           >
-            <option value="RU">RU</option>
-            <option value="UZ">UZ</option>
-            <option value="EN">EN</option>
-          </MacOSSelect>
+            <span style={{ fontSize: '14px' }}>
+              {language === 'ru' ? '🇷🇺' :
+               language === 'uz' ? '🇺🇿' :
+               language === 'en' ? '🇺🇸' :
+               language === 'kk' ? '🇰🇿' : '🌐'}
+            </span>
+            <span style={{ fontWeight: '600' }}>{language.toUpperCase()}</span>
+          </MacOSButton>
         </div>
-        
-        <div style={{ 
-          display: 'flex', 
-          gap: '16px', 
-          flexWrap: 'wrap', 
-          justifyContent: 'center', 
-          marginBottom: '0' 
+
+        {/* Статус системы внутри карточки */}
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          left: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '6px 12px',
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid rgba(34, 197, 94, 0.2)',
+          borderRadius: '16px',
+          fontSize: '12px',
+          color: '#22c55e',
+          zIndex: 10
         }}>
-          <MacOSButton 
-            variant="primary" 
+          <Activity style={{ width: '14px', height: '14px' }} />
+          {t('status')}
+        </div>
+        {/* Логотип и заголовок */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            fontSize: '48px',
+            marginBottom: '16px',
+            color: 'var(--mac-accent-blue)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, var(--mac-accent-blue), #3b82f6)',
+              borderRadius: '16px',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+            }}>
+              <Stethoscope style={{ width: '32px', height: '32px', color: 'white' }} />
+            </div>
+          </div>
+          <div style={headerStyle}>
+            {t('title')}
+          </div>
+          <div style={subtitleStyle}>{t('subtitle')}</div>
+        </div>
+
+        {/* Ключевые возможности */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '20px',
+          marginBottom: '32px',
+          maxWidth: '600px',
+          margin: '0 auto 32px auto'
+        }}>
+          <FeatureCard
+            icon={<Calendar style={{ width: '20px', height: '20px' }} />}
+            title={t('appointments')}
+            description="Запись и управление приемами"
+            color="#10b981"
+            bgColor="rgba(16, 185, 129, 0.1)"
+          />
+
+          <FeatureCard
+            icon={<Activity style={{ width: '20px', height: '20px' }} />}
+            title={t('queue')}
+            description="Онлайн-очереди с QR-регистрацией"
+            color="#f59e0b"
+            bgColor="rgba(245, 158, 11, 0.1)"
+          />
+        </div>
+
+        {/* Кнопки действий */}
+        <div style={{
+          display: 'flex',
+          gap: '16px',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          marginTop: '40px',
+          paddingBottom: '8px'
+        }}>
+          <MacOSButton
+            variant="primary"
             onClick={() => navigate('/login')}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '12px 24px',
+              padding: '14px 28px',
               fontSize: '16px',
-              fontWeight: '600'
+              fontWeight: '600',
+              minWidth: '160px'
             }}
           >
             <User style={{ width: '18px', height: '18px' }} />
-            {t.login}
+            {t('loginButton')}
           </MacOSButton>
-          <MacOSButton 
-            variant="outline" 
+
+          <MacOSButton
+            variant="outline"
             onClick={() => setShowActivation(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '12px 24px',
+              padding: '14px 28px',
               fontSize: '16px',
-              fontWeight: '500'
+              fontWeight: '500',
+              minWidth: '160px'
             }}
           >
             <Key style={{ width: '18px', height: '18px' }} />
-            {t.activate}
+            {t('activateButton')}
           </MacOSButton>
         </div>
       </MacOSCard>
 
-      {/* Карточка контактов (macOS UI) */}
+      {/* Контактная информация */}
       <MacOSCard style={contactCardStyle}>
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ 
-            fontWeight: '600', 
-            fontSize: '20px', 
-            color: 'var(--mac-accent-blue)',
-            marginBottom: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <MapPin style={{ width: '22px', height: '22px', color: 'var(--mac-accent-blue)' }} />
-            {t.contacts}
-          </div>
-        </div>
-        
-        <div style={{ 
-          lineHeight: '1.7', 
-          color: 'var(--mac-text-secondary)',
-          fontSize: '16px'
+        <div style={{
+          fontWeight: '600',
+          fontSize: '18px',
+          color: 'var(--mac-accent-blue)',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
         }}>
-          <div style={{ 
-            marginBottom: '12px', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '12px'
-          }}>
+          <MapPin style={{ width: '20px', height: '20px' }} />
+          {t('contacts')}
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '16px',
+          fontSize: '15px',
+          color: 'var(--mac-text-secondary)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <MapPin style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
-            {t.address}
+            <div>
+              <div style={{ fontWeight: '500', color: 'var(--mac-text-primary)' }}>Адрес</div>
+              <div>{t('address')}</div>
+            </div>
           </div>
-          <div style={{ 
-            marginBottom: '12px', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '12px'
-          }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Phone style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
-            {t.phone}
+            <div>
+              <div style={{ fontWeight: '500', color: 'var(--mac-text-primary)' }}>Телефон</div>
+              <div>{t('phone')}</div>
+            </div>
           </div>
-          <div style={{ 
-            marginBottom: '12px', 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '12px'
-          }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <Clock style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
-            {t.schedule}
+            <div>
+              <div style={{ fontWeight: '500', color: 'var(--mac-text-primary)' }}>График работы</div>
+              <div>{t('schedule')}</div>
+            </div>
           </div>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: '12px'
-          }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <MessageSquare style={{ width: '18px', height: '18px', color: 'var(--mac-text-tertiary)' }} />
-            {t.telegram}
+            <div>
+              <div style={{ fontWeight: '500', color: 'var(--mac-text-primary)' }}>Поддержка</div>
+              <div>{t('telegram')}</div>
+            </div>
           </div>
         </div>
       </MacOSCard>
 
       {/* Футер */}
-      <div style={{ 
-        opacity: 0.7, 
-        fontSize: '14px', 
+      <div style={{
+        opacity: 0.7,
+        fontSize: '14px',
         color: 'var(--mac-text-tertiary)',
         textAlign: 'center',
-        marginTop: '32px',
-        fontWeight: '400',
-        padding: '16px 0'
+        marginTop: '24px',
+        fontWeight: '400'
       }}>
-        {t.footer}
+        {t('footer')}
       </div>
 
       {/* Модальное окно активации */}
       <MacOSModal
         isOpen={showActivation}
         onClose={() => setShowActivation(false)}
-        title="Активация аккаунта"
+        title="Активация лицензии"
         size="md"
       >
         <AppActivation onClose={() => setShowActivation(false)} />

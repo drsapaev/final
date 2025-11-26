@@ -25,7 +25,7 @@ import {
   Pause,
   TestTube
 } from 'lucide-react';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 const TelegramBotManager = () => {
@@ -502,11 +502,11 @@ const TelegramBotManager = () => {
                 </div>
                 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MacOSBadge variant={user.is_active ? "success" : "secondary"}>
-                    {user.is_active ? "Активен" : "Неактивен"}
+                <MacOSBadge variant={user.is_active ? 'success' : 'secondary'}>
+                    {user.is_active ? 'Активен' : 'Неактивен'}
                 </MacOSBadge>
                   
-                <MacOSBadge variant={user.role === "Admin" || user.role === "SuperAdmin" ? "primary" : "outline"}>
+                <MacOSBadge variant={user.role === 'Admin' || user.role === 'SuperAdmin' ? 'primary' : 'outline'}>
                     {user.role}
                 </MacOSBadge>
                 </div>

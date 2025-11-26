@@ -90,7 +90,7 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
       ws.onmessage = (ev) => {
         try {
           const obj = JSON.parse(ev.data);
-          console.log(`📨 Получено WebSocket сообщение:`, obj);
+          console.log('📨 Получено WebSocket сообщение:', obj);
           onMessage && onMessage(obj);
         } catch (e) {
           console.warn('Ошибка парсинга WebSocket сообщения:', e);

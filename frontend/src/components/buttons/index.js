@@ -4,6 +4,18 @@ export { default as ButtonGroup } from './ButtonGroup';
 export { default as IconButton } from './IconButton';
 export { default as FloatingActionButton } from './FloatingActionButton';
 
+// Медицинские компоненты кнопок
+export {
+  default as MedicalButton,
+  EmergencyButton,
+  DiagnoseButton,
+  TreatButton,
+  ApproveButton,
+  RejectButton,
+  CardiologyButton,
+  LabButton
+} from './MedicalButton';
+
 // Утилиты для кнопок
 export const buttonUtils = {
   // Получение размера иконки для кнопки
@@ -89,7 +101,14 @@ export const buttonUtils = {
       warnings.push('Invalid button size. Use: small, medium, large');
     }
     
-    if (props.variant && !['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'light', 'dark'].includes(props.variant)) {
+    // Расширенная валидация вариантов с медицинскими
+    const validVariants = [
+      'primary', 'secondary', 'success', 'warning', 'danger', 'info', 'light', 'dark',
+      'cardiology', 'dermatology', 'dentistry', 'laboratory',
+      'emergency', 'diagnose', 'treat', 'approve', 'reject'
+    ];
+
+    if (props.variant && !validVariants.includes(props.variant)) {
       warnings.push('Invalid button variant');
     }
     
@@ -166,7 +185,20 @@ export const BUTTON_VARIANTS = {
   DANGER: 'danger',
   INFO: 'info',
   LIGHT: 'light',
-  DARK: 'dark'
+  DARK: 'dark',
+
+  // Медицинские отделы
+  CARDIOLOGY: 'cardiology',
+  DERMATOLOGY: 'dermatology',
+  DENTISTRY: 'dentistry',
+  LABORATORY: 'laboratory',
+
+  // Медицинские действия
+  EMERGENCY: 'emergency',
+  DIAGNOSE: 'diagnose',
+  TREAT: 'treat',
+  APPROVE: 'approve',
+  REJECT: 'reject'
 };
 
 export const BUTTON_SIZES = {
@@ -180,5 +212,51 @@ export const BUTTON_POSITIONS = {
   TOP_RIGHT: 'top-right',
   BOTTOM_LEFT: 'bottom-left',
   BOTTOM_RIGHT: 'bottom-right'
+};
+
+// Медицинские приоритеты для кнопок
+export const MEDICAL_PRIORITIES = {
+  LOW: 'low',
+  NORMAL: 'normal',
+  HIGH: 'high',
+  URGENT: 'urgent',
+  CRITICAL: 'critical'
+};
+
+// Статусы медицинских кнопок
+export const MEDICAL_STATUSES = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  LOADING: 'loading',
+  SUCCESS: 'success',
+  ERROR: 'error'
+};
+
+// Медицинские действия
+export const MEDICAL_ACTIONS = {
+  DIAGNOSE: 'diagnose',
+  TREAT: 'treat',
+  PRESCRIBE: 'prescribe',
+  EMERGENCY: 'emergency',
+  APPROVE: 'approve',
+  REJECT: 'reject',
+  MONITOR: 'monitor',
+  EXAMINE: 'examine',
+  TEST: 'test',
+  SCHEDULE: 'schedule'
+};
+
+// Медицинские отделы
+export const MEDICAL_DEPARTMENTS = {
+  CARDIOLOGY: 'cardiology',
+  DERMATOLOGY: 'dermatology',
+  DENTISTRY: 'dentistry',
+  LABORATORY: 'laboratory',
+  NEUROLOGY: 'neurology',
+  GYNECOLOGY: 'gynecology',
+  PEDIATRICS: 'pediatrics',
+  SURGERY: 'surgery',
+  PSYCHIATRY: 'psychiatry',
+  RADIOLOGY: 'radiology'
 };
 

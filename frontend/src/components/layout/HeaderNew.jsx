@@ -300,7 +300,7 @@ export default function HeaderNew() {
         return (
           <Button
             key={item.to}
-            variant={active ? "primary" : "outline"}
+            variant={active ? 'primary' : 'outline'}
             size="small"
             onClick={() => navigate(item.to)}
             title={item.label}

@@ -17,61 +17,61 @@ const MIGRATION_CONFIG = {
   // Замена импортов
   imports: {
     // Старые импорты -> новые импорты
-    "'../ui'": "'../ui/native'",
-    "'../../ui'": "'../../ui/native'",
-    "'../../../ui'": "'../../../ui/native'",
-    "'../../../../ui'": "'../../../../ui/native'",
-    "'../../../../../ui'": "'../../../../../ui/native'"
+    '\'../ui\'': '\'../ui/native\'',
+    '\'../../ui\'': '\'../../ui/native\'',
+    '\'../../../ui\'': '\'../../../ui/native\'',
+    '\'../../../../ui\'': '\'../../../../ui/native\'',
+    '\'../../../../../ui\'': '\'../../../../../ui/native\''
   },
 
   // Замена цветов
   colors: {
     // Старые цвета -> функции дизайн-системы
-    "'#60a5fa'": "getColor('primary', 400)",
-    "'#3b82f6'": "getColor('primary', 500)",
-    "'#2563eb'": "getColor('primary', 600)",
-    "'#1d4ed8'": "getColor('primary', 700)",
-    "'#10b981'": "getColor('success', 500)",
-    "'#f59e0b'": "getColor('warning', 500)",
-    "'#ef4444'": "getColor('danger', 500)",
-    "'#06b6d4'": "getColor('info', 500)",
-    "'#f8fafc'": "getColor('surface')",
-    "'#f1f5f9'": "getColor('background')",
-    "'#e2e8f0'": "getColor('border')",
-    "'#cbd5e1'": "getColor('border')",
-    "'#64748b'": "getColor('textSecondary')",
-    "'#475569'": "getColor('textSecondary')",
-    "'#334155'": "getColor('text')",
-    "'#1e293b'": "getColor('text')",
-    "'#0f172a'": "getColor('text')"
+    '\'#60a5fa\'': 'getColor(\'primary\', 400)',
+    '\'#3b82f6\'': 'getColor(\'primary\', 500)',
+    '\'#2563eb\'': 'getColor(\'primary\', 600)',
+    '\'#1d4ed8\'': 'getColor(\'primary\', 700)',
+    '\'#10b981\'': 'getColor(\'success\', 500)',
+    '\'#f59e0b\'': 'getColor(\'warning\', 500)',
+    '\'#ef4444\'': 'getColor(\'danger\', 500)',
+    '\'#06b6d4\'': 'getColor(\'info\', 500)',
+    '\'#f8fafc\'': 'getColor(\'surface\')',
+    '\'#f1f5f9\'': 'getColor(\'background\')',
+    '\'#e2e8f0\'': 'getColor(\'border\')',
+    '\'#cbd5e1\'': 'getColor(\'border\')',
+    '\'#64748b\'': 'getColor(\'textSecondary\')',
+    '\'#475569\'': 'getColor(\'textSecondary\')',
+    '\'#334155\'': 'getColor(\'text\')',
+    '\'#1e293b\'': 'getColor(\'text\')',
+    '\'#0f172a\'': 'getColor(\'text\')'
   },
 
   // Замена отступов
   spacing: {
-    "'4px'": "getSpacing('xs')",
-    "'8px'": "getSpacing('sm')",
-    "'12px'": "getSpacing('md')",
-    "'16px'": "getSpacing('lg')",
-    "'20px'": "getSpacing('lg')",
-    "'24px'": "getSpacing('xl')",
-    "'32px'": "getSpacing('xl')"
+    '\'4px\'': 'getSpacing(\'xs\')',
+    '\'8px\'': 'getSpacing(\'sm\')',
+    '\'12px\'': 'getSpacing(\'md\')',
+    '\'16px\'': 'getSpacing(\'lg\')',
+    '\'20px\'': 'getSpacing(\'lg\')',
+    '\'24px\'': 'getSpacing(\'xl\')',
+    '\'32px\'': 'getSpacing(\'xl\')'
   },
 
   // Замена размеров шрифтов
   fontSizes: {
-    "'14px'": "getFontSize('sm')",
-    "'16px'": "getFontSize('base')",
-    "'18px'": "getFontSize('lg')",
-    "'20px'": "getFontSize('xl')",
-    "'24px'": "getFontSize('xl')"
+    '\'14px\'': 'getFontSize(\'sm\')',
+    '\'16px\'': 'getFontSize(\'base\')',
+    '\'18px\'': 'getFontSize(\'lg\')',
+    '\'20px\'': 'getFontSize(\'xl\')',
+    '\'24px\'': 'getFontSize(\'xl\')'
   },
 
   // Замена теней
   shadows: {
-    "'0 1px 3px rgba(0, 0, 0, 0.1)'": "getShadow('sm')",
-    "'0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'": "getShadow('md')",
-    "'0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'": "getShadow('lg')",
-    "'0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'": "getShadow('xl')"
+    '\'0 1px 3px rgba(0, 0, 0, 0.1)\'': 'getShadow(\'sm\')',
+    '\'0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)\'': 'getShadow(\'md\')',
+    '\'0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)\'': 'getShadow(\'lg\')',
+    '\'0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)\'': 'getShadow(\'xl\')'
   }
 };
 
@@ -169,12 +169,12 @@ function migrateFile(filePath) {
   }
 
   // Добавляем импорты дизайн-системы, если используются её функции
-  if (content.includes('getColor(') && !content.includes("import.*useTheme")) {
+  if (content.includes('getColor(') && !content.includes('import.*useTheme')) {
     // Добавляем импорт useTheme
     const importMatch = content.match(/import.*from.*react/i);
     if (importMatch) {
       const insertAfter = importMatch[0];
-      const themeImport = "import { useTheme } from '../../../contexts/ThemeContext.jsx';";
+      const themeImport = 'import { useTheme } from \'../../../contexts/ThemeContext.jsx\';';
       content = content.replace(insertAfter, insertAfter + '\n' + themeImport);
       modified = true;
     }

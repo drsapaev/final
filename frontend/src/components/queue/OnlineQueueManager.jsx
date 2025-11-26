@@ -297,7 +297,7 @@ const OnlineQueueManager = () => {
               <Box sx={{ mt: 2 }}>
                 <FormControl component="fieldset">
                   <Button
-                    variant={autoRefresh ? "contained" : "outlined"}
+                    variant={autoRefresh ? 'contained' : 'outlined'}
                     size="small"
                     onClick={() => setAutoRefresh(!autoRefresh)}
                     startIcon={autoRefresh ? <StopIcon /> : <StartIcon />}

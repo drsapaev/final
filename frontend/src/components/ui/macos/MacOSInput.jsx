@@ -9,6 +9,8 @@ const MacOSInput = React.forwardRef(({
   variant = 'default',
   error,
   disabled,
+  clearable, // Extract to prevent passing to input
+  onClear,   // Extract to prevent passing to input
   ...props
 }, ref) => {
   const sizeStyles = {
@@ -113,6 +115,6 @@ const MacOSInput = React.forwardRef(({
   );
 });
 
-MacOSInput.displayName = "MacOSInput";
+MacOSInput.displayName = 'MacOSInput';
 
 export default MacOSInput;

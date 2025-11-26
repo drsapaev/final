@@ -149,7 +149,7 @@ async def reorder_queue(
         queue_info = {
             "queue_id": queue.id,
             "day": queue.day.isoformat(),
-            "specialist_name": queue.specialist.full_name if queue.specialist else "Неизвестно",
+            "specialist_name": queue.specialist.user.full_name if (queue.specialist and queue.specialist.user) else "Неизвестно",
             "total_entries": len(updated_entries),
             "entries": [
                 {
@@ -236,7 +236,7 @@ async def move_queue_entry(
                 queue_info={
                     "queue_id": queue.id,
                     "day": queue.day.isoformat(),
-                    "specialist_name": queue.specialist.full_name if queue.specialist else "Неизвестно",
+                    "specialist_name": queue.specialist.user.full_name if (queue.specialist and queue.specialist.user) else "Неизвестно",
                     "total_entries": len(all_entries),
                     "entries": []
                 }
@@ -283,7 +283,7 @@ async def move_queue_entry(
         queue_info = {
             "queue_id": queue.id,
             "day": queue.day.isoformat(),
-            "specialist_name": queue.specialist.full_name if queue.specialist else "Неизвестно",
+            "specialist_name": queue.specialist.user.full_name if (queue.specialist and queue.specialist.user) else "Неизвестно",
             "total_entries": len(updated_entries),
             "entries": [
                 {
@@ -348,7 +348,7 @@ async def get_queue_status_by_specialist(
         return {
             "queue_id": queue.id,
             "day": queue.day.isoformat(),
-            "specialist_name": queue.specialist.full_name if queue.specialist else "Неизвестно",
+            "specialist_name": queue.specialist.user.full_name if (queue.specialist and queue.specialist.user) else "Неизвестно",
             "specialist_id": queue.specialist_id,
             "is_active": queue.active,
             "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,
@@ -405,7 +405,7 @@ async def get_queue_status(
         return {
             "queue_id": queue.id,
             "day": queue.day.isoformat(),
-            "specialist_name": queue.specialist.full_name if queue.specialist else "Неизвестно",
+            "specialist_name": queue.specialist.user.full_name if (queue.specialist and queue.specialist.user) else "Неизвестно",
             "specialist_id": queue.specialist_id,
             "is_active": queue.active,
             "opened_at": queue.opened_at.isoformat() if queue.opened_at else None,

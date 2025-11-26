@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { doctorsService } from '../api/services';
+import { api } from '../api/client';
 
 const useDoctors = () => {
   const [doctors, setDoctors] = useState([]);
@@ -9,90 +11,18 @@ const useDoctors = () => {
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
-  // Моковые данные для демонстрации
-  const mockDoctors = [
-    {
-      id: 1,
-      name: 'Иванов Иван Иванович',
-      email: 'ivanov@clinic.uz',
-      phone: '+998 90 123 45 67',
-      specialization: 'Кардиолог',
-      department: 'cardiology',
-      experience: 15,
-      schedule: 'Пн-Пт 9:00-18:00',
-      status: 'active',
-      bio: 'Опытный кардиолог с 15-летним стажем. Специализируется на лечении ишемической болезни сердца.',
-      createdAt: '2024-01-15',
-      patientsCount: 156
-    },
-    {
-      id: 2,
-      name: 'Петрова Мария Сергеевна',
-      email: 'petrova@clinic.uz',
-      phone: '+998 91 234 56 78',
-      specialization: 'Дерматолог',
-      department: 'dermatology',
-      experience: 8,
-      schedule: 'Вт-Сб 10:00-19:00',
-      status: 'active',
-      bio: 'Специалист по кожным заболеваниям и косметологии.',
-      createdAt: '2024-01-20',
-      patientsCount: 89
-    },
-    {
-      id: 3,
-      name: 'Сидоров Сергей Петрович',
-      email: 'sidorov@clinic.uz',
-      phone: '+998 92 345 67 89',
-      specialization: 'Стоматолог',
-      department: 'dentistry',
-      experience: 12,
-      schedule: 'Пн-Сб 8:00-17:00',
-      status: 'active',
-      bio: 'Стоматолог-хирург, специализируется на имплантации зубов.',
-      createdAt: '2024-01-25',
-      patientsCount: 203
-    },
-    {
-      id: 4,
-      name: 'Козлова Анна Владимировна',
-      email: 'kozlova@clinic.uz',
-      phone: '+998 93 456 78 90',
-      specialization: 'Терапевт',
-      department: 'general',
-      experience: 20,
-      schedule: 'Пн-Пт 8:00-16:00',
-      status: 'on_leave',
-      bio: 'Врач общей практики с большим опытом работы.',
-      createdAt: '2024-02-01',
-      patientsCount: 312
-    },
-    {
-      id: 5,
-      name: 'Новиков Дмитрий Александрович',
-      email: 'novikov@clinic.uz',
-      phone: '+998 94 567 89 01',
-      specialization: 'Хирург',
-      department: 'surgery',
-      experience: 18,
-      schedule: 'Пн-Пт 7:00-15:00',
-      status: 'active',
-      bio: 'Опытный хирург, специализируется на лапароскопических операциях.',
-      createdAt: '2024-02-05',
-      patientsCount: 78
-    }
-  ];
-
   // Загрузка врачей
   const loadDoctors = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setDoctors(mockDoctors);
+      const response = await api.get('/admin/doctors');
+      if (response.data) {
+        setDoctors(Array.isArray(response.data) ? response.data : []);
+      }
     } catch (err) {
+      console.error('Ошибка загрузки врачей:', err);
       setError(err);
     } finally {
       setLoading(false);
@@ -105,25 +35,81 @@ const useDoctors = () => {
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Преобразуем данные формы в формат, ожидаемый бэкендом
+      // Сначала нужно создать пользователя, если его нет
+      let userId = null;
       
-      const newDoctor = {
-        id: Date.now(),
-        ...doctorData,
-        createdAt: new Date().toISOString().split('T')[0],
-        patientsCount: 0
+      if (doctorData.email || doctorData.name) {
+        try {
+          // Создаем пользователя с ролью Doctor
+          // Роутер подключен с префиксом /users, а внутри есть эндпоинт /users
+          // Полный путь: /api/v1/users/users
+          const userCreateUrl = '/users/users';
+          console.log('🔵 Создание пользователя:', userCreateUrl, {
+            username: doctorData.email?.split('@')[0] || `doctor_${Date.now()}`,
+            email: doctorData.email,
+            full_name: doctorData.name,
+            role: 'Doctor'
+          });
+          const userResponse = await api.post(userCreateUrl, {
+            username: doctorData.email?.split('@')[0] || `doctor_${Date.now()}`,
+            email: doctorData.email,
+            full_name: doctorData.name,
+            phone: doctorData.phone,
+            role: 'Doctor',
+            is_active: doctorData.status === 'active',
+            password: 'TempPassword123!' // Временный пароль, нужно будет изменить при первом входе
+          });
+          
+          if (userResponse.data?.id || userResponse.data?.user?.id) {
+            userId = userResponse.data.id || userResponse.data.user.id;
+          }
+        } catch (userError) {
+          console.error('Ошибка создания пользователя:', userError);
+          // Если пользователь уже существует, пытаемся найти его
+          if (userError.response?.status === 400) {
+            const errorDetail = userError.response?.data?.detail || '';
+            if (errorDetail.includes('уже существует') || errorDetail.includes('already exists')) {
+              throw new Error('Пользователь с таким email или username уже существует');
+            }
+            throw new Error(errorDetail || 'Ошибка создания пользователя');
+          }
+          throw userError;
+        }
+      }
+      
+      // Преобразуем department в specialty (если нужно)
+      const specialty = doctorData.department || doctorData.specialization || 'general';
+      
+      // Создаем врача
+      const doctorPayload = {
+        user_id: userId,
+        specialty: specialty,
+        cabinet: null,
+        price_default: null,
+        start_number_online: 1,
+        max_online_per_day: 15,
+        active: doctorData.status === 'active' || doctorData.status !== 'inactive'
       };
       
-      setDoctors(prev => [newDoctor, ...prev]);
-      return newDoctor;
+      const response = await api.post('/admin/doctors', doctorPayload);
+      
+      if (response.data) {
+        // Обновляем список врачей
+        await loadDoctors();
+        return response.data;
+      }
+      
+      throw new Error('Не удалось создать врача');
     } catch (err) {
+      console.error('Ошибка создания врача:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка создания врача';
       setError(err);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadDoctors]);
 
   // Обновление врача
   const updateDoctor = useCallback(async (id, doctorData) => {
@@ -131,23 +117,32 @@ const useDoctors = () => {
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Преобразуем данные формы в формат, ожидаемый бэкендом
+      const specialty = doctorData.department || doctorData.specialization || 'general';
       
-      setDoctors(prev => prev.map(doctor => 
-        doctor.id === id 
-          ? { ...doctor, ...doctorData }
-          : doctor
-      ));
+      const doctorPayload = {
+        specialty: specialty,
+        active: doctorData.status === 'active' || doctorData.status !== 'inactive'
+      };
       
-      return { id, ...doctorData };
+      const response = await api.put(`/admin/doctors/${id}`, doctorPayload);
+      
+      if (response.data) {
+        // Обновляем список врачей
+        await loadDoctors();
+        return response.data;
+      }
+      
+      throw new Error('Не удалось обновить врача');
     } catch (err) {
+      console.error('Ошибка обновления врача:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обновления врача';
       setError(err);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadDoctors]);
 
   // Удаление врача
   const deleteDoctor = useCallback(async (id) => {
@@ -155,30 +150,35 @@ const useDoctors = () => {
     setError(null);
     
     try {
-      // Имитация API запроса
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setDoctors(prev => prev.filter(doctor => doctor.id !== id));
+      await api.delete(`/admin/doctors/${id}`);
+      // Обновляем список врачей
+      await loadDoctors();
     } catch (err) {
+      console.error('Ошибка удаления врача:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления врача';
       setError(err);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadDoctors]);
 
   // Фильтрация врачей
   const filteredDoctors = doctors.filter(doctor => {
+    const doctorName = doctor.user?.full_name || doctor.name || '';
+    const doctorEmail = doctor.user?.email || doctor.email || '';
+    const doctorSpecialty = doctor.specialty || doctor.specialization || '';
+    
     const matchesSearch = !searchTerm || 
-      doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.email.toLowerCase().includes(searchTerm.toLowerCase());
+      doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctorEmail.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesSpecialization = !filterSpecialization || 
-      doctor.specialization.toLowerCase().includes(filterSpecialization.toLowerCase());
+      doctorSpecialty.toLowerCase().includes(filterSpecialization.toLowerCase());
     
-    const matchesDepartment = !filterDepartment || doctor.department === filterDepartment;
-    const matchesStatus = !filterStatus || doctor.status === filterStatus;
+    const matchesDepartment = !filterDepartment || doctorSpecialty === filterDepartment;
+    const matchesStatus = !filterStatus || (doctor.active ? 'active' : 'inactive') === filterStatus;
     
     return matchesSearch && matchesSpecialization && matchesDepartment && matchesStatus;
   });

@@ -1,26 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Select, Option, Badge, Icon, Alert } from '../components/ui/macos';
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Icon, Alert } from '../components/ui/macos';
 import { useTheme } from '../contexts/ThemeContext';
 import AIAssistant from '../components/ai/AIAssistant';
 import LabResultsManager from '../components/laboratory/LabResultsManager';
 import LabReportGenerator from '../components/laboratory/LabReportGenerator';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
-import { queueService } from '../services/queue';
+import EditPatientModal from '../components/common/EditPatientModal';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
 
+const logger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
+
 const LabPanel = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, getColor, getSpacing } = useTheme();
+  const { isDark, getColor, getSpacing, getFontSize } = useTheme();
   
   // Синхронизация активной вкладки с URL
-  const getActiveTabFromURL = () => {
+  const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
     return params.get('tab') || 'tests';
-  };
+  }, [location.search]);
   
   const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
   
@@ -30,7 +36,7 @@ const LabPanel = () => {
     if (urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
-  }, [location.search]);
+  }, [activeTab, getActiveTabFromURL]);
   
   // Функция для изменения активной вкладки с обновлением URL
   const handleTabChange = (tabId) => {
@@ -48,12 +54,12 @@ const LabPanel = () => {
   // Состояния для таблицы записей
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
   const [services, setServices] = useState({});
   
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const patientModal = useModal();
   const visitModal = useModal();
+  const [editPatientModal, setEditPatientModal] = useState({ open: false, patient: null, loading: false });
 
   // Автоматическое скрытие сообщений через 5 секунд
   useEffect(() => {
@@ -68,17 +74,13 @@ const LabPanel = () => {
   const [testForm, setTestForm] = useState({ patient_id: '', test_date: '', test_type: '', sample_type: '', notes: '' });
   const [resultForm, setResultForm] = useState({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' });
 
-  const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` });
+  const authHeader = useCallback(
+    () => ({ Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}` }),
+    []
+  );
 
-  useEffect(() => {
-    loadPatients();
-    loadTests();
-    loadResults();
-    loadServices();
-  }, []);
-
-  // Загрузка услуг для правильного отображения в tooltips
-  const loadServices = async () => {
+  // ✅ Загрузка услуг для правильного отображения в tooltips (объявлена до использования)
+  const loadServices = useCallback(async () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) return;
@@ -90,12 +92,93 @@ const LabPanel = () => {
         const data = await response.json();
         const servicesData = data.services_by_group || {};
         setServices(servicesData);
-        console.log('[Lab] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+        logger.info('[Lab] Услуги загружены:', Object.keys(servicesData).length, 'групп');
       }
     } catch (error) {
-      console.error('[Lab] Ошибка загрузки услуг:', error);
+      logger.error('[Lab] Ошибка загрузки услуг:', error);
     }
-  };
+  }, []);
+
+  // ✅ Функции загрузки данных (объявлены до использования в useEffect)
+  const loadPatients = useCallback(async () => {
+    try {
+      logger.info('[Lab] loadPatients: start');
+      setLoading(true);
+      const res = await fetch('http://localhost:8000/api/v1/patients?department=Lab&limit=100', { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setPatients(data);
+        logger.info('[Lab] loadPatients: успешно загружено', data.length, 'пациентов');
+      } else {
+        const errorText = await res.text();
+        logger.error('[Lab] loadPatients: HTTP error', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorText
+        });
+        throw new Error(`Ошибка загрузки пациентов: ${res.status} ${res.statusText}`);
+      }
+    } catch (error) {
+      logger.error('[Lab] loadPatients: ошибка', error);
+      setMessage({ type: 'error', text: 'Ошибка при загрузке списка пациентов' });
+    } finally {
+      setLoading(false);
+      logger.info('[Lab] loadPatients: finish');
+    }
+  }, [authHeader, setMessage]);
+
+  const loadTests = useCallback(async () => {
+    try {
+      logger.info('[Lab] loadTests: start');
+      const res = await fetch('http://localhost:8000/api/v1/lab/tests?limit=100', { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setTests(data);
+        logger.info('[Lab] loadTests: успешно загружено', data.length, 'тестов');
+      } else {
+        const errorText = await res.text();
+        logger.error('[Lab] loadTests: HTTP error', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorText
+        });
+        throw new Error(`Ошибка загрузки тестов: ${res.status} ${res.statusText}`);
+      }
+    } catch (error) {
+      logger.error('[Lab] loadTests: ошибка', error);
+      setMessage({ type: 'error', text: 'Ошибка при загрузке списка тестов' });
+    }
+  }, [authHeader, setMessage]);
+
+  const loadResults = useCallback(async () => {
+    try {
+      logger.info('[Lab] loadResults: start');
+      const res = await fetch('http://localhost:8000/api/v1/lab/results?limit=100', { headers: authHeader() });
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data);
+        logger.info('[Lab] loadResults: успешно загружено', data.length, 'результатов');
+      } else {
+        const errorText = await res.text();
+        logger.error('[Lab] loadResults: HTTP error', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorText
+        });
+        throw new Error(`Ошибка загрузки результатов: ${res.status} ${res.statusText}`);
+      }
+    } catch (error) {
+      logger.error('[Lab] loadResults: ошибка', error);
+      setMessage({ type: 'error', text: 'Ошибка при загрузке результатов анализов' });
+    }
+  }, [authHeader, setMessage]);
+
+  useEffect(() => {
+    loadPatients();
+    loadTests();
+    loadResults();
+    loadServices();
+  }, [loadPatients, loadTests, loadResults, loadServices]);
 
   // Функция для получения всех услуг пациента из всех записей
   const getAllPatientServices = useCallback((patientId, allAppointments) => {
@@ -120,13 +203,13 @@ const LabPanel = () => {
   }, []);
 
   // Загрузка записей лаборатории
-  const loadLabAppointments = async () => {
+  const loadLabAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
-      console.log('[Lab] loadLabAppointments: start');
+      logger.info('[Lab] loadLabAppointments: start');
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.warn('[Lab] loadLabAppointments: нет токена аутентификации');
+        logger.warn('[Lab] loadLabAppointments: нет токена аутентификации');
         setMessage({ type: 'error', text: 'Требуется авторизация. Пожалуйста, войдите в систему.' });
         setAppointmentsLoading(false);
         return;
@@ -142,7 +225,7 @@ const LabPanel = () => {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[Lab] loadLabAppointments: HTTP error', {
+        logger.error('[Lab] loadLabAppointments: HTTP error', {
           status: response.status,
           statusText: response.statusText,
           error: errorText
@@ -151,7 +234,7 @@ const LabPanel = () => {
       }
       
       const data = await response.json();
-      console.log('[Lab] loadLabAppointments: данные получены', { queuesCount: data?.queues?.length || 0 });
+      logger.info('[Lab] loadLabAppointments: данные получены', { queuesCount: data?.queues?.length || 0 });
       
       // Собираем ВСЕ записи из всех очередей для получения полной картины услуг
       let allAppointments = [];
@@ -190,7 +273,7 @@ const LabPanel = () => {
       const appointmentsData = allAppointments.filter(apt =>
         apt.specialty === 'lab' || apt.specialty === 'laboratory'
       );
-      console.log('[Lab] loadLabAppointments: отфильтровано лабораторных записей', appointmentsData.length);
+      logger.info('[Lab] loadLabAppointments: отфильтровано лабораторных записей', appointmentsData.length);
 
       // 2. Получаем актуальный payment_status из БД через all-appointments
       const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -206,7 +289,7 @@ const LabPanel = () => {
         if (appointmentsResponse.ok) {
           const appointmentsDBResponse = await appointmentsResponse.json();
           const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
-          console.log('[Lab] Получены appointments из БД:', appointmentsDBData.length);
+          logger.info('[Lab] Получены appointments из БД:', appointmentsDBData.length);
 
           // Создаем карту id -> payment_status
           const paymentStatusMap = new Map();
@@ -234,10 +317,10 @@ const LabPanel = () => {
             };
           });
 
-          console.log('[Lab] Обновлены payment_status для', allAppointments.length, 'записей');
+          logger.info('[Lab] Обновлены payment_status для', allAppointments.length, 'записей');
         }
       } catch (err) {
-        console.warn('[Lab] Не удалось загрузить payment_status из БД:', err);
+        logger.warn('[Lab] Не удалось загрузить payment_status из БД:', err);
       }
 
       // Добавляем информацию о всех услугах пациента в каждую запись
@@ -251,15 +334,15 @@ const LabPanel = () => {
       });
 
       setAppointments(enrichedAppointmentsData);
-      console.log('[Lab] loadLabAppointments: успешно загружено', enrichedAppointmentsData.length, 'записей');
+      logger.info('[Lab] loadLabAppointments: успешно загружено', enrichedAppointmentsData.length, 'записей');
     } catch (error) {
-      console.error('[Lab] loadLabAppointments: ошибка', error);
+      logger.error('[Lab] loadLabAppointments: ошибка', error);
       setMessage({ type: 'error', text: error.message || 'Ошибка при загрузке записей лаборатории' });
     } finally {
       setAppointmentsLoading(false);
-      console.log('[Lab] loadLabAppointments: finish');
+      logger.info('[Lab] loadLabAppointments: finish');
     }
-  };
+  }, [getAllPatientServices]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
@@ -269,7 +352,7 @@ const LabPanel = () => {
     
     // Слушаем глобальные события обновления очереди
     const handleQueueUpdate = (event) => {
-      console.log('[Lab] Получено событие обновления очереди:', event.detail);
+      logger.info('[Lab] Получено событие обновления очереди:', event.detail);
       if (activeTab === 'appointments') {
         loadLabAppointments();
       }
@@ -279,27 +362,120 @@ const LabPanel = () => {
     return () => {
       window.removeEventListener('queueUpdated', handleQueueUpdate);
     };
-  }, [activeTab]);
+  }, [activeTab, loadLabAppointments]);
+
+  // Функция для получения данных пациента по ID
+  const fetchPatientData = useCallback(async (patientId) => {
+    if (patientId >= 1000) {
+      return null;
+    }
+    
+    const token = localStorage.getItem('auth_token');
+    if (!token) return null;
+    
+    const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      logger.error(`Ошибка загрузки данных пациента ${patientId}:`, error);
+    }
+    return null;
+  }, []);
+
+  // Функция для преобразования данных пациента из формата API в формат PatientModal
+  const transformPatientData = useCallback((apiPatient) => {
+    if (!apiPatient) return null;
+    
+    return {
+      id: apiPatient.id,
+      firstName: apiPatient.first_name || '',
+      lastName: apiPatient.last_name || '',
+      middleName: apiPatient.middle_name || '',
+      email: apiPatient.email || '',
+      phone: apiPatient.phone || '',
+      birthDate: apiPatient.birth_date || '',
+      gender: apiPatient.sex === 'M' ? 'male' : apiPatient.sex === 'F' ? 'female' : '',
+      address: apiPatient.address || '',
+      passport: apiPatient.doc_number || '',
+      insuranceNumber: '',
+      emergencyContact: '',
+      emergencyPhone: '',
+      bloodType: '',
+      allergies: '',
+      chronicDiseases: '',
+      notes: ''
+    };
+  }, []);
+
+  // Функция для создания частичного объекта пациента из данных row (для QR-пациентов)
+  const createPartialPatientFromRow = useCallback((row) => {
+    const nameParts = (row.patient_fio || '').split(' ').filter(Boolean);
+    return {
+      firstName: nameParts[1] || '',
+      lastName: nameParts[0] || '',
+      middleName: nameParts[2] || '',
+      phone: row.patient_phone || '',
+      address: row.address || '',
+      birthDate: row.patient_birth_year ? `${row.patient_birth_year}-01-01` : ''
+    };
+  }, []);
+
+  // Обработчик редактирования пациента
+  const handleEditPatient = useCallback(async (row) => {
+    // Если нет patient_id (QR-пациент), используем частичные данные из row
+    if (!row.patient_id) {
+      logger.info('[Lab] QR-пациент без patient_id, используем частичные данные из row');
+      const partialPatient = createPartialPatientFromRow(row);
+      setEditPatientModal({ open: true, patient: partialPatient, loading: false });
+      return;
+    }
+    
+    try {
+      // Показываем индикатор загрузки
+      setEditPatientModal({ open: true, patient: null, loading: true });
+      
+      // Загружаем полные данные пациента
+      const apiPatient = await fetchPatientData(row.patient_id);
+      
+      if (!apiPatient) {
+        // Если не удалось загрузить, используем данные из row (частичные)
+        const partialPatient = createPartialPatientFromRow(row);
+        setEditPatientModal({ open: true, patient: partialPatient, loading: false });
+        logger.warn('[Lab] Не удалось загрузить данные из API, используем частичные данные пациента из row');
+        return;
+      }
+      
+      // Преобразуем данные в формат PatientModal
+      const transformedPatient = transformPatientData(apiPatient);
+      setEditPatientModal({ open: true, patient: transformedPatient, loading: false });
+      
+    } catch (error) {
+      logger.error('[Lab] Ошибка при загрузке данных пациента:', error);
+      // В случае ошибки используем частичные данные
+      const partialPatient = createPartialPatientFromRow(row);
+      setEditPatientModal({ open: true, patient: partialPatient, loading: false });
+      logger.warn('[Lab] Ошибка загрузки, используем частичные данные пациента из row');
+    }
+  }, [fetchPatientData, transformPatientData, createPartialPatientFromRow]);
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = (row) => {
-    console.log('Клик по записи:', row);
+    logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
-      // Создаем объект пациента для переключения на прием
-      const patientData = {
-        id: row.id,
-        patient_name: row.patient_fio,
-        phone: row.patient_phone,
-        number: row.id,
-        source: 'appointments'
-      };
       setActiveTab('tests');
     }
   };
 
   const handleAppointmentActionClick = async (action, row, event) => {
-    console.log('[Lab] handleAppointmentActionClick:', action, row);
+    logger.info('[Lab] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
 
     switch (action) {
@@ -320,123 +496,51 @@ const LabPanel = () => {
           });
 
           if (response.ok) {
-            console.log('[Lab] Пациент вызван:', row.patient_fio);
+            logger.info('[Lab] Пациент вызван:', row.patient_fio);
             await loadLabAppointments();
             setMessage({ type: 'success', text: 'Пациент вызван' });
           }
         } catch (error) {
-          console.error('[Lab] Ошибка вызова пациента:', error);
+          logger.error('[Lab] Ошибка вызова пациента:', error);
           setMessage({ type: 'error', text: 'Ошибка вызова пациента' });
         }
         break;
       case 'payment':
-        console.log('[Lab] Открытие окна оплаты для:', row.patient_fio);
+        logger.info('[Lab] Открытие окна оплаты для:', row.patient_fio);
         alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
         break;
       case 'print':
-        console.log('[Lab] Печать талона для:', row.patient_fio);
+        logger.info('[Lab] Печать талона для:', row.patient_fio);
         window.print();
         break;
       case 'complete':
         // Завершить приём
         try {
-          console.log('[Lab] Завершение приёма для:', row.patient_fio);
+          logger.info('[Lab] Завершение приёма для:', row.patient_fio);
           handleTabChange('tests');
         } catch (error) {
-          console.error('[Lab] Ошибка при завершении приёма:', error);
+          logger.error('[Lab] Ошибка при завершении приёма:', error);
         }
         break;
       case 'edit':
-        console.log('[Lab] Редактирование записи', row.id);
-        // Логика редактирования записи
+        // Загружаем полные данные пациента перед открытием модального окна
+        logger.info('[Lab] Открытие модального окна редактирования для:', row.patient_fio);
+        await handleEditPatient(row);
         break;
       case 'cancel':
-        console.log('[Lab] Отмена записи', row.id);
+        logger.info('[Lab] Отмена записи', row.id);
         // Логика отмены записи
         break;
       default:
-        console.warn('[Lab] Неизвестное действие', action);
+        logger.warn('[Lab] Неизвестное действие', action);
         break;
-    }
-  };
-
-  const loadPatients = async () => {
-    try {
-      console.log('[Lab] loadPatients: start');
-      setLoading(true);
-      const res = await fetch('http://localhost:8000/api/v1/patients?department=Lab&limit=100', { headers: authHeader() });
-      if (res.ok) {
-        const data = await res.json();
-        setPatients(data);
-        console.log('[Lab] loadPatients: успешно загружено', data.length, 'пациентов');
-      } else {
-        const errorText = await res.text();
-        console.error('[Lab] loadPatients: HTTP error', {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorText
-        });
-        throw new Error(`Ошибка загрузки пациентов: ${res.status} ${res.statusText}`);
-      }
-    } catch (error) {
-      console.error('[Lab] loadPatients: ошибка', error);
-      setMessage({ type: 'error', text: 'Ошибка при загрузке списка пациентов' });
-    } finally {
-      setLoading(false);
-      console.log('[Lab] loadPatients: finish');
-    }
-  };
-
-  const loadTests = async () => {
-    try {
-      console.log('[Lab] loadTests: start');
-      const res = await fetch('http://localhost:8000/api/v1/lab/tests?limit=100', { headers: authHeader() });
-      if (res.ok) {
-        const data = await res.json();
-        setTests(data);
-        console.log('[Lab] loadTests: успешно загружено', data.length, 'тестов');
-      } else {
-        const errorText = await res.text();
-        console.error('[Lab] loadTests: HTTP error', {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorText
-        });
-        throw new Error(`Ошибка загрузки тестов: ${res.status} ${res.statusText}`);
-      }
-    } catch (error) {
-      console.error('[Lab] loadTests: ошибка', error);
-      setMessage({ type: 'error', text: 'Ошибка при загрузке списка тестов' });
-    }
-  };
-
-  const loadResults = async () => {
-    try {
-      console.log('[Lab] loadResults: start');
-      const res = await fetch('http://localhost:8000/api/v1/lab/results?limit=100', { headers: authHeader() });
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data);
-        console.log('[Lab] loadResults: успешно загружено', data.length, 'результатов');
-      } else {
-        const errorText = await res.text();
-        console.error('[Lab] loadResults: HTTP error', {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorText
-        });
-        throw new Error(`Ошибка загрузки результатов: ${res.status} ${res.statusText}`);
-      }
-    } catch (error) {
-      console.error('[Lab] loadResults: ошибка', error);
-      setMessage({ type: 'error', text: 'Ошибка при загрузке результатов анализов' });
     }
   };
 
   const handleTestSubmit = async (e) => {
     e.preventDefault();
     try {
-      console.log('[Lab] handleTestSubmit: start', testForm);
+      logger.info('[Lab] handleTestSubmit: start', testForm);
       setLoading(true);
       const res = await fetch('http://localhost:8000/api/v1/lab/tests', { 
         method: 'POST', 
@@ -449,14 +553,14 @@ const LabPanel = () => {
       
       if (res.ok) {
         const savedTest = await res.json();
-        console.log('[Lab] handleTestSubmit: успешно создан тест', savedTest);
+        logger.info('[Lab] handleTestSubmit: успешно создан тест', savedTest);
         setShowTestForm(false);
         setTestForm({ patient_id: '', test_date: '', test_type: '', sample_type: '', notes: '' });
         setMessage({ type: 'success', text: 'Анализ успешно создан' });
         await loadTests();
       } else {
         const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
-        console.error('[Lab] handleTestSubmit: HTTP error', {
+        logger.error('[Lab] handleTestSubmit: HTTP error', {
           status: res.status,
           statusText: res.statusText,
           error: errorData
@@ -464,18 +568,18 @@ const LabPanel = () => {
         throw new Error(errorData.detail || `Ошибка создания теста: ${res.status} ${res.statusText}`);
       }
     } catch (error) {
-      console.error('[Lab] handleTestSubmit: ошибка', error);
+      logger.error('[Lab] handleTestSubmit: ошибка', error);
       setMessage({ type: 'error', text: error.message || 'Ошибка при создании анализа' });
     } finally {
       setLoading(false);
-      console.log('[Lab] handleTestSubmit: finish');
+      logger.info('[Lab] handleTestSubmit: finish');
     }
   };
 
   const handleResultSubmit = async (e) => {
     e.preventDefault();
     try {
-      console.log('[Lab] handleResultSubmit: start', resultForm);
+      logger.info('[Lab] handleResultSubmit: start', resultForm);
       setLoading(true);
       const res = await fetch('http://localhost:8000/api/v1/lab/results', { 
         method: 'POST', 
@@ -488,14 +592,14 @@ const LabPanel = () => {
       
       if (res.ok) {
         const savedResult = await res.json();
-        console.log('[Lab] handleResultSubmit: успешно создан результат', savedResult);
+        logger.info('[Lab] handleResultSubmit: успешно создан результат', savedResult);
         setShowResultForm(false);
         setResultForm({ patient_id: '', result_date: '', test_type: '', parameter: '', value: '', unit: '', reference: '', interpretation: '' });
         setMessage({ type: 'success', text: 'Результат анализа успешно сохранен' });
         await loadResults();
       } else {
         const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
-        console.error('[Lab] handleResultSubmit: HTTP error', {
+        logger.error('[Lab] handleResultSubmit: HTTP error', {
           status: res.status,
           statusText: res.statusText,
           error: errorData
@@ -503,72 +607,79 @@ const LabPanel = () => {
         throw new Error(errorData.detail || `Ошибка сохранения результата: ${res.status} ${res.statusText}`);
       }
     } catch (error) {
-      console.error('[Lab] handleResultSubmit: ошибка', error);
+      logger.error('[Lab] handleResultSubmit: ошибка', error);
       setMessage({ type: 'error', text: error.message || 'Ошибка при сохранении результата анализа' });
     } finally {
       setLoading(false);
-      console.log('[Lab] handleResultSubmit: finish');
+      logger.info('[Lab] handleResultSubmit: finish');
     }
   };
 
-  const pageStyle = { 
-    padding: '20px', 
-    maxWidth: '1400px', 
-    margin: '0 auto', 
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    background: 'var(--mac-bg-primary)',
-    color: 'var(--mac-text-primary)',
-    minHeight: '100vh'
+  const cardStyle = {
+    background: 'var(--mac-bg-secondary)',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-md)',
+    boxShadow: 'var(--mac-shadow-sm)',
+    marginBottom: getSpacing(4)
   };
-  const cardStyle = { 
-    background: 'var(--mac-bg-secondary)', 
-    border: '1px solid var(--mac-border)', 
-    borderRadius: 'var(--mac-radius-md)', 
-    marginBottom: '20px', 
-    boxShadow: 'var(--mac-shadow-sm)' 
+
+  const cardHeaderStyle = {
+    padding: getSpacing(4),
+    borderBottom: '1px solid var(--mac-border)',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'var(--mac-bg-tertiary)',
+    borderRadius: 'var(--mac-radius-md) var(--mac-radius-md) 0 0'
   };
-  const cardHeaderStyle = { 
-    padding: '20px', 
-    borderBottom: '1px solid var(--mac-border)', 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    backgroundColor: 'var(--mac-bg-tertiary)', 
-    color: 'var(--mac-text-primary)', 
-    borderRadius: 'var(--mac-radius-md) var(--mac-radius-md) 0 0' 
-  };
-  const cardContentStyle = { 
-    padding: '20px',
+
+  const cardContentStyle = {
+    padding: getSpacing(4),
     backgroundColor: 'var(--mac-bg-secondary)'
   };
-  const buttonStyle = { 
-    padding: '8px 16px', 
-    backgroundColor: 'var(--mac-accent)', 
-    color: 'var(--mac-text-on-accent)', 
-    border: 'none', 
-    borderRadius: 'var(--mac-radius-sm)', 
-    cursor: 'pointer', 
-    marginRight: '8px', 
-    fontSize: '14px',
-    transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+
+  const formStyle = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: getSpacing(3),
+    marginBottom: getSpacing(4)
   };
-  const buttonSecondaryStyle = { 
-    ...buttonStyle, 
+
+  const labelStyle = {
+    display: 'block',
+    marginBottom: getSpacing(1),
+    fontWeight: 500,
+    fontSize: '14px',
+    color: 'var(--mac-text-primary)'
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid var(--mac-border)',
+    borderRadius: 'var(--mac-radius-sm)',
+    fontSize: '14px',
+    backgroundColor: 'var(--mac-bg-primary)',
+    color: 'var(--mac-text-primary)'
+  };
+
+  const buttonStyle = {
+    padding: '8px 16px',
+    backgroundColor: 'var(--mac-accent)',
+    color: 'var(--mac-text-on-accent)',
+    border: 'none',
+    borderRadius: 'var(--mac-radius-sm)',
+    cursor: 'pointer',
+    marginRight: getSpacing(2),
+    fontSize: '14px'
+  };
+
+  const buttonSecondaryStyle = {
+    ...buttonStyle,
     backgroundColor: 'var(--mac-bg-tertiary)',
     color: 'var(--mac-text-primary)',
     border: '1px solid var(--mac-border)'
   };
-  const buttonSuccessStyle = { 
-    ...buttonStyle, 
-    backgroundColor: 'var(--mac-success)' 
-  };
-  const tabsStyle = { display: 'flex', borderBottom: '1px solid var(--mac-border)', marginBottom: '20px' };
-  const tabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid transparent', color: 'var(--mac-text-secondary)' };
-  const activeTabStyle = { padding: '12px 20px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', borderBottom: '2px solid var(--mac-accent)', color: 'var(--mac-accent)' };
-  const listItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-sm)', marginBottom: '12px', backgroundColor: 'var(--mac-bg-primary)' };
-  const formStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' };
-  const inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid var(--mac-border)', borderRadius: 'var(--mac-radius-sm)', fontSize: '14px', marginBottom: '12px', backgroundColor: 'var(--mac-bg-primary)', color: 'var(--mac-text-primary)' };
-  const labelStyle = { display: 'block', marginBottom: '4px', fontWeight: '500', fontSize: '14px', color: 'var(--mac-text-primary)' };
 
   return (
     <div style={{
@@ -766,7 +877,7 @@ const LabPanel = () => {
                 patientId={patientModal.selectedItem?.id || 'demo-patient-1'}
                 visitId={visitModal.selectedItem?.id || 'demo-visit-1'}
                 onUpdate={() => {
-                  console.log('Результаты обновлены');
+                  logger.info('Результаты обновлены');
                   setResults(prev => [...prev]);
                 }}
               />
@@ -1074,14 +1185,29 @@ const LabPanel = () => {
               specialty="laboratory"
               onSuggestionSelect={(type, suggestion) => {
                 if (type === 'interpretation') {
-                  console.log('AI интерпретация анализов:', suggestion);
+                  logger.info('AI интерпретация анализов:', suggestion);
                 } else if (type === 'anomaly') {
-                  console.log('AI обнаружил аномалию:', suggestion);
+                  logger.info('AI обнаружил аномалию:', suggestion);
                 }
               }}
             />
           </div>
         </div>
+      )}
+
+      {/* Модальное окно редактирования пациента */}
+      {editPatientModal.open && (
+        <EditPatientModal
+          isOpen={editPatientModal.open}
+          onClose={() => setEditPatientModal({ open: false, patient: null, loading: false })}
+          patient={editPatientModal.patient}
+          onSave={async () => {
+            await loadLabAppointments();
+            setEditPatientModal({ open: false, patient: null, loading: false });
+          }}
+          loading={editPatientModal.loading}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
+        />
       )}
     </div>
   );

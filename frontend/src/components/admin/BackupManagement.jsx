@@ -32,7 +32,7 @@ import {
   MacOSAlert,
   MacOSModal
 } from '../ui/macos';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const BackupManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -467,7 +467,7 @@ const BackupManagement = () => {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Введите название резервной копии"
                 />
               </div>
@@ -484,7 +484,7 @@ const BackupManagement = () => {
                 <MacOSSelect
                   required
                   value={formData.backup_type}
-                  onChange={(e) => setFormData({...formData, backup_type: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, backup_type: e.target.value })}
                 >
                   {typeOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -503,7 +503,7 @@ const BackupManagement = () => {
                 </label>
                 <MacOSSelect
                   value={formData.schedule}
-                  onChange={(e) => setFormData({...formData, schedule: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
                 >
                   {scheduleOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -524,7 +524,7 @@ const BackupManagement = () => {
                   type="number"
                   min="1"
                   value={formData.retention_days}
-                  onChange={(e) => setFormData({...formData, retention_days: parseInt(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, retention_days: parseInt(e.target.value) })}
                   placeholder="Введите количество дней"
                 />
               </div>
@@ -542,7 +542,7 @@ const BackupManagement = () => {
               </label>
               <MacOSTextarea
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Введите описание резервной копии"
                 rows={3}
               />
@@ -560,7 +560,7 @@ const BackupManagement = () => {
               }}>
                 <MacOSCheckbox
                   checked={formData.compression}
-                  onChange={(checked) => setFormData({...formData, compression: checked})}
+                  onChange={(checked) => setFormData({ ...formData, compression: checked })}
                 />
                 <span style={{ 
                   fontSize: 'var(--mac-font-size-sm)', 
@@ -576,7 +576,7 @@ const BackupManagement = () => {
               }}>
                 <MacOSCheckbox
                   checked={formData.encryption}
-                  onChange={(checked) => setFormData({...formData, encryption: checked})}
+                  onChange={(checked) => setFormData({ ...formData, encryption: checked })}
                 />
                 <span style={{ 
                   fontSize: 'var(--mac-font-size-sm)', 

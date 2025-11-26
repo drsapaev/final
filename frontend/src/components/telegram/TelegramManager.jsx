@@ -389,12 +389,12 @@ const TelegramManager = () => {
               <input
                 type="password"
                 value={settings.bot_token || ''}
-                onChange={(e) => setSettings({...settings, bot_token: e.target.value})}
+                onChange={(e) => setSettings({ ...settings, bot_token: e.target.value })}
                 placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <Button
-                onClick={() => setSettings({...settings, bot_token: ''})}
+                onClick={() => setSettings({ ...settings, bot_token: '' })}
                 variant="outline"
                 size="sm"
               >
@@ -413,7 +413,7 @@ const TelegramManager = () => {
             <input
               type="url"
               value={settings.webhook_url || ''}
-              onChange={(e) => setSettings({...settings, webhook_url: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, webhook_url: e.target.value })}
               placeholder="https://yourdomain.com/api/v1/telegram/webhook"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -429,7 +429,7 @@ const TelegramManager = () => {
               </label>
               <select
                 value={settings.notifications_enabled ? 'true' : 'false'}
-                onChange={(e) => setSettings({...settings, notifications_enabled: e.target.value === 'true'})}
+                onChange={(e) => setSettings({ ...settings, notifications_enabled: e.target.value === 'true' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="true">Включены</option>
@@ -443,7 +443,7 @@ const TelegramManager = () => {
               </label>
               <select
                 value={settings.default_language || 'ru'}
-                onChange={(e) => setSettings({...settings, default_language: e.target.value})}
+                onChange={(e) => setSettings({ ...settings, default_language: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ru">Русский</option>

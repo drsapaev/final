@@ -638,7 +638,7 @@ const MedicalEquipmentManager = () => {
             <MacOSSelect
               id="device-type-filter"
               value={filters.device_type}
-              onChange={(e) => setFilters({...filters, device_type: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, device_type: e.target.value })}
               options={[
                 { value: '', label: 'Все типы' },
                 { value: 'blood_pressure', label: 'Тонометр' },
@@ -661,7 +661,7 @@ const MedicalEquipmentManager = () => {
             <MacOSSelect
               id="status-filter"
               value={filters.status}
-              onChange={(e) => setFilters({...filters, status: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
               options={[
                 { value: '', label: 'Все статусы' },
                 { value: 'online', label: 'В сети' },
@@ -682,7 +682,7 @@ const MedicalEquipmentManager = () => {
             <MacOSInput
               id="location-filter"
               value={filters.location}
-              onChange={(e) => setFilters({...filters, location: e.target.value})}
+              onChange={(e) => setFilters({ ...filters, location: e.target.value })}
               placeholder="Поиск по местоположению"
             />
           </div>
@@ -803,7 +803,7 @@ const MedicalEquipmentManager = () => {
               <MacOSSelect
                 id="measurement-device"
                 value={measurementForm.device_id}
-                onChange={(e) => setMeasurementForm({...measurementForm, device_id: e.target.value})}
+                onChange={(e) => setMeasurementForm({ ...measurementForm, device_id: e.target.value })}
                 options={[
                   { value: '', label: 'Выберите устройство' },
                   ...devices
@@ -827,7 +827,7 @@ const MedicalEquipmentManager = () => {
               <MacOSInput
                 id="measurement-patient"
                 value={measurementForm.patient_id}
-                onChange={(e) => setMeasurementForm({...measurementForm, patient_id: e.target.value})}
+                onChange={(e) => setMeasurementForm({ ...measurementForm, patient_id: e.target.value })}
                 placeholder="Введите ID пациента"
               />
             </div>
@@ -923,7 +923,7 @@ const MedicalEquipmentManager = () => {
               <MacOSSelect
                 id="measurements-device-type"
                 value={filters.device_type}
-                onChange={(e) => setFilters({...filters, device_type: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, device_type: e.target.value })}
                 options={[
                   { value: '', label: 'Все типы' },
                   { value: 'blood_pressure', label: 'Тонометр' },

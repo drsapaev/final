@@ -7,6 +7,7 @@ import auth from '../../stores/auth.js';
 import { getRouteForProfile } from '../../constants/routes';
 import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
+import ForgotPassword from './ForgotPassword';
 import { Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert } from '../ui/macos';
 
 // macOS-стиль анимации для декоративных элементов
@@ -29,7 +30,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
-  
+
   const [formData, setFormData] = useState({
     username: 'admin@example.com',
     password: 'admin123',
@@ -39,7 +40,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+
   // 2FA состояние
   const [requires2FA, setRequires2FA] = useState(false);
   const [pending2FAToken, setPending2FAToken] = useState('');
@@ -48,8 +50,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   // Функция для проверки защищенных панелей
   const isProtectedPanelPath = (pathname) => {
     const prefixes = [
-      '/admin','/registrar-panel','/doctor-panel','/lab-panel','/cashier-panel',
-      '/cardiologist','/dermatologist','/dentist'
+      '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
+      '/cardiologist', '/dermatologist', '/dentist'
     ];
     return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
   };
@@ -58,12 +60,12 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     try {
       // Принудительно используем значения по умолчанию, если поля пустые
       const username = formData.username || 'admin@example.com';
       const password = formData.password || 'admin123';
-      
+
       const credentials = {
         username: username,
         password: password,
@@ -81,14 +83,14 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         },
         body: JSON.stringify(credentials)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Ошибка авторизации');
       }
-      
+
       const data = await response.json();
-      
+
       // Проверяем, требуется ли 2FA (в простом сервере 2FA отключено)
       if (data.requires_2fa && data.pending_2fa_token) {
         setRequires2FA(true);
@@ -96,17 +98,17 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         setLoading(false);
         return;
       }
-      
+
       // Обычный вход без 2FA
       if (data.access_token) {
         // Сохраняем токен единообразно для всех клиентов
         setToken(data.access_token);
         localStorage.setItem('auth_token', data.access_token);
-        
+
         try {
           // Используем данные пользователя из ответа авторизации
           setProfile(data.user);
-          
+
           // Расширенная логика перенаправления
           await new Promise(resolve => setTimeout(resolve, 100));
           const state = auth.getState ? auth.getState() : { profile: null };
@@ -126,14 +128,14 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           }
 
           // Детальная аналитика входа
-          console.log('🔐 Login redirect:', { 
-            from: fromClean, 
-            computedRoute, 
-            target, 
+          console.log('🔐 Login redirect:', {
+            from: fromClean,
+            computedRoute,
+            target,
             profile: profile?.role || 'unknown',
             timestamp: new Date().toISOString()
           });
-          
+
           navigate(target, { replace: true });
         } catch (profileError) {
           console.warn('Не удалось получить профиль:', profileError);
@@ -145,7 +147,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
     } catch (err) {
       // Улучшенная обработка ошибок с нормализацией
       let errorMessage = 'Ошибка входа';
-      
+
       if (err?.response?.data?.detail) {
         const detail = err.response.data.detail;
         if (Array.isArray(detail)) {
@@ -160,7 +162,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
       } else if (err?.message) {
         errorMessage = err.message;
       }
-      
+
       // Логирование ошибки для аналитики
       console.error('🚨 Login error:', {
         error: errorMessage,
@@ -168,7 +170,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         username: formData.username,
         loginType: formData.loginType
       });
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -179,16 +181,16 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
     try {
       if (response.data?.access_token) {
         setToken(response.data.access_token);
-        
+
         const profileResponse = await api.get('/auth/me');
         setProfile(profileResponse.data);
-        
+
         await new Promise(resolve => setTimeout(resolve, 100));
         const state = auth.getState ? auth.getState() : { profile: null };
         const profile = state?.profile || null;
         const computedRoute = getRouteForProfile(profile);
         const target = computedRoute || from || '/';
-        
+
         navigate(target, { replace: true });
       }
     } catch (err) {
@@ -338,6 +340,28 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
     );
   }
 
+  // Если нажали "Забыли пароль", показываем компонент восстановления
+  if (showForgotPassword) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#1d1d1f',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        position: 'relative'
+      }}>
+        <ForgotPassword
+          onBack={() => setShowForgotPassword(false)}
+          onSuccess={() => setShowForgotPassword(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -351,9 +375,9 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
       padding: '20px',
       position: 'relative'
     }}>
-      
-      <Card style={{ 
-        width: '100%', 
+
+      <Card style={{
+        width: '100%',
         maxWidth: '420px',
         // macOS-стиль карточки: полупрозрачная с размытием
         backgroundColor: 'rgba(255, 255, 255, 0.8)',
@@ -370,24 +394,24 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
         zIndex: 1
       }}>
         <CardHeader>
-          <CardTitle style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
+          <CardTitle style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             gap: 8,
             textAlign: 'center'
           }}>
-            <span style={{ 
-              fontSize: '24px', 
+            <span style={{
+              fontSize: '24px',
               fontWeight: '600',
               color: '#1d1d1f',
               letterSpacing: '-0.5px'
             }}>
               🔐 Вход в систему
             </span>
-            <span style={{ 
-              fontSize: '14px', 
-              fontWeight: '400', 
+            <span style={{
+              fontSize: '14px',
+              fontWeight: '400',
               color: '#86868b',
               letterSpacing: '0.1px'
             }}>
@@ -447,7 +471,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} /> Запомнить меня
               </label>
-              <Button type="button" variant="ghost" onClick={onForgotPassword}>
+              <Button type="button" variant="ghost" onClick={() => setShowForgotPassword(true)}>
                 Забыли пароль?
               </Button>
             </div>
@@ -462,8 +486,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           </form>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <Button type="button" variant="outline" fullWidth onClick={onRegister}>Регистрация</Button>
-            <Button type="button" variant="outline" fullWidth>Гость</Button>
+            <Button type="button" variant="outline" fullWidth onClick={() => navigate('/register')}>Регистрация</Button>
+            <Button type="button" variant="outline" fullWidth onClick={() => navigate('/')}>Гость</Button>
           </div>
         </CardContent>
       </Card>
@@ -472,4 +496,3 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 };
 
 export default LoginFormStyled;
-

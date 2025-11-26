@@ -122,10 +122,7 @@ export const API_ENDPOINTS = {
     TEST: '/print/test'
   },
 
-  // WebSocket (новое)
-  WEBSOCKET: {
-    DISPLAY_BOARD: '/display/ws/board'
-  },
+  // WebSocket endpoints объединены ниже
 
   // Аудит
   AUDIT: {

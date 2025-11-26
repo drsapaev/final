@@ -23,7 +23,7 @@ import {
   TestTube,
   Zap
 } from 'lucide-react';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
 const FCMManager = () => {
@@ -474,7 +474,7 @@ const FCMManager = () => {
                     }}>
                       {user.full_name || user.username}
                     </span>
-                    <MacOSBadge variant={user.push_enabled ? "success" : "secondary"} style={{ marginLeft: 'auto' }}>
+                    <MacOSBadge variant={user.push_enabled ? 'success' : 'secondary'} style={{ marginLeft: 'auto' }}>
                       {user.device_type}
                     </MacOSBadge>
                   </label>
@@ -556,8 +556,8 @@ const FCMManager = () => {
               </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MacOSBadge variant={user.push_enabled ? "success" : "secondary"}>
-                  {user.push_enabled ? "Push включен" : "Push отключен"}
+                <MacOSBadge variant={user.push_enabled ? 'success' : 'secondary'}>
+                  {user.push_enabled ? 'Push включен' : 'Push отключен'}
                 </MacOSBadge>
                 
                 <MacOSBadge variant="outline">

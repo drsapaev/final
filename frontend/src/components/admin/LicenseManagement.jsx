@@ -32,7 +32,7 @@ import {
   MacOSAlert,
   MacOSModal
 } from '../ui/macos';
-import { api } from '../../utils/api';
+import { api } from '../../api/client';
 
 const LicenseManagement = () => {
   const [loading, setLoading] = useState(true);
@@ -432,7 +432,7 @@ const LicenseManagement = () => {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Введите название лицензии"
                 />
               </div>
@@ -449,7 +449,7 @@ const LicenseManagement = () => {
                 <MacOSSelect
                   required
                   value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 >
                   <option value="">Выберите тип</option>
                   {typeOptions.map(option => (
@@ -471,7 +471,7 @@ const LicenseManagement = () => {
                   type="text"
                   required
                   value={formData.license_key}
-                  onChange={(e) => setFormData({...formData, license_key: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, license_key: e.target.value })}
                   placeholder="Введите лицензионный ключ"
                 />
               </div>
@@ -488,7 +488,7 @@ const LicenseManagement = () => {
                 <MacOSInput
                   type="text"
                   value={formData.vendor}
-                  onChange={(e) => setFormData({...formData, vendor: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                   placeholder="Введите название поставщика"
                 />
               </div>
@@ -504,7 +504,7 @@ const LicenseManagement = () => {
                 </label>
                 <MacOSSelect
                   value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   {statusOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -524,7 +524,7 @@ const LicenseManagement = () => {
                 <MacOSInput
                   type="date"
                   value={formData.purchase_date}
-                  onChange={(e) => setFormData({...formData, purchase_date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                 />
               </div>
               <div>
@@ -540,7 +540,7 @@ const LicenseManagement = () => {
                 <MacOSInput
                   type="date"
                   value={formData.expiry_date}
-                  onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
                 />
               </div>
               <div>
@@ -556,7 +556,7 @@ const LicenseManagement = () => {
                 <MacOSInput
                   type="number"
                   value={formData.cost}
-                  onChange={(e) => setFormData({...formData, cost: parseFloat(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) })}
                   placeholder="Введите стоимость"
                 />
               </div>
@@ -574,7 +574,7 @@ const LicenseManagement = () => {
                   type="number"
                   min="1"
                   value={formData.seats}
-                  onChange={(e) => setFormData({...formData, seats: parseInt(e.target.value)})}
+                  onChange={(e) => setFormData({ ...formData, seats: parseInt(e.target.value) })}
                   placeholder="Введите количество мест"
                 />
               </div>
@@ -592,7 +592,7 @@ const LicenseManagement = () => {
               </label>
               <MacOSTextarea
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Введите описание лицензии"
                 rows={3}
               />

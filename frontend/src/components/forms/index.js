@@ -68,7 +68,7 @@ export const validators = {
 
   match: (fieldName, message) => (value, allValues) => {
     if (!value) return true;
-    const actualMessage = message || `Поля не совпадают`;
+    const actualMessage = message || 'Поля не совпадают';
     return value === allValues[fieldName] ? true : actualMessage;
   },
 

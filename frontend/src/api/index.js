@@ -5,7 +5,6 @@ export * from './client';
 export * from './endpoints';
 export * from './services';
 export * from './visits';
-export * from './queues';
 export * from './setting';
 export * from './ws';
 export * from './health';

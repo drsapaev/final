@@ -129,7 +129,7 @@ const ReportGenerator = ({
               <MacOSButton
                 key={type}
                 onClick={() => onReportTypeChange(type)}
-                variant={isSelected ? "primary" : "outline"}
+                variant={isSelected ? 'primary' : 'outline'}
                 style={{
                   padding: '16px',
                   textAlign: 'left',
@@ -445,7 +445,7 @@ const ReportGenerator = ({
                 <MacOSButton
                   key={value}
                   onClick={() => setReportFormat(value)}
-                  variant={reportFormat === value ? "primary" : "outline"}
+                  variant={reportFormat === value ? 'primary' : 'outline'}
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
