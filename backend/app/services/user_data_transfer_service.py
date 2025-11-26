@@ -110,7 +110,7 @@ class UserDataTransferService:
                         "number": entry.number,
                         "status": entry.status,
                         "queue_date": entry.queue.day.isoformat() if entry.queue else None,
-                        "specialist_name": entry.queue.specialist.full_name if entry.queue and entry.queue.specialist else "Неизвестно"
+                        "specialist_name": entry.queue.specialist.user.full_name if (entry.queue and entry.queue.specialist and entry.queue.specialist.user) else "Неизвестно"
                     })
             
             return summary

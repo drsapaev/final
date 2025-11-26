@@ -86,8 +86,8 @@ def get_queues_cabinet_info(
         result = []
         for queue in queues:
             # Получаем информацию о специалисте
-            specialist = db.query(User).filter(User.id == queue.specialist_id).first()
-            specialist_name = specialist.full_name if specialist else f"Специалист #{queue.specialist_id}"
+            specialist = db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
+            specialist_name = specialist.user.full_name if (specialist and specialist.user) else f"Специалист #{queue.specialist_id}"
             
             # Подсчитываем записи в очереди
             entries_count = db.query(OnlineQueueEntry).filter(
@@ -138,8 +138,8 @@ def get_queue_cabinet_info(
             )
         
         # Получаем информацию о специалисте
-        specialist = db.query(User).filter(User.id == queue.specialist_id).first()
-        specialist_name = specialist.full_name if specialist else f"Специалист #{queue.specialist_id}"
+        specialist = db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
+        specialist_name = specialist.user.full_name if (specialist and specialist.user) else f"Специалист #{queue.specialist_id}"
         
         # Подсчитываем записи в очереди
         entries_count = db.query(OnlineQueueEntry).filter(
@@ -351,7 +351,7 @@ def sync_cabinet_info_from_doctors(
         for queue in queues:
             try:
                 # Получаем информацию о враче
-                doctor = db.query(Doctor).filter(Doctor.user_id == queue.specialist_id).first()
+                doctor = db.query(Doctor).filter(Doctor.id == queue.specialist_id).first()
                 
                 if doctor and doctor.cabinet and queue.cabinet_number != doctor.cabinet:
                     queue.cabinet_number = doctor.cabinet

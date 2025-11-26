@@ -15,6 +15,7 @@ from app.models import (  # noqa: F401, E402
     audit as _m_audit,
     clinic as _m_clinic,
     online_queue as _m_online_queue,
+    department as _m_department,
     emr as _m_emr,
     enums as _m_enums,
     lab as _m_lab,
@@ -29,4 +30,6 @@ from app.models import (  # noqa: F401, E402
     setting as _m_setting,
     user as _m_user,
     visit as _m_visit,
+    doctor_price_override as _m_doctor_price_override,
+    role_permission as _m_role_permission,
 )

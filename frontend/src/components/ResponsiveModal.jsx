@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useBreakpoint } from '../hooks/useMediaQuery';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { Button } from './ui';
 import { X } from 'lucide-react';
 

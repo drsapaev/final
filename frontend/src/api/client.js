@@ -18,6 +18,22 @@ const api = axios.create({
   // Optionally timeout: timeout: 15000,
 });
 
+// Ensure Authorization header is attached for every request from localStorage
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  console.log('🔍 [api/client.js] Request interceptor:', {
+    url: config.url,
+    hasToken: !!token,
+    tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',
+    headers: config.headers
+  });
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
+
 function getApiBase() {
   return API_BASE;
 }
@@ -86,7 +102,7 @@ async function login(username, password) {
   };
 
   const resp = await api.post('/auth/login', credentials);
-  
+
   return resp.data;
 }
 

@@ -148,7 +148,7 @@ export const printService = {
    */
   async testPrint(printerName) {
     try {
-      const response = await api.post(`/print/test`, {
+      const response = await api.post('/print/test', {
         printer_name: printerName
       });
       

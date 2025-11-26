@@ -340,7 +340,7 @@ class DeepSeekProvider(BaseAIProvider):
     async def analyze_drug_safety(self, drug: str, patient_info: Optional[Dict] = None) -> Dict[str, Any]:
         return {"error": "Not implemented"}
     
-    async def analyze_medical_trends(self, data: List[Dict]) -> Dict[str, Any]:
+    async def analyze_medical_trends(self, medical_data: List[Dict], time_period: str, analysis_type: str) -> Dict[str, Any]:
         return {"error": "Not implemented"}
     
     async def analyze_workload_distribution(self, data: Dict) -> Dict[str, Any]:

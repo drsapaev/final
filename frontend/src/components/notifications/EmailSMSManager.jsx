@@ -351,7 +351,7 @@ const EmailSMSManager = () => {
             <input
               type="email"
               value={emailForm.to}
-              onChange={(e) => setEmailForm({...emailForm, to: e.target.value})}
+              onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="example@email.com"
             />
@@ -364,7 +364,7 @@ const EmailSMSManager = () => {
             <input
               type="text"
               value={emailForm.subject}
-              onChange={(e) => setEmailForm({...emailForm, subject: e.target.value})}
+              onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Тема письма"
             />
@@ -376,7 +376,7 @@ const EmailSMSManager = () => {
             </label>
             <select
               value={emailForm.template}
-              onChange={(e) => setEmailForm({...emailForm, template: e.target.value})}
+              onChange={(e) => setEmailForm({ ...emailForm, template: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Выберите шаблон</option>
@@ -394,7 +394,7 @@ const EmailSMSManager = () => {
             </label>
             <select
               value={emailForm.priority}
-              onChange={(e) => setEmailForm({...emailForm, priority: e.target.value})}
+              onChange={(e) => setEmailForm({ ...emailForm, priority: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="normal">Обычный</option>
@@ -409,7 +409,7 @@ const EmailSMSManager = () => {
           </label>
           <textarea
             value={emailForm.message}
-            onChange={(e) => setEmailForm({...emailForm, message: e.target.value})}
+            onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Текст сообщения"
@@ -451,7 +451,7 @@ const EmailSMSManager = () => {
             <input
               type="tel"
               value={smsForm.phone}
-              onChange={(e) => setSmsForm({...smsForm, phone: e.target.value})}
+              onChange={(e) => setSmsForm({ ...smsForm, phone: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               placeholder="+998901234567"
             />
@@ -464,7 +464,7 @@ const EmailSMSManager = () => {
             <input
               type="text"
               value={smsForm.sender}
-              onChange={(e) => setSmsForm({...smsForm, sender: e.target.value})}
+              onChange={(e) => setSmsForm({ ...smsForm, sender: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               placeholder="Clinic"
             />
@@ -476,7 +476,7 @@ const EmailSMSManager = () => {
             </label>
             <select
               value={smsForm.template}
-              onChange={(e) => setSmsForm({...smsForm, template: e.target.value})}
+              onChange={(e) => setSmsForm({ ...smsForm, template: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             >
               <option value="">Выберите шаблон</option>
@@ -494,7 +494,7 @@ const EmailSMSManager = () => {
             </label>
             <select
               value={smsForm.priority}
-              onChange={(e) => setSmsForm({...smsForm, priority: e.target.value})}
+              onChange={(e) => setSmsForm({ ...smsForm, priority: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             >
               <option value="normal">Обычный</option>
@@ -509,7 +509,7 @@ const EmailSMSManager = () => {
           </label>
           <textarea
             value={smsForm.message}
-            onChange={(e) => setSmsForm({...smsForm, message: e.target.value})}
+            onChange={(e) => setSmsForm({ ...smsForm, message: e.target.value })}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             placeholder="Текст SMS сообщения"
@@ -550,7 +550,7 @@ const EmailSMSManager = () => {
             </label>
             <select
               value={bulkForm.type}
-              onChange={(e) => setBulkForm({...bulkForm, type: e.target.value})}
+              onChange={(e) => setBulkForm({ ...bulkForm, type: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
               <option value="email">Email</option>
@@ -565,7 +565,7 @@ const EmailSMSManager = () => {
             <input
               type="number"
               value={bulkForm.batchSize}
-              onChange={(e) => setBulkForm({...bulkForm, batchSize: parseInt(e.target.value)})}
+              onChange={(e) => setBulkForm({ ...bulkForm, batchSize: parseInt(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               min="1"
               max="1000"
@@ -580,7 +580,7 @@ const EmailSMSManager = () => {
               type="number"
               step="0.1"
               value={bulkForm.delay}
-              onChange={(e) => setBulkForm({...bulkForm, delay: parseFloat(e.target.value)})}
+              onChange={(e) => setBulkForm({ ...bulkForm, delay: parseFloat(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               min="0"
               max="10"
@@ -593,7 +593,7 @@ const EmailSMSManager = () => {
             </label>
             <select
               value={bulkForm.template}
-              onChange={(e) => setBulkForm({...bulkForm, template: e.target.value})}
+              onChange={(e) => setBulkForm({ ...bulkForm, template: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             >
               <option value="">Выберите шаблон</option>
@@ -614,7 +614,7 @@ const EmailSMSManager = () => {
             <input
               type="text"
               value={bulkForm.subject}
-              onChange={(e) => setBulkForm({...bulkForm, subject: e.target.value})}
+              onChange={(e) => setBulkForm({ ...bulkForm, subject: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               placeholder="Тема письма"
             />
@@ -627,7 +627,7 @@ const EmailSMSManager = () => {
           </label>
           <textarea
             value={bulkForm.message}
-            onChange={(e) => setBulkForm({...bulkForm, message: e.target.value})}
+            onChange={(e) => setBulkForm({ ...bulkForm, message: e.target.value })}
             rows={4}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             placeholder="Текст сообщения"

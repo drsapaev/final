@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.api.deps import get_current_user
-from app.services.advanced_analytics import get_advanced_analytics_service, AdvancedAnalyticsService
+from app.services.analytics import AnalyticsService
 
 router = APIRouter()
 
@@ -33,8 +33,9 @@ async def get_kpi_metrics(
             status_code=400, detail="Начальная дата должна быть раньше конечной"
         )
 
-    analytics_service = get_advanced_analytics_service()
-    return analytics_service.get_kpi_metrics(db, start, end, department)
+    # Используем SSOT для KPI метрик
+    # get_kpi_metrics() заменён на calculate_statistics() (SSOT)
+    return AnalyticsService.calculate_statistics(db, start, end, department)
 
 
 @router.get("/doctors/performance")
@@ -104,8 +105,8 @@ async def get_advanced_revenue_analytics(
             status_code=400, detail="Начальная дата должна быть раньше конечной"
         )
 
-    analytics_service = get_advanced_analytics_service()
-    return analytics_service.get_revenue_analytics(db, start, end, department)
+    # Используем SSOT для доходов
+    return AnalyticsService.calculate_revenue(db, start, end, department)
 
 
 @router.get("/predictive")
@@ -140,23 +141,13 @@ async def get_advanced_comprehensive_report(
             status_code=400, detail="Начальная дата должна быть раньше конечной"
         )
 
-    analytics_service = get_advanced_analytics_service()
+    # Используем SSOT для комплексного отчёта
+    report = AnalyticsService.calculate_statistics(db, start, end, department)
     
-    # Собираем все виды аналитики
-    report = {
-        "report_period": {
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
-            "department": department or "all",
-            "generated_at": datetime.utcnow().isoformat()
-        },
-        "kpi_metrics": analytics_service.get_kpi_metrics(db, start, end, department),
-        "doctor_performance": analytics_service.get_doctor_performance(db, start, end, department),
-        "patient_analytics": analytics_service.get_patient_analytics(db, start, end),
-        "revenue_analytics": analytics_service.get_revenue_analytics(db, start, end, department)
-    }
-    
+    # Добавляем расширенные метрики из advanced_analytics (если нужно)
     if include_predictive:
+        from app.services.advanced_analytics import get_advanced_analytics_service
+        analytics_service = get_advanced_analytics_service()
         report["predictive_analytics"] = analytics_service.get_predictive_analytics(db, 30)
     
     return report

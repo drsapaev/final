@@ -1,19 +1,23 @@
 """
 API endpoints для системы очередей
 """
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.user import User
 from app.models.clinic import Doctor
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user
-from app.services.queue_service import get_queue_service
+from app.services.queue_service import (
+    get_queue_service,
+    QueueValidationError,
+    QueueNotFoundError,
+    QueueConflictError,
+)
 from pydantic import BaseModel
-import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -79,7 +83,6 @@ def generate_qr_token(
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
         
-        # Проверка существования специалиста
         specialist = db.query(User).filter(
             User.id == specialist_id,
             User.role == "Doctor"
@@ -88,58 +91,27 @@ def generate_qr_token(
         if not specialist:
             raise HTTPException(status_code=404, detail="Специалист не найден")
         
-        # Проверка даты (не в прошлом)
         if day < date.today():
             raise HTTPException(status_code=400, detail="Нельзя создать очередь на прошедший день")
-        
-        # Создание или получение очереди на день
-        daily_queue = db.query(DailyQueue).filter(
-            DailyQueue.day == day,
-            DailyQueue.specialist_id == specialist_id
-        ).first()
-        
-        if not daily_queue:
-            daily_queue = DailyQueue(
-                day=day,
-                specialist_id=specialist_id,
-                active=True
-            )
-            db.add(daily_queue)
-            db.commit()
-            db.refresh(daily_queue)
-        
-        # Генерация токена
-        token_str = str(uuid.uuid4())
-        expires_at = datetime.combine(day, time(23, 59, 59))  # До конца дня
-        
-        # Проверка существующего токена
-        existing_token = db.query(QueueToken).filter(
-            QueueToken.day == day,
-            QueueToken.specialist_id == specialist_id,
-            QueueToken.expires_at > datetime.now()
-        ).first()
-        
-        if existing_token:
-            token_str = existing_token.token
-        else:
-            queue_token = QueueToken(
-                token=token_str,
-                day=day,
-                specialist_id=specialist_id,
-                expires_at=expires_at
-            )
-            db.add(queue_token)
-            db.commit()
 
-        # Формирование QR URL
-        qr_url = f"/queue/join?token={token_str}"
-    
+        queue_service = get_queue_service()
+        token_value, token_meta = queue_service.assign_queue_token(
+            db,
+            specialist_id=specialist_id,
+            department=None,
+            generated_by_user_id=current_user.id,
+            target_date=day,
+            is_clinic_wide=False,
+        )
+
+        qr_url = f"/queue/join?token={token_value}"
+
         return QueueTokenResponse(
-            token=token_str,
+            token=token_value,
             qr_url=qr_url,
-            expires_at=expires_at,
-            specialist_name=specialist.full_name or specialist.username,
-            day=day
+            expires_at=token_meta.get("expires_at"),
+            specialist_name=token_meta.get("specialist_name") or specialist.full_name or specialist.username,
+            day=token_meta.get("day", day)
         )
     except HTTPException:
         raise
@@ -160,132 +132,86 @@ def join_queue(
     Доступно всем (публичный endpoint)
     """
     try:
-        # Проверка токена
-        token = db.query(QueueToken).filter(
-            QueueToken.token == request.token,
-            QueueToken.expires_at > datetime.now()
-        ).first()
-        
-        if not token:
-            return QueueJoinResponse(
-                success=False,
-                message="Недействительный или истекший токен"
-            )
-        
-        # Получение очереди
-        daily_queue = db.query(DailyQueue).filter(
-            DailyQueue.day == token.day,
-            DailyQueue.specialist_id == token.specialist_id
-        ).first()
-        
-        if not daily_queue:
-            return QueueJoinResponse(
-                success=False,
-                message="Очередь не найдена"
-            )
-        
-        # Получаем сервис очереди
         queue_service = get_queue_service()
-        
-        # Валидация данных
-        is_valid, validation_message = queue_service.validate_queue_entry_data(
-            request.patient_name, request.phone, request.telegram_id
+        try:
+            join_result = queue_service.join_queue_with_token(
+                db,
+                token_str=request.token,
+                patient_name=request.patient_name,
+                phone=request.phone,
+                telegram_id=request.telegram_id,
+                source="online",
+            )
+        except (QueueValidationError, QueueNotFoundError, QueueConflictError) as exc:
+            return QueueJoinResponse(success=False, message=str(exc))
+
+        queue_entry = join_result["entry"]
+        daily_queue = join_result.get("daily_queue")
+        specialist_display = (
+            daily_queue.specialist.user.full_name
+            if daily_queue and daily_queue.specialist and daily_queue.specialist.user
+            else join_result.get("specialist_name")
         )
-        if not is_valid:
-            return QueueJoinResponse(success=False, message=validation_message)
-        
-        # Проверка временного окна
-        time_allowed, time_message = queue_service.check_queue_time_window(
-            token.day, daily_queue.opened_at
+        queue_day = (
+            str(daily_queue.day)
+            if daily_queue and daily_queue.day
+            else queue_entry.queue.day.isoformat()
+            if queue_entry.queue and queue_entry.queue.day
+            else None
         )
-        if not time_allowed:
-            return QueueJoinResponse(success=False, message=time_message)
-        
-        # Проверка лимитов
-        limits_ok, limits_message = queue_service.check_queue_limits(db, daily_queue)
-        if not limits_ok:
-            return QueueJoinResponse(success=False, message=limits_message)
-        
-        # Проверка уникальности
-        existing_entry, duplicate_reason = queue_service.check_uniqueness(
-            db, daily_queue, request.phone, request.telegram_id
-        )
-        
-        if existing_entry:
-            # Возвращаем существующий номер с подробной информацией
+
+        if join_result["duplicate"]:
             status_text = {
                 "waiting": "ожидает вызова",
-                "called": "вызван к врачу"
-            }.get(existing_entry.status, existing_entry.status)
-            
+                "called": "вызван к врачу",
+            }.get(queue_entry.status, queue_entry.status)
+
             return QueueJoinResponse(
                 success=True,
-                number=existing_entry.number,
-                message=f"✅ Вы уже записаны по {duplicate_reason}. Ваш номер: {existing_entry.number} ({status_text})",
+                number=queue_entry.number,
+                message=f"✅ Вы уже записаны по {join_result['duplicate_reason']}. Ваш номер: {queue_entry.number} ({status_text})",
                 duplicate=True,
                 queue_info={
-                    "specialist": daily_queue.specialist.full_name,
-                    "day": str(daily_queue.day),
-                    "position": existing_entry.number,
-                    "status": existing_entry.status,
-                    "created_at": existing_entry.created_at.isoformat(),
-                    "estimated_time": f"Записались в {existing_entry.created_at.strftime('%H:%M')}"
-                }
+                    "specialist": specialist_display,
+                    "day": queue_day,
+                    "position": queue_entry.number,
+                    "status": queue_entry.status,
+                    "created_at": queue_entry.created_at.isoformat()
+                    if queue_entry.created_at
+                    else None,
+                    "estimated_time": "Ожидайте вызова",
+                },
             )
-        
-        # Создание новой записи
-        # Вычисляем следующий номер через сервис
-        next_number = queue_service.calculate_next_number(db, daily_queue)
-        
-        queue_entry = OnlineQueueEntry(
-            queue_id=daily_queue.id,
-            number=next_number,
-            patient_name=request.patient_name,
-            phone=request.phone,
-            telegram_id=request.telegram_id,
-            source="online",
-            status="waiting"
-        )
-        
-        db.add(queue_entry)
-        
-        # Увеличиваем счетчик использований токена
-        token.current_uses += 1
-        
-        db.commit()
-        db.refresh(queue_entry)
-        
-        # Отправка WebSocket события о новой записи
+
         try:
             import asyncio
             from app.services.display_websocket import get_display_manager
-            
+
             async def send_queue_update():
                 manager = get_display_manager()
                 await manager.broadcast_queue_update(
                     queue_entry=queue_entry,
                     event_type="queue.created"
                 )
-            
-            # Запускаем асинхронную отправку в фоне
+
             asyncio.create_task(send_queue_update())
-            
+
         except Exception as ws_error:
             print(f"Предупреждение: не удалось отправить обновление очереди: {ws_error}")
-        
+
         return QueueJoinResponse(
             success=True,
-            number=next_number,
-            message=f"Вы записаны в очередь. Ваш номер: {next_number}",
+            number=queue_entry.number,
+            message=f"Вы записаны в очередь. Ваш номер: {queue_entry.number}",
             duplicate=False,
             queue_info={
-                "specialist": daily_queue.specialist.full_name,
-                "day": str(daily_queue.day),
-                "position": next_number,
+                "specialist": specialist_display,
+                "day": queue_day,
+                "position": queue_entry.number,
                 "estimated_time": "Придите к открытию приема"
             }
         )
-    
+
     except Exception as e:
         logger.error(f"Ошибка при записи в очередь: {str(e)}")
         return QueueJoinResponse(
@@ -344,7 +270,7 @@ def get_queue_statistics(
             "statistics": stats,
             "specialist": {
                 "id": specialist_id,
-                "name": daily_queue.specialist.full_name if daily_queue.specialist else f"Врач #{specialist_id}"
+                "name": daily_queue.specialist.user.full_name if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{specialist_id}"
             },
             "day": day.isoformat()
         }
@@ -457,7 +383,7 @@ def get_today_queue(
         return QueueStatusResponse(
             queue_id=daily_queue.id,
             day=daily_queue.day,
-            specialist_name=daily_queue.specialist.full_name or daily_queue.specialist.username,
+            specialist_name=(daily_queue.specialist.user.full_name or daily_queue.specialist.user.username) if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{daily_queue.specialist_id}",
             is_open=daily_queue.opened_at is not None,
             opened_at=daily_queue.opened_at,
             total_entries=len(entries),

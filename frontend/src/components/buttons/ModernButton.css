@@ -53,6 +53,21 @@
 
 .modern-button:focus-visible {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/* Улучшенная accessibility для медицинских кнопок */
+.modern-button.variant-emergency:focus-visible {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.5);
+}
+
+.modern-button.variant-diagnose:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5);
+}
+
+.modern-button.variant-treat:focus-visible {
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.5);
 }
 
 .modern-button.disabled {
@@ -64,7 +79,7 @@
   pointer-events: none;
 }
 
-/* Варианты */
+/* Варианты (обновлено с новыми медицинскими цветами) */
 .modern-button.variant-primary:hover:not(.disabled):not(.loading) {
   background-color: #2563eb !important;
 }
@@ -87,6 +102,45 @@
 
 .modern-button.variant-info:hover:not(.disabled):not(.loading) {
   background-color: #0284c7 !important;
+}
+
+/* Медицинские варианты */
+.modern-button.variant-cardiology:hover:not(.disabled):not(.loading) {
+  background-color: #b91c1c !important;
+}
+
+.modern-button.variant-dermatology:hover:not(.disabled):not(.loading) {
+  background-color: #6d28d9 !important;
+}
+
+.modern-button.variant-dentistry:hover:not(.disabled):not(.loading) {
+  background-color: #047857 !important;
+}
+
+.modern-button.variant-laboratory:hover:not(.disabled):not(.loading) {
+  background-color: #0e7490 !important;
+}
+
+/* Семантические медицинские действия */
+.modern-button.variant-emergency:hover:not(.disabled):not(.loading) {
+  background-color: #b91c1c !important;
+  animation: pulse-emergency 1.5s infinite;
+}
+
+.modern-button.variant-diagnose:hover:not(.disabled):not(.loading) {
+  background-color: #1d4ed8 !important;
+}
+
+.modern-button.variant-treat:hover:not(.disabled):not(.loading) {
+  background-color: #047857 !important;
+}
+
+.modern-button.variant-approve:hover:not(.disabled):not(.loading) {
+  background-color: #1f2937 !important;
+}
+
+.modern-button.variant-reject:hover:not(.disabled):not(.loading) {
+  background-color: #374151 !important;
 }
 
 .modern-button.variant-light:hover:not(.disabled):not(.loading) {
@@ -335,6 +389,17 @@
   }
   50% {
     opacity: 0.8;
+  }
+}
+
+@keyframes pulse-emergency {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0);
   }
 }
 

@@ -23,7 +23,7 @@ import {
   Plus,
   Edit
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { Card, Button, Badge } from '../ui/macos';
 
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,7 @@ const DisplayBoardSettings = () => {
   // Языки озвучки
   const voiceLanguages = [
     { value: 'ru', label: 'Русский' },
-    { value: 'uz', label: "O'zbekcha" },
+    { value: 'uz', label: 'O\'zbekcha' },
     { value: 'en', label: 'English' }
   ];
 

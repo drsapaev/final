@@ -15,9 +15,10 @@ const api = axios.create({
 // Интерцептор для добавления токена авторизации
 api.interceptors.request.use(
   (config) => {
-    // Используем единый ключ 'auth_token' для всех токенов
-    const token = localStorage.getItem('auth_token');
+    // Поддерживаем оба ключа: 'auth_token' и 'access_token'
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -43,4 +44,5 @@ api.interceptors.response.use(
   }
 );
 
+export { api };
 export default api;

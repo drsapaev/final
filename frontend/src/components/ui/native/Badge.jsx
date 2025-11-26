@@ -1,43 +1,105 @@
 import React from 'react';
-import { cn } from '../../../utils/cn';
+import { useTheme } from '../../../contexts/ThemeContext';
 
-const Badge = React.forwardRef(({ 
-  children, 
-  className = '', 
+const Badge = React.forwardRef(({
+  children,
+  className = '',
   variant = 'default',
   size = 'md',
-  ...props 
+  style = {},
+  ...props
 }, ref) => {
-  const baseClasses = 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2';
-  
+  const { getColor, getSpacing, getFontSize } = useTheme();
+
+  const baseStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: '9999px',
+    fontWeight: '600',
+    transition: 'all 0.2s ease',
+    border: '1px solid transparent'
+  };
+
   const variants = {
-    default: 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80',
-    secondary: 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    destructive: 'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
-    outline: 'text-foreground',
-    primary: 'bg-blue-100 text-blue-800 border-blue-200',
-    success: 'bg-green-100 text-green-800 border-green-200',
-    warning: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    danger: 'bg-red-100 text-red-800 border-red-200',
-    info: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-    gray: 'bg-gray-100 text-gray-800 border-gray-200'
+    default: {
+      backgroundColor: getColor('primary', 500),
+      color: 'white',
+      border: '1px solid transparent'
+    },
+    secondary: {
+      backgroundColor: getColor('secondary', 500),
+      color: 'white',
+      border: '1px solid transparent'
+    },
+    destructive: {
+      backgroundColor: getColor('danger', 500),
+      color: 'white',
+      border: '1px solid transparent'
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      color: getColor('text'),
+      border: `1px solid ${getColor('border')}`
+    },
+    primary: {
+      backgroundColor: getColor('primary', 100),
+      color: getColor('primary', 800),
+      border: `1px solid ${getColor('primary', 200)}`
+    },
+    success: {
+      backgroundColor: getColor('success', 100),
+      color: getColor('success', 800),
+      border: `1px solid ${getColor('success', 200)}`
+    },
+    warning: {
+      backgroundColor: getColor('warning', 100),
+      color: getColor('warning', 800),
+      border: `1px solid ${getColor('warning', 200)}`
+    },
+    danger: {
+      backgroundColor: getColor('danger', 100),
+      color: getColor('danger', 800),
+      border: `1px solid ${getColor('danger', 200)}`
+    },
+    info: {
+      backgroundColor: getColor('info', 100),
+      color: getColor('info', 800),
+      border: `1px solid ${getColor('info', 200)}`
+    },
+    gray: {
+      backgroundColor: getColor('secondary', 100),
+      color: getColor('secondary', 800),
+      border: `1px solid ${getColor('secondary', 200)}`
+    }
   };
-  
+
   const sizes = {
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-0.5 text-xs',
-    lg: 'px-3 py-1 text-sm'
+    sm: {
+      padding: `${getSpacing('xs')} ${getSpacing('sm')}`,
+      fontSize: getFontSize('xs')
+    },
+    md: {
+      padding: `${getSpacing('xs')} ${getSpacing('md')}`,
+      fontSize: getFontSize('xs')
+    },
+    lg: {
+      padding: `${getSpacing('xs')} ${getSpacing('md')}`,
+      fontSize: getFontSize('sm')
+    }
   };
-  
+
+  const combinedStyle = {
+    ...baseStyle,
+    ...sizes[size],
+    ...variants[variant],
+    ...style
+  };
+
   return (
     <div
       ref={ref}
-      className={cn(
-        baseClasses,
-        variants[variant],
-        sizes[size],
-        className
-      )}
+      className={className}
+      style={combinedStyle}
       {...props}
     >
       {children}

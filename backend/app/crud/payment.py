@@ -12,39 +12,40 @@ def list_payments(
     db: Session,
     *,
     visit_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> List[Payment]:
-    stmt = select(Payment)
+    """Получить список платежей с фильтрацией"""
+    from datetime import datetime, date
+    from sqlalchemy.orm import selectinload
+    
+    stmt = select(Payment).options(selectinload(Payment.payment_visits))
+    
     if visit_id:
         stmt = stmt.where(Payment.visit_id == visit_id)
+    
+    # ✅ ИСПРАВЛЕНО: Фильтрация по датам на уровне SQL для правильной работы limit
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+            stmt = stmt.where(Payment.created_at >= datetime.combine(from_date, datetime.min.time()))
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+            stmt = stmt.where(Payment.created_at <= datetime.combine(to_date, datetime.max.time()))
+        except ValueError:
+            pass
+    
     stmt = stmt.order_by(Payment.id.desc()).limit(limit).offset(offset)
     return list(db.execute(stmt).scalars().all())
 
 
-def create_payment(
-    db: Session,
-    *,
-    visit_id: int,
-    amount: float,
-    currency: str = "UZS",
-    method: str = "cash",
-    status: str = "paid",
-    receipt_no: Optional[str] = None,
-    note: Optional[str] = None,
-) -> Payment:
-    row = Payment(
-        visit_id=visit_id,
-        amount=amount,
-        currency=currency,
-        method=method,
-        status=status,
-        receipt_no=receipt_no,
-        note=note,
-    )
-    db.add(row)
-    db.flush()
-    return row
+# create_payment() удалена - используйте billing_service.create_payment() (SSOT)
 
 
 def sum_paid_by_visit(db: Session, *, visit_id: int) -> float:

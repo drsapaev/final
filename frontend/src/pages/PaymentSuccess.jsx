@@ -6,28 +6,16 @@ import {
   CardContent,
   Typography,
   Button,
-  Grid,
-  Divider,
   Alert,
   CircularProgress,
-  Chip,
-  Paper
-} from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Download as DownloadIcon,
-  Home as HomeIcon,
-  Receipt as ReceiptIcon,
-  Print as PrintIcon,
-  Share as ShareIcon
-} from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+  Badge
+} from '../components/ui/macos';
+import { CheckCircle as CheckIcon, Download as DownloadIcon, Home as HomeIcon, Receipt as ReceiptIcon, Printer as PrintIcon, Share as ShareIcon } from 'lucide-react';
 
 // API клиент
 import { api as apiClient } from '../api/client';
 
 const PaymentSuccess = () => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   

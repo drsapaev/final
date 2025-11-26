@@ -1,5 +1,5 @@
 // Экспорт всех хуков дизайн-системы
-export { useBreakpoint, useTouchDevice } from './useMediaQuery';
+export { useBreakpoint, useTouchDevice } from '../../hooks/useEnhancedMediaQuery';
 export { 
   useFade, 
   useScale, 

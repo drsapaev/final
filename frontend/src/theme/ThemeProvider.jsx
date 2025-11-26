@@ -5,6 +5,48 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getTheme, applyCSSVariables, lightTheme, darkTheme } from './themes';
 import { tokens } from './tokens';
+import '../theme/macos-tokens.css';
+
+// Утилиты для работы с токенами дизайна
+const getColor = (colorName, shade = 500) => {
+  return `var(--mac-${colorName}${shade !== 500 ? `-${shade}` : ''})`;
+};
+
+const getSpacing = (size) => {
+  const spacingMap = {
+    xs: '4px',
+    sm: '8px',
+    md: '16px',
+    lg: '24px',
+    xl: '32px',
+    '2xl': '48px',
+    '3xl': '64px'
+  };
+  return spacingMap[size] || size;
+};
+
+const getFontSize = (size) => {
+  const fontSizeMap = {
+    xs: '11px',
+    sm: '12px',
+    base: '13px',
+    lg: '15px',
+    xl: '17px',
+    '2xl': '22px',
+    '3xl': '28px'
+  };
+  return fontSizeMap[size] || size;
+};
+
+const getShadow = (size) => {
+  const shadowMap = {
+    sm: '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)',
+    md: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    lg: '0 10px 25px rgba(0, 0, 0, 0.15)',
+    xl: '0 20px 40px rgba(0, 0, 0, 0.15)'
+  };
+  return shadowMap[size] || size;
+};
 
 // Контекст темы
 const ThemeContext = createContext({
@@ -14,7 +56,11 @@ const ThemeContext = createContext({
   setTheme: () => {},
   toggleTheme: () => {},
   isDark: false,
-  isLight: true
+  isLight: true,
+  getColor,
+  getSpacing,
+  getFontSize,
+  getShadow
 });
 
 // Хук для использования темы
@@ -112,45 +158,12 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
     toggleTheme,
     isDark: themeName === 'dark',
     isLight: themeName === 'light',
-    
-    // Утилиты для работы с цветами
-    getColor: (path) => {
-      const keys = path.split('.');
-      let value = theme.colors;
-      
-      for (const key of keys) {
-        if (value && typeof value === 'object' && key in value) {
-          value = value[key];
-        } else {
-          console.warn(`Color path not found: ${path}`);
-          return theme.colors.gray[500]; // Fallback цвет
-        }
-      }
-      
-      return value;
-    },
-    
-    // Утилиты для работы с размерами
-    getSpacing: (size) => tokens.spacing[size] || size,
-    
-    // Утилиты для работы с тенями
-    getShadow: (name) => theme.shadows[name] || theme.shadows.base,
-    
-    // Утилиты для работы с радиусами
-    getRadius: (size) => tokens.borderRadius[size] || size,
-    
-    // Утилиты для медицинских цветов
-    getDepartmentColor: (department) => {
-      return tokens.medical.departments[department] || tokens.colors.primary[500];
-    },
-    
-    getStatusColor: (status) => {
-      return theme.colors.status[status] || theme.colors.status.info;
-    },
-    
-    getPriorityColor: (priority) => {
-      return tokens.medical.priority[priority] || tokens.medical.priority.normal;
-    }
+
+    // macOS утилиты для работы с токенами дизайна
+    getColor,
+    getSpacing,
+    getFontSize,
+    getShadow
   };
 
   return (

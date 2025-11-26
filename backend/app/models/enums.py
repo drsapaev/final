@@ -30,12 +30,46 @@ class AppointmentStatus(str, Enum):
 
 
 class PaymentStatus(str, Enum):
-    """Статусы платежей"""
-
+    """Статусы платежей (SSOT)"""
+    
     PENDING = "pending"
+    PROCESSING = "processing"
     PAID = "paid"
     FAILED = "failed"
+    CANCELLED = "cancelled"
     REFUNDED = "refunded"
+    VOID = "void"
+
+
+class VisitStatus(str, Enum):
+    """Статусы визитов (SSOT)"""
+    
+    OPEN = "open"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+    # Дополнительные статусы для совместимости
+    PAID = "paid"
+    IN_VISIT = "in_visit"
+    IN_PROGRESS = "in progress"
+    COMPLETED = "completed"
+    DONE = "done"
+    PENDING_CONFIRMATION = "pending_confirmation"
+    CONFIRMED = "confirmed"
+
+
+class ServiceCategory(str, Enum):
+    """
+    Категории услуг (SSOT) - только базовые категории.
+    
+    Подкатегории (ECG, ECHO, DERM_PROC, DENT, STOM, PHYS, COSM) обрабатываются
+    отдельно как subcategory в service_mapping.py.
+    """
+    CARDIO = "K"  # Кардиология
+    DERMA = "D"  # Дерматология
+    LAB = "L"  # Лаборатория
+    STOMATO = "S"  # Стоматология
+    COSMETO = "C"  # Косметология
+    PROCEDURE = "P"  # Процедуры/Физиотерапия
 
 
 class PaymentMethod(str, Enum):

@@ -1,57 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  QrCode, 
-  RefreshCw, 
-  Play, 
-  Pause, 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle,
-  Phone,
-  Calendar,
-  TrendingUp,
-  Download,
-  Printer,
-  Eye,
-  UserCheck,
-  X,
-  ChevronRight,
-  Activity
-} from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useTheme } from '../../contexts/ThemeContext';
 import ModernDialog from '../dialogs/ModernDialog';
 import { toast } from 'react-toastify';
+import PropTypes from 'prop-types';
+import { Button, Card, CardContent, Badge, Icon } from '../ui/macos';
+import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
+import { useQueueManager } from '../../hooks/useQueueManager';
+import QueueTable from './QueueTable';
 import './ModernQueueManager.css';
 
 const ModernQueueManager = ({
-  selectedDate = new Date().toISOString().split('T')[0],
+  selectedDate = getLocalDateString(),
   selectedDoctor = '',
-  searchQuery = '',
   onQueueUpdate,
   language = 'ru',
-  theme = 'light',
   doctors = [],
   onDoctorChange,
   onDateChange,
-  ...props
+  searchQuery,
 }) => {
-  const { getColor } = useTheme();
-  const [loading, setLoading] = useState(false);
-  const [queueData, setQueueData] = useState(null);
-  const [statistics, setStatistics] = useState(null);
-  const [qrData, setQrData] = useState(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  // Локальные значения если пропсы не переданы
+  const {
+    loading,
+    queueData,
+    statistics,
+    qrData,
+    loadQueueSnapshot,
+    generateDoctorQRCode,
+    generateClinicQRCode,
+    openReceptionForDoctor,
+    callNextPatientInQueue,
+    setQrData,
+  } = useQueueManager();
+
   const [internalDoctor, setInternalDoctor] = useState('');
-  const [internalDate, setInternalDate] = useState(new Date().toISOString().split('T')[0]);
-  const effectiveDoctor = selectedDoctor || internalDoctor;
-  const effectiveDate = selectedDate || internalDate;
+  const [internalDate, setInternalDate] = useState(getLocalDateString());
+  const effectiveDoctor = selectedDoctor !== undefined && selectedDoctor !== '' ? selectedDoctor : internalDoctor;
+  const effectiveDate = selectedDate !== undefined && selectedDate !== '' ? selectedDate : internalDate;
   const [showQrDialog, setShowQrDialog] = useState(false);
-  const [showStatsDialog, setShowStatsDialog] = useState(false);
-  
-  const refreshIntervalRef = useRef(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Переводы
   const t = {
@@ -80,152 +66,104 @@ const ModernQueueManager = ({
       called: 'Вызван',
       cancel: 'Отмена',
       download: 'Скачать',
-      print: 'Печать'
+      print: 'Печать',
+      clinicQr: 'Общий QR клиники',
+      doctorQr: 'QR для специалиста'
     }
   }[language] || {};
 
-  // Автообновление
-  useEffect(() => {
-    if (autoRefresh && effectiveDoctor) {
-      refreshIntervalRef.current = setInterval(() => {
-        loadQueue();
-        loadStatistics();
-      }, 10000);
-    } else {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-        refreshIntervalRef.current = null;
-      }
+  // Загрузка данных очереди
+  const loadQueue = useCallback(async () => {
+    if (!effectiveDoctor) {
+      return;
     }
 
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
+    const doctor = doctors.find(
+      (candidate) => String(candidate.id) === String(effectiveDoctor)
+    );
+
+    try {
+      await loadQueueSnapshot({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
+        doctor,
+      });
+    } catch (error) {
+      // Не показываем тост при автообновлении, чтобы не спамить
+      console.error('Ошибка загрузки очереди:', error);
+    }
+  }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot]);
+
+  // Автоматическая загрузка при изменении врача или даты
+  useEffect(() => {
+    if (effectiveDoctor) {
+      loadQueue();
+    }
+  }, [effectiveDoctor, effectiveDate, loadQueue]);
+
+  // Polling для автообновления
+  useEffect(() => {
+    let interval;
+    if (autoRefresh && effectiveDoctor && effectiveDate) {
+      interval = setInterval(() => {
+        loadQueue();
+      }, 30000); // 30 секунд
+    }
+    return () => clearInterval(interval);
+  }, [autoRefresh, effectiveDoctor, effectiveDate, loadQueue]);
+
+  // Слушатель событий от QueueJoin для мгновенного обновления
+  useEffect(() => {
+    const handleQueueUpdate = (event) => {
+      console.log('[ModernQueueManager] Получено событие queueUpdated:', event.detail);
+      // Обновляем очередь при любом событии добавления
+      if (event.detail?.action === 'refreshAll' || event.detail?.action === 'entryAdded') {
+        loadQueue();
       }
     };
-  }, [autoRefresh, effectiveDoctor]);
 
-  // Загрузка данных очереди
-  const loadQueue = async () => {
-    if (!effectiveDoctor) return;
-    
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/v1/queue/status/${effectiveDoctor}?target_date=${effectiveDate}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      });
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    return () => window.removeEventListener('queueUpdated', handleQueueUpdate);
+  }, [loadQueue]);
 
-      if (!response.ok) {
-        throw new Error('Ошибка загрузки статуса очереди');
-      }
-
-      const queueStatus = await response.json();
-      
-      const queueData = {
-        id: effectiveDoctor,
-        is_open: queueStatus.active,
-        total_entries: queueStatus.entries.length,
-        waiting_entries: queueStatus.queue_length,
-        current_number: queueStatus.current_number,
-        online_start_time: queueStatus.online_start_time || '07:00',
-        online_end_time: queueStatus.online_end_time || '09:00',
-        current_time: queueStatus.current_time,
-        online_available: queueStatus.online_available,
-        entries: queueStatus.entries.map(entry => ({
-          id: entry.number,
-          number: entry.number,
-          patient_name: entry.patient_name,
-          phone: entry.phone || '',
-          status: entry.status,
-          source: entry.source,
-          created_at: entry.created_at
-        }))
-      };
-      
-      setQueueData(queueData);
-    } catch (error) {
-      console.error('Error loading queue:', error);
-      toast.error(error.message || 'Ошибка загрузки очереди');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Загрузка статистики
-  const loadStatistics = async () => {
-    if (!effectiveDoctor) return;
-    
-    try {
-      // Мок данных для демонстрации
-      const mockStats = {
-        total_entries: 8,
-        waiting: 3,
-        completed: 4,
-        cancelled: 1,
-        available_slots: 12,
-        average_wait_time: 15,
-        current_wait_time: 8
-      };
-      
-      setStatistics(mockStats);
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-    }
-  };
-
-  // Генерация QR кода
+  // Генерация QR кода для одного специалиста
   const generateQR = async () => {
     if (!effectiveDoctor || !effectiveDate) {
       toast.error('Выберите врача и дату');
       return;
     }
-    
-    setLoading(true);
+
+    const doctor = doctors.find(
+      (item) => String(item.id) === String(effectiveDoctor)
+    );
+
     try {
-      // Определяем отделение на основе врача
-      const doctor = doctors.find(d => String(d.id) === String(effectiveDoctor));
-      
-      // Используем админский эндпоинт (доступен Admin/Doctor/Registrar)
-      const response = await fetch('/api/v1/admin/qr-tokens/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({
-          specialist_id: parseInt(effectiveDoctor),
-          department: doctor?.department || 'general',
-          expires_hours: 24
-        })
+      await generateDoctorQRCode({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
+        department: doctor?.department || doctor?.specialty || 'general',
+        specialistName: doctor?.full_name || doctor?.name,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка генерации QR токена');
-      }
-
-      const qrTokenData = await response.json();
-      
-      const qrData = {
-        token: qrTokenData.token,
-        specialist_name: doctor?.full_name || doctor?.name || 'Врач',
-        day: effectiveDate,
-        expires_at: qrTokenData.expires_at,
-        qr_url: qrTokenData.qr_url,
-        online_start_time: '07:00',
-        online_end_time: '09:00'
-      };
-      
-      setQrData(qrData);
       setShowQrDialog(true);
       toast.success('QR код сгенерирован');
     } catch (error) {
-      console.error('Error generating QR:', error);
       toast.error(error.message || 'Ошибка генерации QR кода');
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Генерация общего QR кода клиники
+  const generateClinicQR = async () => {
+    if (!effectiveDate) {
+      toast.error('Выберите дату');
+      return;
+    }
+
+    try {
+      await generateClinicQRCode({ targetDate: effectiveDate });
+      setShowQrDialog(true);
+      toast.success('Общий QR код клиники сгенерирован');
+    } catch (error) {
+      toast.error(error.message || 'Ошибка генерации общего QR кода');
     }
   };
 
@@ -235,683 +173,454 @@ const ModernQueueManager = ({
       toast.error('Выберите врача');
       return;
     }
-    
-    setLoading(true);
+
+    if (queueData?.is_open) {
+      toast.info('Прием уже открыт');
+      return;
+    }
+
     try {
-      // Мок для демонстрации
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setQueueData(prev => prev ? { ...prev, is_open: true } : null);
-      toast.success('Прием открыт');
-      
+      const result = await openReceptionForDoctor({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
+      });
+
+      toast.success(result?.message || 'Прием открыт. Онлайн-набор закрыт.');
+      await loadQueue();
+
       if (onQueueUpdate) {
         onQueueUpdate();
       }
     } catch (error) {
-      console.error('Error opening reception:', error);
-      toast.error('Ошибка открытия приема');
-    } finally {
-      setLoading(false);
+      toast.error(error.message || 'Ошибка открытия приема');
     }
   };
 
   // Вызов пациента
-  const callPatient = async (entryId) => {
-    if (!selectedDoctor) {
+  const callPatient = async () => {
+    if (!effectiveDoctor) {
       toast.error('Выберите врача');
       return;
     }
 
-    setLoading(true);
     try {
-      const response = await fetch(`/api/v1/queue/${effectiveDoctor}/call-next`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+      const result = await callNextPatientInQueue({
+        specialistId: effectiveDoctor,
+        targetDate: effectiveDate,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Ошибка вызова пациента');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success(`Вызван пациент: ${result.patient.name} (№${result.patient.number})`);
-        // Обновляем данные очереди
-        await loadQueue();
+      if (result?.success && result?.patient) {
+        toast.success(
+          `Вызван пациент: ${result.patient.name} (№${result.patient.number})`
+        );
       } else {
-        toast.info(result.message || 'Нет пациентов в очереди');
+        toast.info(result?.message || 'Нет пациентов в очереди');
       }
+
+      await loadQueue();
     } catch (error) {
-      console.error('Error calling patient:', error);
       toast.error(error.message || 'Ошибка вызова пациента');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Форматирование времени
-  const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Получение цвета статуса
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'waiting': return getColor('warning');
-      case 'called': return getColor('primary');
-      case 'completed': return getColor('success');
-      case 'cancelled': return getColor('danger');
-      default: return getColor('textSecondary');
-    }
-  };
-
-  // Получение текста статуса
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'waiting': return 'Ожидает';
-      case 'called': return 'Вызван';
-      case 'completed': return 'Завершен';
-      case 'cancelled': return 'Отменен';
-      default: return status;
-    }
-  };
-
-  // Скачивание QR кода
   const downloadQR = () => {
-    if (!qrData || !qrData.qr_url) {
+    if (!qrData) {
       toast.error('QR данные недоступны');
       return;
     }
-    
-    // Создаем текстовый файл с информацией о QR коде
-    const qrInfo = `
-QR код для онлайн-очереди
 
-Специалист: ${qrData.specialist_name}
-Дата приёма: ${new Date(qrData.day).toLocaleDateString('ru-RU')}
-Окно онлайн-записи: ${qrData.online_start_time} - ${qrData.online_end_time}
-
-Ссылка для записи:
-${window.location.origin}${qrData.qr_url}
-
-Токен: ${qrData.token}
-
-⏰ QR код действует с ${qrData.online_start_time} до момента открытия приёма в регистратуре
-📅 Токен истекает: ${new Date(qrData.expires_at).toLocaleString('ru-RU')}
-    `.trim();
-    
-    const blob = new Blob([qrInfo], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    link.download = `qr-queue-${selectedDate}-${qrData.specialist_name.replace(/\s+/g, '_')}.txt`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
-    
-    toast.success('Информация о QR коде скачана');
+    if (qrData.qr_code_base64) {
+      const link = document.createElement('a');
+      link.download = `qr-queue-${qrData.day}-${qrData.specialist_name.replace(/\s+/g, '_')}.png`;
+      link.href = qrData.qr_code_base64;
+      link.click();
+      toast.success('QR код скачан');
+    } else {
+      toast.error('QR изображение недоступно');
+    }
   };
 
-  return (
-    <div className={`modern-queue-manager ${props.className || ''}`} {...props}>
-      {/* Заголовок */}
-      <div className="queue-header">
-        <h2 style={{ color: getColor('textPrimary') }}>
-          {t.title}
-        </h2>
-        
-        <div className="queue-actions">
-          <button
-            type="button"
-            className="queue-btn queue-btn--primary"
-            onClick={() => setShowStatsDialog(true)}
-            disabled={!statistics}
-            style={{
-              backgroundColor: getColor('primary'),
-              color: 'white'
-            }}
-          >
-            <TrendingUp size={18} />
-            <span>{t.statistics}</span>
-          </button>
-        </div>
-      </div>
+  // Мемоизация списка врачей для выпадающего списка
+  const doctorOptions = useMemo(() => {
+    if (!doctors || doctors.length === 0) return [];
 
+    // Группируем врачей по специальности, чтобы избежать дубликатов в списке выбора очереди
+    // (если очередь привязана к специальности, а не к конкретному врачу)
+    const seenSpecialties = new Set();
+
+    // Маппинг специальностей на русские названия (можно расширить)
+    const specialtyNames = {
+      'cardiology': 'Кардиолог',
+      'cardio': 'Кардиолог',
+      'dermatology': 'Дерматолог',
+      'derma': 'Дерматолог',
+      'stomatology': 'Стоматолог',
+      'dentist': 'Стоматолог',
+      'dentistry': 'Стоматолог',
+      'laboratory': 'Лаборатория',
+      'lab': 'Лаборатория',
+      'neurology': 'Невролог',
+      'pediatrics': 'Педиатр',
+      'therapy': 'Терапевт',
+      'surgery': 'Хирург',
+      'ophthalmology': 'Окулист',
+      'ent': 'ЛОР',
+      'gynecology': 'Гинеколог',
+      'urology': 'Уролог',
+      'endocrinology': 'Эндокринолог',
+      'traumatology': 'Травматолог',
+      'ultrasound': 'УЗИ'
+    };
+
+    const normalizeSpecialty = (spec) => {
+      const s = spec?.toLowerCase();
+      if (s === 'cardio') return 'cardiology';
+      if (s === 'derma') return 'dermatology';
+      if (s === 'dentist' || s === 'dentistry') return 'stomatology';
+      if (s === 'lab') return 'laboratory';
+      return s;
+    };
+
+    return doctors
+      .filter(d => d.specialty) // Только врачи со специальностью
+      .reduce((acc, d) => {
+        const normalizedSpec = normalizeSpecialty(d.specialty);
+
+        // Если специальность уже была, пропускаем (для группировки очередей)
+        // Если нужно показывать всех врачей, уберите эту проверку
+        if (seenSpecialties.has(normalizedSpec)) {
+          return acc;
+        }
+        seenSpecialties.add(normalizedSpec);
+
+        const specialtyLabel = specialtyNames[normalizedSpec] || d.specialty;
+        const cabinetInfo = d.cabinet ? ` (Каб. ${d.cabinet})` : '';
+
+        acc.push({
+          id: d.id,
+          label: `${specialtyLabel}${cabinetInfo}`,
+          specialty: normalizedSpec
+        });
+        return acc;
+      }, [])
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [doctors]);
+
+  return (
+    <div className="modern-queue-manager">
       {/* Статистические карточки */}
       {statistics && (
-        <div className="stats-grid">
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('primary') }}>
-              <Users size={24} />
+        <div className="mqm-stats-grid">
+          <div className="mqm-card mqm-stat-card">
+            <div className="mqm-stat-icon primary">
+              <Icon name="person" size="large" color="white" />
             </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
-                {statistics.total_entries}
-              </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
-                {t.totalEntries}
-              </div>
+            <div>
+              <div className="mqm-stat-value">{statistics.total_entries}</div>
+              <div className="mqm-stat-label">{t.totalEntries}</div>
             </div>
           </div>
 
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('warning') }}>
-              <Clock size={24} />
+          <div className="mqm-card mqm-stat-card">
+            <div className="mqm-stat-icon warning">
+              <Icon name="magnifyingglass" size="large" style={{ color: 'white' }} />
             </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
-                {statistics.waiting}
-              </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
-                {t.waiting}
-              </div>
+            <div>
+              <div className="mqm-stat-value">{statistics.waiting}</div>
+              <div className="mqm-stat-label">{t.waiting}</div>
             </div>
           </div>
 
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('success') }}>
-              <CheckCircle size={24} />
+          <div className="mqm-card mqm-stat-card">
+            <div className="mqm-stat-icon success">
+              <Icon name="checkmark.circle" size="large" style={{ color: 'white' }} />
             </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
-                {statistics.completed}
-              </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
-                {t.completed}
-              </div>
-            </div>
-          </div>
-
-          <div className="stat-card" style={{ backgroundColor: getColor('cardBg') }}>
-            <div className="stat-icon" style={{ backgroundColor: getColor('info') }}>
-              <Activity size={24} />
-            </div>
-            <div className="stat-content">
-              <div className="stat-value" style={{ color: getColor('textPrimary') }}>
-                {statistics.available_slots}
-              </div>
-              <div className="stat-label" style={{ color: getColor('textSecondary') }}>
-                {t.available}
-              </div>
+            <div>
+              <div className="mqm-stat-value">{statistics.completed}</div>
+              <div className="mqm-stat-label">{t.completed}</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Панель управления */}
-      <div className="queue-controls" style={{ backgroundColor: getColor('cardBg') }}>
-        <div className="controls-section">
-          <h3 style={{ color: getColor('textPrimary') }}>Управление очередью</h3>
-          
-          <div className="controls-grid">
-            {/* Выбор даты */}
-            <div className="control-field">
-              <label style={{ color: getColor('textSecondary'), fontSize: '12px' }}>Дата</label>
+      <div className="mqm-card mqm-controls-card">
+        <div className="mqm-controls-header">
+          <h3 className="mqm-title">
+            {t.title}
+          </h3>
+
+          <div className="mqm-controls-grid">
+            <div className="mqm-input-group">
+              <label className="mqm-label">
+                Дата
+              </label>
               <input
                 type="date"
                 value={effectiveDate}
+                // Min удален, чтобы можно было смотреть историю и текущий день в любое время
                 onChange={(e) => {
-                  setInternalDate(e.target.value);
-                  onDateChange && onDateChange(e.target.value);
+                  const newDate = e.target.value;
+                  setInternalDate(newDate);
+                  if (onDateChange) {
+                    onDateChange(newDate);
+                  }
                 }}
-                style={{
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  border: '1px solid ' + getColor('border'),
-                  borderRadius: '6px',
-                  padding: '8px 10px'
-                }}
+                className="mqm-input"
               />
             </div>
 
-            {/* Выбор врача */}
-            <div className="control-field">
-              <label style={{ color: getColor('textSecondary'), fontSize: '12px' }}>Специалист</label>
+            <div className="mqm-input-group">
+              <label className="mqm-label">
+                Врач
+              </label>
               <select
                 value={effectiveDoctor}
                 onChange={(e) => {
-                  setInternalDoctor(e.target.value);
-                  onDoctorChange && onDoctorChange(e.target.value);
+                  const newDoctor = e.target.value;
+                  setInternalDoctor(newDoctor);
+                  if (onDoctorChange) {
+                    onDoctorChange(newDoctor);
+                  }
                 }}
-                style={{
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  border: '1px solid ' + getColor('border'),
-                  borderRadius: '6px',
-                  padding: '8px 10px',
-                  minWidth: '14rem'
-                }}
+                className="mqm-select"
               >
-                <option value="">Выберите врача</option>
-                {doctors.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.full_name || d.name || d.username || `ID ${d.id}`}
-                  </option>
-                ))}
+                <option value="">Выберите специалиста</option>
+                {doctorOptions.length > 0 ? (
+                  doctorOptions.map(opt => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>Загрузка специалистов...</option>
+                )}
               </select>
             </div>
 
-            <button
-              type="button"
-              className="control-btn control-btn--primary"
-              onClick={generateQR}
-              disabled={!effectiveDoctor || loading}
-              style={{
-                backgroundColor: getColor('primary'),
-                color: 'white'
-              }}
-            >
-              <QrCode size={20} />
-              <span>{t.generateQr}</span>
-              {loading && <div className="btn-spinner" />}
-            </button>
+            <div className="mqm-actions">
+              <Button
+                variant="primary"
+                size="default"
+                onClick={generateQR}
+                disabled={!effectiveDoctor || loading}
+                className="mqm-button-icon"
+                title="Генерировать QR для выбранного специалиста"
+              >
+                <Icon name="magnifyingglass" size="small" style={{ color: 'white' }} />
+                {t.doctorQr}
+              </Button>
 
-            <button
-              type="button"
-              className="control-btn control-btn--secondary"
-              onClick={loadQueue}
-              disabled={!selectedDoctor || loading}
-              style={{
-                backgroundColor: getColor('cardBg'),
-                color: getColor('textPrimary'),
-                borderColor: getColor('border')
-              }}
-            >
-              <RefreshCw size={20} className={loading ? 'spinning' : ''} />
-              <span>{t.refreshQueue}</span>
-            </button>
+              <Button
+                variant="outline"
+                size="default"
+                onClick={generateClinicQR}
+                disabled={loading}
+                className="mqm-button-icon"
+                title="Генерировать общий QR код для всех специалистов клиники"
+              >
+                <Icon name="square.grid.2x2" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+                {t.clinicQr}
+              </Button>
+            </div>
 
-            <button
-              type="button"
-              className="control-btn control-btn--success"
-              onClick={openReception}
-              disabled={!selectedDoctor || loading || queueData?.is_open}
-              style={{
-                backgroundColor: queueData?.is_open ? getColor('success') : getColor('cardBg'),
-                color: queueData?.is_open ? 'white' : getColor('textPrimary'),
-                borderColor: getColor('success')
-              }}
-            >
-              {queueData?.is_open ? <CheckCircle size={20} /> : <Play size={20} />}
-              <span>{queueData?.is_open ? t.receptionOpen : t.openReception}</span>
-            </button>
+            {(() => {
+              const isDisabled = !effectiveDoctor || loading || queueData?.is_open;
+              return (
+                <Button
+                  variant="success"
+                  size="default"
+                  className="mqm-reception-btn"
+                  onClick={openReception}
+                  disabled={isDisabled}
+                  title={
+                    !effectiveDoctor
+                      ? 'Выберите врача'
+                      : queueData?.is_open
+                        ? 'Прием уже открыт'
+                        : 'Открыть прием и закрыть онлайн-запись'
+                  }
+                >
+                  <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
+                  {t.openReception}
+                </Button>
+              );
+            })()}
 
-            <label className="auto-refresh-control">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                disabled={!selectedDoctor}
-              />
-              <div className="checkbox-custom" style={{ borderColor: getColor('border') }}>
-                {autoRefresh && <CheckCircle size={14} style={{ color: getColor('primary') }} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}>
+              <Button
+                variant="outline"
+                size="default"
+                onClick={loadQueue}
+                disabled={!effectiveDoctor || loading}
+                className="mqm-button-icon"
+              >
+                <Icon name="gear" size="small" style={{ color: 'var(--mac-text-primary)' }} />
+                {t.refreshQueue}
+              </Button>
+
+              <div
+                style={{ cursor: 'pointer' }}
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                title={autoRefresh ? "Автообновление включено" : "Автообновление выключено"}
+              >
+                <Icon
+                  name={autoRefresh ? "arrow.clockwise.circle.fill" : "arrow.clockwise.circle"}
+                  size="medium"
+                  style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }}
+                />
               </div>
-              <span style={{ color: getColor('textPrimary') }}>{t.autoRefresh}</span>
-              {autoRefresh && <RefreshCw size={16} className="spinning" style={{ color: getColor('primary') }} />}
-            </label>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Текущая очередь */}
-      <div className="queue-list" style={{ backgroundColor: getColor('cardBg') }}>
-        <div className="queue-list-header">
-          <h3 style={{ color: getColor('textPrimary') }}>
-            {t.currentQueue}
+      <div className="mqm-card">
+        <CardContent style={{ padding: 'var(--mac-spacing-5)' }}>
+          <div className="mqm-queue-header">
+            <h3 className="mqm-title">
+              {t.currentQueue}
+            </h3>
             {queueData && (
-              <div className="queue-status-container">
-                <span 
-                  className={`queue-status ${queueData.is_open ? 'open' : 'closed'}`}
-                  style={{ 
-                    backgroundColor: queueData.is_open ? getColor('success') : 
-                                   queueData.online_available ? getColor('primary') : getColor('warning'),
-                    color: 'white'
-                  }}
-                >
-                  {queueData.is_open ? t.receptionOpen : 
-                   queueData.online_available ? 'Онлайн-запись открыта' : 
-                   `Откроется в ${queueData.online_start_time}`}
-                </span>
-                {!queueData.is_open && (
-                  <div className="time-info" style={{ color: getColor('textSecondary'), fontSize: '12px', marginTop: '4px' }}>
-                    <Clock size={12} style={{ marginRight: '4px' }} />
-                    Сейчас: {queueData.current_time} | Запись: {queueData.online_start_time}-{queueData.online_end_time}
-                  </div>
-                )}
-              </div>
+              <Badge variant={queueData.is_open ? 'success' : 'secondary'}>
+                {queueData.is_open ? t.receptionOpen : `Откроется в ${queueData.online_start_time || '09:00'}`}
+              </Badge>
             )}
-          </h3>
-          
-          {queueData && (
-            <div className="queue-summary">
-              <span style={{ color: getColor('textSecondary') }}>
-                Всего: <strong style={{ color: getColor('textPrimary') }}>{queueData.total_entries}</strong>
-              </span>
-              <span style={{ color: getColor('textSecondary') }}>
-                Ожидают: <strong style={{ color: getColor('warning') }}>{queueData.waiting_entries}</strong>
-              </span>
-            </div>
-          )}
-        </div>
+          </div>
 
-        <div className="queue-content">
-          {!selectedDoctor ? (
-            <div className="queue-message" style={{ color: getColor('textSecondary') }}>
-              <AlertCircle size={48} />
-              <p>{t.selectDoctor}</p>
-            </div>
-          ) : !queueData ? (
-            <div className="queue-message" style={{ color: getColor('textSecondary') }}>
-              <QrCode size={48} />
-              <p>{t.queueNotFound}</p>
-              <button
-                type="button"
-                className="message-action-btn"
-                onClick={generateQR}
-                style={{
-                  backgroundColor: getColor('primary'),
-                  color: 'white'
-                }}
-              >
-                {t.generateQr}
-              </button>
-            </div>
-          ) : queueData.entries.length === 0 ? (
-            <div className="queue-message" style={{ color: getColor('textSecondary') }}>
-              <Users size={48} />
-              <p>{t.queueEmpty}</p>
-            </div>
-          ) : (
-            <div className="queue-table">
-              <div className="queue-table-header">
-                <div className="queue-col queue-col--number">№</div>
-                <div className="queue-col queue-col--patient">{t.patient}</div>
-                <div className="queue-col queue-col--phone">{t.phone}</div>
-                <div className="queue-col queue-col--time">{t.time}</div>
-                <div className="queue-col queue-col--status">{t.status}</div>
-                <div className="queue-col queue-col--actions">{t.actions}</div>
-              </div>
-              
-              <div className="queue-table-body">
-                {queueData.entries.map((entry, index) => (
-                  <div 
-                    key={entry.id} 
-                    className={`queue-row ${entry.status === 'called' ? 'called' : ''}`}
-                    style={{ 
-                      backgroundColor: getColor('cardBg'),
-                      borderColor: getColor('border')
-                    }}
-                  >
-                    <div className="queue-col queue-col--number">
-                      <div 
-                        className={`queue-number ${entry.status === 'called' ? 'pulsing' : ''}`}
-                        style={{
-                          backgroundColor: entry.status === 'called' ? getColor('warning') : getColor('primary'),
-                          color: 'white'
-                        }}
-                      >
-                        {entry.number}
-                      </div>
-                    </div>
-                    
-                    <div className="queue-col queue-col--patient">
-                      <div className="patient-info">
-                        <UserCheck size={16} style={{ color: getColor('textSecondary') }} />
-                        <span style={{ color: getColor('textPrimary') }}>
-                          {entry.patient_name || 'Не указано'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="queue-col queue-col--phone">
-                      <div className="phone-info">
-                        <Phone size={16} style={{ color: getColor('textSecondary') }} />
-                        <span style={{ color: getColor('textSecondary') }}>
-                          {entry.phone || 'Не указан'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="queue-col queue-col--time">
-                      <div className="time-info">
-                        <Clock size={16} style={{ color: getColor('textSecondary') }} />
-                        <span style={{ color: getColor('textSecondary') }}>
-                          {formatTime(entry.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="queue-col queue-col--status">
-                      <span 
-                        className={`status-badge status-${entry.status}`}
-                        style={{
-                          backgroundColor: getStatusColor(entry.status),
-                          color: 'white'
-                        }}
-                      >
-                        {getStatusText(entry.status)}
-                      </span>
-                    </div>
-                    
-                    <div className="queue-col queue-col--actions">
-                      {entry.status === 'waiting' && (
-                        <button
-                          type="button"
-                          className="action-btn action-btn--call"
-                          onClick={() => callPatient(entry.id)}
-                          disabled={loading}
-                          style={{
-                            backgroundColor: getColor('success'),
-                            color: 'white'
-                          }}
-                          title={t.call}
-                        >
-                          <Play size={16} />
-                        </button>
-                      )}
-                      {entry.status === 'called' && (
-                        <span 
-                          className="called-indicator"
-                          style={{ color: getColor('warning') }}
-                        >
-                          <Activity size={16} className="pulsing" />
-                          {t.called}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+          <QueueTable
+            queueData={queueData}
+            effectiveDoctor={effectiveDoctor}
+            onGenerateQR={generateQR}
+            onCallPatient={callPatient}
+            loading={loading}
+            t={t}
+          />
+        </CardContent>
       </div>
 
       {/* Диалог QR кода */}
       <ModernDialog
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
-        title="QR код для онлайн-очереди"
+        title={qrData?.is_clinic_wide ? "Общий QR код клиники" : "QR код для записи"}
         maxWidth="32rem"
       >
-        {qrData && (
-          <div className="qr-dialog-content">
-            <div className="qr-info" style={{ marginBottom: '16px' }}>
-              <p style={{ marginBottom: '8px' }}>
-                <strong>Специалист:</strong> {qrData.specialist_name}
-              </p>
-              <p style={{ marginBottom: '8px' }}>
-                <strong>Дата приёма:</strong> {new Date(qrData.day).toLocaleDateString('ru-RU')}
-              </p>
-              <p style={{ marginBottom: '8px' }}>
-                <strong>Окно онлайн-записи:</strong> {qrData.online_start_time} - {qrData.online_end_time}
-              </p>
-              <p style={{ marginBottom: '8px', fontSize: '0.875rem', color: getColor('textSecondary') }}>
-                ⏰ QR код действует с {qrData.online_start_time} до момента открытия приёма в регистратуре
-              </p>
-              <p style={{ fontSize: '0.875rem', color: getColor('textSecondary') }}>
-                📅 Токен истекает: {new Date(qrData.expires_at).toLocaleDateString('ru-RU')} в {formatTime(qrData.expires_at)}
-              </p>
-            </div>
-            
-            <div className="qr-code-container" style={{ 
-              textAlign: 'center', 
-              padding: '20px',
-              backgroundColor: getColor('cardBg'),
-              borderRadius: '8px',
-              marginBottom: '16px'
-            }}>
-              {qrData.qr_url ? (
-                <div>
-                  <div style={{
-                    display: 'inline-block',
-                    padding: '16px',
-                    backgroundColor: 'white',
-                    borderRadius: '8px',
-                    border: '2px solid ' + getColor('border')
-                  }}>
-                    <QRCodeSVG
-                      value={`${window.location.origin}${qrData.qr_url}`}
-                      size={200}
-                      level="M"
-                      includeMargin={true}
-                    />
-                  </div>
-                  <p style={{ 
-                    marginTop: '12px', 
-                    fontSize: '0.75rem', 
-                    color: getColor('textSecondary'),
-                    wordBreak: 'break-all'
-                  }}>
-                    {window.location.origin}{qrData.qr_url}
-                  </p>
-                </div>
-              ) : (
-                <div className="qr-placeholder">
-                  <QrCode size={200} style={{ color: getColor('textSecondary') }} />
-                  <p style={{ color: getColor('textSecondary'), marginTop: '8px' }}>
-                    QR код загружается...
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            <div className="qr-actions" style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="qr-action-btn"
-                onClick={downloadQR}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: getColor('cardBg'),
-                  color: getColor('textPrimary'),
-                  border: '1px solid ' + getColor('border'),
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Download size={16} />
-                {t.download}
-              </button>
-              <button
-                type="button"
-                className="qr-action-btn"
-                onClick={() => window.print()}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  backgroundColor: getColor('primary'),
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Printer size={16} />
-                {t.print}
-              </button>
-            </div>
+        <div className="mqm-qr-modal-content">
+          {/* Badge для типа QR */}
+          <div className="mqm-qr-badge-container">
+            {qrData?.is_clinic_wide ? (
+              <Badge variant="primary" className="mqm-qr-badge">
+                <Icon name="building.2.fill" size="small" style={{ marginRight: '6px' }} />
+                Общий QR код клиники
+              </Badge>
+            ) : (
+              <Badge variant="success" className="mqm-qr-badge">
+                <Icon name="person.fill" size="small" style={{ marginRight: '6px' }} />
+                QR код специалиста
+              </Badge>
+            )}
           </div>
-        )}
-      </ModernDialog>
 
-      {/* Диалог статистики */}
-      <ModernDialog
-        isOpen={showStatsDialog}
-        onClose={() => setShowStatsDialog(false)}
-        title="Детальная статистика очереди"
-        maxWidth="40rem"
-      >
-        {statistics && (
-          <div className="stats-dialog-content">
-            <div className="stats-detailed-grid">
-              <div className="stats-card">
-                <div className="stats-card-header">
-                  <Users size={20} />
-                  <span>Записи</span>
-                </div>
-                <div className="stats-card-body">
-                  <div className="stats-item">
-                    <span>Всего записей:</span>
-                    <strong>{statistics.total_entries}</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Ожидают:</span>
-                    <strong style={{ color: getColor('warning') }}>{statistics.waiting}</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Завершено:</span>
-                    <strong style={{ color: getColor('success') }}>{statistics.completed}</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Отменено:</span>
-                    <strong style={{ color: getColor('danger') }}>{statistics.cancelled}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="stats-card">
-                <div className="stats-card-header">
-                  <Clock size={20} />
-                  <span>Время ожидания</span>
-                </div>
-                <div className="stats-card-body">
-                  <div className="stats-item">
-                    <span>Среднее время:</span>
-                    <strong>{statistics.average_wait_time} мин</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Текущее ожидание:</span>
-                    <strong style={{ color: getColor('primary') }}>{statistics.current_wait_time} мин</strong>
-                  </div>
-                  <div className="stats-item">
-                    <span>Свободных мест:</span>
-                    <strong style={{ color: getColor('info') }}>{statistics.available_slots}</strong>
-                  </div>
-                </div>
-              </div>
+          {/* Информация о враче/отделении */}
+          <div className="mqm-qr-info-card">
+            <div className="mqm-qr-info-row">
+              <span className="mqm-qr-label">Специалист:</span>
+              <span className="mqm-qr-value highlight">
+                {qrData?.specialist_name || (qrData?.is_clinic_wide ? "Все специалисты" : "Не указан")}
+              </span>
             </div>
+            <div className="mqm-qr-info-row">
+              <span className="mqm-qr-label">Отделение:</span>
+              <span className="mqm-qr-value">
+                {qrData?.department_name || (qrData?.is_clinic_wide ? "Клиника" : qrData?.department)}
+              </span>
+            </div>
+            {qrData?.target_date && (
+              <div className="mqm-qr-info-row">
+                <span className="mqm-qr-label">Дата приема:</span>
+                <span className="mqm-qr-value">
+                  {new Date(qrData.target_date).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* QR Код */}
+          <div className="mqm-qr-code-container">
+            {qrData?.qr_code_base64 ? (
+              <img
+                src={qrData.qr_code_base64}
+                alt="QR Code"
+                className="mqm-qr-image"
+              />
+            ) : qrData?.token ? (
+              <QRCodeSVG
+                value={`https://med-queue.uz/queue/join?token=${qrData.token}`}
+                size={240}
+                level="H"
+                includeMargin={true}
+                className="mqm-qr-svg"
+              />
+            ) : (
+              <div className="mqm-qr-loading">
+                <div className="mqm-spinner"></div>
+                <span>Генерация QR кода...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Инструкция и срок действия */}
+          <div className="mqm-qr-footer-info">
+            <p className="mqm-qr-instruction">
+              Отсканируйте камеру телефона для записи в очередь
+            </p>
+            <p className="mqm-qr-expiry">
+              <Icon name="clock" size="small" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+              Действует до: {qrData?.expires_at ? new Date(qrData.expires_at).toLocaleString('ru-RU', {
+                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+              }) : '—'}
+            </p>
+          </div>
+
+          {/* Кнопки действий */}
+          <div className="mqm-qr-actions">
+            <Button
+              variant="primary"
+              onClick={downloadQR}
+              className="mqm-qr-action-btn"
+            >
+              <Icon name="arrow.down.circle" size="small" style={{ marginRight: '8px' }} />
+              {t.download}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowQrDialog(false)}
+              className="mqm-qr-action-btn"
+            >
+              {t.close || 'Закрыть'}
+            </Button>
+          </div>
+        </div>
       </ModernDialog>
     </div>
   );
 };
 
+ModernQueueManager.propTypes = {
+  selectedDate: PropTypes.string,
+  selectedDoctor: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onQueueUpdate: PropTypes.func,
+  language: PropTypes.string,
+  doctors: PropTypes.array,
+  onDoctorChange: PropTypes.func,
+  onDateChange: PropTypes.func,
+  searchQuery: PropTypes.string,
+};
+
 export default ModernQueueManager;
-
-

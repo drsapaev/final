@@ -21,6 +21,8 @@ from app.models.doctor_price_override import DoctorPriceOverride
 from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
 from app.services.feature_flags import is_feature_enabled
+from app.services.queue_service import queue_service
+from app.services.service_mapping import normalize_service_code
 
 router = APIRouter()
 
@@ -89,41 +91,7 @@ def _check_repeat_visit_eligibility(
     
     return len(consultation_services) > 0
 
-def _calculate_visit_price(
-    db: Session,
-    services: List[ServiceItemRequest],
-    discount_mode: str,
-    patient_id: int,
-    doctor_id: Optional[int]
-) -> Decimal:
-    """
-    Расчёт цены визита с учётом льгот и скидок
-    """
-    total = Decimal('0')
-    
-    for service_item in services:
-        service = db.query(Service).filter(Service.id == service_item.service_id).first()
-        if not service:
-            continue
-            
-        # Базовая цена (кастомная или из справочника)
-        base_price = service_item.custom_price or service.price or Decimal('0')
-        item_total = base_price * service_item.quantity
-        
-        # Применяем скидки
-        if discount_mode == "repeat" and service.is_consultation:
-            # Повторная консультация бесплатна
-            item_total = Decimal('0')
-        elif discount_mode == "benefit" and service.is_consultation:
-            # Льготная консультация бесплатна
-            item_total = Decimal('0')
-        elif discount_mode == "all_free":
-            # Всё бесплатно (требует одобрения)
-            item_total = Decimal('0')
-        
-        total += item_total
-    
-    return total
+# _calculate_visit_price() удалена - используйте billing_service.calculate_total() (SSOT)
 
 def _create_queue_entries(
     db: Session,
@@ -191,18 +159,20 @@ def _create_queue_entries(
                     db, today, doctor_id, queue_tag
                 )
                 
-                # Вычисляем номер
-                current_count = crud_queue.count_queue_entries(db, daily_queue.id)
                 start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
-                next_number = start_number + current_count
+                next_number = queue_service.get_next_queue_number(
+                    db,
+                    daily_queue=daily_queue,
+                    queue_tag=queue_tag,
+                    default_start=start_number,
+                )
                 
-                # Создаём запись
-                queue_entry = crud_queue.create_queue_entry(
+                queue_entry = queue_service.create_queue_entry(
                     db, 
-                    queue_id=daily_queue.id,
+                    daily_queue=daily_queue,
                     patient_id=visit.patient_id,
                     number=next_number,
-                    source="desk"
+                    source="desk",
                 )
                 
                 visit_queue_numbers.append({
@@ -383,7 +353,11 @@ def check_invoice_status(
                         invoice.status = "paid"
                         invoice.paid_at = datetime.utcnow()
                         
-                        # Помечаем все визиты как оплаченные
+                        # [OK] ИСПРАВЛЕНО: Создаем платежи для всех визитов через SSOT
+                        from app.services.billing_service import BillingService
+                        billing_service = BillingService(db)
+                        
+                        # Помечаем все визиты как оплаченные и создаем платежи
                         invoice_visits = db.query(PaymentInvoiceVisit).filter(
                             PaymentInvoiceVisit.invoice_id == invoice.id
                         ).all()
@@ -391,6 +365,26 @@ def check_invoice_status(
                         for iv in invoice_visits:
                             visit = db.query(Visit).filter(Visit.id == iv.visit_id).first()
                             if visit:
+                                # Проверяем, не создан ли уже платеж
+                                from app.models.payment import Payment
+                                existing_payment = db.query(Payment).filter(
+                                    Payment.visit_id == visit.id,
+                                    Payment.status == "paid"
+                                ).first()
+                                
+                                if not existing_payment:
+                                    # Создаем платеж через SSOT
+                                    payment = billing_service.create_payment(
+                                        visit_id=visit.id,
+                                        amount=float(iv.visit_amount),
+                                        currency=invoice.currency,
+                                        method="online",  # Онлайн оплата через провайдера
+                                        status="paid",
+                                        provider=invoice.provider,
+                                        note=f"Оплата через {invoice.provider} (invoice {invoice.id})"
+                                    )
+                                    print(f"[check_invoice_status] [OK] Создан платеж ID={payment.id} для визита {visit.id}")
+                                
                                 visit.status = "confirmed"  # Оплачено и подтверждено
                         
                         db.commit()
@@ -427,7 +421,7 @@ def create_cart_appointments(
     Создание корзины визитов с единым платежом
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
-    print(f"📥 REGISTRATION DEBUG: Получен запрос на создание корзины")
+    print(f"[CART] REGISTRATION DEBUG: Получен запрос на создание корзины")
     print(f"   Patient ID: {cart_data.patient_id}")
     print(f"   Количество визитов: {len(cart_data.visits)}")
     print(f"   Discount mode: {cart_data.discount_mode}")
@@ -445,7 +439,7 @@ def create_cart_appointments(
         
         # Создаём визиты
         from time import sleep
-        print(f"📋 REGISTRATION DEBUG: Создаём {len(cart_data.visits)} визитов")
+        print(f"[CREATE] REGISTRATION DEBUG: Создаём {len(cart_data.visits)} визитов")
         for idx, visit_req in enumerate(cart_data.visits):
             print(f"   Визит {idx+1}: department={visit_req.department}, services={len(visit_req.services)}")
             # Проверяем право на повторный визит
@@ -459,43 +453,37 @@ def create_cart_appointments(
                         detail=f"Повторный визит недоступен: нет консультации у этого врача за последние 21 день"
                     )
             
-            # Рассчитываем цену визита
-            visit_amount = _calculate_visit_price(
-                db, visit_req.services, cart_data.discount_mode, 
-                cart_data.patient_id, visit_req.doctor_id
+            # Рассчитываем цену визита через SSOT
+            from app.services.billing_service import BillingService
+            billing_service = BillingService(db)
+            services_data = [
+                {
+                    "service_id": s.service_id,
+                    "quantity": s.quantity,
+                    "custom_price": s.custom_price
+                }
+                for s in visit_req.services
+            ]
+            total_info = billing_service.calculate_total(
+                services=services_data,
+                discount_mode=cart_data.discount_mode
             )
+            visit_amount = Decimal(str(total_info["total"]))
             
-            # ✅ ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
+            # [OK] ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
             # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
             # Записи от регистратора сразу попадают в очередь
             visit_status = "confirmed"
             confirmed_at = datetime.utcnow()
             confirmed_by = f"registrar_{current_user.id}"
             
-            # ✅ ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
+            # [OK] ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
             # Это гарантирует, что визиты одного пациента будут иметь разные временные метки
             if idx > 0:
                 sleep(0.001)  # 1 миллисекунда задержки между визитами
             
-            # Создаём визит
-            visit = Visit(
-                patient_id=cart_data.patient_id,
-                doctor_id=visit_req.doctor_id,
-                visit_date=visit_req.visit_date,
-                visit_time=visit_req.visit_time,
-                department=visit_req.department,
-                notes=visit_req.notes,
-                status=visit_status,
-                discount_mode=cart_data.discount_mode,
-                approval_status="approved" if cart_data.discount_mode != "all_free" else "pending",
-                confirmed_at=confirmed_at,
-                confirmed_by=confirmed_by
-            )
-            db.add(visit)
-            db.flush()  # Получаем ID визита
-            print(f"✅ REGISTRATION DEBUG: Визит {visit.id} добавлен в сессию")
-            
-            # Добавляем услуги к визиту
+            # Подготавливаем услуги для передачи в create_visit
+            services_data = []
             for service_item in visit_req.services:
                 service = db.query(Service).filter(Service.id == service_item.service_id).first()
                 if not service:
@@ -512,23 +500,42 @@ def create_cart_appointments(
                 else:
                     item_price = service_item.custom_price or service.price or Decimal('0')
                 
-                visit_service = VisitService(
-                    visit_id=visit.id,
-                    service_id=service.id,
-                    code=service.code,
-                    name=service.name,
-                    qty=service_item.quantity,
-                    price=item_price,
-                    currency="UZS"
-                )
-                db.add(visit_service)
+                services_data.append({
+                    "service_id": service.id,
+                    "code": normalize_service_code(service.code) if service.code else None,
+                    "name": service.name,
+                    "qty": service_item.quantity,
+                    "price": float(item_price)
+                })
+            
+            # Создаём визит используя единую функцию create_visit для обеспечения Single Source of Truth
+            from app.crud.visit import create_visit
+            visit = create_visit(
+                db=db,
+                patient_id=cart_data.patient_id,
+                doctor_id=visit_req.doctor_id,
+                visit_date=visit_req.visit_date,
+                visit_time=visit_req.visit_time,
+                department=visit_req.department,
+                notes=visit_req.notes,
+                discount_mode=cart_data.discount_mode,
+                services=services_data,
+                status=visit_status,
+                approval_status="approved" if cart_data.discount_mode != "all_free" else "pending",
+                confirmed_at=confirmed_at,
+                confirmed_by=confirmed_by,
+                auto_status=False,  # Статус уже установлен выше
+                notify=False,  # Уведомления отправляются отдельно
+                log=True
+            )
+            print(f"[OK] REGISTRATION DEBUG: Визит {visit.id} создан через create_visit()")
             
             created_visits.append(visit)
             total_invoice_amount += visit_amount
-            print(f"   ✅ Визит {visit.id} создан успешно для пациента {cart_data.patient_id}")
+            print(f"   [OK] Визит {visit.id} создан успешно для пациента {cart_data.patient_id}")
         
         # Создаём единый invoice
-        print(f"📋 REGISTRATION DEBUG: Создаём инвойс на сумму {total_invoice_amount}")
+        print(f"[CREATE] REGISTRATION DEBUG: Создаём инвойс на сумму {total_invoice_amount}")
         invoice = PaymentInvoice(
             patient_id=cart_data.patient_id,
             total_amount=total_invoice_amount,
@@ -539,18 +546,18 @@ def create_cart_appointments(
         )
         db.add(invoice)
         db.flush()  # Получаем ID invoice
-        print(f"📋 REGISTRATION DEBUG: Инвойс {invoice.id} создан")
+        print(f"[CREATE] REGISTRATION DEBUG: Инвойс {invoice.id} создан")
         
         # Связываем визиты с invoice
+        from app.services.billing_service import BillingService
+        billing_service = BillingService(db)
         for visit in created_visits:
-            visit_amount = _calculate_visit_price(
-                db, 
-                [ServiceItemRequest(service_id=vs.service_id, quantity=vs.qty) 
-                 for vs in db.query(VisitService).filter(VisitService.visit_id == visit.id).all()],
-                cart_data.discount_mode,
-                cart_data.patient_id,
-                visit.doctor_id
+            # Рассчитываем цену визита через SSOT
+            total_info = billing_service.calculate_total(
+                visit_id=visit.id,
+                discount_mode=cart_data.discount_mode
             )
+            visit_amount = Decimal(str(total_info["total"]))
             
             invoice_visit = PaymentInvoiceVisit(
                 invoice_id=invoice.id,
@@ -569,24 +576,26 @@ def create_cart_appointments(
                 try:
                     # Используем функцию из утренней сборки для присвоения номеров
                     from app.services.morning_assignment import MorningAssignmentService
+                    # [OK] ИСПРАВЛЕНО: Убеждаемся, что VisitService импортирован для использования в morning_assignment
+                    from app.models.visit import VisitService
                     service = MorningAssignmentService()
                     service.db = db  # Используем существующую сессию
                     queue_assignments = service._assign_queues_for_visit(visit, today)
                     if queue_assignments:
                         visit.status = "open"  # Готов к приему
                         queue_numbers[visit.id] = queue_assignments
-                        print(f"✅ REGISTRATION DEBUG: Визит {visit.id} - присвоено {len(queue_assignments)} номеров в очередях")
+                        print(f"[OK] REGISTRATION DEBUG: Визит {visit.id} - присвоено {len(queue_assignments)} номеров в очередях")
                     else:
-                        print(f"⚠️ REGISTRATION DEBUG: Визит {visit.id} - не удалось присвоить номера в очередях")
+                        print(f"[WARN] REGISTRATION DEBUG: Визит {visit.id} - не удалось присвоить номера в очередях")
                 except Exception as e:
-                    print(f"⚠️ REGISTRATION DEBUG: Ошибка присвоения очередей для визита {visit.id}: {str(e)}")
+                    print(f"[WARN] REGISTRATION DEBUG: Ошибка присвоения очередей для визита {visit.id}: {str(e)}")
                     import traceback
-                    print(f"⚠️ TRACEBACK: {traceback.format_exc()}")
+                    print(f"[WARN] TRACEBACK: {traceback.format_exc()}")
                     # Не прерываем создание визита из-за ошибки очередей
                     continue
         
         db.commit()
-        print(f"✅ REGISTRATION DEBUG: Транзакция зафиксирована в базе данных!")
+        print(f"[OK] REGISTRATION DEBUG: Транзакция зафиксирована в базе данных!")
         
         # Формируем талоны для визитов с присвоенными номерами очередей
         print_tickets = []
@@ -602,7 +611,12 @@ def create_cart_appointments(
                 
                 # Получаем данные врача  
                 doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
-                doctor_name = doctor.user.full_name if doctor and doctor.user else "Без врача"
+                # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
+                if doctor and doctor.user_id:
+                    user = db.query(User).filter(User.id == doctor.user_id).first()
+                    doctor_name = (user.full_name or user.username) if user else "Без врача"
+                else:
+                    doctor_name = "Без врача"
                 
                 # Получаем услуги визита
                 visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
@@ -610,7 +624,7 @@ def create_cart_appointments(
                 for vs in visit_services:
                     services_info.append({
                         "name": vs.name,
-                        "code": vs.code,
+                        "code": normalize_service_code(vs.code) if vs.code else None,
                         "quantity": vs.qty,
                         "price": float(vs.price) if vs.price else 0
                     })
@@ -628,7 +642,7 @@ def create_cart_appointments(
                     "confirmation_token": visit.confirmation_token if visit.status == "pending_confirmation" else None
                 })
         except Exception as e:
-            print(f"⚠️ REGISTRATION DEBUG: Ошибка формирования ответа (визиты уже сохранены): {str(e)}")
+            print(f"[WARN] REGISTRATION DEBUG: Ошибка формирования ответа (визиты уже сохранены): {str(e)}")
             # Визиты уже сохранены, поэтому не откатываем транзакцию
         
         # Определяем сообщение в зависимости от результата
@@ -637,7 +651,7 @@ def create_cart_appointments(
         else:
             message = "Визиты созданы. Номера в очередях будут присвоены в день визита."
         
-        print(f"✅ REGISTRATION DEBUG: Корзина создана успешно!")
+        print(f"[OK] REGISTRATION DEBUG: Корзина создана успешно!")
         print(f"   Создано визитов: {len(created_visits)}")
         print(f"   ID визитов: {[v.id for v in created_visits]}")
         print(f"   Invoice ID: {invoice.id}")
@@ -657,9 +671,9 @@ def create_cart_appointments(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ REGISTRATION DEBUG: Ошибка создания корзины: {str(e)}")
+        print(f"[ERROR] REGISTRATION DEBUG: Ошибка создания корзины: {str(e)}")
         import traceback
-        print(f"❌ Трейсбек: {traceback.format_exc()}")
+        print(f"[ERROR] Трейсбек: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -880,14 +894,42 @@ def get_all_free_requests(
             doctor_name = None
             doctor_specialty = None
             if visit.doctor_id:
-                doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
-                if doctor:
-                    doctor_name = f"Врач #{doctor.id}"  # Здесь нужно получить имя врача
-                    doctor_specialty = doctor.specialty
+                try:
+                    doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                    if doctor:
+                        # Получаем имя врача из связанного пользователя
+                        # [OK] ИСПРАВЛЕНО: Используем явный запрос вместо relationship, чтобы избежать ошибок
+                        if doctor.user_id:
+                            user = db.query(User).filter(User.id == doctor.user_id).first()
+                            if user:
+                                # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
+                                doctor_name = (user.full_name or user.username) if user else f"Врач #{doctor.id}"
+                            else:
+                                doctor_name = f"Врач #{doctor.id}"
+                        else:
+                            doctor_name = f"Врач #{doctor.id}"
+                        doctor_specialty = doctor.specialty
+                except Exception as e:
+                    print(f"[get_all_free_requests] Ошибка получения данных врача для visit {visit.id}: {e}")
+                    doctor_name = f"Врач #{visit.doctor_id}"
+                    doctor_specialty = None
             
-            # Получаем данные пациента (заглушка)
+            # [OK] ИСПРАВЛЕНО: Получаем реальные данные пациента
             patient_name = f"Пациент #{visit.patient_id}"
-            patient_phone = None  # Здесь нужно получить телефон пациента
+            patient_phone = None
+            if visit.patient_id:
+                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                if patient:
+                    # Формируем ФИО пациента
+                    name_parts = []
+                    if patient.last_name:
+                        name_parts.append(patient.last_name)
+                    if patient.first_name:
+                        name_parts.append(patient.first_name)
+                    if patient.middle_name:
+                        name_parts.append(patient.middle_name)
+                    patient_name = ' '.join(name_parts) if name_parts else f"Пациент #{visit.patient_id}"
+                    patient_phone = patient.phone
             
             result.append(AllFreeVisitResponse(
                 id=visit.id,
@@ -1347,11 +1389,13 @@ def get_visits(
             doctor_specialty = None
             if visit.doctor_id:
                 doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
-                if doctor and doctor.user:
-                    doctor_name = doctor.user.full_name
-                    doctor_specialty = doctor.specialty
-                elif doctor:
-                    doctor_name = f"Врач #{doctor.id}"
+                if doctor:
+                    # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
+                    if doctor.user_id:
+                        user = db.query(User).filter(User.id == doctor.user_id).first()
+                        doctor_name = (user.full_name or user.username) if user else f"Врач #{doctor.id}"
+                    else:
+                        doctor_name = f"Врач #{doctor.id}"
                     doctor_specialty = doctor.specialty
             
             # Получаем данные пациента
@@ -1405,7 +1449,7 @@ def get_visits(
 @router.get("/registrar/all-appointments")
 def get_all_appointments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "cardiology", "derma", "dentist", "Lab")),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
@@ -1474,13 +1518,56 @@ def get_all_appointments(
                         if service:
                             service_names.append(service.name)
                             if service.code:
-                                service_codes.append(service.code)
+                                service_codes.append(normalize_service_code(service.code))
                             if service.price:
                                 total_amount += float(service.price)
                     except (ValueError, TypeError):
                         # Если service_id не число, возможно это уже название
                         service_names.append(str(service_id))
             
+            # Определяем payment_status для Appointment
+            payment_status = 'pending'
+            is_paid = False
+            visit_type = getattr(apt, 'visit_type', None)
+            if visit_type == 'paid':
+                payment_status = 'paid'
+                is_paid = True
+            elif apt.status and apt.status.lower() in ('paid', 'in_visit', 'completed', 'done'):
+                payment_status = 'paid'
+                is_paid = True
+            elif getattr(apt, 'payment_processed_at', None):
+                payment_status = 'paid'
+                is_paid = True
+            else:
+                # Проверяем Payment table
+                try:
+                    from app.models.payment import Payment
+                    from sqlalchemy import and_
+                    # Ищем связанный Visit
+                    related_visit = db.query(Visit).filter(
+                        and_(
+                            Visit.patient_id == apt.patient_id,
+                            Visit.visit_date == apt.appointment_date,
+                            Visit.doctor_id == apt.doctor_id
+                        )
+                    ).first()
+                    if related_visit:
+                        payment_row = db.query(Payment).filter(Payment.visit_id == related_visit.id).order_by(Payment.created_at.desc()).first()
+                        if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+                            payment_status = 'paid'
+                            is_paid = True
+                except Exception:
+                    pass
+
+            # [OK] ВАЖНО: Сохраняем visit_type в БД для существующих записей
+            if is_paid and apt.visit_type != 'paid':
+                apt.visit_type = 'paid'
+                try:
+                    db.commit()
+                    db.refresh(apt)
+                except Exception:
+                    db.rollback()
+
             result.append({
                 'id': apt.id,
                 'patient_id': apt.patient_id,
@@ -1493,6 +1580,8 @@ def get_all_appointments(
                 'services': service_names,  # Преобразованные названия услуг
                 'service_codes': service_codes,  # Коды услуг для фильтрации
                 'total_amount': total_amount,  # Общая сумма услуг
+                'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                'visit_type': visit_type,  # Тип визита для совместимости
                 'notes': apt.notes,
                 'created_at': apt.created_at,
                 'source': 'appointments',
@@ -1564,13 +1653,13 @@ def get_all_appointments(
                 if vs.name:  # Используем сохраненное имя
                     service_names.append(vs.name)
                     if vs.code:
-                        service_codes.append(vs.code)
+                        service_codes.append(normalize_service_code(vs.code))
                 else:  # Fallback - ищем в таблице services
                     service = db.query(Service).filter(Service.id == vs.service_id).first()
                     if service:
                         service_names.append(service.name)
                         if service.code:
-                            service_codes.append(service.code)
+                            service_codes.append(normalize_service_code(service.code))
             
             # Получаем информацию о номерах в очередях для визита
             queue_numbers = []
@@ -1610,7 +1699,59 @@ def get_all_appointments(
                 confirmation_status = "confirmed"
             else:
                 confirmation_status = "none"
-            
+
+            # Определяем payment_status для Visit (та же логика что в registrar_integration.py)
+            payment_status = 'pending'
+            is_paid = False
+            try:
+                v_status = (getattr(visit, 'status', None) or '').lower()
+                if v_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                    payment_status = 'paid'
+                    is_paid = True
+                elif getattr(visit, 'payment_processed_at', None):
+                    payment_status = 'paid'
+                    is_paid = True
+                else:
+                    # Проверяем Payment table
+                    from app.models.payment import Payment
+                    payment_row = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
+                    if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+                        payment_status = 'paid'
+                        is_paid = True
+                    elif visit.discount_mode == 'paid' and v_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                        payment_status = 'paid'
+                        is_paid = True
+                    elif visit.discount_mode == 'paid' and getattr(visit, 'payment_processed_at', None):
+                        payment_status = 'paid'
+                        is_paid = True
+            except Exception:
+                # Если не удалось определить, проверяем discount_mode
+                if visit.discount_mode == 'paid':
+                    payment_status = 'paid'
+                    is_paid = True
+
+            # [OK] ИСПРАВЛЕНО: Сохраняем discount_mode в БД для существующих записей
+            # Если визит оплачен (есть платеж), но discount_mode не установлен - обновляем
+            # НО: это GET endpoint, не создаем платежи, только обновляем discount_mode если платеж уже есть
+            if is_paid and visit.discount_mode != 'paid':
+                # Проверяем, что платеж действительно существует
+                from app.models.payment import Payment
+                existing_payment = db.query(Payment).filter(
+                    Payment.visit_id == visit.id,
+                    Payment.status == "paid"
+                ).first()
+                
+                if existing_payment:
+                    # Платеж существует - обновляем discount_mode
+                    visit.discount_mode = 'paid'
+                    try:
+                        db.commit()
+                        db.refresh(visit)
+                    except Exception:
+                        db.rollback()
+                # Если платежа нет, но is_paid=True - НЕ создаем платеж в GET endpoint
+                # Платеж должен быть создан через соответствующие POST endpoints
+
             result.append({
                 'id': visit.id + 20000,  # Смещение для избежания конфликтов
                 'patient_id': visit.patient_id,
@@ -1623,7 +1764,9 @@ def get_all_appointments(
                 'services': service_names,  # Реальные названия услуг
                 'service_codes': service_codes,  # Коды услуг для фильтрации
                 'total_amount': total_amount,  # Общая сумма услуг
+                'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
                 'discount_mode': visit.discount_mode,  # Тип визита для отображения
+                'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
                 'notes': visit.notes,
                 'created_at': visit.created_at,
                 'source': 'visits',
@@ -1660,11 +1803,15 @@ def get_all_appointments(
 def mark_visit_as_paid(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor"))
 ):
-    """Отметить запись из таблицы visits как оплаченную"""
+    """Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)"""
     try:
         from app.models.visit import Visit
+        from app.services.billing_service import BillingService
+        
+        # Логирование для диагностики
+        print(f"[mark_visit_as_paid] User: {current_user.username}, Role: {current_user.role}, Visit ID: {visit_id}")
         
         # Находим запись
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
@@ -1674,8 +1821,63 @@ def mark_visit_as_paid(
                 detail="Запись не найдена"
             )
         
-        # Обновляем статус
+        # [OK] ИСПРАВЛЕНО: Проверяем, не создан ли уже платеж для этого визита
+        from app.models.payment import Payment
+        existing_payment = db.query(Payment).filter(
+            Payment.visit_id == visit_id,
+            Payment.status == "paid"
+        ).first()
+        
+        if not existing_payment:
+            # [OK] ИСПРАВЛЕНО: Создаем платеж через SSOT перед пометкой визита как оплаченного
+            billing_service = BillingService(db)
+            
+            # Рассчитываем сумму визита через SSOT
+            total_info = billing_service.calculate_total(
+                visit_id=visit_id,
+                discount_mode=visit.discount_mode or "none"
+            )
+            payment_amount = float(total_info["total"])
+            
+            # [OK] ИСПРАВЛЕНО: Используем прямой SQL для создания платежа, чтобы обойти конфликт моделей
+            # (BillingPayment и Payment используют одну таблицу, что вызывает проблемы)
+            from sqlalchemy import text
+            from datetime import datetime, timezone
+            
+            currency = total_info.get("currency", "UZS")
+            note = f"Оплата визита {visit_id} через панель кассира"
+            paid_at = datetime.now(timezone.utc)
+            
+            # Создаем платеж через прямой SQL
+            result = db.execute(
+                text("""
+                    INSERT INTO payments 
+                    (visit_id, amount, currency, method, status, note, paid_at, created_at)
+                    VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
+                """),
+                {
+                    "visit_id": visit_id,
+                    "amount": payment_amount,
+                    "currency": currency,
+                    "method": "cash",
+                    "status": "paid",
+                    "note": note,
+                    "paid_at": paid_at,
+                    "created_at": paid_at
+                }
+            )
+            db.commit()
+            
+            # Получаем созданный платеж
+            payment = db.query(Payment).filter(Payment.visit_id == visit_id).order_by(Payment.created_at.desc()).first()
+            
+            print(f"[mark_visit_as_paid] [OK] Создан платеж ID={payment.id} для визита {visit_id}, сумма={payment_amount}")
+        else:
+            print(f"[mark_visit_as_paid] [WARN] Платеж уже существует для визита {visit_id}, ID={existing_payment.id}")
+        
+        # Обновляем статус и discount_mode
         visit.status = "paid"
+        visit.discount_mode = "paid"  # [OK] ВАЖНО: устанавливаем discount_mode для корректного отображения payment_status
         db.commit()
         db.refresh(visit)
         
@@ -1688,6 +1890,10 @@ def mark_visit_as_paid(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[mark_visit_as_paid] Error: {str(e)}")
+        import traceback
+        print(f"[mark_visit_as_paid] Traceback: {traceback.format_exc()}")
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления записи: {str(e)}"
@@ -1698,7 +1904,7 @@ def mark_visit_as_paid(
 def complete_visit(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor"))
 ):
     """Завершить запись из таблицы visits"""
     try:
@@ -1911,18 +2117,29 @@ def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Di
         # Получаем или создаем дневную очередь
         daily_queue = crud_queue.get_or_create_daily_queue(db, today, doctor_id, queue_tag)
         
-        # Подсчитываем текущее количество записей в очереди
-        current_count = crud_queue.count_queue_entries(db, daily_queue.id)
         start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
-        next_number = start_number + current_count
+        next_number = queue_service.get_next_queue_number(
+            db,
+            daily_queue=daily_queue,
+            queue_tag=queue_tag,
+            default_start=start_number,
+        )
         
         # Создаем запись в очереди
+        # queue_time - бизнес-время регистрации
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        queue_settings = crud_clinic.get_queue_settings(db)
+        timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+        queue_time = datetime.now(timezone)
+        
         queue_entry = OnlineQueueEntry(
             queue_id=daily_queue.id,
             patient_id=visit.patient_id,
             number=next_number,
             status="waiting",
-            source="confirmation"  # Источник: подтверждение визита
+            source="confirmation",  # Источник: подтверждение визита
+            queue_time=queue_time  # Устанавливаем время регистрации
         )
         db.add(queue_entry)
         
@@ -1946,6 +2163,12 @@ def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Di
         doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
         patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
         
+        # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
+        doctor_name = "Без врача"
+        if doctor and doctor.user_id:
+            user = db.query(User).filter(User.id == doctor.user_id).first()
+            doctor_name = (user.full_name or user.username) if user else "Без врача"
+        
         print_tickets.append({
             "visit_id": visit.id,
             "queue_tag": queue_tag,
@@ -1954,7 +2177,7 @@ def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Di
             "queue_id": daily_queue.id,
             "patient_id": visit.patient_id,
             "patient_name": patient.short_name() if patient else "Неизвестный пациент",
-            "doctor_name": doctor.user.full_name if doctor and doctor.user else "Без врача",
+            "doctor_name": doctor_name,
             "department": visit.department,
             "visit_date": visit.visit_date.isoformat(),
             "visit_time": visit.visit_time

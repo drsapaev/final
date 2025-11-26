@@ -45,27 +45,38 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Vendor chunks
+          // Vendor chunks - более детальное разделение
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
+            // React ecosystem
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
               return 'react-vendor';
             }
-            if (id.includes('react-router')) {
-              return 'router';
-            }
+            
+            // Material-UI отдельно (очень большой)
             if (id.includes('@mui')) {
               return 'mui';
             }
-            if (id.includes('lucide-react')) {
+            
+            // Иконки отдельно
+            if (id.includes('lucide-react') || id.includes('@mui/icons-material')) {
               return 'icons';
             }
-            if (id.includes('axios') || id.includes('fetch')) {
+            
+            // HTTP клиенты
+            if (id.includes('axios') || id.includes('fetch') || id.includes('http')) {
               return 'http';
             }
+            
+            // Утилиты и библиотеки
+            if (id.includes('lodash') || id.includes('moment') || id.includes('date-fns')) {
+              return 'utils';
+            }
+            
+            // Остальные vendor библиотеки
             return 'vendor';
           }
           
-          // App chunks по функциональности
+          // App chunks по функциональности - более детальное разделение
           if (id.includes('/pages/')) {
             if (id.includes('Admin') || id.includes('Settings') || id.includes('Audit')) {
               return 'admin-pages';
@@ -86,19 +97,52 @@ export default defineConfig({
           }
           
           if (id.includes('/components/')) {
+            // macOS UI компоненты отдельно
+            if (id.includes('/ui/macos/')) {
+              return 'macos-ui';
+            }
+            
+            // Медицинские компоненты
             if (id.includes('medical') || id.includes('laboratory')) {
               return 'medical-components';
             }
+            
+            // Админ компоненты
             if (id.includes('admin') || id.includes('auth')) {
               return 'admin-components';
             }
+            
+            // PWA компоненты
             if (id.includes('pwa') || id.includes('mobile')) {
               return 'pwa-components';
             }
+            
+            // AI компоненты
             if (id.includes('ai')) {
               return 'ai-components';
             }
+            
+            // Таблицы отдельно (могут быть большими)
+            if (id.includes('table') || id.includes('Table')) {
+              return 'table-components';
+            }
+            
+            // Формы отдельно
+            if (id.includes('form') || id.includes('Form') || id.includes('input') || id.includes('Input')) {
+              return 'form-components';
+            }
+            
             return 'common-components';
+          }
+          
+          // Хуки и утилиты отдельно
+          if (id.includes('/hooks/') || id.includes('/utils/') || id.includes('/contexts/')) {
+            return 'utils';
+          }
+          
+          // Стили отдельно
+          if (id.includes('.css') || id.includes('.scss')) {
+            return 'styles';
           }
         }
       }

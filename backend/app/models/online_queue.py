@@ -1,5 +1,25 @@
 """
 Модели для онлайн-очереди согласно detail.md стр. 224-257
+
+============================================================================
+✅ OFFICIAL SSOT (Single Source of Truth) for Queue System
+============================================================================
+
+These models represent the OFFICIAL and PREFERRED queue system architecture:
+  - DailyQueue: Specialist-based daily queues (SSOT)
+  - OnlineQueueEntry: Queue entries with full metadata (SSOT)
+  - QueueToken: QR code tokens for online registration (SSOT)
+
+All NEW queue features MUST use these models.
+
+DEPRECATED ALTERNATIVE:
+  - app/models/online.py (OnlineDay) - legacy department-based system
+  - app/services/online_queue.py - legacy service for appointments
+
+See also:
+  - docs/ONLINE_QUEUE_SYSTEM_IMPLEMENTATION.md (full specification)
+  - docs/QUEUE_SYSTEM_ARCHITECTURE.md (architecture guide)
+============================================================================
 """
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Date, BigInteger, Text, JSON
 from sqlalchemy.orm import relationship
@@ -10,10 +30,10 @@ from app.db.base_class import Base
 class DailyQueue(Base):
     """Ежедневные очереди по специалистам"""
     __tablename__ = "daily_queues"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     day = Column(Date, nullable=False, index=True)  # YYYY-MM-DD
-    specialist_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    specialist_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)  # ИСПРАВЛЕНО: FK к doctors.id
     queue_tag = Column(String(32), nullable=True, index=True)  # ecg, lab, cardiology_common, etc.
     active = Column(Boolean, default=True, nullable=False)
     opened_at = Column(DateTime(timezone=True), nullable=True)  # Факт открытия приема
@@ -31,7 +51,7 @@ class DailyQueue(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    specialist = relationship("User", foreign_keys=[specialist_id])
+    specialist = relationship("Doctor", foreign_keys=[specialist_id])  # ИСПРАВЛЕНО: relationship к Doctor
     entries = relationship("OnlineQueueEntry", back_populates="queue", cascade="all, delete-orphan")
 
 
@@ -48,15 +68,27 @@ class OnlineQueueEntry(Base):
     patient_name = Column(String(200), nullable=True)  # Если пациент не зарегистрирован
     phone = Column(String(20), nullable=True, index=True)  # Для уникальности
     telegram_id = Column(BigInteger, nullable=True, index=True)  # Для уникальности
-    
+    birth_year = Column(Integer, nullable=True)  # Год рождения пациента
+    address = Column(String(500), nullable=True)  # Адрес пациента
+
     # Связь с визитом (для подтвержденных визитов)
     visit_id = Column(Integer, ForeignKey("visits.id"), nullable=True, index=True)
-    
+
+    # Тип визита и услуги
+    visit_type = Column(String(20), default="paid", nullable=False)  # paid, repeat, benefit
+    discount_mode = Column(String(20), default="none", nullable=False)  # none, repeat, benefit, all_free
+    services = Column(JSON, nullable=True)  # Список услуг с полными данными: [{"service_id": 123, "name": "...", "code": "K01", "quantity": 1, "price": 50000, "queue_time": "2025-11-11T10:30:00", "cancelled": false, "cancel_reason": null, "cancelled_by": null, "was_paid_before_cancel": false}]
+    service_codes = Column(JSON, nullable=True)  # DEPRECATED: Коды услуг ["K01", "K02", ...] - сохранено для обратной совместимости
+    total_amount = Column(Integer, default=0, nullable=False)  # Итоговая сумма к оплате
+
     # Источник записи
     source = Column(String(20), default="online", nullable=False)  # online, desk, telegram, confirmation, morning_assignment
     
     # Статус
     status = Column(String(20), default="waiting", nullable=False)  # waiting, called, served, no_show
+    
+    # Время регистрации в очереди (бизнес-время, не меняется при редактировании)
+    queue_time = Column(DateTime(timezone=True), nullable=True, index=True)  # Время регистрации в очереди
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     called_at = Column(DateTime(timezone=True), nullable=True)
@@ -76,8 +108,9 @@ class QueueToken(Base):
     
     # Параметры токена
     day = Column(Date, nullable=False, index=True)
-    specialist_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
+    specialist_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)  # NULL для общего QR клиники
     department = Column(String(50), nullable=True, index=True)  # Отделение
+    is_clinic_wide = Column(Boolean, default=False, nullable=False)  # True для общего QR клиники
     
     # Метаданные
     generated_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

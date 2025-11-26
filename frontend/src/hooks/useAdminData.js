@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { api } from '../api/client';
+import axios from 'axios';
 
 const useAdminData = (url, options = {}) => {
   const {
@@ -26,50 +28,35 @@ const useAdminData = (url, options = {}) => {
     onSuccessRef.current = onSuccess;
   });
 
-  const fetchData = useCallback(async (signal) => {
+  const fetchData = useCallback(async () => {
     if (!enabled || !url || !mountedRef.current) return;
+
+    // Создаем новый AbortController для этого конкретного запроса
+    const currentAbortController = new AbortController();
+    abortControllerRef.current = currentAbortController;
 
     try {
       setLoading(true);
       setError(null);
 
-      // Отменяем предыдущий запрос если он есть
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      // Убираем префикс /api/v1 если он есть, так как baseURL уже содержит его
+      const cleanUrl = url.startsWith('/api/v1') ? url.replace('/api/v1', '') : url;
 
-      // Создаем новый AbortController
-      abortControllerRef.current = new AbortController();
-      const currentSignal = signal || abortControllerRef.current.signal;
+      const response = await api.get(cleanUrl);
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
-        signal: currentSignal
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (mountedRef.current) {
-        setData(result);
-        onSuccessRef.current(result);
-      }
+      // Устанавливаем данные - React сам проверит, смонтирован ли компонент
+      setData(response.data);
+      onSuccessRef.current(response.data);
     } catch (err) {
-      if (err.name !== 'AbortError' && mountedRef.current) {
-        setError(err);
-        onErrorRef.current(err);
+      // Игнорируем ошибки отмены запроса
+      if (err.name === 'AbortError' || err.name === 'CanceledError' || axios.isCancel(err)) {
+        return; // Игнорируем ошибку отмены
       }
+      
+      setError(err);
+      onErrorRef.current(err);
     } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [url, enabled]);
 
@@ -82,7 +69,8 @@ const useAdminData = (url, options = {}) => {
     if (enabled && url) {
       fetchData();
     }
-  }, [enabled, url, fetchData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, url]);
 
   // Настройка интервала обновления
   useEffect(() => {

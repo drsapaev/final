@@ -6,6 +6,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.services.analytics import AnalyticsService
 
 router = APIRouter()
 
@@ -105,36 +106,12 @@ async def get_trends_analytics(
     current_user=Depends(require_roles(["admin", "doctor", "nurse"])),
     db: Session = Depends(get_db),
 ):
-    """Получение трендов за последние N дней"""
+    """Получение трендов за последние N дней через SSOT"""
     try:
-        from app.models.appointment import Appointment
-        
-        end_date = datetime.now().date()
+        end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Простой подсчет записей по дням
-        appointments_by_day = db.query(
-            func.date(Appointment.appointment_date).label('date'),
-            func.count(Appointment.id).label('count')
-        ).filter(
-            func.date(Appointment.appointment_date) >= start_date,
-            func.date(Appointment.appointment_date) <= end_date
-        ).group_by(
-            func.date(Appointment.appointment_date)
-        ).all()
-        
-        trends_data = []
-        for row in appointments_by_day:
-            trends_data.append({
-                "date": row.date.isoformat(),
-                "appointments": row.count
-            })
-        
-        return {
-            "period_days": days,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "trends": trends_data
-        }
+        # Используем SSOT для получения трендов
+        return AnalyticsService.get_trends(db, days)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения трендов: {str(e)}")

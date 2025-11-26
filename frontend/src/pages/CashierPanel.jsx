@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '../components/ui/native';
-import { useBreakpoint } from '../hooks/useMediaQuery';
+import { CreditCard, Calendar, Download, Search, Filter, CheckCircle, XCircle, DollarSign, User, Stethoscope, Clock, Receipt } from 'lucide-react';
+import { Card, Badge, Button, Progress, Icon } from '../components/ui/macos';
+import Tooltip from '../components/ui/macos/Tooltip';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import PaymentWidget from '../components/payment/PaymentWidget';
+import MacOSTab from '../components/ui/macos/MacOSTab';
+import SegmentedControl from '../components/ui/macos/SegmentedControl';
+import Input from '../components/ui/macos/Input';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
-import useModal from '../hooks/useModal';
+import useModal from '../hooks/useModal.jsx';
+import { usePayments } from '../hooks/usePayments';
 import { 
   Dialog, 
   DialogTitle, 
@@ -13,11 +18,30 @@ import {
   DialogActions,
   Typography,
   Box,
-  Alert
-} from '@mui/material';
+  Alert,
+  Skeleton
+} from '../components/ui/macos';
+
+// Функция для получения даты в формате YYYY-MM-DD
+const getLocalDateString = (date = new Date()) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Вспомогательная функция для создания прозрачного цвета
+const withOpacity = (color, opacity) => {
+  if (color.startsWith('var(')) {
+    return `rgba(from ${color} r g b / ${opacity})`;
+  }
+  return color;
+};
 
 const CashierPanel = () => {
   const { isMobile } = useBreakpoint();
+  const paymentsHook = usePayments();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
@@ -26,62 +50,95 @@ const CashierPanel = () => {
   const [paymentSuccess, setPaymentSuccess] = useState(null);
   const [paymentError, setPaymentError] = useState(null);
 
+  // Состояния для календаря
+  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
+  const [dateFrom, setDateFrom] = useState(() => getLocalDateString());
+  const [dateTo, setDateTo] = useState(() => getLocalDateString());
+  
+  // Состояние для вкладок
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
+
+
   // ✅ УЛУЧШЕНИЕ: Универсальные хуки вместо дублированных состояний
   const paymentModal = useModal();
   const paymentWidget = useModal();
+
+  // Вычисляем параметры даты для запроса
+  const getDateParams = () => {
+    if (dateMode === 'single') {
+      return {
+        date_from: selectedDate,
+        date_to: selectedDate
+      };
+    } else {
+      return {
+        date_from: dateFrom,
+        date_to: dateTo
+      };
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       
-      // Загружаем записи ожидающие оплаты
+      const { date_from, date_to } = getDateParams();
+      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+      
+      console.log('📅 Параметры даты для запроса:', { date_from, date_to, dateMode, selectedDate, dateFrom, dateTo });
+      
+      // Загружаем записи ожидающие оплаты через SSOT hook
       try {
-        const appointmentsResponse = await fetch('/api/v1/appointments/?status=pending&limit=50', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
+        const pendingResult = await paymentsHook.getPendingPayments({
+          date_from: date_from || undefined,  // Не передаем пустые строки
+          date_to: date_to || undefined,
+          limit: 100
         });
-        if (appointmentsResponse.ok) {
-          const appointmentsData = await appointmentsResponse.json();
+        if (pendingResult.success) {
+          // Данные уже включают и appointments, и visits с правильными услугами и суммами
+          const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
+          console.log('📋 Загружено записей ожидающих оплаты:', appointmentsData.length);
+          console.log('📋 Первая запись (пример):', appointmentsData[0]);
           setAppointments(appointmentsData);
+        } else {
+          console.warn('⚠️ Ошибка загрузки записей:', pendingResult.error);
+          setAppointments([]);
         }
       } catch (error) {
         console.error('Ошибка загрузки записей:', error);
       }
 
-      // Загружаем историю платежей
+      // Загружаем историю платежей через SSOT hook
       try {
-        const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-        const paymentsResponse = await fetch(`${API_BASE}/api/v1/appointments/?limit=50`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
+        const paymentsResult = await paymentsHook.getPayments({
+          date_from: date_from || undefined,  // Не передаем пустые строки
+          date_to: date_to || undefined,
+          limit: 50
         });
-        if (paymentsResponse.ok) {
-          const paymentsData = await paymentsResponse.json();
+        if (paymentsResult.success) {
+          const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
+          console.log('💰 Загружено платежей:', paymentsData.length);
+          console.log('💰 Первый платеж (пример):', paymentsData[0]);
+          
+          // Данные уже отформатированы на backend (SSOT)
+          // Используем данные как есть, без дополнительного форматирования
           setPayments(paymentsData);
         } else {
-          // Fallback данные
-          setPayments([
-            { id: 1, time: '09:10', patient: 'Ахмедов Алишер', service: 'Консультация', amount: 120000, method: 'Карта', status: 'paid' },
-            { id: 2, time: '09:30', patient: 'Каримова Зухра',  service: 'Анализы',     amount: 85000,  method: 'Наличные', status: 'paid' },
-            { id: 3, time: '10:05', patient: 'Тошматов Бахтиёр', service: 'ЭхоКГ',       amount: 220000, method: 'Карта', status: 'pending' },
-          ]);
+          console.warn('⚠️ Ошибка загрузки платежей:', paymentsResult.error);
+          // ✅ УЛУЧШЕНИЕ: Убраны демо данные (согласно плану - только реальные данные с backend)
+          setPayments([]);
         }
       } catch (error) {
         console.error('Ошибка загрузки платежей:', error);
-        // Fallback данные
-        setPayments([
-          { id: 1, time: '09:10', patient: 'Ахмедов Алишер', service: 'Консультация', amount: 120000, method: 'Карта', status: 'paid' },
-          { id: 2, time: '09:30', patient: 'Каримова Зухра',  service: 'Анализы',     amount: 85000,  method: 'Наличные', status: 'paid' },
-          { id: 3, time: '10:05', patient: 'Тошматов Бахтиёр', service: 'ЭхоКГ',       amount: 220000, method: 'Карта', status: 'pending' },
-        ]);
+        // ✅ УЛУЧШЕНИЕ: Убраны демо данные (согласно плану - только реальные данные с backend)
+        setPayments([]);
       }
       
       setIsLoading(false);
     };
     load();
-  }, []);
+  }, [dateMode, selectedDate, dateFrom, dateTo]);
 
   const format = (n) => new Intl.NumberFormat('ru-RU').format(n) + ' сум';
 
@@ -124,224 +181,729 @@ const CashierPanel = () => {
     setPaymentSuccess(null);
   };
 
-  // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами с fallback
+  // ✅ УЛУЧШЕНИЕ: Функции для работы с оплатами через SSOT hook
   const processPayment = async (appointment, paymentData) => {
     try {
-      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
+      const recordType = appointment.record_type || (appointment.id >= 20000 ? 'visit' : 'appointment');
       
-      // Попытка создать платеж через API
-      const paymentResponse = await fetch(`${API_BASE}/api/v1/payments/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        },
-        body: JSON.stringify({
-          appointment_id: appointment.id,
-          amount: paymentData.amount,
-          method: paymentData.method,
-          note: paymentData.note || `Оплата за ${appointment.department || 'услугу'}`
-        })
-      });
-
-      if (paymentResponse.ok) {
-        const payment = await paymentResponse.json();
+      // Если это visit с несколькими visit_ids (группированные)
+      if (recordType === 'visit' && appointment.visit_ids && appointment.visit_ids.length > 0) {
+        // ✅ ИСПРАВЛЕНО: Создаем платежи для всех визитов с правильной суммой и методом
+        // Затем markVisitAsPaid проверит существование платежа и обновит статус
+        const paymentPromises = appointment.visit_ids.map(visitId => 
+          paymentsHook.createPayment({
+            visit_id: visitId,
+            amount: paymentData.amount / appointment.visit_ids.length, // Распределяем сумму между визитами
+            method: paymentData.method,
+            note: paymentData.note || `Оплата за ${appointment.department || 'услугу'}`
+          })
+        );
         
-        // Затем отмечаем запись как оплаченную
-        const markPaidResponse = await fetch(`${API_BASE}/api/v1/appointments/${appointment.id}/mark-paid`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        });
-
-        if (markPaidResponse.ok) {
-          // Обновляем списки
-          setAppointments(prev => prev.filter(apt => apt.id !== appointment.id));
-          setPayments(prev => [payment, ...prev]);
-          paymentModal.closeModal();
-          alert('Оплата успешно обработана!');
-        } else {
-          throw new Error('Ошибка при обновлении статуса записи');
+        const paymentResults = await Promise.all(paymentPromises);
+        const failedPayments = paymentResults.filter(r => !r.success);
+        if (failedPayments.length > 0) {
+          throw new Error(`Ошибка создания платежей: ${failedPayments.map(f => f.error).join(', ')}`);
         }
-      } else {
-        // Fallback: работаем локально без backend
-        console.log('API недоступен, работаем локально');
-        const localPayment = {
-          id: Date.now(),
-          time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-          patient: appointment.patient_name || 'Пациент',
-          service: appointment.department || 'Услуга',
-          amount: paymentData.amount,
-          method: paymentData.method === 'cash' ? 'Наличные' : 'Карта',
-          status: 'paid'
-        };
         
-        // Обновляем списки локально
+        // Отмечаем все visits как оплаченные (markVisitAsPaid проверит существование платежа)
+        const markPaidPromises = appointment.visit_ids.map(visitId => 
+          paymentsHook.markVisitAsPaid(visitId)
+        );
+        
+        const results = await Promise.all(markPaidPromises);
+        
+        // Проверяем, что все визиты успешно отмечены
+        const failed = results.filter(r => !r.success);
+        if (failed.length > 0) {
+          throw new Error(`Ошибка при отметке визитов как оплаченных: ${failed.map(f => f.error).join(', ')}`);
+        }
+        
         setAppointments(prev => prev.filter(apt => apt.id !== appointment.id));
-        setPayments(prev => [localPayment, ...prev]);
+        
+        // ✅ ИСПРАВЛЕНО: Перезагружаем историю платежей после успешного создания
+        const { date_from, date_to } = getDateParams();
+        const paymentsResult = await paymentsHook.getPayments({
+          date_from: date_from || undefined,
+          date_to: date_to || undefined,
+          limit: 50
+        });
+        if (paymentsResult.success) {
+          const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
+          setPayments(paymentsData);
+          console.log('💰 История платежей перезагружена после создания платежа:', paymentsData.length);
+        }
+        
         paymentModal.closeModal();
-        alert('Оплата обработана локально (демо режим)!');
+        alert('Оплата успешно обработана!');
+      } else {
+        // Остальной код для одиночных записей...
+        const recordId = recordType === 'visit' ? appointment.id - 20000 : appointment.id;
+        
+        // ✅ ИСПРАВЛЕНО: Для visit используем markVisitAsPaid, который сам создаст платеж
+        // Для appointment создаем платеж вручную
+        if (recordType === 'visit') {
+          // markVisitAsPaid создаст платеж автоматически, если его еще нет
+          const markPaidResult = await paymentsHook.markVisitAsPaid(recordId);
+          if (!markPaidResult.success) {
+            throw new Error(markPaidResult.error || 'Ошибка при обновлении статуса визита');
+          }
+        } else {
+          // Для appointment создаем платеж вручную
+          const paymentResult = await paymentsHook.createPayment({
+            appointment_id: recordId,
+            visit_id: null,
+            amount: paymentData.amount,
+            method: paymentData.method,
+            note: paymentData.note || `Оплата за ${appointment.department || 'услугу'}`
+          });
+          
+          if (!paymentResult.success) {
+            throw new Error(paymentResult.error || 'Ошибка создания платежа');
+          }
+        }
+        
+        // Обновляем списки
+        setAppointments(prev => prev.filter(apt => apt.id !== appointment.id));
+        
+        // ✅ ИСПРАВЛЕНО: Перезагружаем историю платежей после успешного создания
+        const { date_from, date_to } = getDateParams();
+        const paymentsResult = await paymentsHook.getPayments({
+          date_from: date_from || undefined,
+          date_to: date_to || undefined,
+          limit: 50
+        });
+        if (paymentsResult.success) {
+          const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
+          setPayments(paymentsData);
+          console.log('💰 История платежей перезагружена после создания платежа:', paymentsData.length);
+        }
+        
+        paymentModal.closeModal();
+        alert('Оплата успешно обработана!');
       }
     } catch (error) {
-      console.error('CashierPanel: Payment error:', error);
-      
-      // Fallback: создаем локальный платеж даже при ошибке
-      const localPayment = {
-        id: Date.now(),
-        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-        patient: appointment.patient_name || 'Пациент',
-        service: appointment.department || 'Услуга',
-        amount: paymentData.amount,
-        method: paymentData.method === 'cash' ? 'Наличные' : 'Карта',
-        status: 'paid'
-      };
-      
-      // Обновляем списки локально
-      setAppointments(prev => prev.filter(apt => apt.id !== appointment.id));
-      setPayments(prev => [localPayment, ...prev]);
-      paymentModal.closeModal();
-      alert('Оплата обработана локально (демо режим)!');
+      console.error('Ошибка обработки платежа:', error);
+      setPaymentError(error.message || 'Ошибка обработки платежа. Попробуйте позже.');
+      // ✅ УЛУЧШЕНИЕ: Убран демо режим (согласно плану - только реальные данные с backend)
+      // Показываем ошибку пользователю, не создаем локальные данные
+      alert(`Ошибка обработки платежа: ${error.message || 'Попробуйте позже'}`);
     }
   };
 
-  const filtered = payments.filter(p => {
+  // ✅ ОТОБРАЖЕНИЕ УСЛУГ: Рендерим коды услуг с бейджами и tooltip (как в RegistrarPanel)
+  const renderServiceBadges = (serviceCodes, serviceNames) => {
+    // Если нет кодов, возвращаем пустой элемент
+    if (!serviceCodes || !Array.isArray(serviceCodes) || serviceCodes.length === 0) {
+      return <span style={{ color: 'var(--mac-text-tertiary)' }}>—</span>;
+    }
+
+    // Создаем tooltip с полными названиями услуг
+    const tooltipContent = (
+      <div style={{ padding: '4px 0', maxWidth: '300px' }}>
+        {serviceNames && Array.isArray(serviceNames) && serviceNames.length === serviceCodes.length
+          ? serviceNames.map((name, idx) => (
+              <div key={idx} style={{
+                marginBottom: idx < serviceNames.length - 1 ? '6px' : '0',
+                lineHeight: '1.4',
+                fontSize: '12px'
+              }}>
+                {name}
+              </div>
+            ))
+          : serviceCodes.map((code, idx) => (
+              <div key={idx} style={{
+                marginBottom: idx < serviceCodes.length - 1 ? '6px' : '0',
+                lineHeight: '1.4',
+                fontSize: '12px'
+              }}>
+                {code}
+              </div>
+            ))
+        }
+      </div>
+    );
+
+    return (
+      <Tooltip
+        content={tooltipContent}
+        position="bottom"
+        delay={200}
+      >
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px',
+          cursor: 'help',
+          maxWidth: '280px'
+        }}>
+          {serviceCodes.map((code, idx) => (
+            <span
+              key={idx}
+              style={{
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: '600',
+                backgroundColor: 'rgba(0, 122, 255, 0.12)',
+                color: '#007AFF',
+                border: '1px solid rgba(0, 122, 255, 0.25)',
+                whiteSpace: 'nowrap',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif'
+              }}
+            >
+              {code}
+            </span>
+          ))}
+        </div>
+      </Tooltip>
+    );
+  };
+
+  // ✅ ГРУППИРОВКА: Объединяем платежи одного пациента, созданных в одно время
+  const groupPaymentsByPatientAndTime = (paymentsList) => {
+    const grouped = {};
+
+    paymentsList.forEach(payment => {
+      // Ключ: пациент + дата + время (с точностью до минуты)
+      const dateKey = payment.date || '—';
+      const timeKey = payment.time || '00:00';
+      const groupKey = `${payment.patient}_${dateKey}_${timeKey}`;
+
+      if (!grouped[groupKey]) {
+        // Создаём новую группу
+        grouped[groupKey] = {
+          ...payment,
+          services: payment.services || [payment.service],
+          services_names: payment.services_names || [payment.service],
+          grouped_payments: [payment.id],
+          total_amount: payment.amount
+        };
+      } else {
+        // Добавляем к существующей группе
+        if (payment.services && payment.services.length > 0) {
+          grouped[groupKey].services.push(...payment.services);
+          if (payment.services_names) {
+            grouped[groupKey].services_names.push(...payment.services_names);
+          }
+        } else {
+          grouped[groupKey].services.push(payment.service);
+          grouped[groupKey].services_names.push(payment.service);
+        }
+        grouped[groupKey].grouped_payments.push(payment.id);
+        grouped[groupKey].total_amount += payment.amount;
+      }
+    });
+
+    // ✅ Удаляем дубликаты услуг и обновляем строки
+    Object.values(grouped).forEach(group => {
+      // Создаём уникальные массивы кодов и названий
+      const uniqueServices = [...new Set(group.services)];
+      const uniqueServicesMap = new Map();
+
+      // Создаём мапу код → название (берём первое попавшееся название для каждого кода)
+      group.services.forEach((code, idx) => {
+        if (!uniqueServicesMap.has(code) && group.services_names && group.services_names[idx]) {
+          uniqueServicesMap.set(code, group.services_names[idx]);
+        }
+      });
+
+      group.services = uniqueServices;
+      group.services_names = uniqueServices.map(code => uniqueServicesMap.get(code) || code);
+      group.service = uniqueServices.join(', ');
+      group.amount = group.total_amount;
+    });
+
+    return Object.values(grouped);
+  };
+
+  // Сначала фильтруем, затем группируем
+  const filteredBeforeGrouping = payments.filter(p => {
     const matchesText = [p.patient, p.service, p.method].join(' ').toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === 'all' || p.status === status;
     return matchesText && matchesStatus;
   });
 
+  // Группируем платежи
+  const filtered = groupPaymentsByPatientAndTime(filteredBeforeGrouping);
+
+  console.log('💰 Отфильтровано платежей (UI фильтр):', filteredBeforeGrouping.length, 'из', payments.length);
+  console.log('💰 После группировки:', filtered.length, 'строк');
+
+  // ✅ УЛУЧШЕНИЕ: Убрана клиентская фильтрация по датам (данные уже отфильтрованы на backend согласно SSOT)
+  // Фильтрация только по текстовому запросу и статусу (UI логика)
+  const filteredAppointments = appointments.filter(apt => {
+    // Только UI фильтрация (текст, статус) - бизнес-логика фильтрации дат на backend
+    if (query) {
+      const searchText = [apt.patient_name, apt.patient_last_name, apt.patient_first_name, apt.department]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!searchText.includes(query.toLowerCase())) {
+        return false;
+      }
+    }
+    return true;
+  });
+  
+  console.log('🔍 Отфильтровано записей (UI фильтр):', filteredAppointments.length, 'из', appointments.length);
+  console.log('🔍 filteredAppointments[0]:', filteredAppointments[0]);
+  console.log('🔍 isLoading:', isLoading, 'activeTab:', activeTab);
+
   return (
-    <div style={{ padding: 16 }}>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CreditCard className="w-7 h-7 text-blue-600" />
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Панель кассира</h1>
-              <p className="text-sm text-gray-500">Приём оплат и выдача чеков</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="clinic-button clinic-button-outline"><Calendar className="w-4 h-4 mr-2"/>Сегодня</button>
-            <button className="clinic-button clinic-button-outline"><Download className="w-4 h-4 mr-2"/>Экспорт</button>
-          </div>
-        </div>
+    <div style={{ 
+      padding: '0',
+      minHeight: '100vh',
+      background: 'var(--mac-gradient-window)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+      color: 'var(--mac-text-primary)',
+      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
+    }}>
+
+      <div style={{ padding: '0px' }}> {/* Убираем padding, так как он уже есть в main контейнере */}
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Старый header удален - теперь используется macOS Header */}
 
         {/* Filters */}
-        <Card className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Card 
+          variant="default"
+          padding="default"
+          style={{ marginBottom: '16px' }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+            {/* Поиск */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+              <Search style={{ 
+                position: 'absolute', 
+                left: '12px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                width: '16px', 
+                height: '16px', 
+                color: 'var(--mac-text-tertiary)' 
+              }} />
               <input
                 value={query}
                 onChange={(e)=>setQuery(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '12px',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
                 placeholder="Поиск по пациенту, услуге, способу оплаты"
               />
             </div>
+
+            {/* Статус */}
             <select
               value={status}
               onChange={(e)=>setStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg"
+              style={{
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)',
+                fontSize: '14px',
+                outline: 'none',
+                minWidth: '140px'
+              }}
             >
               <option value="all">Все статусы</option>
               <option value="paid">Оплачено</option>
               <option value="pending">Ожидает</option>
             </select>
-            <Button variant="outline"><Filter className="w-4 h-4 mr-2"/>Фильтры</Button>
+
+            {/* Переключатель режима даты */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Calendar style={{ width: '16px', height: '16px', color: 'var(--mac-text-secondary)' }} />
+              <SegmentedControl
+                options={[
+                  { label: 'Одна дата', value: 'single' },
+                  { label: 'Диапазон', value: 'range' }
+                ]}
+                value={dateMode}
+                onChange={setDateMode}
+                size="default"
+              />
+            </div>
+
+            {/* Поля даты */}
+            {dateMode === 'single' ? (
+              <>
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{ minWidth: '160px' }}
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const today = getLocalDateString();
+                    setSelectedDate(today);
+                  }}
+                >
+                  Сегодня
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    setSelectedDate(getLocalDateString(yesterday));
+                  }}
+                >
+                  Вчера
+                </Button>
+              </>
+            ) : (
+              <>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  style={{ minWidth: '140px' }}
+                />
+                <span style={{ fontSize: '13px', color: 'var(--mac-text-secondary)' }}>—</span>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  style={{ minWidth: '140px' }}
+                />
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const today = getLocalDateString();
+                    setDateFrom(today);
+                    setDateTo(today);
+                  }}
+                >
+                  Сегодня
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const today = new Date();
+                    const weekAgo = new Date();
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    setDateFrom(getLocalDateString(weekAgo));
+                    setDateTo(getLocalDateString(today));
+                  }}
+                >
+                  Неделя
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    const today = new Date();
+                    const monthAgo = new Date();
+                    monthAgo.setMonth(monthAgo.getMonth() - 1);
+                    setDateFrom(getLocalDateString(monthAgo));
+                    setDateTo(getLocalDateString(today));
+                  }}
+                >
+                  Месяц
+                </Button>
+              </>
+            )}
           </div>
         </Card>
 
-        {/* Записи ожидающие оплаты */}
-        {appointments.length > 0 && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-orange-500" />
-                Записи ожидающие оплаты ({appointments.length})
-              </h2>
-            </div>
-            <div className="space-y-3">
-              {appointments.map((appointment) => (
-                <div key={appointment.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900">
-                      {appointment.patient_name || `Пациент #${appointment.patient_id}`}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {appointment.department} • {appointment.appointment_date} {appointment.appointment_time}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="warning">Ожидает оплаты</Badge>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => openPaymentWidget(appointment)}
-                      >
-                        <CreditCard className="w-4 h-4 mr-1" />
-                        Онлайн
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        onClick={() => {
-                          paymentModal.openModal(appointment);
-                        }}
-                      >
-                        <DollarSign className="w-4 h-4 mr-1" />
-                        Касса
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+        {/* Объединенная секция с вкладками */}
+        <Card 
+          variant="default"
+          padding="default"
+        >
+          <MacOSTab
+            tabs={[
+              {
+                id: 'pending',
+                label: 'Ожидающие оплаты',
+                icon: DollarSign,
+                badge: filteredAppointments.length > 0 ? filteredAppointments.length : undefined
+              },
+              {
+                id: 'history',
+                label: 'История платежей',
+                icon: CreditCard
+              }
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            size="md"
+            variant="default"
+          />
 
-        {/* Table */}
-        <Card className="p-0 overflow-hidden">
-          {isLoading ? (
-            <Skeleton className="h-48" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Время</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Пациент</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Услуга</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Способ</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Сумма</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Статус</th>
-                    <th className="text-left px-4 py-3 text-gray-900 font-medium">Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(row => (
-                    <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-3">{row.time}</td>
-                      <td className="px-4 py-3">{row.patient}</td>
-                      <td className="px-4 py-3">{row.service}</td>
-                      <td className="px-4 py-3">{row.method}</td>
-                      <td className="px-4 py-3 font-medium">{format(row.amount)}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={row.status === 'paid' ? 'success' : 'warning'}>
-                          {row.status === 'paid' ? 'Оплачено' : 'Ожидает'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 flex gap-2">
-                        <Button size="sm" variant="success"><CheckCircle className="w-4 h-4 mr-1"/>Принять</Button>
-                        <Button size="sm" variant="danger"><XCircle className="w-4 h-4 mr-1"/>Отмена</Button>
-                      </td>
-                    </tr>
+          {activeTab === 'pending' && (
+            <div style={{ marginTop: '24px' }}>
+              {isLoading ? (
+                <Skeleton style={{ height: '192px' }} />
+              ) : filteredAppointments.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {filteredAppointments.map((appointment, index) => (
+                    <div key={`${appointment.record_type || 'appointment'}-${appointment.id || index}-${appointment.visit_ids?.join('-') || ''}`} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '12px', 
+                      backgroundColor: 'var(--mac-bg-tertiary)', 
+                      border: '1px solid var(--mac-border)', 
+                      borderRadius: 'var(--mac-radius-sm)'
+                    }}>
+                      <div style={{ flex: '1' }}>
+                        {/* Первый ряд: Фамилия - Имя, затем Дата-Время */}
+                        <div style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          marginBottom: '6px'
+                        }}>
+                          <div style={{ 
+                            fontWeight: '500', 
+                            color: 'var(--mac-text-primary)',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <User style={{ width: '14px', height: '14px', color: 'var(--mac-text-secondary)' }} />
+                            {appointment.patient_last_name && appointment.patient_first_name
+                              ? `${appointment.patient_last_name} - ${appointment.patient_first_name}`
+                              : appointment.patient_name || `Пациент #${appointment.patient_id}`
+                            }
+                          </div>
+                          <div style={{ 
+                            fontSize: '12px', 
+                            color: 'var(--mac-text-tertiary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <Clock style={{ width: '12px', height: '12px', color: 'var(--mac-text-tertiary)' }} />
+                            {appointment.created_at 
+                              ? new Date(appointment.created_at).toLocaleString('ru-RU', { 
+                                  day: '2-digit', 
+                                  month: '2-digit', 
+                                  year: 'numeric',
+                                  hour: '2-digit', 
+                                  minute: '2-digit',
+                                  timeZone: 'Asia/Tashkent'
+                                })
+                              : `${appointment.appointment_date} ${appointment.appointment_time || ''}`
+                            }
+                          </div>
+                        </div>
+                        
+                        {/* Второй ряд: Коды услуг с tooltip и сумма оплаты */}
+                        <div style={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}>
+                          <div style={{ 
+                            fontSize: '13px', 
+                            color: 'var(--mac-text-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            flex: '1'
+                          }}>
+                            <Stethoscope style={{ width: '13px', height: '13px', color: 'var(--mac-text-tertiary)' }} />
+                            {renderServiceBadges(appointment.services, appointment.services_names)}
+                          </div>
+                          {appointment.payment_amount && (
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: 'var(--mac-text-tertiary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
+                              <Receipt style={{ width: '12px', height: '12px', color: 'var(--mac-text-tertiary)' }} />
+                              {format(appointment.payment_amount || 0)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Badge variant="warning">Ожидает оплаты</Badge>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openPaymentWidget(appointment)}
+                          >
+                            <CreditCard style={{ width: '16px', height: '16px', marginRight: '4px' }} />
+                            Онлайн
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={() => {
+                              paymentModal.openModal(appointment);
+                            }}
+                          >
+                            <DollarSign style={{ width: '16px', height: '16px', marginRight: '4px' }} />
+                            Касса
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              ) : (
+                <div style={{ 
+                  padding: '48px', 
+                  textAlign: 'center', 
+                  color: 'var(--mac-text-secondary)',
+                  fontSize: '14px'
+                }}>
+                  Нет записей, ожидающих оплаты
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div style={{ marginTop: '24px' }}>
+              {isLoading ? (
+                <Skeleton style={{ height: '192px' }} />
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%' }}>
+                    <thead>
+                      <tr style={{ 
+                        backgroundColor: 'var(--mac-bg-tertiary)', 
+                        borderBottom: '1px solid var(--mac-border)' 
+                      }}>
+                        <th style={{
+                          textAlign: 'left',
+                          padding: '12px 16px',
+                          color: 'var(--mac-text-primary)',
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Дата/Время</th>
+                        <th style={{ 
+                          textAlign: 'left', 
+                          padding: '12px 16px', 
+                          color: 'var(--mac-text-primary)', 
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Пациент</th>
+                        <th style={{ 
+                          textAlign: 'left', 
+                          padding: '12px 16px', 
+                          color: 'var(--mac-text-primary)', 
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Услуга</th>
+                        <th style={{ 
+                          textAlign: 'left', 
+                          padding: '12px 16px', 
+                          color: 'var(--mac-text-primary)', 
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Способ</th>
+                        <th style={{ 
+                          textAlign: 'left', 
+                          padding: '12px 16px', 
+                          color: 'var(--mac-text-primary)', 
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Сумма</th>
+                        <th style={{ 
+                          textAlign: 'left', 
+                          padding: '12px 16px', 
+                          color: 'var(--mac-text-primary)', 
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Статус</th>
+                        <th style={{ 
+                          textAlign: 'left', 
+                          padding: '12px 16px', 
+                          color: 'var(--mac-text-primary)', 
+                          fontWeight: '500',
+                          fontSize: '14px'
+                        }}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.length > 0 ? (
+                        filtered.map((row, index) => (
+                          <tr key={`payment-${row.id || row.payment_id || index}`} style={{ 
+                            borderBottom: '1px solid var(--mac-border)', 
+                            transition: 'background-color var(--mac-duration-normal) var(--mac-ease)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--mac-bg-tertiary)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span style={{ fontWeight: '500' }}>{row.date || '—'}</span>
+                                <span style={{ fontSize: '12px', color: 'var(--mac-text-secondary)' }}>{row.time || '—'}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              {row.patient}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              {renderServiceBadges(row.services, row.services_names)}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
+                              {row.method}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px', fontWeight: '500' }}>
+                              {format(row.amount)}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <Badge variant={row.status === 'paid' ? 'success' : 'warning'}>
+                                {row.status === 'paid' ? 'Оплачено' : 'Ожидает'}
+                              </Badge>
+                            </td>
+                            <td style={{ padding: '12px 16px', display: 'flex', gap: '8px' }}>
+                              <Button size="sm" variant="success">
+                                <CheckCircle style={{ width: '16px', height: '16px', marginRight: '4px' }}/>
+                                Принять
+                              </Button>
+                              <Button size="sm" variant="danger">
+                                <XCircle style={{ width: '16px', height: '16px', marginRight: '4px' }}/>
+                                Отмена
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="7" style={{ 
+                            padding: '48px', 
+                            textAlign: 'center', 
+                            color: 'var(--mac-text-secondary)',
+                            fontSize: '14px'
+                          }}>
+                            Нет данных для отображения
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -375,7 +937,7 @@ const CashierPanel = () => {
           
           <DialogContent>
             {paymentError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert severity="error" style={{ marginBottom: 8 }}>
                 {paymentError}
               </Alert>
             )}
@@ -437,9 +999,12 @@ const CashierPanel = () => {
           </DialogActions>
         </Dialog>
       </div>
+      </div>
     </div>
   );
 };
+
+export default CashierPanel;
 
 // Компонент модального окна оплаты
 const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
@@ -472,74 +1037,101 @@ const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
       zIndex: 9999
     }}>
       <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
+        backgroundColor: 'var(--mac-bg-secondary)',
+        borderRadius: 'var(--mac-radius-md)',
         padding: '24px',
         width: '100%',
         maxWidth: '400px',
-        margin: '16px'
+        margin: '16px',
+        border: '1px solid var(--mac-border)',
+        boxShadow: 'var(--mac-shadow-lg)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Обработка оплаты</h3>
-          <button onClick={onClose} style={{ color: '#9CA3AF', cursor: 'pointer', border: 'none', background: 'none' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--mac-text-primary)' }}>Обработка оплаты</h3>
+          <button onClick={onClose} style={{ color: 'var(--mac-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}>
             <XCircle className="w-6 h-6" />
           </button>
         </div>
-
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <div className="font-medium text-gray-900">
-            {appointment.patient_name || `Пациент #${appointment.patient_id}`}
-          </div>
-          <div className="text-sm text-gray-600">
-            {appointment.department} • {appointment.appointment_date} {appointment.appointment_time}
-          </div>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)', marginBottom: '8px' }}>Пациент:</p>
+          <p style={{ fontSize: '16px', fontWeight: '500', color: 'var(--mac-text-primary)' }}>
+            {appointment?.patient_name || `Пациент #${appointment?.patient_id}`}
+          </p>
+          <p style={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
+            {appointment?.department} • {appointment?.appointment_date} {appointment?.appointment_time}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
               Сумма (сум)
             </label>
             <input
               type="number"
               value={paymentData.amount}
-              onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setPaymentData(prev => ({ ...prev, amount: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '16px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
+              }}
               placeholder="Введите сумму"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
               Способ оплаты
             </label>
             <select
               value={paymentData.method}
-              onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(e) => setPaymentData(prev => ({ ...prev, method: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '16px',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
+              }}
             >
               <option value="cash">Наличные</option>
-              <option value="card">Банковская карта</option>
-              <option value="online">Онлайн оплата</option>
+              <option value="card">Карта</option>
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: 'var(--mac-text-primary)', marginBottom: '4px' }}>
               Примечание (необязательно)
             </label>
             <textarea
               value={paymentData.note}
-              onChange={(e) => setPaymentData({ ...paymentData, note: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows="2"
+              onChange={(e) => setPaymentData(prev => ({ ...prev, note: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-sm)',
+                fontSize: '16px',
+                minHeight: '80px',
+                resize: 'vertical',
+                backgroundColor: 'var(--mac-bg-primary)',
+                color: 'var(--mac-text-primary)'
+              }}
               placeholder="Дополнительная информация"
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="submit" className="flex-1">
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <Button type="submit" variant="primary">
               <CheckCircle className="w-4 h-4 mr-2" />
               Обработать оплату
             </Button>
@@ -552,8 +1144,4 @@ const PaymentModal = ({ appointment, onProcessPayment, onClose }) => {
     </div>
   );
 };
-
-export default CashierPanel;
-
-
 

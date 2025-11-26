@@ -5,21 +5,18 @@ import {
   CardContent,
   Typography,
   Button,
-  IconButton,
-  Slide,
   Alert,
-  Stack,
-  Chip
-} from '@mui/material';
+  Badge,
+} from '../ui/macos';
 import {
-  GetApp,
-  Close,
+  Download,
+  X,
   Smartphone,
   WifiOff,
-  Notifications,
-  Update,
-  CheckCircle
-} from '@mui/icons-material';
+  Bell,
+  RefreshCw,
+  CheckCircle,
+} from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
 
 const PWAInstallPrompt = ({ onClose }) => {
@@ -117,15 +114,15 @@ const PWAInstallPrompt = ({ onClose }) => {
                   <Box display="flex" alignItems="center" gap={1}>
                     <Chip
                       icon={isOnline ? <CheckCircle /> : <WifiOff />}
-                      label={isOnline ? "Онлайн" : "Офлайн режим"}
-                      color={isOnline ? "success" : "warning"}
+                      label={isOnline ? 'Онлайн' : 'Офлайн режим'}
+                      color={isOnline ? 'success' : 'warning'}
                       size="small"
                     />
                     {capabilities.notifications && (
                       <Chip
                         icon={<Notifications />}
                         label="Push уведомления"
-                        color={notificationPermission === 'granted' ? "success" : "default"}
+                        color={notificationPermission === 'granted' ? 'success' : 'default'}
                         size="small"
                         onClick={notificationPermission !== 'granted' ? handleNotificationPermission : undefined}
                         clickable={notificationPermission !== 'granted'}

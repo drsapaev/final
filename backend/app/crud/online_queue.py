@@ -1,95 +1,41 @@
 """
 CRUD операции для онлайн-очереди согласно detail.md стр. 224-257
+
+============================================================================
+⚠️ TRANSITIONAL: Mixed CRUD + Business Logic (Legacy)
+============================================================================
+
+WARNING: This file contains a mix of CRUD operations and business logic.
+
+Current State:
+  - Contains both DB queries (CRUD) and business logic
+  - Used by 8 endpoints for backward compatibility
+  - Imports queue_service but also duplicates some functionality
+
+For NEW Features:
+  ✅ USE: app/services/queue_service.py (QueueBusinessService - SSOT)
+  ❌ AVOID: Adding new business logic to this file
+
+Migration Path:
+  - New endpoints should use queue_service.py directly
+  - Existing endpoints will be gradually migrated
+  - This file will eventually contain only pure CRUD operations
+
+See Also:
+  - app/services/queue_service.py (SSOT for business logic)
+  - docs/QUEUE_SYSTEM_ARCHITECTURE.md (architecture guide)
+============================================================================
 """
-import uuid
-from datetime import datetime, date, time, timedelta
-from typing import Optional, Tuple, Dict, Any
+from datetime import datetime, date
+from typing import Optional, Tuple, Dict, Any, List
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_
 from zoneinfo import ZoneInfo
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.clinic import Doctor
 from app.crud.clinic import get_queue_settings
-
-
-# ===================== ГЕНЕРАЦИЯ QR ТОКЕНОВ =====================
-
-def generate_qr_token(
-    db: Session, 
-    day: date, 
-    specialist_id: int,
-    user_id: Optional[int] = None
-) -> Tuple[str, Dict[str, Any]]:
-    """
-    Генерация QR токена для онлайн-очереди
-    Из detail.md стр. 228: POST /api/online-queue/qrcode?day=YYYY-MM-DD&specialist_id=X → token
-    """
-    
-    # Проверяем существование врача
-    doctor = db.query(Doctor).filter(
-        and_(Doctor.id == specialist_id, Doctor.active == True)
-    ).first()
-    
-    if not doctor:
-        raise ValueError(f"Врач с ID {specialist_id} не найден или неактивен")
-    
-    # Проверяем что дата не в прошлом
-    if day < date.today():
-        raise ValueError("Нельзя создать токен для прошедшей даты")
-    
-    # Получаем настройки очереди
-    queue_settings = get_queue_settings(db)
-    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
-    
-    # Создаем или получаем дневную очередь
-    daily_queue = db.query(DailyQueue).filter(
-        and_(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
-    ).first()
-    
-    if not daily_queue:
-        daily_queue = DailyQueue(
-            day=day,
-            specialist_id=specialist_id,
-            active=True
-        )
-        db.add(daily_queue)
-        db.commit()
-        db.refresh(daily_queue)
-    
-    # Генерируем уникальный токен
-    token = str(uuid.uuid4())
-    
-    # Вычисляем срок действия токена (до конца дня)
-    expires_at = datetime.combine(day, time(23, 59, 59))
-    expires_at = timezone.localize(expires_at)
-    
-    # Сохраняем токен
-    queue_token = QueueToken(
-        token=token,
-        day=day,
-        specialist_id=specialist_id,
-        generated_by_user_id=user_id,
-        expires_at=expires_at,
-        active=True
-    )
-    db.add(queue_token)
-    db.commit()
-    
-    # Формируем ответ
-    current_count = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == daily_queue.id).count()
-    max_slots = queue_settings.get("max_per_day", {}).get(doctor.specialty, 15)
-    
-    return token, {
-        "specialist_name": doctor.user.full_name if doctor.user else f"Врач #{doctor.id}",
-        "specialty": doctor.specialty,
-        "cabinet": doctor.cabinet,
-        "day": day,
-        "start_time": f"{queue_settings.get('queue_start_hour', 7)}:00",
-        "max_slots": max_slots,
-        "current_count": current_count,
-        "queue_id": daily_queue.id
-    }
+from app.services.queue_service import queue_service  # ✅ SSOT for business logic
 
 
 # ===================== ВСТУПЛЕНИЕ В ОЧЕРЕДЬ =====================
@@ -119,7 +65,13 @@ def join_online_queue(
         }
     
     # Проверяем срок действия токена
-    if datetime.utcnow() > queue_token.expires_at.replace(tzinfo=None):
+    # SQLite возвращает naive datetime в локальном времени
+    # Сравниваем с текущим временем в локальном timezone
+    queue_settings = get_queue_settings(db)
+    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+    now_local = datetime.now(timezone).replace(tzinfo=None)
+    
+    if now_local > queue_token.expires_at:
         return {
             "success": False,
             "error_code": "TOKEN_EXPIRED", 
@@ -207,11 +159,23 @@ def join_online_queue(
             "queue_full": True
         }
     
-    # Вычисляем номер в очереди
-    start_number = queue_settings.get("start_numbers", {}).get(queue_token.specialist.specialty, 1)
-    next_number = start_number + current_count
+    queue_tag_hint = None
+    if queue_token.specialist and getattr(queue_token.specialist, "specialty", None):
+        queue_tag_hint = queue_token.specialist.specialty
+    elif queue_token.department:
+        queue_tag_hint = queue_token.department
+
+    next_number = queue_service.get_next_queue_number(
+        db,
+        daily_queue=daily_queue,
+        queue_tag=queue_tag_hint,
+    )
+
+    print(f"[join_online_queue] next_number (SSOT) = {next_number}, queue_tag={queue_tag_hint}")
     
     # Создаем запись в очереди
+    # queue_time - бизнес-время регистрации, не меняется при редактировании
+    queue_time = datetime.now(timezone)
     queue_entry = OnlineQueueEntry(
         queue_id=daily_queue.id,
         number=next_number,
@@ -219,7 +183,8 @@ def join_online_queue(
         phone=phone,
         telegram_id=telegram_id,
         source="online",
-        status="waiting"
+        status="waiting",
+        queue_time=queue_time  # Устанавливаем время регистрации
     )
     db.add(queue_entry)
     
@@ -238,6 +203,256 @@ def join_online_queue(
         "cabinet": queue_token.specialist.cabinet,
         "estimated_time": f"Примерно в {queue_start_hour + 2}:00"
     }
+
+
+def join_online_queue_multiple(
+    db: Session,
+    token: str,
+    specialist_ids: List[int],
+    phone: Optional[str] = None,
+    telegram_id: Optional[int] = None,
+    patient_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Вступление в онлайн-очередь для нескольких специалистов одновременно
+    Создает отдельные записи OnlineQueueEntry для каждого специалиста с одинаковым queue_time
+    """
+    
+    # Проверяем токен (может быть общий QR клиники)
+    queue_token = db.query(QueueToken).filter(
+        and_(QueueToken.token == token, QueueToken.active == True)
+    ).first()
+    
+    if not queue_token:
+        return {
+            "success": False,
+            "error_code": "INVALID_TOKEN",
+            "message": "Неверный или истекший токен QR кода"
+        }
+    
+    # Проверяем срок действия токена
+    # SQLite возвращает naive datetime в локальном времени
+    # Сравниваем с текущим временем в локальном timezone
+    queue_settings = get_queue_settings(db)
+    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+    now_local = datetime.now(timezone).replace(tzinfo=None)
+    
+    if now_local > queue_token.expires_at:
+        return {
+            "success": False,
+            "error_code": "TOKEN_EXPIRED",
+            "message": "Срок действия QR кода истек"
+        }
+    
+    # Валидация: должен быть выбран хотя бы один специалист
+    if not specialist_ids or len(specialist_ids) == 0:
+        return {
+            "success": False,
+            "error_code": "NO_SPECIALISTS",
+            "message": "Выберите хотя бы одного специалиста"
+        }
+    
+    # Получаем настройки очереди
+    queue_settings = get_queue_settings(db)
+    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+    
+    # Проверяем рабочие часы
+    current_time = datetime.now(timezone)
+    queue_start_hour = queue_settings.get("queue_start_hour", 7)
+    
+    if current_time.hour < queue_start_hour:
+        return {
+            "success": False,
+            "error_code": "OUTSIDE_HOURS",
+            "message": f"Онлайн-запись доступна с {queue_start_hour}:00",
+            "outside_hours": True
+        }
+    
+    # queue_time одинаковое для всех записей (ранняя регистрация)
+    queue_time = datetime.now(timezone)
+    
+    # Результаты для каждого специалиста
+    results = []
+    errors = []
+    
+    # Создаем записи для каждого специалиста
+    print(f"[join_online_queue_multiple] Начинаем создание записей для {len(specialist_ids)} специалистов: {specialist_ids}")
+    for specialist_id in specialist_ids:
+        try:
+            print(f"[join_online_queue_multiple] Обрабатываем specialist_id={specialist_id}")
+            # Получаем или создаем дневную очередь для специалиста
+            daily_queue = db.query(DailyQueue).filter(
+                and_(
+                    DailyQueue.day == queue_token.day,
+                    DailyQueue.specialist_id == specialist_id,
+                    DailyQueue.active == True
+                )
+            ).first()
+            
+            if not daily_queue:
+                print(f"[join_online_queue_multiple] DailyQueue не найдена для specialist_id={specialist_id}, создаем новую")
+                # Создаем очередь если не существует
+                daily_queue = DailyQueue(
+                    day=queue_token.day,
+                    specialist_id=specialist_id,
+                    active=True
+                )
+                db.add(daily_queue)
+                db.commit()
+                db.refresh(daily_queue)
+                print(f"[join_online_queue_multiple] Создана DailyQueue id={daily_queue.id} для specialist_id={specialist_id}")
+            else:
+                print(f"[join_online_queue_multiple] Найдена DailyQueue id={daily_queue.id} для specialist_id={specialist_id}")
+            
+            # Проверяем что очередь еще не открыта
+            if daily_queue.opened_at:
+                errors.append({
+                    "specialist_id": specialist_id,
+                    "error": "QUEUE_CLOSED",
+                    "message": "Онлайн-набор закрыт для этого специалиста"
+                })
+                continue
+            
+            # Проверяем дубликат по телефону в этой очереди
+            existing_entry = None
+            if phone:
+                existing_entry = db.query(OnlineQueueEntry).filter(
+                    and_(
+                        OnlineQueueEntry.queue_id == daily_queue.id,
+                        OnlineQueueEntry.phone == phone
+                    )
+                ).first()
+            
+            if existing_entry:
+                # Уже записан в эту очередь
+                results.append({
+                    "specialist_id": specialist_id,
+                    "number": existing_entry.number,
+                    "duplicate": True,
+                    "message": f"Вы уже записаны под номером {existing_entry.number}"
+                })
+                continue
+            
+            # Проверяем лимит мест
+            current_count = db.query(OnlineQueueEntry).filter(
+                OnlineQueueEntry.queue_id == daily_queue.id
+            ).count()
+            
+            max_slots = daily_queue.max_online_entries or queue_settings.get("max_per_day", {}).get("default", 15)
+            
+            if current_count >= max_slots:
+                errors.append({
+                    "specialist_id": specialist_id,
+                    "error": "QUEUE_FULL",
+                    "message": f"Все места заняты ({max_slots}/{max_slots})"
+                })
+                continue
+            
+            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+            queue_tag_hint = doctor.specialty if doctor and doctor.specialty else None
+            next_number = queue_service.get_next_queue_number(
+                db,
+                daily_queue=daily_queue,
+                queue_tag=queue_tag_hint,
+            )
+
+            print(
+                f"[join_online_queue_multiple] specialist_id={specialist_id}, "
+                f"queue_tag={queue_tag_hint}, next_number={next_number}"
+            )
+
+            # ✅ УЛУЧШЕНИЕ: Находим или создаем пациента по телефону
+            # Используем единые функции из crud.patient для обеспечения Single Source of Truth
+            patient_id = None
+            if phone:
+                from app.crud.patient import find_patient, find_or_create_patient, normalize_patient_name
+                
+                # Ищем существующего пациента
+                existing_patient = find_patient(db, phone=phone)
+
+                if existing_patient:
+                    patient_id = existing_patient.id
+                    print(f"[join_online_queue_multiple] Найден существующий пациент ID={patient_id} для телефона {phone}")
+                else:
+                    # ✅ ИСПРАВЛЕНО: Передаем full_name в find_or_create_patient для нормализации
+                    # find_or_create_patient сам выполнит нормализацию, не нужно делать это дважды
+                    new_patient = find_or_create_patient(db, {
+                        "phone": phone,
+                        "full_name": patient_name  # Передаем full_name для нормализации внутри find_or_create_patient
+                    })
+                    patient_id = new_patient.id
+                    print(f"[join_online_queue_multiple] ✅ Создан новый пациент ID={patient_id} для телефона {phone}")
+
+            # Создаем запись в очереди с одинаковым queue_time
+            queue_entry = OnlineQueueEntry(
+                queue_id=daily_queue.id,
+                number=next_number,
+                patient_id=patient_id,  # ✅ Теперь связываем с пациентом
+                patient_name=patient_name,
+                phone=phone,
+                telegram_id=telegram_id,
+                source="online",
+                status="waiting",
+                queue_time=queue_time  # Одинаковое время для всех записей
+            )
+            db.add(queue_entry)
+            db.flush()  # Получаем ID записи
+            print(f"[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id={queue_entry.id} для specialist_id={specialist_id}, queue_id={daily_queue.id}, number={next_number}, patient_id={patient_id}")
+            
+            # Получаем информацию о специальности для иконки
+            specialty_icon_map = {
+                'cardiology': '❤️',
+                'cardio': '❤️',
+                'dermatology': '✨',
+                'derma': '✨',
+                'dentistry': '🦷',
+                'dentist': '🦷',
+                'laboratory': '🔬',
+                'lab': '🔬'
+            }
+            doctor_specialty = doctor.specialty.lower() if doctor and doctor.specialty else ''
+            icon = next((icon for key, icon in specialty_icon_map.items() if key in doctor_specialty), '👨‍⚕️')
+            
+            results.append({
+                "specialist_id": specialist_id,
+                "specialist_name": doctor.user.full_name if doctor and doctor.user else f"Врач #{specialist_id}",
+                "department": doctor.specialty if doctor else None,
+                "number": next_number,
+                "queue_id": daily_queue.id,
+                "queue_time": queue_time.isoformat(),
+                "icon": icon,
+                "duplicate": False
+            })
+            print(f"[join_online_queue_multiple] ✅ Добавлен результат для specialist_id={specialist_id}: number={next_number}, queue_id={daily_queue.id}")
+            
+        except Exception as e:
+            errors.append({
+                "specialist_id": specialist_id,
+                "error": "INTERNAL_ERROR",
+                "message": str(e)
+            })
+    
+    # Увеличиваем счетчик использования токена
+    queue_token.usage_count += 1
+    
+    db.commit()
+    
+    # Формируем итоговый ответ
+    if len(results) > 0:
+        return {
+            "success": True,
+            "queue_time": queue_time.isoformat(),
+            "entries": results,
+            "errors": errors if errors else None,
+            "message": f"Вы записаны к {len(results)} специалистам"
+        }
+    else:
+        return {
+            "success": False,
+            "error_code": "ALL_FAILED",
+            "errors": errors,
+            "message": "Не удалось записаться ни к одному специалисту"
+        }
 
 
 # ===================== ОТКРЫТИЕ ПРИЕМА =====================
@@ -437,7 +652,13 @@ def validate_queue_token(db: Session, token: str) -> Tuple[bool, Optional[QueueT
     if not queue_token:
         return False, None, "Неверный токен QR кода"
     
-    if datetime.utcnow() > queue_token.expires_at.replace(tzinfo=None):
+    # SQLite возвращает naive datetime в локальном времени
+    # Сравниваем с текущим временем в локальном timezone
+    queue_settings = get_queue_settings(db)
+    timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
+    now_local = datetime.now(timezone).replace(tzinfo=None)
+    
+    if now_local > queue_token.expires_at:
         return False, queue_token, "Срок действия QR кода истек"
     
     return True, queue_token, "Токен валиден"
@@ -457,26 +678,36 @@ def get_or_create_daily_queue(
     """
     Получить или создать дневную очередь с поддержкой queue_tag и информации о кабинете
     Теперь очереди уникальны по (day, specialist_id, queue_tag)
+    
+    ⭐ ВАЖНО: specialist_id - это user_id (ForeignKey на users.id), а не doctor_id!
     """
+    # ✅ ВАЛИДАЦИЯ: Проверяем, что specialist_id существует в таблице users
+    from app.models.user import User
+    user_exists = db.query(User).filter(User.id == specialist_id).first()
+    if not user_exists:
+        raise ValueError(f"User with id {specialist_id} does not exist in users table")
+    
+    # Находим Doctor по user_id для получения информации о кабинете
+    doctor_exists = db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
+
     # Ищем очередь с учетом queue_tag
     query_filters = [
-        DailyQueue.day == day, 
+        DailyQueue.day == day,
         DailyQueue.specialist_id == specialist_id
     ]
-    
+
     if queue_tag:
         query_filters.append(DailyQueue.queue_tag == queue_tag)
     else:
         query_filters.append(DailyQueue.queue_tag.is_(None))
-    
+
     daily_queue = db.query(DailyQueue).filter(and_(*query_filters)).first()
-    
+
     if not daily_queue:
         # Если информация о кабинете не передана, получаем из таблицы doctors
-        if not cabinet_number:
-            doctor = db.query(Doctor).filter(Doctor.user_id == specialist_id).first()
-            if doctor and doctor.cabinet:
-                cabinet_number = doctor.cabinet
+        if not cabinet_number and doctor_exists:
+            if doctor_exists.cabinet:
+                cabinet_number = doctor_exists.cabinet
         
         daily_queue = DailyQueue(
             day=day,
@@ -515,30 +746,6 @@ def count_queue_entries(db: Session, queue_id: int) -> int:
     Подсчёт записей в очереди
     """
     return db.query(OnlineQueueEntry).filter(OnlineQueueEntry.queue_id == queue_id).count()
-
-
-def create_queue_entry(
-    db: Session,
-    queue_id: int,
-    patient_id: int,
-    number: int,
-    source: str = "desk"
-) -> OnlineQueueEntry:
-    """
-    Создание записи в очереди
-    """
-    queue_entry = OnlineQueueEntry(
-        queue_id=queue_id,
-        number=number,
-        patient_id=patient_id,
-        source=source,
-        status="waiting"
-    )
-    db.add(queue_entry)
-    db.commit()
-    db.refresh(queue_entry)
-    return queue_entry
-
 
 def get_queue_statistics(
     db: Session,

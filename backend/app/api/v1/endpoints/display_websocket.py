@@ -406,10 +406,14 @@ async def quick_call_next_patient(
         # Находим дневную очередь
         from app.models.online_queue import DailyQueue
         today = date.today()
-        daily_queue = db.query(DailyQueue).filter(
-            DailyQueue.day == today,
-            DailyQueue.specialist_id == doctor.id
-        ).first()
+        # ⭐ ВАЖНО: DailyQueue.specialist_id - это user_id, а не doctor_id
+        doctor_user_id = doctor.user_id if doctor.user_id else None
+        daily_queue = None
+        if doctor_user_id:
+            daily_queue = db.query(DailyQueue).filter(
+                DailyQueue.day == today,
+                DailyQueue.specialist_id == doctor_user_id  # ⭐ user_id, а не doctor.id
+            ).first()
         
         if not daily_queue:
             raise HTTPException(

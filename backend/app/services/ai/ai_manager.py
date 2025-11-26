@@ -190,6 +190,25 @@ class AIManager:
         return await provider.interpret_ecg(ecg_data, patient_info)
 
 
+    async def analyze_medical_trends(
+        self, 
+        medical_data: List[Dict], 
+        time_period: str, 
+        analysis_type: str,
+        provider: Optional[AIProviderType] = None
+    ) -> Dict[str, Any]:
+        """Анализ медицинских трендов и паттернов в данных"""
+        provider_instance = self.get_provider(provider)
+        if not provider_instance:
+            raise ValueError("Нет доступного AI провайдера")
+        
+        return await provider_instance.analyze_medical_trends(
+            medical_data=medical_data,
+            time_period=time_period,
+            analysis_type=analysis_type
+        )
+
+
 # Глобальный экземпляр менеджера
 ai_manager = AIManager()
 

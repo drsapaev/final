@@ -341,48 +341,39 @@ class Mutation:
                     errors=["SERVICES_NOT_FOUND"]
                 )
             
-            # Рассчитываем общую стоимость
-            total_amount = sum(service.price for service in services)
-            if input.all_free:
-                total_amount = 0
-            elif input.discount_mode == "repeat":
-                total_amount *= 0.8  # 20% скидка для повторных визитов
-            elif input.discount_mode == "benefit":
-                total_amount *= 0.5  # 50% скидка для льготных
-            
-            # Создаем визит
-            visit_data = {
-                "patient_id": input.patient_id,
-                "doctor_id": input.doctor_id,
-                "visit_date": input.visit_date,
-                "visit_time": input.visit_time,
-                "status": "scheduled",
-                "discount_mode": input.discount_mode,
-                "all_free": input.all_free,
-                "total_amount": total_amount,
-                "payment_status": "paid" if input.all_free else "pending"
-            }
-            
-            visit = crud_visit.create(db, obj_in=visit_data)
-            
-            # Добавляем услуги к визиту
+            # Подготавливаем услуги для передачи в create_visit
+            services_data = []
             for service in services:
-                service_price = 0 if input.all_free else service.price
+                # Рассчитываем цену услуги с учетом скидок
+                service_price = 0 if input.all_free else (service.price or 0)
                 if input.discount_mode == "repeat":
-                    service_price *= 0.8
+                    service_price *= 0.8  # 20% скидка для повторных визитов
                 elif input.discount_mode == "benefit":
-                    service_price *= 0.5
+                    service_price *= 0.5  # 50% скидка для льготных
                 
-                visit_service = VisitService(
-                    visit_id=visit.id,
-                    service_id=service.id,
-                    price=service_price,
-                    quantity=1,
-                    total_price=service_price
-                )
-                db.add(visit_service)
+                services_data.append({
+                    "service_id": service.id,
+                    "code": getattr(service, 'code', None),
+                    "name": service.name,
+                    "qty": 1,
+                    "price": float(service_price)
+                })
             
-            db.commit()
+            # Создаем визит используя единую функцию create_visit для обеспечения Single Source of Truth
+            from app.crud.visit import create_visit
+            visit = create_visit(
+                db=db,
+                patient_id=input.patient_id,
+                doctor_id=input.doctor_id,
+                visit_date=input.visit_date,
+                visit_time=input.visit_time,
+                discount_mode=input.discount_mode,
+                services=services_data,
+                status="scheduled",
+                auto_status=False,  # Статус уже установлен
+                notify=False,
+                log=True
+            )
             
             return VisitMutationResponse(
                 success=True,

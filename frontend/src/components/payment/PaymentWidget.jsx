@@ -10,30 +10,25 @@ import {
   CardContent, 
   Typography, 
   Button, 
-  Grid, 
   Alert, 
   CircularProgress,
-  Chip,
-  Divider,
-  FormControl,
-  InputLabel,
+  Badge,
   Select,
-  MenuItem,
-  TextField,
+  Option,
+  Input,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions
-} from '@mui/material';
+} from '../ui/macos';
 import {
-  Payment as PaymentIcon,
-  CreditCard as CreditCardIcon,
-  AccountBalance as BankIcon,
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+  CreditCard,
+  Banknote,
+  Building,
+  CheckCircle,
+  XCircle,
+  Info,
+} from 'lucide-react';
 
 // API клиент
 import { api as apiClient, getToken } from '../../api/client';

@@ -1,39 +1,6 @@
 import React from 'react';
-import {
-  Box,
-  CircularProgress,
-  Typography,
-  LinearProgress,
-  Paper,
-  Stack,
-  Fade,
-  keyframes
-} from '@mui/material';
-import { Psychology, AutoAwesome } from '@mui/icons-material';
-
-const pulse = keyframes`
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-`;
-
-const rotate = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-`;
+import { Box, Typography, Progress, CircularProgress } from '../../components/ui/macos';
+import { Brain, Sparkles } from 'lucide-react';
 
 const AILoader = ({ 
   variant = 'circular',
@@ -58,135 +25,65 @@ const AILoader = ({
   const { iconSize, progressSize, fontSize } = getSizeProps();
 
   const content = (
-    <Stack spacing={2} alignItems="center">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
       {showIcon && variant === 'circular' && (
-        <Box position="relative" display="inline-flex">
-          <CircularProgress
-            size={progressSize}
-            thickness={2}
-            sx={{
-              color: 'primary.main',
-              animationDuration: '1.5s'
-            }}
-          />
-          <Box
-            position="absolute"
-            top={0}
-            left={0}
-            bottom={0}
-            right={0}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Psychology
-              sx={{
-                fontSize: iconSize,
-                color: 'primary.main',
-                animation: `${pulse} 2s ease-in-out infinite`
-              }}
-            />
-          </Box>
-        </Box>
+        <div style={{ position: 'relative', display: 'inline-flex' }}>
+          <CircularProgress size={progressSize} />
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Brain style={{ width: iconSize, height: iconSize, color: 'var(--mac-accent-blue)' }} />
+          </div>
+        </div>
       )}
 
       {variant === 'linear' && (
-        <Box width="100%" maxWidth={400}>
-          <Stack spacing={1}>
-            {showIcon && (
-              <Box display="flex" justifyContent="center">
-                <AutoAwesome
-                  sx={{
-                    fontSize: iconSize,
-                    color: 'primary.main',
-                    animation: `${rotate} 3s linear infinite`
-                  }}
-                />
-              </Box>
-            )}
-            <LinearProgress
-              variant={progress !== null ? 'determinate' : 'indeterminate'}
-              value={progress}
-              sx={{
-                height: 6,
-                borderRadius: 3,
-                '& .MuiLinearProgress-bar': {
-                  borderRadius: 3
-                }
-              }}
-            />
-          </Stack>
-        </Box>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+          {showIcon && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+              <Sparkles style={{ width: iconSize, height: iconSize, color: 'var(--mac-accent-blue)' }} />
+            </div>
+          )}
+          <Progress value={progress} />
+        </div>
       )}
 
       {text && (
-        <Fade in timeout={500}>
-          <Typography
-            variant={fontSize}
-            color="text.primary"
-            align="center"
-            sx={{ fontWeight: 500 }}
-          >
-            {text}
-          </Typography>
-        </Fade>
+        <Typography variant={fontSize} color="textPrimary" style={{ fontWeight: 500, textAlign: 'center' }}>
+          {text}
+        </Typography>
       )}
 
       {subtext && (
-        <Fade in timeout={700}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            align="center"
-          >
-            {subtext}
-          </Typography>
-        </Fade>
+        <Typography variant="caption" color="textSecondary" style={{ textAlign: 'center' }}>
+          {subtext}
+        </Typography>
       )}
 
       {progress !== null && (
-        <Typography variant="caption" color="text.secondary">
-          {Math.round(progress)}%
-        </Typography>
+        <Typography variant="caption" color="textSecondary">{Math.round(progress)}%</Typography>
       )}
-    </Stack>
+    </div>
   );
 
   if (fullScreen) {
     return (
-      <Box
-        position="fixed"
-        top={0}
-        left={0}
-        right={0}
-        bottom={0}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        bgcolor="rgba(0, 0, 0, 0.5)"
-        zIndex={9999}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            borderRadius: 2,
-            bgcolor: 'background.paper'
-          }}
-        >
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.5)', zIndex: 9999
+      }}>
+        <div style={{
+          background: 'var(--mac-bg-primary)', borderRadius: 12, padding: 24, minWidth: 320,
+          border: '1px solid var(--mac-border)', boxShadow: 'var(--mac-shadow-lg)'
+        }}>
           {content}
-        </Paper>
-      </Box>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      p={3}
-    >
+    <Box style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
       {content}
     </Box>
   );

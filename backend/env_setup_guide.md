@@ -8,7 +8,7 @@
 - ✅ **CORS** - для работы frontend с backend
 
 ### 2. **ПОЗЖЕ (По мере необходимости)**
-- 🔄 **Firebase** - когда понадобятся push-уведомления
+- 🔄 **FCM (Firebase Cloud Messaging)** - для push-уведомлений (см. `docs/FCM_SETUP_GUIDE.md`)
 - 🔄 **Telegram** - для уведомлений в Telegram
 - 🔄 **Платежи** - для интеграции с Payme/другими системами
 - 🔄 **Принтер** - для печати чеков
@@ -56,6 +56,14 @@ CLINIC_LOGO_PATH=
 # --- ПРИНТЕР ---
 PRINTER_TYPE=none
 
+# --- FCM (Firebase Cloud Messaging) для push уведомлений ---
+# Получите Server Key в Firebase Console: Project Settings > Cloud Messaging
+# Подробная инструкция: docs/FCM_SETUP_GUIDE.md
+# FCM_SERVER_KEY=your_fcm_server_key_here
+# FCM_SENDER_ID=your_fcm_sender_id_here
+# FCM_PROJECT_ID=your_fcm_project_id_here
+# FCM_ENABLED=true
+
 # --- ЛИЦЕНЗИРОВАНИЕ ---
 REQUIRE_LICENSE=0
 LICENSE_ALLOW_HEALTH=1
@@ -74,7 +82,7 @@ LICENSE_ALLOW_HEALTH=1
 6. **PDF_FOOTER_ENABLED** - для печати
 
 ### 🟢 ОПЦИОНАЛЬНО (по необходимости)
-7. **FIREBASE_*** - для push-уведомлений
+7. **FCM_*** - для push-уведомлений (см. `docs/FCM_SETUP_GUIDE.md`)
 8. **TELEGRAM_*** - для Telegram уведомлений
 9. **PAYME_*** - для платежей
 10. **PRINTER_*** - для печати чеков

@@ -382,6 +382,7 @@ const useReports = () => {
     refresh: loadReports,
     getReportStats,
     getReportTypes,
+    getReportTypeLabel,
     getStatusLabel,
     getStatusVariant,
     formatDateRange

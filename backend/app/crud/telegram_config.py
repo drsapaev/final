@@ -211,10 +211,14 @@ def get_users_for_notifications(
     return query.all()
 
 def find_patient_by_phone(db: Session, phone: str) -> Optional[Dict[str, Any]]:
-    """Найти пациента по номеру телефона"""
+    """
+    Найти пациента по номеру телефона.
+    
+    Использует единую функцию find_patient из crud.patient для обеспечения Single Source of Truth.
+    """
     try:
-        from app.models.patient import Patient
-        patient = db.query(Patient).filter(Patient.phone == phone).first()
+        from app.crud.patient import find_patient
+        patient = find_patient(db, phone=phone)
         
         if patient:
             return {

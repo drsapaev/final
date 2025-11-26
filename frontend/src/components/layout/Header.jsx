@@ -385,7 +385,7 @@ export default function Header() {
                   gap: '8px',
                   cursor: 'pointer',
                   ...(new URLSearchParams(location.search).get('view') === 'queue' ? {
-                    background: `linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)`,
+                    background: 'linear-gradient(135deg, #9333ea 0%, #7c3aed 100%)',
                     color: 'white',
                     border: 'none',
                     boxShadow: '0 4px 6px -1px rgba(147, 51, 234, 0.3)',

@@ -11,6 +11,7 @@ from app.api.deps import get_db, require_roles
 from app.crud import service as crud
 from app.models.service import Service
 from app.models.clinic import ServiceCategory, Doctor
+from app.services.service_mapping import normalize_service_code
 
 router = APIRouter(tags=["services"])
 
@@ -65,6 +66,7 @@ class ServiceOut(BaseModel):
     queue_tag: Optional[str] = None
     is_consultation: Optional[bool] = None
     allow_doctor_price_override: Optional[bool] = None
+    department_key: Optional[str] = None  # ✅ ДОБАВЛЕНО: связь с отделением
 
     class Config:
         from_attributes = True
@@ -82,12 +84,13 @@ class ServiceCreate(BaseModel):
     duration_minutes: Optional[int] = Field(30, ge=1, le=480)
     doctor_id: Optional[int] = None
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
-    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSO]$")
+    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSOP]$")
     service_code: Optional[str] = Field(None, max_length=16)
     requires_doctor: bool = False
     queue_tag: Optional[str] = Field(None, max_length=32)
     is_consultation: bool = False
     allow_doctor_price_override: bool = False
+    department_key: Optional[str] = Field(None, max_length=50)  # ✅ ДОБАВЛЕНО: связь с отделением
 
 
 class ServiceUpdate(BaseModel):
@@ -102,12 +105,13 @@ class ServiceUpdate(BaseModel):
     duration_minutes: Optional[int] = Field(None, ge=1, le=480)
     doctor_id: Optional[int] = None
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
-    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSO]$")
+    category_code: Optional[str] = Field(None, max_length=2, pattern="^[KDCLSOP]$")
     service_code: Optional[str] = Field(None, max_length=16)
     requires_doctor: Optional[bool] = None
     queue_tag: Optional[str] = Field(None, max_length=32)
     is_consultation: Optional[bool] = None
     allow_doctor_price_override: Optional[bool] = None
+    department_key: Optional[str] = Field(None, max_length=50)  # ✅ ДОБАВЛЕНО: связь с отделением
 
 
 def _row_to_out(r) -> ServiceOut:
@@ -135,6 +139,7 @@ def _row_to_out(r) -> ServiceOut:
         queue_tag=getattr(r, 'queue_tag', None),
         is_consultation=getattr(r, 'is_consultation', None),
         allow_doctor_price_override=getattr(r, 'allow_doctor_price_override', None),
+        department_key=getattr(r, 'department_key', None),  # ✅ ДОБАВЛЕНО
     )
 
 
@@ -239,15 +244,21 @@ async def list_services(
     offset: int = Query(default=0, ge=0),
 ):
     """Получить список услуг с фильтрацией"""
-    rows = crud.list_services(db, q=q, active=active, limit=limit, offset=offset)
-    
-    # Дополнительная фильтрация
-    if category_id is not None:
-        rows = [r for r in rows if getattr(r, 'category_id', None) == category_id]
-    if department:
-        rows = [r for r in rows if getattr(r, 'department', None) == department]
-    
-    return [_row_to_out(r) for r in rows]
+    try:
+        rows = crud.list_services(db, q=q, active=active, limit=limit, offset=offset)
+        
+        # Дополнительная фильтрация
+        if category_id is not None:
+            rows = [r for r in rows if getattr(r, 'category_id', None) == category_id]
+        if department:
+            rows = [r for r in rows if getattr(r, 'department', None) == department]
+        
+        return [_row_to_out(r) for r in rows]
+    except Exception as e:
+        import traceback
+        print(f"Error in list_services: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Ошибка получения услуг: {str(e)}")
 
 
 @router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
@@ -281,8 +292,17 @@ async def create_service(
         category = db.query(ServiceCategory).filter(ServiceCategory.id == service_data.category_id).first()
         if not category:
             raise HTTPException(status_code=400, detail="Указанная категория не найдена")
-    
-    service = Service(**service_data.dict())
+
+    # Normalize service codes before creating the service
+    service_dict = service_data.dict()
+    if service_dict.get('code'):
+        service_dict['code'] = normalize_service_code(service_dict['code'])
+    if service_dict.get('service_code'):
+        service_dict['service_code'] = normalize_service_code(service_dict['service_code'])
+    if service_dict.get('category_code'):
+        service_dict['category_code'] = normalize_service_code(service_dict['category_code'])
+
+    service = Service(**service_dict)
     db.add(service)
     db.commit()
     db.refresh(service)
@@ -312,10 +332,19 @@ async def update_service(
         category = db.query(ServiceCategory).filter(ServiceCategory.id == service_data.category_id).first()
         if not category:
             raise HTTPException(status_code=400, detail="Указанная категория не найдена")
-    
-    for field, value in service_data.dict(exclude_unset=True).items():
+
+    # Normalize service codes before updating
+    update_dict = service_data.dict(exclude_unset=True)
+    if 'code' in update_dict and update_dict['code'] is not None:
+        update_dict['code'] = normalize_service_code(update_dict['code'])
+    if 'service_code' in update_dict and update_dict['service_code'] is not None:
+        update_dict['service_code'] = normalize_service_code(update_dict['service_code'])
+    if 'category_code' in update_dict and update_dict['category_code'] is not None:
+        update_dict['category_code'] = normalize_service_code(update_dict['category_code'])
+
+    for field, value in update_dict.items():
         setattr(service, field, value)
-    
+
     db.commit()
     db.refresh(service)
     return _row_to_out(service)
@@ -356,3 +385,49 @@ async def list_doctors_temp(
     """Временный endpoint для получения списка врачей"""
     doctors = db.query(Doctor).filter(Doctor.active == True).all()
     return doctors
+
+
+# ==================== РАЗРЕШЕНИЕ УСЛУГ (SSOT) ====================
+
+class ServiceResolveResponse(BaseModel):
+    """Response schema для resolve_service endpoint"""
+    service_id: Optional[int] = None
+    service_code: Optional[str] = None
+    normalized_code: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    departments: List[str] = []
+    ui_type: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/resolve", response_model=ServiceResolveResponse, summary="Разрешить услугу (SSOT)")
+async def resolve_service_endpoint(
+    service_id: Optional[int] = Query(None, description="ID услуги"),
+    code: Optional[str] = Query(None, description="Код услуги"),
+    db: Session = Depends(get_db),
+    # user=Depends(require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier")),
+):
+    """
+    Универсальный endpoint для разрешения услуги.
+    
+    Возвращает полную информацию об услуге: нормализованный код, категорию,
+    подкатегорию, отделения и UI-тип для фронтенда.
+    
+    Можно указать либо service_id, либо code (или оба).
+    """
+    from app.services.service_mapping import resolve_service
+    
+    # Валидация: должен быть указан хотя бы один параметр
+    if not service_id and not code:
+        raise HTTPException(
+            status_code=400,
+            detail="Необходимо указать либо service_id, либо code (или оба)"
+        )
+    
+    # Вызов SSOT функции
+    result = resolve_service(service_id=service_id, code=code, db=db)
+    
+    return ServiceResolveResponse(**result)

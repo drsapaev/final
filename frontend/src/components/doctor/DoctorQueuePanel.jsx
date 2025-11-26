@@ -13,7 +13,14 @@ import {
   Hash,
   Activity
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { 
+  MacOSCard, 
+  MacOSButton, 
+  MacOSBadge,
+  MacOSLoadingSkeleton,
+  MacOSEmptyState,
+  MacOSAlert
+} from '../ui/macos';
 
 /**
  * Панель очереди для врача - показывает пациентов из регистратуры
@@ -279,55 +286,61 @@ const DoctorQueuePanel = ({
 
   if (loading && !queueData) {
     return (
-      <Card className={`p-6 ${className}`}>
-        <div className="flex items-center justify-center">
-          <RefreshCw className="animate-spin mr-2" size={20} />
-          <span>Загрузка очереди...</span>
-        </div>
-      </Card>
+      <MacOSCard style={{ padding: '24px' }}>
+        <MacOSLoadingSkeleton type="card" count={3} />
+      </MacOSCard>
     );
   }
 
   if (!queueData?.queue_exists) {
     return (
-      <Card className={`p-6 text-center ${className}`}>
-        <Users size={48} className="mx-auto text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          Очередь не создана
-        </h3>
-        <p className="text-gray-500">
-          Очередь будет создана когда регистратура добавит первого пациента
-        </p>
-      </Card>
+      <MacOSEmptyState
+        type="users"
+        title="Очередь не создана"
+        description="Очередь будет создана когда регистратура добавит первого пациента"
+      />
     );
   }
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Сообщения */}
       {message.text && (
-        <div className={`flex items-center p-3 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-        }`}>
-          {message.type === 'success' ? (
-            <CheckCircle size={16} className="mr-2" />
-          ) : (
-            <AlertCircle size={16} className="mr-2" />
-          )}
-          {message.text}
-        </div>
+        <MacOSAlert 
+          type={message.type === 'success' ? 'success' : 'error'}
+          title={message.type === 'success' ? 'Успешно' : 'Ошибка'}
+          description={message.text}
+          onClose={() => setMessage({ type: '', text: '' })}
+        />
       )}
 
       {/* Информация о враче и очереди */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <User size={24} className="mr-3 text-blue-600" />
+      <MacOSCard style={{ padding: '16px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <User size={24} style={{ marginRight: '12px', color: 'var(--mac-accent)' }} />
             <div>
-              <h3 className="text-lg font-medium">{queueData.doctor.name}</h3>
-              <div className="flex items-center text-sm text-gray-500 space-x-4">
+              <h3 style={{ 
+                margin: 0,
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)'
+              }}>
+                {queueData.doctor.name}
+              </h3>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)',
+                gap: '16px',
+                marginTop: '4px'
+              }}>
                 <span>{queueData.doctor.specialty}</span>
                 {queueData.doctor.cabinet && (
                   <>
@@ -339,53 +352,127 @@ const DoctorQueuePanel = ({
             </div>
           </div>
           
-          <div className="text-right">
-            <div className="text-sm text-gray-500">Статус очереди:</div>
-            <Badge variant={queueData.opened_at ? 'success' : 'warning'}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)',
+              marginBottom: '4px'
+            }}>
+              Статус очереди:
+            </div>
+            <MacOSBadge variant={queueData.opened_at ? 'success' : 'warning'}>
               {queueData.opened_at ? 'Открыта' : 'Не открыта'}
-            </Badge>
+            </MacOSBadge>
           </div>
         </div>
 
         {/* Статистика очереди */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{queueData.stats.total}</div>
-            <div className="text-sm text-gray-500">Всего</div>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+          gap: '16px' 
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-accent)',
+              marginBottom: '4px'
+            }}>
+              {queueData.stats.total}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              Всего
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{queueData.stats.waiting}</div>
-            <div className="text-sm text-gray-500">Ожидают</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-warning)',
+              marginBottom: '4px'
+            }}>
+              {queueData.stats.waiting}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              Ожидают
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{queueData.stats.served}</div>
-            <div className="text-sm text-gray-500">Приняты</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-success)',
+              marginBottom: '4px'
+            }}>
+              {queueData.stats.served}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              Приняты
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{queueData.stats.online_entries}</div>
-            <div className="text-sm text-gray-500">Онлайн</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-bold)',
+              color: 'var(--mac-info)',
+              marginBottom: '4px'
+            }}>
+              {queueData.stats.online_entries}
+            </div>
+            <div style={{ 
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-secondary)'
+            }}>
+              Онлайн
+            </div>
           </div>
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Список пациентов в очереди */}
-      <Card className="overflow-hidden">
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border-b">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Пациенты в очереди</h3>
-            <Button variant="outline" size="sm" onClick={loadQueueData}>
-              <RefreshCw size={14} className="mr-1" />
+      <MacOSCard style={{ overflow: 'hidden' }}>
+        <div style={{ 
+          padding: '16px',
+          backgroundColor: 'var(--mac-bg-secondary)',
+          borderBottom: '1px solid var(--mac-border)'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between' 
+          }}>
+            <h3 style={{ 
+              margin: 0,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
+              Пациенты в очереди
+            </h3>
+            <MacOSButton variant="outline" onClick={loadQueueData}>
+              <RefreshCw size={14} style={{ marginRight: '4px' }} />
               Обновить
-            </Button>
+            </MacOSButton>
           </div>
         </div>
 
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+        <div style={{ borderTop: '1px solid var(--mac-border)' }}>
           {queueData.entries.length === 0 ? (
-            <div className="p-8 text-center">
-              <Users size={48} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">Пациентов в очереди нет</p>
-            </div>
+            <MacOSEmptyState
+              type="users"
+              title="Пациентов в очереди нет"
+              description="Ожидайте поступления новых пациентов от регистратуры"
+            />
           ) : (
             queueData.entries.map(entry => {
               const status = statusConfig[entry.status] || statusConfig.waiting;
@@ -395,39 +482,78 @@ const DoctorQueuePanel = ({
               return (
                 <div 
                   key={entry.id} 
-                  className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors ${
-                    selectedPatient?.id === entry.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                  }`}
+                  style={{
+                    padding: '16px',
+                    cursor: 'pointer',
+                    transition: 'background-color var(--mac-duration-normal) var(--mac-ease)',
+                    backgroundColor: selectedPatient?.id === entry.id ? 'var(--mac-bg-accent)' : 'transparent',
+                    borderBottom: '1px solid var(--mac-border)'
+                  }}
                   onClick={() => {
                     setSelectedPatient(entry);
                     if (onPatientSelect) onPatientSelect(entry);
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       {/* Номер в очереди */}
-                      <div className="flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                        <span className="text-xl font-bold text-blue-600">
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '48px',
+                        height: '48px',
+                        backgroundColor: 'var(--mac-bg-accent)',
+                        borderRadius: '50%',
+                        border: '2px solid var(--mac-accent)'
+                      }}>
+                        <span style={{ 
+                          fontSize: 'var(--mac-font-size-lg)',
+                          fontWeight: 'var(--mac-font-weight-bold)',
+                          color: 'var(--mac-accent)'
+                        }}>
                           {entry.number}
                         </span>
                       </div>
                       
                       {/* Информация о пациенте */}
                       <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
+                        <div style={{ 
+                          fontWeight: 'var(--mac-font-weight-semibold)',
+                          color: 'var(--mac-text-primary)',
+                          fontSize: 'var(--mac-font-size-md)',
+                          marginBottom: '4px'
+                        }}>
                           {entry.patient_name}
                         </div>
                         {entry.phone && (
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Phone size={18} className="mr-1" style={{ color: '#3b82f6', fontWeight: 'bold' }} />
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            fontSize: 'var(--mac-font-size-sm)',
+                            color: 'var(--mac-text-secondary)',
+                            marginBottom: '4px'
+                          }}>
+                            <Phone size={16} style={{ marginRight: '4px', color: 'var(--mac-accent)' }} />
                             {entry.phone}
                           </div>
                         )}
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="outline" size="sm">
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px' 
+                        }}>
+                          <MacOSBadge variant="outline">
                             {source.icon} {source.label}
-                          </Badge>
-                          <span className="text-xs text-gray-400">
+                          </MacOSBadge>
+                          <span style={{ 
+                            fontSize: 'var(--mac-font-size-xs)',
+                            color: 'var(--mac-text-tertiary)'
+                          }}>
                             {new Date(entry.created_at).toLocaleTimeString('ru-RU', { 
                               hour: '2-digit', 
                               minute: '2-digit' 
@@ -437,15 +563,23 @@ const DoctorQueuePanel = ({
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-3">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '12px' 
+                    }}>
                       {/* Статус */}
-                      <div className="text-center">
-                        <Badge variant={status.color}>
-                          <StatusIcon size={14} className="mr-1" />
+                      <div style={{ textAlign: 'center' }}>
+                        <MacOSBadge variant={status.color}>
+                          <StatusIcon size={14} style={{ marginRight: '4px' }} />
                           {status.label}
-                        </Badge>
+                        </MacOSBadge>
                         {entry.called_at && (
-                          <div className="text-xs text-gray-400 mt-1">
+                          <div style={{ 
+                            fontSize: 'var(--mac-font-size-xs)',
+                            color: 'var(--mac-text-tertiary)',
+                            marginTop: '4px'
+                          }}>
                             Вызван: {new Date(entry.called_at).toLocaleTimeString('ru-RU', { 
                               hour: '2-digit', 
                               minute: '2-digit' 
@@ -455,46 +589,43 @@ const DoctorQueuePanel = ({
                       </div>
                       
                       {/* Действия */}
-                      <div className="flex flex-col gap-2">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {entry.status === 'waiting' && (
-                          <Button 
-                            size="sm" 
+                          <MacOSButton 
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCallPatient(entry.id);
                             }}
                           >
-                            <Play size={14} className="mr-1" />
+                            <Play size={14} style={{ marginRight: '4px' }} />
                             Вызвать
-                          </Button>
+                          </MacOSButton>
                         )}
                         
                         {entry.status === 'called' && (
-                          <Button 
-                            size="sm"
+                          <MacOSButton 
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleStartVisit(entry.id);
                             }}
                           >
-                            <Activity size={14} className="mr-1" />
+                            <Activity size={14} style={{ marginRight: '4px' }} />
                             Начать
-                          </Button>
+                          </MacOSButton>
                         )}
                         
                         {entry.status === 'in_progress' && (
-                          <Button 
-                            size="sm"
+                          <MacOSButton 
                             variant="success"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCompleteVisit(entry.id);
                             }}
                           >
-                            <CheckCircle size={14} className="mr-1" />
+                            <CheckCircle size={14} style={{ marginRight: '4px' }} />
                             Завершить
-                          </Button>
+                          </MacOSButton>
                         )}
                       </div>
                     </div>
@@ -504,15 +635,33 @@ const DoctorQueuePanel = ({
             })
           )}
         </div>
-      </Card>
+      </MacOSCard>
 
       {/* Информация о настройках очереди */}
       {doctorInfo && (
-        <Card className="p-4 bg-blue-50 border-blue-200 dark:bg-blue-900/20">
-          <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">
+        <MacOSCard style={{ 
+          padding: '16px',
+          backgroundColor: 'var(--mac-bg-accent)',
+          border: '1px solid var(--mac-accent)'
+        }}>
+          <h4 style={{ 
+            margin: '0 0 8px 0',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-accent)',
+            fontSize: 'var(--mac-font-size-md)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
             ⚙️ Настройки очереди:
           </h4>
-          <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+          <div style={{ 
+            fontSize: 'var(--mac-font-size-sm)',
+            color: 'var(--mac-text-secondary)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
             <div>Стартовый номер онлайн: #{doctorInfo?.queue_settings?.start_number || '—'}</div>
             <div>Лимит в день: {doctorInfo?.queue_settings?.max_per_day ?? '—'}</div>
             <div>Часовой пояс: {doctorInfo?.queue_settings?.timezone || '—'}</div>
@@ -520,7 +669,7 @@ const DoctorQueuePanel = ({
               <div>Кабинет: {doctorInfo.doctor.cabinet}</div>
             )}
           </div>
-        </Card>
+        </MacOSCard>
       )}
     </div>
   );

@@ -23,6 +23,7 @@ from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
 from app.crud import visit as crud_visit
 from app.services.notification_service import NotificationService
+from app.services.service_mapping import get_service_code
 
 router = APIRouter()
 
@@ -56,41 +57,59 @@ class ScheduleNextVisitResponse(BaseModel):
 def get_doctor_queue_today(
     specialty: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist", "Lab"))
 ):
     """
     Получить очередь врача на сегодня
     Из passport.md стр. 1419: GET /api/doctor/cardiology/queue/today
     """
     try:
+        # Нормализуем название специальности для поиска
+        specialty_mapping = {
+            'cardiology': ['cardiology', 'cardio', 'Cardiologist', 'Cardio'],
+            'cardio': ['cardiology', 'cardio', 'Cardiologist', 'Cardio'],
+            'derma': ['derma', 'dermatology', 'Dermatologist'],
+            'dentist': ['dentist', 'dental', 'dentistry', 'Dentist'],
+            'lab': ['lab', 'laboratory', 'Laboratory']
+        }
+        
+        # Получаем возможные варианты специальности
+        specialty_variants = specialty_mapping.get(specialty.lower(), [specialty])
+        
         # Получаем врача по специальности и пользователю
         doctor = db.query(Doctor).filter(
             and_(
-                Doctor.specialty == specialty,
+                Doctor.specialty.in_(specialty_variants),
                 Doctor.user_id == current_user.id,
                 Doctor.active == True
             )
         ).first()
         
         if not doctor:
-            # Если врач не найден по user_id, ищем по специальности (для админа)
-            if current_user.role == "Admin":
-                doctor = db.query(Doctor).filter(
-                    and_(Doctor.specialty == specialty, Doctor.active == True)
-                ).first()
+            # Если врач не найден по user_id, ищем по специальности (для админа и других ролей)
+            doctor = db.query(Doctor).filter(
+                and_(
+                    Doctor.specialty.in_(specialty_variants),
+                    Doctor.active == True
+                )
+            ).first()
             
             if not doctor:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Врач специальности '{specialty}' не найден"
+                    detail=f"Врач специальности '{specialty}' не найден. Проверенные варианты: {specialty_variants}"
                 )
         
         today = date.today()
         
-        # Получаем дневную очередь
-        daily_queue = db.query(DailyQueue).filter(
-            and_(DailyQueue.day == today, DailyQueue.specialist_id == doctor.id)
-        ).first()
+        # ⭐ ВАЖНО: DailyQueue.specialist_id - это user_id, а не doctor_id
+        # Получаем дневную очередь по user_id
+        doctor_user_id = doctor.user_id if doctor.user_id else None
+        daily_queue = None
+        if doctor_user_id:
+            daily_queue = db.query(DailyQueue).filter(
+                and_(DailyQueue.day == today, DailyQueue.specialist_id == doctor_user_id)
+            ).first()
         
         if not daily_queue:
             return {
@@ -184,7 +203,7 @@ def get_doctor_queue_today(
 def call_patient(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist", "Lab"))
 ):
     """
     Вызвать пациента в кабинет
@@ -202,9 +221,22 @@ def call_patient(
         
         # Проверяем что врач имеет право работать с этой очередью
         daily_queue = queue_entry.queue
+
+        if not daily_queue:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Очередь не найдена"
+            )
+
         doctor = daily_queue.specialist
-        
-        if current_user.role != "Admin" and doctor.user_id != current_user.id:
+
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Врач не найден для этой очереди"
+            )
+
+        if current_user.role != "Admin" and doctor.user_id and doctor.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Нет прав для работы с этой очередью"
@@ -264,7 +296,7 @@ def call_patient(
 def start_patient_visit(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist", "Lab"))
 ):
     """
     Начать прием пациента (статус в процессе)
@@ -316,7 +348,7 @@ def complete_patient_visit(
     entry_id: int,
     visit_data: Optional[Dict[str, Any]] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist", "Lab"))
 ):
     """
     Завершить прием пациента
@@ -331,6 +363,42 @@ def complete_patient_visit(
         if visit:
             # Обновляем статус визита
             visit.status = "completed"
+            
+            # ✅ ИСПРАВЛЕНО: Сохраняем discount_mode и создаем платеж через SSOT
+            # Проверяем через Payment или по существующему discount_mode
+            from app.models.payment import Payment
+            if not visit.discount_mode or visit.discount_mode == "none":
+                payment = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
+                if payment and (payment.status and payment.status.lower() == 'paid' or payment.paid_at):
+                    visit.discount_mode = "paid"
+                elif visit.status in ("in_visit", "in_progress", "completed"):
+                    # ✅ ИСПРАВЛЕНО: Если визит был начат (в кабинете) или завершён, вероятно был оплачен
+                    # Создаем платеж через SSOT
+                    from app.services.billing_service import BillingService
+                    billing_service = BillingService(db)
+                    
+                    # Проверяем, не создан ли уже платеж
+                    if not payment:
+                        # Рассчитываем сумму визита через SSOT
+                        total_info = billing_service.calculate_total(
+                            visit_id=visit.id,
+                            discount_mode=visit.discount_mode or "none"
+                        )
+                        payment_amount = float(total_info["total"])
+                        
+                        # Создаем платеж через SSOT
+                        payment = billing_service.create_payment(
+                            visit_id=visit.id,
+                            amount=payment_amount,
+                            currency=total_info.get("currency", "UZS"),
+                            method="cash",  # Предполагаем наличные для визитов в процессе
+                            status="paid",
+                            note=f"Автоматическое создание платежа при завершении приема (visit {visit.id})"
+                        )
+                        print(f"[complete_visit] ✅ Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                    
+                    visit.discount_mode = "paid"
+            
             db.commit()
             db.refresh(visit)
             
@@ -354,6 +422,19 @@ def complete_patient_visit(
         if appointment:
             # Обновляем статус appointment
             appointment.status = "completed"
+            
+            # ✅ Сохраняем информацию об оплате: если appointment был оплачен, сохраняем visit_type='paid'
+            # Appointment не имеет discount_mode, используем visit_type
+            if not appointment.visit_type or appointment.visit_type not in ("paid", "repeat", "benefit", "all_free"):
+                from app.models.payment import Payment
+                payment = db.query(Payment).filter(Payment.visit_id == appointment.id).order_by(Payment.created_at.desc()).first()
+                if payment and (payment.status and payment.status.lower() == 'paid' or payment.paid_at):
+                    appointment.visit_type = "paid"
+                elif (hasattr(appointment, 'payment_amount') and appointment.payment_amount and appointment.payment_amount > 0):
+                    appointment.visit_type = "paid"
+                elif appointment.status in ("paid", "in_visit", "in_progress", "completed"):
+                    appointment.visit_type = "paid"
+            
             db.commit()
             db.refresh(appointment)
             
@@ -364,11 +445,121 @@ def complete_patient_visit(
                 "status": "completed"
             }
         
-        # Если не найден ни в Visit, ни в Appointment
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись в очереди не найдена"
-        )
+        # Если не найден ни в Visit, ни в Appointment — пробуем завершить по записи очереди
+        from app.models.online_queue import OnlineQueueEntry
+        queue_entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+        if queue_entry:
+            # Проверяем права врача на эту очередь
+            daily_queue = queue_entry.queue
+            doctor = daily_queue.specialist if daily_queue else None
+            if doctor and current_user.role != "Admin" and doctor.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет прав для работы с этой очередью"
+                )
+
+            # Отмечаем запись очереди как обслуженную
+            queue_entry.status = "served"
+            db.commit()
+            db.refresh(queue_entry)
+
+            # Создаем или обновляем визит на сегодня и помечаем как завершенный,
+            # чтобы это отразилось в registrar/queues/today, который читает Visit/Appointment
+            try:
+                visit = crud_visit.find_or_create_today_visit(
+                    db=db,
+                    patient_id=queue_entry.patient_id,
+                    doctor_id=current_user.id,
+                    department=daily_queue.department if daily_queue and hasattr(daily_queue, 'department') else "cardiology"
+                )
+                # ✅ Обновляем статус визита на completed
+                visit.status = "completed"
+                
+                # ✅ ИСПРАВЛЕНО: Проверяем и сохраняем информацию об оплате, создаем платеж через SSOT
+                # Если визит был оплачен (есть записи в Payment или статус указывает на оплату)
+                from app.models.payment import Payment
+                payment = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
+                if payment and (payment.status and payment.status.lower() == 'paid' or payment.paid_at):
+                    # Визит оплачен - устанавливаем discount_mode и payment_processed_at
+                    visit.discount_mode = "paid"
+                    if hasattr(visit, 'payment_processed_at') and not visit.payment_processed_at:
+                        visit.payment_processed_at = payment.paid_at or datetime.utcnow()
+                elif not visit.discount_mode or visit.discount_mode == "none":
+                    # ✅ ИСПРАВЛЕНО: Если нет информации об оплате, но был вызван в кабинет - считаем что оплачен
+                    # Создаем платеж через SSOT
+                    from app.services.billing_service import BillingService
+                    billing_service = BillingService(db)
+                    
+                    # Проверяем, не создан ли уже платеж
+                    if not payment:
+                        # Рассчитываем сумму визита через SSOT
+                        total_info = billing_service.calculate_total(
+                            visit_id=visit.id,
+                            discount_mode=visit.discount_mode or "none"
+                        )
+                        payment_amount = float(total_info["total"])
+                        
+                        # Создаем платеж через SSOT
+                        payment = billing_service.create_payment(
+                            visit_id=visit.id,
+                            amount=payment_amount,
+                            currency=total_info.get("currency", "UZS"),
+                            method="cash",  # Предполагаем наличные для визитов в процессе
+                            status="paid",
+                            note=f"Автоматическое создание платежа при завершении приема из очереди (visit {visit.id})"
+                        )
+                        print(f"[complete_queue_visit] ✅ Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                    
+                    visit.discount_mode = "paid"
+                    if hasattr(visit, 'payment_processed_at') and not visit.payment_processed_at:
+                        visit.payment_processed_at = payment.paid_at or datetime.utcnow() if payment else datetime.utcnow()
+                
+                # ✅ Также обновляем соответствующий Appointment, если он существует
+                from app.models.appointment import Appointment
+                appointment = db.query(Appointment).filter(
+                    and_(
+                        Appointment.patient_id == queue_entry.patient_id,
+                        Appointment.appointment_date == visit.visit_date if visit.visit_date else date.today(),
+                        Appointment.doctor_id == visit.doctor_id
+                    )
+                ).first()
+                
+                if appointment:
+                    appointment.status = "completed"
+                    # Сохраняем discount_mode для appointment
+                    if not appointment.discount_mode or appointment.discount_mode == "none":
+                        if visit.discount_mode == "paid":
+                            appointment.discount_mode = "paid"
+                        elif hasattr(appointment, 'payment_amount') and appointment.payment_amount and appointment.payment_amount > 0:
+                            appointment.discount_mode = "paid"
+                
+                if visit_data:
+                    # Сохраняем медицинские данные, если переданы
+                    crud_visit.complete_visit(
+                        db=db,
+                        visit_id=visit.id,
+                        medical_data=visit_data
+                    )
+                
+                # ✅ Коммитим все изменения (Visit и Appointment)
+                db.commit()
+                db.refresh(visit)
+                if appointment:
+                    db.refresh(appointment)
+            except Exception as e:
+                # Не блокируем основной флоу очереди, если с визитом что-то пошло не так
+                logger.warning(f"Ошибка создания/обновления визита при завершении приема: {e}")
+                db.rollback()
+
+            return {
+                "success": True,
+                "message": "Прием пациента завершен",
+                "entry_id": entry_id,
+                "status": "completed"
+            }
+
+        # Иначе действительно не найдено
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
         
     except HTTPException:
         raise
@@ -385,7 +576,7 @@ def complete_patient_visit(
 def get_doctor_services(
     specialty: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist", "Lab"))
 ):
     """
     Получить услуги для врача конкретной специальности
@@ -451,7 +642,7 @@ def get_doctor_services(
 @router.get("/doctor/my-info")
 def get_doctor_info(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "cardio", "cardiology", "derma", "dentist"))
 ):
     """
     Получить информацию о текущем враче
@@ -525,7 +716,7 @@ def get_doctor_calendar(
     start_date: date = Query(..., description="Начальная дата"),
     end_date: date = Query(..., description="Конечная дата"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "cardio", "cardiology", "derma", "dentist"))
 ):
     """
     Календарь врача с будущими записями
@@ -579,7 +770,7 @@ def get_doctor_calendar(
 def get_doctor_stats(
     days_back: int = Query(7, ge=1, le=30, description="Дней назад"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "cardio", "cardiology", "derma", "dentist"))
 ):
     """Статистика работы врача"""
     try:
@@ -600,7 +791,7 @@ def get_doctor_stats(
         # Получаем очереди за период
         daily_queues = db.query(DailyQueue).filter(
             and_(
-                DailyQueue.specialist_id == doctor.id,
+                DailyQueue.specialist_id == doctor.user_id,  # ⭐ user_id, а не doctor.id
                 DailyQueue.day >= start_date
             )
         ).all()
@@ -661,7 +852,7 @@ def get_doctor_stats(
 async def schedule_next_visit(
     request: ScheduleNextVisitRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist"))
 ):
     """
     Назначение следующего визита врачом (без номера в очереди)
@@ -747,7 +938,8 @@ async def schedule_next_visit(
                 visit_id=visit.id,
                 service_id=service.id,
                 name=service.name,
-                code=service.code or service.service_code,
+                # ✅ SSOT: Используем service_mapping.get_service_code() вместо дублирующей логики
+                code=get_service_code(service.id, db) or service.code,
                 qty=service_req.quantity,
                 price=service_price,
                 currency="UZS"
@@ -808,7 +1000,7 @@ async def schedule_next_visit(
 @router.get("/doctor/visits/today")
 def get_today_visits(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist"))
 ):
     """Получить сегодняшние визиты врача"""
     try:
@@ -867,7 +1059,7 @@ def get_today_visits(
 def get_visit_details(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar", "Cashier", "Receptionist", "cardio", "cardiology", "derma", "dentist"))
 ):
     """Получить детали визита"""
     try:
@@ -943,7 +1135,7 @@ def add_service_to_visit(
     quantity: int = 1,
     custom_price: Optional[float] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist"))
 ):
     """Добавить услугу к визиту"""
     try:
@@ -1007,7 +1199,7 @@ def remove_service_from_visit(
     visit_id: int,
     visit_service_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist"))
 ):
     """Удалить услугу из визита"""
     try:
@@ -1054,7 +1246,7 @@ def get_visit_statistics(
     date_from: Optional[str] = Query(None, description="Дата начала в формате YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="Дата окончания в формате YYYY-MM-DD"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "derma", "dentist"))
+    current_user: User = Depends(require_roles("Admin", "Doctor", "cardio", "cardiology", "derma", "dentist"))
 ):
     """Получить статистику визитов врача"""
     try:

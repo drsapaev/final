@@ -6,6 +6,9 @@
 // Экспортируем все нативные компоненты
 export * from './native';
 
+// Явно экспортируем AnimatedTransition для обратной совместимости
+export { AnimatedTransition } from './native';
+
 // Специализированные компоненты, которые остаются в ui/
 export { default as PhoneInput } from './PhoneInput';
 

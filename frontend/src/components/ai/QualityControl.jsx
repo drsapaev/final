@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
 import { 
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea,
+  MacOSBadge,
+  MacOSLoadingSkeleton,
+  MacOSCheckbox
+} from '../ui/macos';
+import { 
   FileCheck, 
   AlertTriangle, 
   CheckCircle, 
@@ -19,7 +29,7 @@ import {
   Zap
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import api from '../../utils/api';
+import { api } from '../../utils/api';
 
 const QualityControl = () => {
   const [activeTab, setActiveTab] = useState('quality-analysis');
@@ -84,11 +94,11 @@ const QualityControl = () => {
   });
 
   const tabs = [
-    { id: 'quality-analysis', label: 'Анализ качества', icon: <FileCheck className="w-4 h-4" /> },
-    { id: 'gaps-detection', label: 'Выявление пробелов', icon: <Search className="w-4 h-4" /> },
-    { id: 'improvements', label: 'Предложения улучшений', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'consistency', label: 'Клиническая согласованность', icon: <Target className="w-4 h-4" /> },
-    { id: 'prescription-safety', label: 'Безопасность назначений', icon: <Shield className="w-4 h-4" /> }
+    { id: 'quality-analysis', label: 'Анализ качества', icon: FileCheck },
+    { id: 'gaps-detection', label: 'Выявление пробелов', icon: Search },
+    { id: 'improvements', label: 'Предложения улучшений', icon: TrendingUp },
+    { id: 'consistency', label: 'Клиническая согласованность', icon: Target },
+    { id: 'prescription-safety', label: 'Безопасность назначений', icon: Shield }
   ];
 
   const handleSubmit = async () => {
@@ -212,39 +222,52 @@ const QualityControl = () => {
   };
 
   const renderQualityAnalysis = () => (
-    <div className="space-y-6">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-blue-900 flex items-center">
-            <FileCheck className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-info-bg)', 
+        border: '1px solid var(--mac-info-border)' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-info)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <FileCheck style={{ width: '16px', height: '16px' }} />
             Медицинские записи для анализа
           </h4>
-          <button
+          <MacOSButton
             onClick={addMedicalRecord}
-            className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 flex items-center"
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus style={{ width: '16px', height: '16px' }} />
             Добавить запись
-          </button>
+          </MacOSButton>
         </div>
-        <div className="space-y-3 max-h-40 overflow-y-auto">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {medicalRecords.map((record, index) => (
-            <div key={record.id} className="flex space-x-2 items-center">
-              <select
+            <div key={record.id} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <MacOSSelect
                 value={record.type}
                 onChange={(e) => {
                   const newRecords = [...medicalRecords];
                   newRecords[index].type = e.target.value;
                   setMedicalRecords(newRecords);
                 }}
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="consultation">Консультация</option>
-                <option value="procedure">Процедура</option>
-                <option value="discharge">Выписка</option>
-                <option value="prescription">Рецепт</option>
-              </select>
-              <input
+                options={[
+                  { value: 'consultation', label: 'Консультация' },
+                  { value: 'procedure', label: 'Процедура' },
+                  { value: 'discharge', label: 'Выписка' },
+                  { value: 'prescription', label: 'Рецепт' }
+                ]}
+                style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }}
+              />
+              <MacOSInput
                 type="text"
                 value={record.diagnosis}
                 onChange={(e) => {
@@ -252,10 +275,10 @@ const QualityControl = () => {
                   newRecords[index].diagnosis = e.target.value;
                   setMedicalRecords(newRecords);
                 }}
-                className="flex-2 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="Диагноз"
+                style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }}
               />
-              <input
+              <MacOSInput
                 type="text"
                 value={record.treatment}
                 onChange={(e) => {
@@ -263,138 +286,233 @@ const QualityControl = () => {
                   newRecords[index].treatment = e.target.value;
                   setMedicalRecords(newRecords);
                 }}
-                className="flex-2 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="Лечение"
+                style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }}
               />
-              <button
+              <MacOSButton
                 onClick={() => removeMedicalRecord(index)}
-                className="p-1 text-red-600 hover:text-red-800"
+                variant="outline"
+                style={{ padding: '4px', minWidth: 'auto' }}
               >
-                <Minus className="w-4 h-4" />
-              </button>
+                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+              </MacOSButton>
             </div>
           ))}
         </div>
-      </div>
+      </MacOSCard>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <h4 className="font-medium text-green-900 mb-3 flex items-center">
-          <ClipboardCheck className="w-4 h-4 mr-2" />
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-success-bg)', 
+        border: '1px solid var(--mac-success-border)' 
+      }}>
+        <h4 style={{ 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-success)',
+          margin: '0 0 12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <ClipboardCheck style={{ width: '16px', height: '16px' }} />
           Стандарты качества
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Порог полноты (%)</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Порог полноты (%)
+            </label>
+            <MacOSInput
               type="number"
               value={qualityStandards.completeness_threshold}
               onChange={(e) => setQualityStandards(prev => ({ ...prev, completeness_threshold: parseInt(e.target.value) || 90 }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Своевременность (часы)</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Своевременность (часы)
+            </label>
+            <MacOSInput
               type="number"
               value={qualityStandards.documentation_timeliness}
               onChange={(e) => setQualityStandards(prev => ({ ...prev, documentation_timeliness: parseInt(e.target.value) || 24 }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MacOSCheckbox
               id="required_signatures"
               checked={qualityStandards.required_signatures}
               onChange={(e) => setQualityStandards(prev => ({ ...prev, required_signatures: e.target.checked }))}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="required_signatures" className="ml-2 text-sm text-gray-700">
+            <label htmlFor="required_signatures" style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Обязательные подписи
             </label>
           </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MacOSCheckbox
               id="icd_coding_required"
               checked={qualityStandards.icd_coding_required}
               onChange={(e) => setQualityStandards(prev => ({ ...prev, icd_coding_required: e.target.checked }))}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="icd_coding_required" className="ml-2 text-sm text-gray-700">
+            <label htmlFor="icd_coding_required" style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Обязательное кодирование МКБ
             </label>
           </div>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 
   const renderGapsDetection = () => (
-    <div className="space-y-6">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h4 className="font-medium text-yellow-900 mb-3 flex items-center">
-          <Activity className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-warning-bg)', 
+        border: '1px solid var(--mac-warning-border)' 
+      }}>
+        <h4 style={{ 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-warning)',
+          margin: '0 0 12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Activity style={{ width: '16px', height: '16px' }} />
           Медицинская запись пациента
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ID пациента</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              ID пациента
+            </label>
+            <MacOSInput
               type="text"
               value={patientRecord.patient_id}
               onChange={(e) => setPatientRecord(prev => ({ ...prev, patient_id: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ФИО пациента</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              ФИО пациента
+            </label>
+            <MacOSInput
               type="text"
               value={patientRecord.name}
               onChange={(e) => setPatientRecord(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Диагноз</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Диагноз
+            </label>
+            <MacOSInput
               type="text"
               value={patientRecord.diagnosis}
               onChange={(e) => setPatientRecord(prev => ({ ...prev, diagnosis: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Симптомы</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Симптомы
+            </label>
+            <MacOSInput
               type="text"
               value={patientRecord.symptoms}
               onChange={(e) => setPatientRecord(prev => ({ ...prev, symptoms: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
-      </div>
+      </MacOSCard>
 
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-purple-900 flex items-center">
-            <Search className="w-4 h-4 mr-2" />
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-accent-bg)', 
+        border: '1px solid var(--mac-accent-border)' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-accent)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Search style={{ width: '16px', height: '16px' }} />
             Обязательные поля для проверки
           </h4>
-          <button
+          <MacOSButton
             onClick={addRequiredField}
-            className="px-3 py-1 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700 flex items-center"
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus style={{ width: '16px', height: '16px' }} />
             Добавить поле
-          </button>
+          </MacOSButton>
         </div>
-        <div className="space-y-2 max-h-32 overflow-y-auto">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '128px', overflowY: 'auto' }}>
           {requiredFields.map((field, index) => (
-            <div key={index} className="flex space-x-2 items-center">
-              <input
+            <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <MacOSInput
                 type="text"
                 value={field}
                 onChange={(e) => {
@@ -402,133 +520,220 @@ const QualityControl = () => {
                   newFields[index] = e.target.value;
                   setRequiredFields(newFields);
                 }}
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="Название поля"
+                style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }}
               />
-              <button
+              <MacOSButton
                 onClick={() => removeRequiredField(index)}
-                className="p-1 text-red-600 hover:text-red-800"
+                variant="outline"
+                style={{ padding: '4px', minWidth: 'auto' }}
               >
-                <Minus className="w-4 h-4" />
-              </button>
+                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+              </MacOSButton>
             </div>
           ))}
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 
   const renderImprovements = () => (
-    <div className="space-y-6">
-      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-        <h4 className="font-medium text-indigo-900 mb-3 flex items-center">
-          <TrendingUp className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-accent-bg)', 
+        border: '1px solid var(--mac-accent-border)' 
+      }}>
+        <h4 style={{ 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-accent)',
+          margin: '0 0 12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <TrendingUp style={{ width: '16px', height: '16px' }} />
           Анализ текущего состояния
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Оценка полноты (%)</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Оценка полноты (%)
+            </label>
+            <MacOSInput
               type="number"
               value={recordAnalysis.completeness_score}
               onChange={(e) => setRecordAnalysis(prev => ({ ...prev, completeness_score: parseInt(e.target.value) || 75 }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Отсутствующие поля</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Отсутствующие поля
+            </label>
+            <MacOSInput
               type="text"
               value={recordAnalysis.missing_fields.join(', ')}
               onChange={(e) => setRecordAnalysis(prev => ({ ...prev, missing_fields: e.target.value.split(',').map(f => f.trim()) }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Через запятую"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
-      </div>
+      </MacOSCard>
 
-      <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-        <h4 className="font-medium text-teal-900 mb-3 flex items-center">
-          <Target className="w-4 h-4 mr-2" />
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-success-bg)', 
+        border: '1px solid var(--mac-success-border)' 
+      }}>
+        <h4 style={{ 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-success)',
+          margin: '0 0 12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Target style={{ width: '16px', height: '16px' }} />
           Лучшие практики
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Стандарт документации</label>
-            <select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Стандарт документации
+            </label>
+            <MacOSSelect
               value={bestPractices.documentation_standards}
               onChange={(e) => setBestPractices(prev => ({ ...prev, documentation_standards: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="WHO guidelines">WHO guidelines</option>
-              <option value="HL7 FHIR">HL7 FHIR</option>
-              <option value="ICD-11">ICD-11</option>
-              <option value="SNOMED CT">SNOMED CT</option>
-            </select>
+              options={[
+                { value: 'WHO guidelines', label: 'WHO guidelines' },
+                { value: 'HL7 FHIR', label: 'HL7 FHIR' },
+                { value: 'ICD-11', label: 'ICD-11' },
+                { value: 'SNOMED CT', label: 'SNOMED CT' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MacOSCheckbox
               id="template_usage"
               checked={bestPractices.template_usage}
               onChange={(e) => setBestPractices(prev => ({ ...prev, template_usage: e.target.checked }))}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="template_usage" className="ml-2 text-sm text-gray-700">
+            <label htmlFor="template_usage" style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Использование шаблонов
             </label>
           </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MacOSCheckbox
               id="real_time_documentation"
               checked={bestPractices.real_time_documentation}
               onChange={(e) => setBestPractices(prev => ({ ...prev, real_time_documentation: e.target.checked }))}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="real_time_documentation" className="ml-2 text-sm text-gray-700">
+            <label htmlFor="real_time_documentation" style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Документирование в реальном времени
             </label>
           </div>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 
   const renderConsistency = () => (
-    <div className="space-y-6">
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <h4 className="font-medium text-red-900 mb-3 flex items-center">
-          <Target className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-bg-primary)', 
+        border: '1px solid var(--mac-border)' 
+      }}>
+        <h4 style={{ 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-danger)',
+          margin: '0 0 12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Target style={{ width: '16px', height: '16px' }} />
           Клинические данные
         </h4>
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Диагноз</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Диагноз
+            </label>
+            <MacOSInput
               type="text"
               value={diagnosis}
               onChange={(e) => setDiagnosis(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">Симптомы</label>
-              <button
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <label style={{ 
+                fontSize: 'var(--mac-font-size-sm)', 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
+                Симптомы
+              </label>
+              <MacOSButton
                 onClick={addSymptom}
-                className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 flex items-center"
+                variant="outline"
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}
               >
-                <Plus className="w-3 h-3 mr-1" />
+                <Plus style={{ width: '12px', height: '12px' }} />
                 Добавить
-              </button>
+              </MacOSButton>
             </div>
-            <div className="space-y-2 max-h-24 overflow-y-auto">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '96px', overflowY: 'auto' }}>
               {symptoms.map((symptom, index) => (
-                <div key={index} className="flex space-x-2 items-center">
-                  <input
+                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <MacOSInput
                     type="text"
                     value={symptom}
                     onChange={(e) => {
@@ -536,23 +741,32 @@ const QualityControl = () => {
                       newSymptoms[index] = e.target.value;
                       setSymptoms(newSymptoms);
                     }}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                     placeholder="Симптом"
+                    style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }}
                   />
-                  <button
+                  <MacOSButton
                     onClick={() => removeSymptom(index)}
-                    className="p-1 text-red-600 hover:text-red-800"
+                    variant="outline"
+                    style={{ padding: '4px', minWidth: 'auto' }}
                   >
-                    <Minus className="w-4 h-4" />
-                  </button>
+                    <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+                  </MacOSButton>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Лечение (JSON)</label>
-            <textarea
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Лечение (JSON)
+            </label>
+            <MacOSTextarea
               value={JSON.stringify(treatment, null, 2)}
               onChange={(e) => {
                 try {
@@ -561,34 +775,51 @@ const QualityControl = () => {
                   // Игнорируем ошибки парсинга во время ввода
                 }
               }}
-              className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+              style={{ 
+                width: '100%', 
+                height: '96px', 
+                fontFamily: 'var(--mac-font-mono)',
+                fontSize: 'var(--mac-font-size-xs)'
+              }}
             />
           </div>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 
   const renderPrescriptionSafety = () => (
-    <div className="space-y-6">
-      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-orange-900 flex items-center">
-            <Shield className="w-4 h-4 mr-2" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-warning-bg)', 
+        border: '1px solid var(--mac-warning-border)' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h4 style={{ 
+            fontWeight: 'var(--mac-font-weight-medium)', 
+            color: 'var(--mac-warning)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Shield style={{ width: '16px', height: '16px' }} />
             Назначения для проверки
           </h4>
-          <button
+          <MacOSButton
             onClick={addPrescription}
-            className="px-3 py-1 bg-orange-600 text-white rounded-md text-sm hover:bg-orange-700 flex items-center"
+            variant="outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus className="w-4 h-4 mr-1" />
+            <Plus style={{ width: '16px', height: '16px' }} />
             Добавить назначение
-          </button>
+          </MacOSButton>
         </div>
-        <div className="space-y-3 max-h-40 overflow-y-auto">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '160px', overflowY: 'auto' }}>
           {prescriptions.map((prescription, index) => (
-            <div key={index} className="flex space-x-2 items-center">
-              <input
+            <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <MacOSInput
                 type="text"
                 value={prescription.medication}
                 onChange={(e) => {
@@ -596,10 +827,10 @@ const QualityControl = () => {
                   newPrescriptions[index].medication = e.target.value;
                   setPrescriptions(newPrescriptions);
                 }}
-                className="flex-2 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="Препарат"
+                style={{ flex: 2, fontSize: 'var(--mac-font-size-xs)' }}
               />
-              <input
+              <MacOSInput
                 type="text"
                 value={prescription.dosage}
                 onChange={(e) => {
@@ -607,10 +838,10 @@ const QualityControl = () => {
                   newPrescriptions[index].dosage = e.target.value;
                   setPrescriptions(newPrescriptions);
                 }}
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="Дозировка"
+                style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }}
               />
-              <input
+              <MacOSInput
                 type="text"
                 value={prescription.frequency}
                 onChange={(e) => {
@@ -618,77 +849,134 @@ const QualityControl = () => {
                   newPrescriptions[index].frequency = e.target.value;
                   setPrescriptions(newPrescriptions);
                 }}
-                className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
                 placeholder="Частота"
+                style={{ flex: 1, fontSize: 'var(--mac-font-size-xs)' }}
               />
-              <button
+              <MacOSButton
                 onClick={() => removePrescription(index)}
-                className="p-1 text-red-600 hover:text-red-800"
+                variant="outline"
+                style={{ padding: '4px', minWidth: 'auto' }}
               >
-                <Minus className="w-4 h-4" />
-              </button>
+                <Minus style={{ width: '16px', height: '16px', color: 'var(--mac-danger)' }} />
+              </MacOSButton>
             </div>
           ))}
         </div>
-      </div>
+      </MacOSCard>
 
-      <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
-        <h4 className="font-medium text-cyan-900 mb-3 flex items-center">
-          <Activity className="w-4 h-4 mr-2" />
+      <MacOSCard style={{ 
+        padding: '16px', 
+        backgroundColor: 'var(--mac-info-bg)', 
+        border: '1px solid var(--mac-info-border)' 
+      }}>
+        <h4 style={{ 
+          fontWeight: 'var(--mac-font-weight-medium)', 
+          color: 'var(--mac-info)',
+          margin: '0 0 12px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Activity style={{ width: '16px', height: '16px' }} />
           Профиль пациента
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Возраст</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Возраст
+            </label>
+            <MacOSInput
               type="number"
               value={patientProfile.age}
               onChange={(e) => setPatientProfile(prev => ({ ...prev, age: parseInt(e.target.value) || 0 }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Пол</label>
-            <select
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Пол
+            </label>
+            <MacOSSelect
               value={patientProfile.gender}
               onChange={(e) => setPatientProfile(prev => ({ ...prev, gender: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="мужской">Мужской</option>
-              <option value="женский">Женский</option>
-            </select>
+              options={[
+                { value: 'мужской', label: 'Мужской' },
+                { value: 'женский', label: 'Женский' }
+              ]}
+              style={{ width: '100%' }}
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Вес (кг)</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Вес (кг)
+            </label>
+            <MacOSInput
               type="number"
               value={patientProfile.weight}
               onChange={(e) => setPatientProfile(prev => ({ ...prev, weight: parseInt(e.target.value) || 0 }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Аллергии</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Аллергии
+            </label>
+            <MacOSInput
               type="text"
               value={patientProfile.allergies.join(', ')}
               onChange={(e) => setPatientProfile(prev => ({ ...prev, allergies: e.target.value.split(',').map(a => a.trim()) }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Через запятую"
+              style={{ width: '100%' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Сопутствующие заболевания</label>
-            <input
+            <label style={{ 
+              display: 'block', 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)', 
+              marginBottom: '4px' 
+            }}>
+              Сопутствующие заболевания
+            </label>
+            <MacOSInput
               type="text"
               value={patientProfile.comorbidities.join(', ')}
               onChange={(e) => setPatientProfile(prev => ({ ...prev, comorbidities: e.target.value.split(',').map(c => c.trim()) }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Через запятую"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 
@@ -697,146 +985,300 @@ const QualityControl = () => {
 
     if (result.error) {
       return (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <XCircle className="h-5 w-5 text-red-400 mr-2" />
-            <h3 className="text-sm font-medium text-red-800">Ошибка</h3>
+        <MacOSCard style={{ 
+          padding: '16px', 
+          backgroundColor: 'var(--mac-error-bg)', 
+          border: '1px solid var(--mac-error-border)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <XCircle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-sm)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-danger)',
+              margin: 0
+            }}>
+              Ошибка
+            </h3>
           </div>
-          <p className="mt-2 text-sm text-red-700">{result.error}</p>
-        </div>
+          <p style={{ 
+            marginTop: '8px',
+            fontSize: 'var(--mac-font-size-sm)', 
+            color: 'var(--mac-danger)',
+            margin: '8px 0 0 0'
+          }}>
+            {result.error}
+          </p>
+        </MacOSCard>
       );
     }
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+      <MacOSCard style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h3 style={{ 
+            fontSize: 'var(--mac-font-size-lg)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <CheckCircle style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
             Результат анализа качества
           </h3>
-          <div className="flex space-x-2">
-            <button
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <MacOSButton
               onClick={() => copyToClipboard(JSON.stringify(result, null, 2))}
-              className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              variant="outline"
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              <Copy className="h-4 w-4 mr-1" />
+              <Copy style={{ width: '16px', height: '16px' }} />
               Копировать
-            </button>
-            <button
+            </MacOSButton>
+            <MacOSButton
               onClick={exportResult}
-              className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              variant="outline"
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              <Download className="h-4 w-4 mr-1" />
+              <Download style={{ width: '16px', height: '16px' }} />
               Экспорт
-            </button>
+            </MacOSButton>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {Object.entries(result).map(([key, value]) => (
-            <div key={key} className="border-l-4 border-blue-400 pl-4">
-              <h4 className="font-medium text-gray-900 capitalize mb-2">
+            <div key={key} style={{ 
+              borderLeft: '4px solid var(--mac-accent)', 
+              paddingLeft: '16px' 
+            }}>
+              <h4 style={{ 
+                fontWeight: 'var(--mac-font-weight-medium)', 
+                color: 'var(--mac-text-primary)',
+                margin: '0 0 8px 0',
+                fontSize: 'var(--mac-font-size-sm)',
+                textTransform: 'capitalize'
+              }}>
                 {key.replace(/_/g, ' ')}
               </h4>
-              <div className="text-sm text-gray-600">
+              <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)' }}>
                 {typeof value === 'object' && value !== null ? (
-                  <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded text-xs overflow-x-auto max-h-64">
+                  <pre style={{ 
+                    whiteSpace: 'pre-wrap', 
+                    backgroundColor: 'var(--mac-bg-secondary)', 
+                    padding: '8px', 
+                    borderRadius: 'var(--mac-radius-sm)', 
+                    fontSize: 'var(--mac-font-size-xs)', 
+                    overflowX: 'auto', 
+                    maxHeight: '256px',
+                    margin: 0,
+                    fontFamily: 'var(--mac-font-mono)'
+                  }}>
                     {JSON.stringify(value, null, 2)}
                   </pre>
                 ) : (
-                  <p>{String(value)}</p>
+                  <p style={{ margin: 0 }}>{String(value)}</p>
                 )}
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </MacOSCard>
     );
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-            <ClipboardCheck className="h-6 w-6 text-blue-600 mr-2" />
+    <div style={{ 
+      padding: '24px',
+      backgroundColor: 'var(--mac-bg-primary)',
+      minHeight: '100vh'
+    }}>
+      <MacOSCard style={{ padding: '24px' }}>
+        {/* Заголовок */}
+        <div style={{ 
+          paddingBottom: '24px', 
+          borderBottom: '1px solid var(--mac-border)',
+          marginBottom: '24px'
+        }}>
+          <h2 style={{ 
+            fontSize: 'var(--mac-font-size-2xl)', 
+            fontWeight: 'var(--mac-font-weight-semibold)', 
+            color: 'var(--mac-text-primary)',
+            margin: '0 0 8px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <ClipboardCheck style={{ width: '32px', height: '32px', color: 'var(--mac-accent)' }} />
             AI Контроль Качества Медицинских Записей
           </h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p style={{ 
+            color: 'var(--mac-text-secondary)',
+            fontSize: 'var(--mac-font-size-sm)',
+            margin: 0
+          }}>
             Анализ качества документации, выявление пробелов и предложение улучшений
           </p>
         </div>
 
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6 overflow-x-auto">
-            {tabs.map((tab) => (
+        {/* Вкладки */}
+        <div style={{ 
+          display: 'flex', 
+          marginBottom: '24px'
+        }}>
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
+            return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                style={{
+                  padding: '12px 20px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)',
+                  fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                  position: 'relative',
+                  marginBottom: '-1px'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.target.style.color = 'var(--mac-text-primary)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.target.style.color = 'var(--mac-text-secondary)';
+                  }
+                }}
               >
-                {tab.icon}
-                <span>{tab.label}</span>
+                <Icon style={{ 
+                  width: '16px', 
+                  height: '16px',
+                  color: isActive ? 'var(--mac-accent)' : 'var(--mac-text-secondary)'
+                }} />
+                {tab.label}
+                {isActive && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '0',
+                    right: '0',
+                    height: '3px',
+                    backgroundColor: 'var(--mac-accent)',
+                    borderRadius: '2px 2px 0 0'
+                  }} />
+                )}
               </button>
-            ))}
-          </nav>
+            );
+          })}
         </div>
+        
+        {/* Разделительная линия */}
+        <div style={{ 
+          borderBottom: '1px solid var(--mac-border)',
+          marginBottom: '24px'
+        }} />
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Настройки и данные
-              </h3>
-              
-              {activeTab === 'quality-analysis' && renderQualityAnalysis()}
-              {activeTab === 'gaps-detection' && renderGapsDetection()}
-              {activeTab === 'improvements' && renderImprovements()}
-              {activeTab === 'consistency' && renderConsistency()}
-              {activeTab === 'prescription-safety' && renderPrescriptionSafety()}
-              
-              <div className="mt-6 flex justify-center">
-                <button
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                      Анализируем...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-5 w-5 mr-2" />
-                      Запустить AI анализ
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Результат</h3>
-              {renderResult()}
-              
-              {error && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
-                    <h3 className="text-sm font-medium text-red-800">Ошибка</h3>
-                  </div>
-                  <p className="mt-2 text-sm text-red-700">{error}</p>
-                </div>
-              )}
+        {/* Контент */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+          gap: '24px' 
+        }}>
+          <div>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 16px 0'
+            }}>
+              Настройки и данные
+            </h3>
+            
+            {activeTab === 'quality-analysis' && renderQualityAnalysis()}
+            {activeTab === 'gaps-detection' && renderGapsDetection()}
+            {activeTab === 'improvements' && renderImprovements()}
+            {activeTab === 'consistency' && renderConsistency()}
+            {activeTab === 'prescription-safety' && renderPrescriptionSafety()}
+            
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+              <MacOSButton
+                onClick={handleSubmit}
+                disabled={loading}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                {loading ? (
+                  <>
+                    <Loader style={{ 
+                      width: '20px', 
+                      height: '20px',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Анализируем...
+                  </>
+                ) : (
+                  <>
+                    <Zap style={{ width: '20px', height: '20px' }} />
+                    Запустить AI анализ
+                  </>
+                )}
+              </MacOSButton>
             </div>
           </div>
+
+          <div>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-primary)',
+              margin: '0 0 16px 0'
+            }}>
+              Результат
+            </h3>
+            {renderResult()}
+            
+            {error && (
+              <MacOSCard style={{ 
+                padding: '16px', 
+                backgroundColor: 'var(--mac-error-bg)', 
+                border: '1px solid var(--mac-error-border)',
+                marginTop: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle style={{ width: '20px', height: '20px', color: 'var(--mac-danger)' }} />
+                  <h3 style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-danger)',
+                    margin: 0
+                  }}>
+                    Ошибка
+                  </h3>
+                </div>
+                <p style={{ 
+                  marginTop: '8px',
+                  fontSize: 'var(--mac-font-size-sm)', 
+                  color: 'var(--mac-danger)',
+                  margin: '8px 0 0 0'
+                }}>
+                  {error}
+                </p>
+              </MacOSCard>
+            )}
+          </div>
         </div>
-      </div>
+      </MacOSCard>
     </div>
   );
 };

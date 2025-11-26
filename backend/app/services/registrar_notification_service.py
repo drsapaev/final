@@ -419,6 +419,103 @@ class RegistrarNotificationService:
             logger.error(f"Ошибка отправки ежедневной сводки: {e}")
             return {"success": False, "error": str(e)}
     
+    # ===================== УВЕДОМЛЕНИЯ О НАЗНАЧЕННЫХ УСЛУГАХ =====================
+    
+    async def notify_services_assigned(
+        self,
+        appointment: Appointment,
+        services: List[Any],
+        doctor: User,
+        department: str = None
+    ) -> Dict[str, Any]:
+        """
+        Уведомляет регистраторов о назначенных услугах
+        
+        Args:
+            appointment: Запись на прием
+            services: Список назначенных услуг
+            doctor: Врач, который назначил услуги
+            department: Отделение (опционально)
+        """
+        try:
+            # Получаем список регистраторов
+            if department:
+                registrars = self.get_registrars_by_department(department)
+            else:
+                registrars = self.get_active_registrars()
+            
+            if not registrars:
+                logger.warning("Нет активных регистраторов для отправки уведомления")
+                return {"success": False, "error": "Нет активных регистраторов"}
+            
+            # Получаем информацию о пациенте
+            patient = self.db.query(Patient).filter(Patient.id == appointment.patient_id).first()
+            patient_name = patient.name if patient else f"Пациент ID: {appointment.patient_id}"
+            
+            # Формируем сообщение
+            services_text = "\n".join([
+                f"  • {service.name} - {service.price:.0f} сум (x{service.quantity})"
+                for service in services
+            ])
+            
+            total_price = sum(service.price * service.quantity for service in services)
+            
+            message = f"""
+🏥 НОВЫЕ НАЗНАЧЕННЫЕ УСЛУГИ
+
+📋 Пациент: {patient_name}
+👨‍⚕️ Врач: {doctor.full_name if hasattr(doctor, 'full_name') else doctor.username}
+📅 Дата записи: {appointment.appointment_date}
+🕐 Время: {appointment.appointment_time or 'Не указано'}
+
+💰 Назначенные услуги:
+{services_text}
+
+💵 Итого: {total_price:.0f} сум
+
+⚠️ Требуется добавить услуги в регистратуре и произвести оплату.
+
+📎 ID записи: {appointment.id}
+            """.strip()
+            
+            results = []
+            for registrar in registrars:
+                try:
+                    result = await self._send_notification_to_registrar(
+                        registrar=registrar,
+                        message=message,
+                        notification_type="services_assigned"
+                    )
+                    results.append({
+                        "registrar_id": registrar.id,
+                        "registrar_name": registrar.full_name if hasattr(registrar, 'full_name') else registrar.username,
+                        **result
+                    })
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления регистратору {registrar.id}: {e}")
+                    results.append({
+                        "registrar_id": registrar.id,
+                        "success": False,
+                        "error": str(e)
+                    })
+            
+            success_count = sum(1 for r in results if r.get("success", False))
+            
+            return {
+                "success": True,
+                "message": f"Уведомление отправлено {success_count} из {len(registrars)} регистраторов",
+                "results": results,
+                "appointment_id": appointment.id,
+                "patient_name": patient_name,
+                "doctor_name": doctor.full_name if hasattr(doctor, 'full_name') else doctor.username,
+                "services_count": len(services),
+                "total_price": total_price
+            }
+            
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомлений о назначенных услугах: {e}")
+            return {"success": False, "error": str(e)}
+    
     # ===================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====================
     
     async def _send_notification_to_registrar(

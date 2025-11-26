@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+# ============================================================================
+# DEPRECATED SERVICE: Legacy department-based queue system
+# ============================================================================
+#
+# ⚠️ WARNING: This service uses DEPRECATED OnlineDay model
+#
+# This service provides simple ticket issuing for appointments endpoint.
+# It uses department-based approach with Settings table for counters.
+#
+# For NEW queue features, use:
+#   - app/services/queue_service.py (SSOT for queue operations)
+#   - app/models/online_queue.py (DailyQueue model)
+#
+# This file is kept for backward compatibility with appointments endpoint.
+# Migration to DailyQueue-based system is planned for future.
+# ============================================================================
+
 import datetime as _dt
 from dataclasses import dataclass
 from typing import Optional
@@ -8,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.online import OnlineDay  # type: ignore[attr-defined]
+from app.models.online import OnlineDay  # type: ignore[attr-defined]  # DEPRECATED: use DailyQueue instead
 from app.models.setting import Setting  # type: ignore[attr-defined]
 
 

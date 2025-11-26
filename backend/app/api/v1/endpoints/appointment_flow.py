@@ -2,15 +2,18 @@
 API endpoints для жесткого потока: запись → платеж → прием → медкарта → рецепт
 """
 
+from datetime import date, datetime
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from app.api import deps
 from app.crud.appointment import appointment as crud_appointment
 from app.crud import emr as crud_emr
 from app.models.enums import AppointmentStatus
+from app.models.appointment import Appointment as AppointmentModel
 from app.models.user import User
 from app.schemas.appointment import Appointment
 from app.schemas.emr import (
@@ -21,6 +24,18 @@ from app.schemas.emr import (
     PrescriptionCreate,
     PrescriptionUpdate,
 )
+
+
+def convert_datetimes_to_iso(obj):
+    """Рекурсивно преобразует все datetime объекты в ISO строки для JSON сериализации"""
+    if isinstance(obj, dict):
+        return {k: convert_datetimes_to_iso(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_datetimes_to_iso(item) for item in obj]
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    return obj
+
 
 router = APIRouter()
 
@@ -34,19 +49,24 @@ def start_visit(
     """
     Начать прием (переход paid -> in_visit)
     """
-    appointment = crud_appointment.appointment.get(db, id=appointment_id)
+    appointment = crud_appointment.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
-    # Проверяем, что запись оплачена
-    if appointment.status != AppointmentStatus.PAID:
+    # Проверяем, что запись оплачена или вызвана (called/calling)
+    # Разрешаем начать прием если статус: paid, called, calling, waiting, queued
+    status_str = str(appointment.status).lower()
+    allowed_start_statuses = [
+        AppointmentStatus.PAID,
+    ]
+    if appointment.status not in allowed_start_statuses and status_str not in ['paid', 'called', 'calling', 'waiting', 'queued']:
         raise HTTPException(
             status_code=400,
             detail=f"Нельзя начать прием. Текущий статус: {appointment.status}",
         )
 
     # Переводим в статус "на приеме"
-    updated_appointment = crud_appointment.appointment.start_visit(
+    updated_appointment = crud_appointment.start_visit(
         db, appointment_id=appointment_id
     )
     return updated_appointment
@@ -57,61 +77,177 @@ def create_or_update_emr(
     appointment_id: int,
     emr_data: EMRCreate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_roles("Admin", "Doctor")),
+    current_user: User = Depends(deps.require_roles("Admin", "Doctor", "Registrar", "cardio", "cardiology", "Cardiologist", "Cardio", "derma", "Dermatologist", "dentist", "Dentist", "Lab", "Laboratory")),
 ) -> Any:
     """
     Создать или обновить EMR
+    Может работать как с Appointment ID, так и с Visit ID (создает Appointment из Visit если нужно)
     """
-    appointment = crud_appointment.appointment.get(db, id=appointment_id)
-    if not appointment:
-        raise HTTPException(status_code=404, detail="Запись не найдена")
+    try:
+        print(f"[create_or_update_emr] Начало обработки appointment_id={appointment_id}, user={current_user.username}, role={getattr(current_user, 'role', 'N/A')}")
+        appointment = crud_appointment.get(db, id=appointment_id)
+        
+        # Если Appointment не найден, проверяем, может это Visit ID
+        if not appointment:
+            print(f"[create_or_update_emr] Appointment {appointment_id} не найден, проверяем Visit...")
+            from app.models.visit import Visit
+            visit = db.query(Visit).filter(Visit.id == appointment_id).first()
+            if visit:
+                print(f"[create_or_update_emr] Найден Visit {appointment_id}, проверяем существующий Appointment...")
+                # Проверяем, нет ли уже Appointment для этого Visit (по patient_id, дате, doctor_id)
+                existing_appointment = db.query(AppointmentModel).filter(
+                    and_(
+                        AppointmentModel.patient_id == visit.patient_id,
+                        AppointmentModel.appointment_date == (visit.visit_date or date.today()),
+                        AppointmentModel.doctor_id == visit.doctor_id
+                    )
+                ).first()
+                
+                if existing_appointment:
+                    print(f"[create_or_update_emr] Найден существующий Appointment {existing_appointment.id} для Visit {visit.id}, используем его")
+                    appointment = existing_appointment
+                    # Обновляем appointment_id в emr_data для корректной привязки
+                    emr_data.appointment_id = existing_appointment.id
+                else:
+                    print(f"[create_or_update_emr] Создаем новый Appointment из Visit {visit.id}...")
+                    # Создаем Appointment из Visit для работы с EMR
+                    appointment = AppointmentModel(
+                        patient_id=visit.patient_id,
+                        appointment_date=visit.visit_date or date.today(),
+                        appointment_time=visit.visit_time or "09:00",
+                        status=AppointmentStatus.IN_VISIT if visit.status in ["in_progress", "confirmed"] else AppointmentStatus.PAID,
+                        doctor_id=visit.doctor_id,
+                        department=visit.department,
+                        notes=visit.notes,
+                        created_at=visit.created_at
+                    )
+                    db.add(appointment)
+                    db.commit()
+                    db.refresh(appointment)
+                    print(f"[create_or_update_emr] Создан Appointment {appointment.id} из Visit {visit.id}")
+            else:
+                print(f"[create_or_update_emr] Запись {appointment_id} не найдена ни в Appointment, ни в Visit")
+                raise HTTPException(status_code=404, detail="Запись не найдена")
+        else:
+            print(f"[create_or_update_emr] Appointment найден: status={appointment.status}")
+    except Exception as e:
+        print(f"[create_or_update_emr] Ошибка при поиске appointment: {e}")
+        raise
 
     # Проверяем статус записи
-    if appointment.status not in [
+    # Разрешаем сохранение EMR если статус: in_visit, in_progress, completed, или called (вызван врачом)
+    allowed_statuses = [
         AppointmentStatus.IN_VISIT,
         AppointmentStatus.COMPLETED,
-    ]:
+    ]
+    # Также проверяем строковые значения для совместимости
+    status_str = str(appointment.status).lower()
+    
+    if appointment.status not in allowed_statuses and status_str not in ['in_visit', 'in_progress', 'completed', 'called', 'calling', 'paid', 'waiting', 'queued']:
+        # Если статус не подходит, но это called/calling/paid/waiting/queued, обновляем статус на in_visit
+        # Это позволяет начать сохранение EMR для вызванных или оплаченных пациентов
+        if status_str in ['called', 'calling', 'paid', 'waiting', 'queued']:
+            appointment.status = AppointmentStatus.IN_VISIT
+            db.commit()
+            db.refresh(appointment)
+            print(f"[create_or_update_emr] Статус appointment {appointment_id} обновлен с '{status_str}' на 'in_visit'")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"EMR доступно только во время приема. Текущий статус: {appointment.status}",
+            )
+
+    try:
+        # Проверяем, есть ли уже EMR для этой записи
+        print(f"[create_or_update_emr] Проверка существующего EMR для appointment_id={appointment_id}")
+        existing_emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
+
+        if existing_emr:
+            print(f"[create_or_update_emr] EMR найден, обновление...")
+            # Создаем версию перед обновлением
+            try:
+                from app.crud.emr_template import emr_version
+                # Очищаем объект от SQLAlchemy внутренних полей перед сериализацией
+                # Используем Pydantic схему для безопасной сериализации
+                from app.schemas.emr import EMR as EMRSchema
+                emr_dict = EMRSchema.from_orm(existing_emr).dict()
+                
+                # Преобразуем все datetime объекты в ISO строки для JSON сериализации
+                emr_dict_clean = convert_datetimes_to_iso(emr_dict)
+                
+                emr_version.create_version(
+                    db,
+                    emr_id=existing_emr.id,
+                    version_data=emr_dict_clean,
+                    change_type="updated",
+                    change_description="Обновление EMR",
+                    changed_by=current_user.id
+                )
+            except Exception as version_error:
+                print(f"[create_or_update_emr] Предупреждение: не удалось создать версию: {version_error}")
+                import traceback
+                traceback.print_exc()
+            
+            # Обновляем существующий EMR
+            emr_update_dict = emr_data.dict(exclude={"appointment_id"})
+            print(f"[create_or_update_emr] Данные для обновления: {list(emr_update_dict.keys())}")
+            emr_update = EMRUpdate(**emr_update_dict)
+            updated_emr = crud_emr.emr.update(db, db_obj=existing_emr, obj_in=emr_update)
+            print(f"[create_or_update_emr] EMR обновлен успешно")
+            return updated_emr
+        else:
+            print(f"[create_or_update_emr] EMR не найден, создание нового...")
+            # Создаем новый EMR
+            # Убеждаемся, что appointment_id установлен из URL параметра
+            if emr_data.appointment_id != appointment_id:
+                print(f"[create_or_update_emr] Предупреждение: appointment_id в данных ({emr_data.appointment_id}) != URL ({appointment_id}), используем URL")
+            emr_data.appointment_id = appointment_id
+            print(f"[create_or_update_emr] Создание EMR с appointment_id={appointment_id}, is_draft={emr_data.is_draft}")
+            try:
+                new_emr = crud_emr.emr.create(db, obj_in=emr_data)
+                print(f"[create_or_update_emr] EMR создан, id={new_emr.id}")
+            except Exception as create_error:
+                print(f"[create_or_update_emr] Ошибка при создании EMR: {type(create_error).__name__}: {create_error}")
+                import traceback
+                traceback.print_exc()
+                raise
+            
+            # Создаем первую версию
+            try:
+                from app.crud.emr_template import emr_version
+                # Очищаем объект от SQLAlchemy внутренних полей перед сериализацией
+                # Используем Pydantic схему для безопасной сериализации
+                from app.schemas.emr import EMR as EMRSchema
+                emr_dict = EMRSchema.from_orm(new_emr).dict()
+                
+                # Преобразуем все datetime объекты в ISO строки для JSON сериализации
+                emr_dict_clean = convert_datetimes_to_iso(emr_dict)
+                
+                emr_version.create_version(
+                    db,
+                    emr_id=new_emr.id,
+                    version_data=emr_dict_clean,
+                    change_type="created",
+                    change_description="Создание EMR",
+                    changed_by=current_user.id
+                )
+            except Exception as version_error:
+                print(f"[create_or_update_emr] Предупреждение: не удалось создать версию: {version_error}")
+                import traceback
+                traceback.print_exc()
+            
+            print(f"[create_or_update_emr] EMR создан успешно, id={new_emr.id}")
+            return new_emr
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[create_or_update_emr] КРИТИЧЕСКАЯ ОШИБКА: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
-            status_code=400,
-            detail=f"EMR доступно только во время приема. Текущий статус: {appointment.status}",
+            status_code=500,
+            detail=f"Ошибка при сохранении EMR: {str(e)}"
         )
-
-    # Проверяем, есть ли уже EMR для этой записи
-    existing_emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
-
-    if existing_emr:
-        # Создаем версию перед обновлением
-        from app.crud.emr_template import emr_version
-        emr_version.create_version(
-            db,
-            emr_id=existing_emr.id,
-            version_data=existing_emr.__dict__,
-            change_type="updated",
-            change_description="Обновление EMR",
-            changed_by=current_user.id
-        )
-        
-        # Обновляем существующий EMR
-        emr_update = EMRUpdate(**emr_data.dict(exclude={"appointment_id"}))
-        updated_emr = crud_emr.emr.update(db, db_obj=existing_emr, obj_in=emr_update)
-        return updated_emr
-    else:
-        # Создаем новый EMR
-        emr_data.appointment_id = appointment_id
-        new_emr = crud_emr.emr.create(db, obj_in=emr_data)
-        
-        # Создаем первую версию
-        from app.crud.emr_template import emr_version
-        emr_version.create_version(
-            db,
-            emr_id=new_emr.id,
-            version_data=new_emr.__dict__,
-            change_type="created",
-            change_description="Создание EMR",
-            changed_by=current_user.id
-        )
-        
-        return new_emr
 
 
 @router.post("/{appointment_id}/emr/save", response_model=EMR)
@@ -157,7 +293,7 @@ def create_or_update_prescription(
     """
     Создать или обновить рецепт
     """
-    appointment = crud_appointment.appointment.get(db, id=appointment_id)
+    appointment = crud_appointment.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
@@ -248,7 +384,7 @@ def complete_visit(
     """
     Завершить прием (переход in_visit -> completed)
     """
-    appointment = crud_appointment.appointment.get(db, id=appointment_id)
+    appointment = crud_appointment.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
@@ -267,7 +403,7 @@ def complete_visit(
         )
 
     # Завершаем прием
-    completed_appointment = crud_appointment.appointment.complete_visit(
+    completed_appointment = crud_appointment.complete_visit(
         db, appointment_id=appointment_id
     )
     return completed_appointment
@@ -304,7 +440,7 @@ def get_appointment_status(
     """
     Получить полную информацию о статусе записи и связанных данных
     """
-    appointment = crud_appointment.appointment.get(db, id=appointment_id)
+    appointment = crud_appointment.get(db, id=appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Запись не найдена")
 

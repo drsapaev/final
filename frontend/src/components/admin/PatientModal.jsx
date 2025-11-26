@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle, Heart } from 'lucide-react';
-import { Card, Button } from '../ui/native';
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
+  MacOSSelect,
+  MacOSTextarea,
+  MacOSModal
+} from '../ui/macos';
 
-const PatientModal = ({ 
-  isOpen, 
-  onClose, 
-  patient = null, 
-  onSave, 
-  loading = false 
+const PatientModal = ({
+  isOpen,
+  onClose,
+  patient = null,
+  onSave,
+  loading = false
 }) => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -28,7 +35,9 @@ const PatientModal = ({
     notes: ''
   });
   const [errors, setErrors] = useState({});
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Инициализация формы при открытии
   useEffect(() => {
@@ -73,6 +82,7 @@ const PatientModal = ({
         });
       }
       setErrors({});
+      setIsDirty(false);
     }
   }, [isOpen, patient]);
 
@@ -112,9 +122,10 @@ const PatientModal = ({
       newErrors.gender = 'Пол обязателен';
     }
 
-    if (!formData.passport.trim()) {
-      newErrors.passport = 'Паспортные данные обязательны';
-    }
+    // Passport is now optional for quick registration
+    // if (!formData.passport.trim()) {
+    //   newErrors.passport = 'Паспортные данные обязательны';
+    // }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -122,7 +133,7 @@ const PatientModal = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -157,8 +168,19 @@ const PatientModal = ({
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    setIsDirty(true);
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const handleClose = () => {
+    if (isDirty) {
+      if (window.confirm('У вас есть несохраненные изменения. Вы уверены, что хотите закрыть окно?')) {
+        onClose();
+      }
+    } else {
+      onClose();
     }
   };
 
@@ -181,497 +203,525 @@ const PatientModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          {/* Заголовок */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {patient ? 'Редактировать пациента' : 'Добавить пациента'}
-            </h2>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <X className="w-5 h-5" />
-            </button>
+    <MacOSModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={patient ? 'Редактировать пациента' : 'Добавить пациента'}
+      size="lg"
+    >
+
+      {/* Форма */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Личная информация */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            Личная информация
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Фамилия */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Фамилия *
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => handleChange('lastName', e.target.value)}
+                placeholder="Иванов"
+                error={errors.lastName}
+                icon={User}
+              />
+              {errors.lastName && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.lastName}
+                </p>
+              )}
+            </div>
+
+            {/* Имя */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Имя *
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => handleChange('firstName', e.target.value)}
+                placeholder="Иван"
+                error={errors.firstName}
+              />
+              {errors.firstName && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.firstName}
+                </p>
+              )}
+            </div>
+
+            {/* Отчество */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Отчество
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.middleName}
+                onChange={(e) => handleChange('middleName', e.target.value)}
+                placeholder="Иванович"
+              />
+            </div>
           </div>
 
-          {/* Форма */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Личная информация */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                Личная информация
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Фамилия */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Фамилия *
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="text"
-                      value={formData.lastName}
-                      onChange={(e) => handleChange('lastName', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.lastName ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.lastName ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="Иванов"
-                    />
-                  </div>
-                  {errors.lastName && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.lastName}
-                    </p>
-                  )}
-                </div>
-
-                {/* Имя */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Имя *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => handleChange('firstName', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.firstName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: errors.firstName ? 'var(--danger-color)' : 'var(--border-color)'
-                    }}
-                    placeholder="Иван"
-                  />
-                  {errors.firstName && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.firstName}
-                    </p>
-                  )}
-                </div>
-
-                {/* Отчество */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Отчество
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.middleName}
-                    onChange={(e) => handleChange('middleName', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    placeholder="Иванович"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Дата рождения */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Дата рождения *
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                              style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="date"
-                      value={formData.birthDate}
-                      onChange={(e) => handleChange('birthDate', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.birthDate ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.birthDate ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                    />
-                  </div>
-                  {errors.birthDate && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.birthDate}
-                    </p>
-                  )}
-                </div>
-
-                {/* Пол */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Пол *
-                  </label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => handleChange('gender', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.gender ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: errors.gender ? 'var(--danger-color)' : 'var(--border-color)'
-                    }}
-                  >
-                    <option value="">Выберите пол</option>
-                    <option value="male">Мужской</option>
-                    <option value="female">Женский</option>
-                  </select>
-                  {errors.gender && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.gender}
-                    </p>
-                  )}
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Дата рождения */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Дата рождения *
+              </label>
+              <MacOSInput
+                type="date"
+                value={formData.birthDate}
+                onChange={(e) => handleChange('birthDate', e.target.value)}
+                error={errors.birthDate}
+                icon={Calendar}
+              />
+              {formData.birthDate && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-text-secondary)',
+                  marginTop: '4px',
+                  marginLeft: '2px'
+                }}>
+                  Возраст: {new Date().getFullYear() - new Date(formData.birthDate).getFullYear()} лет
+                </p>
+              )}
+              {errors.birthDate && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.birthDate}
+                </p>
+              )}
             </div>
 
-            {/* Контактная информация */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                Контактная информация
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Телефон */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Телефон *
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                           style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handlePhoneChange}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.phone ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.phone ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="+998 90 123 45 67"
-                    />
-                  </div>
-                  {errors.phone && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.phone}
-                    </p>
-                  )}
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                          style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.email ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.email ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="ivan@example.com"
-                    />
-                  </div>
-                  {errors.email && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.email}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Адрес */}
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Адрес
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                           style={{ color: 'var(--text-tertiary)' }} />
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => handleChange('address', e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    placeholder="г. Ташкент, ул. Навои, д. 1"
-                  />
-                </div>
-              </div>
+            {/* Пол */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Пол *
+              </label>
+              <MacOSSelect
+                value={formData.gender}
+                onChange={(e) => handleChange('gender', e.target.value)}
+                options={[
+                  { value: '', label: 'Выберите пол' },
+                  { value: 'male', label: 'Мужской' },
+                  { value: 'female', label: 'Женский' }
+                ]}
+                error={errors.gender}
+              />
+              {errors.gender && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.gender}
+                </p>
+              )}
             </div>
-
-            {/* Документы */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                Документы
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Паспорт */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Паспортные данные *
-                  </label>
-                  <div className="relative">
-                    <IdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                             style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      type="text"
-                      value={formData.passport}
-                      onChange={(e) => handleChange('passport', e.target.value)}
-                      className={`w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        errors.passport ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: errors.passport ? 'var(--danger-color)' : 'var(--border-color)'
-                      }}
-                      placeholder="AA1234567"
-                    />
-                  </div>
-                  {errors.passport && (
-                    <p className="text-sm text-red-500 mt-1 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      {errors.passport}
-                    </p>
-                  )}
-                </div>
-
-                {/* Страховой номер */}
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Страховой номер
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.insuranceNumber}
-                    onChange={(e) => handleChange('insuranceNumber', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    placeholder="12345678901234"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Экстренный контакт */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                Экстренный контакт
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Контактное лицо
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.emergencyContact}
-                    onChange={(e) => handleChange('emergencyContact', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    placeholder="Иванова Мария Ивановна"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Телефон экстренного контакта
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.emergencyPhone}
-                    onChange={(e) => handleChange('emergencyPhone', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    placeholder="+998 90 987 65 43"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Медицинская информация */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                Медицинская информация
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Группа крови
-                  </label>
-                  <div className="relative">
-                    <Heart className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" 
-                            style={{ color: 'var(--text-tertiary)' }} />
-                    <select
-                      value={formData.bloodType}
-                      onChange={(e) => handleChange('bloodType', e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        background: 'var(--bg-primary)', 
-                        color: 'var(--text-primary)',
-                        borderColor: 'var(--border-color)'
-                      }}
-                    >
-                      <option value="">Не указано</option>
-                      <option value="A+">A+</option>
-                      <option value="A-">A-</option>
-                      <option value="B+">B+</option>
-                      <option value="B-">B-</option>
-                      <option value="AB+">AB+</option>
-                      <option value="AB-">AB-</option>
-                      <option value="O+">O+</option>
-                      <option value="O-">O-</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Аллергии
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.allergies}
-                    onChange={(e) => handleChange('allergies', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-color)'
-                    }}
-                    placeholder="Пенициллин, пыльца"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Хронические заболевания
-                </label>
-                <input
-                  type="text"
-                  value={formData.chronicDiseases}
-                  onChange={(e) => handleChange('chronicDiseases', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border-color)'
-                  }}
-                  placeholder="Гипертония, диабет"
-                />
-              </div>
-            </div>
-
-            {/* Дополнительная информация */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
-                Дополнительная информация
-              </h3>
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Заметки
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => handleChange('notes', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border-color)'
-                  }}
-                  rows="3"
-                  placeholder="Дополнительная информация о пациенте..."
-                />
-              </div>
-            </div>
-
-            {/* Кнопки */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                disabled={isSubmitting || loading}
-                className="flex-1"
-                style={{ 
-                  background: 'var(--accent-color)',
-                  color: 'white'
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    Сохранение...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    {patient ? 'Сохранить изменения' : 'Добавить пациента'}
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Отмена
-              </Button>
-            </div>
-          </form>
+          </div>
         </div>
-      </Card>
-    </div>
+
+        {/* Контактная информация */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            Контактная информация
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Телефон */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Телефон *
+              </label>
+              <MacOSInput
+                type="tel"
+                value={formData.phone}
+                onChange={handlePhoneChange}
+                placeholder="+998 90 123 45 67"
+                error={errors.phone}
+                icon={Phone}
+              />
+              {errors.phone && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.phone}
+                </p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Email
+              </label>
+              <MacOSInput
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleChange('email', e.target.value)}
+                placeholder="ivan@example.com"
+                error={errors.email}
+                icon={Mail}
+              />
+              {errors.email && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.email}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Адрес */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
+            }}>
+              Адрес
+            </label>
+            <MacOSInput
+              type="text"
+              value={formData.address}
+              onChange={(e) => handleChange('address', e.target.value)}
+              placeholder="г. Ташкент, ул. Навои, д. 1"
+              icon={MapPin}
+            />
+          </div>
+        </div>
+
+        {/* Документы */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            Документы
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Паспорт */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Паспортные данные
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.passport}
+                onChange={(e) => handleChange('passport', e.target.value)}
+                placeholder="AA1234567"
+                error={errors.passport}
+                icon={IdCard}
+              />
+              {errors.passport && (
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-error)',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <AlertCircle style={{ width: '14px', height: '14px' }} />
+                  {errors.passport}
+                </p>
+              )}
+            </div>
+
+            {/* Страховой номер */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Страховой номер
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.insuranceNumber}
+                onChange={(e) => handleChange('insuranceNumber', e.target.value)}
+                placeholder="12345678901234"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Экстренный контакт */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            Экстренный контакт
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Контактное лицо
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.emergencyContact}
+                onChange={(e) => handleChange('emergencyContact', e.target.value)}
+                placeholder="Иванова Мария Ивановна"
+              />
+            </div>
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Телефон экстренного контакта
+              </label>
+              <MacOSInput
+                type="tel"
+                value={formData.emergencyPhone}
+                onChange={(e) => handleChange('emergencyPhone', e.target.value)}
+                placeholder="+998 90 987 65 43"
+                icon={Phone}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Медицинская информация */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            Медицинская информация
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Группа крови
+              </label>
+              <MacOSSelect
+                value={formData.bloodType}
+                onChange={(e) => handleChange('bloodType', e.target.value)}
+                options={[
+                  { value: '', label: 'Не указано' },
+                  { value: 'A+', label: 'A+' },
+                  { value: 'A-', label: 'A-' },
+                  { value: 'B+', label: 'B+' },
+                  { value: 'B-', label: 'B-' },
+                  { value: 'AB+', label: 'AB+' },
+                  { value: 'AB-', label: 'AB-' },
+                  { value: 'O+', label: 'O+' },
+                  { value: 'O-', label: 'O-' }
+                ]}
+                icon={Heart}
+              />
+            </div>
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
+              }}>
+                Аллергии
+              </label>
+              <MacOSInput
+                type="text"
+                value={formData.allergies}
+                onChange={(e) => handleChange('allergies', e.target.value)}
+                placeholder="Пенициллин, пыльца"
+              />
+            </div>
+          </div>
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
+            }}>
+              Хронические заболевания
+            </label>
+            <MacOSTextarea
+              value={formData.chronicDiseases}
+              onChange={(e) => handleChange('chronicDiseases', e.target.value)}
+              placeholder="Гипертония, диабет"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        {/* Дополнительная информация */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
+            Дополнительная информация
+          </h3>
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '8px'
+            }}>
+              Заметки
+            </label>
+            <MacOSTextarea
+              value={formData.notes}
+              onChange={(e) => handleChange('notes', e.target.value)}
+              placeholder="Дополнительная информация о пациенте..."
+              rows={3}
+            />
+          </div>
+        </div>
+
+        {/* Кнопки */}
+        <div style={{ display: 'flex', gap: '12px', paddingTop: '16px' }}>
+          <MacOSButton
+            type="submit"
+            disabled={isSubmitting || loading}
+            style={{ flex: 1 }}
+          >
+            {isSubmitting ? (
+              <>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid transparent',
+                  borderTop: '2px solid currentColor',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginRight: '8px'
+                }} />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Save style={{ width: '16px', height: '16px', marginRight: '8px' }} />
+                {patient ? 'Сохранить изменения' : 'Добавить пациента'}
+              </>
+            )}
+          </MacOSButton>
+          <MacOSButton
+            type="button"
+            variant="outline"
+
+            onClick={handleClose}
+            disabled={isSubmitting}
+            style={{ flex: 1 }}
+          >
+            Отмена
+          </MacOSButton>
+        </div>
+      </form>
+    </MacOSModal>
   );
 };
 

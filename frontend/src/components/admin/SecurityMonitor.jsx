@@ -20,7 +20,7 @@ import {
   TrendingUp,
   TrendingDown
 } from 'lucide-react';
-import { Card, Button, Badge } from '../ui/native';
+import { MacOSCard, MacOSButton, MacOSBadge, MacOSInput, MacOSSelect, MacOSTab } from '../ui/macos';
 
 const SecurityMonitor = ({ 
   data = {},
@@ -232,12 +232,12 @@ const SecurityMonitor = ({
 
   const getSeverityColor = (severity) => {
     const colorMap = {
-      critical: 'var(--danger-color)',
-      high: 'var(--warning-color)',
-      medium: 'var(--info-color)',
-      low: 'var(--success-color)'
+      critical: 'var(--mac-danger)',
+      high: 'var(--mac-warning)',
+      medium: 'var(--mac-info)',
+      low: 'var(--mac-success)'
     };
-    return colorMap[severity] || 'var(--text-secondary)';
+    return colorMap[severity] || 'var(--mac-text-secondary)';
   };
 
   const getSeverityLabel = (severity) => {
@@ -268,18 +268,18 @@ const SecurityMonitor = ({
 
   const getStatusColor = (status) => {
     const colorMap = {
-      success: 'var(--success-color)',
-      failed: 'var(--danger-color)',
-      blocked: 'var(--danger-color)',
-      monitoring: 'var(--info-color)',
-      investigating: 'var(--warning-color)',
-      quarantined: 'var(--warning-color)',
-      denied: 'var(--danger-color)',
-      active: 'var(--success-color)',
-      idle: 'var(--warning-color)',
-      expired: 'var(--text-tertiary)'
+      success: 'var(--mac-success)',
+      failed: 'var(--mac-danger)',
+      blocked: 'var(--mac-danger)',
+      monitoring: 'var(--mac-info)',
+      investigating: 'var(--mac-warning)',
+      quarantined: 'var(--mac-warning)',
+      denied: 'var(--mac-danger)',
+      active: 'var(--mac-success)',
+      idle: 'var(--mac-warning)',
+      expired: 'var(--mac-text-tertiary)'
     };
-    return colorMap[status] || 'var(--text-secondary)';
+    return colorMap[status] || 'var(--mac-text-secondary)';
   };
 
   const getStatusLabel = (status) => {
@@ -327,15 +327,30 @@ const SecurityMonitor = ({
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px' 
+        }}>
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="p-4">
-              <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            </Card>
+            <MacOSCard key={i} style={{ padding: '16px' }}>
+              <div style={{ 
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                backgroundColor: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-sm)',
+                height: '16px',
+                width: '75%',
+                marginBottom: '8px'
+              }}></div>
+              <div style={{ 
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                backgroundColor: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-sm)',
+                height: '32px',
+                width: '50%'
+              }}></div>
+            </MacOSCard>
           ))}
         </div>
       </div>
@@ -343,162 +358,302 @@ const SecurityMonitor = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Вкладки */}
-      <div className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-        <nav className="flex space-x-8">
+      <div style={{ display: 'flex', marginBottom: '24px' }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
                 style={{
-                  borderBottomColor: activeTab === tab.id ? 'var(--accent-color)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)'
-                }}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
+                padding: '12px 20px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)',
+                fontWeight: isActive ? 'var(--mac-font-weight-semibold)' : 'var(--mac-font-weight-normal)',
+                fontSize: 'var(--mac-font-size-sm)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                position: 'relative',
+                marginBottom: '-1px'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                }
+              }}
+            >
+              <Icon style={{ 
+                width: '16px', 
+                height: '16px',
+                color: isActive ? 'var(--mac-accent-blue)' : 'var(--mac-text-secondary)'
+              }} />
+              {tab.label}
+              {isActive && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '3px',
+                  backgroundColor: 'var(--mac-accent-blue)',
+                  borderRadius: '2px 2px 0 0'
+                }} />
+              )}
               </button>
             );
           })}
-        </nav>
       </div>
+      
+      {/* Разделительная линия */}
+      <div style={{ 
+        borderBottom: '1px solid var(--mac-border)',
+        marginBottom: '24px'
+      }} />
 
       {/* Обзор безопасности */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Статистика */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '16px' 
+          }}>
+            <MacOSCard style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Всего угроз</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{currentData.totalThreats}</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>Всего угроз</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-2xl)', 
+                    fontWeight: 'var(--mac-font-weight-bold)', 
+                    color: 'var(--mac-text-primary)',
+                    margin: '4px 0 0 0'
+                  }}>{currentData.totalThreats}</p>
                 </div>
-                <AlertTriangle className="w-8 h-8" style={{ color: 'var(--warning-color)' }} />
+                <AlertTriangle style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  color: 'var(--mac-warning)' 
+                }} />
               </div>
-            </Card>
+            </MacOSCard>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
+            <MacOSCard style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Критические</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--danger-color)' }}>{currentData.criticalThreats}</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>Критические</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-2xl)', 
+                    fontWeight: 'var(--mac-font-weight-bold)', 
+                    color: 'var(--mac-danger)',
+                    margin: '4px 0 0 0'
+                  }}>{currentData.criticalThreats}</p>
                 </div>
-                <XCircle className="w-8 h-8" style={{ color: 'var(--danger-color)' }} />
+                <XCircle style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  color: 'var(--mac-danger)' 
+                }} />
               </div>
-            </Card>
+            </MacOSCard>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
+            <MacOSCard style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Заблокированные IP</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{currentData.blockedIPs}</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>Заблокированные IP</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-2xl)', 
+                    fontWeight: 'var(--mac-font-weight-bold)', 
+                    color: 'var(--mac-text-primary)',
+                    margin: '4px 0 0 0'
+                  }}>{currentData.blockedIPs}</p>
                 </div>
-                <Globe className="w-8 h-8" style={{ color: 'var(--info-color)' }} />
+                <Globe style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  color: 'var(--mac-info)' 
+                }} />
               </div>
-            </Card>
+            </MacOSCard>
 
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
+            <MacOSCard style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Оценка безопасности</p>
-                  <p className="text-2xl font-bold" style={{ color: currentData.securityScore >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }}>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-sm)', 
+                    fontWeight: 'var(--mac-font-weight-medium)', 
+                    color: 'var(--mac-text-secondary)',
+                    margin: 0
+                  }}>Оценка безопасности</p>
+                  <p style={{ 
+                    fontSize: 'var(--mac-font-size-2xl)', 
+                    fontWeight: 'var(--mac-font-weight-bold)', 
+                    color: currentData.securityScore >= 80 ? 'var(--mac-success)' : 'var(--mac-warning)',
+                    margin: '4px 0 0 0'
+                  }}>
                     {currentData.securityScore}%
                   </p>
                 </div>
-                <Shield className="w-8 h-8" style={{ color: currentData.securityScore >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }} />
+                <Shield style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  color: currentData.securityScore >= 80 ? 'var(--mac-success)' : 'var(--mac-warning)' 
+                }} />
               </div>
-            </Card>
+            </MacOSCard>
           </div>
 
           {/* Последние угрозы */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '16px',
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Последние угрозы
             </h3>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {threats.slice(0, 5).map((threat) => {
                 const SeverityIcon = getSeverityIcon(threat.severity);
                 return (
-                  <div key={threat.id} className="flex items-center justify-between p-3 rounded-lg border" 
-                       style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                    <div className="flex items-center space-x-3">
-                      <SeverityIcon className="w-5 h-5" style={{ color: getSeverityColor(threat.severity) }} />
+                  <div key={threat.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '12px', 
+                    borderRadius: 'var(--mac-radius-md)', 
+                    border: '1px solid var(--mac-border)', 
+                    backgroundColor: 'var(--mac-bg-secondary)' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <SeverityIcon style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        color: getSeverityColor(threat.severity) 
+                      }} />
                       <div>
-                        <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{threat.type}</p>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{threat.description}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        <p style={{ 
+                          fontWeight: 'var(--mac-font-weight-medium)', 
+                          color: 'var(--mac-text-primary)',
+                          margin: 0
+                        }}>{threat.type}</p>
+                        <p style={{ 
+                          fontSize: 'var(--mac-font-size-sm)', 
+                          color: 'var(--mac-text-secondary)',
+                          margin: '4px 0 0 0'
+                        }}>{threat.description}</p>
+                        <p style={{ 
+                          fontSize: 'var(--mac-font-size-xs)', 
+                          color: 'var(--mac-text-tertiary)',
+                          margin: '4px 0 0 0'
+                        }}>
                           {threat.source} • {getTimeAgo(threat.timestamp)}
                         </p>
                       </div>
                     </div>
-                    <Badge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
+                    <MacOSBadge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
                       {getSeverityLabel(threat.severity)}
-                    </Badge>
+                    </MacOSBadge>
                   </div>
                 );
               })}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
       )}
 
       {/* Угрозы */}
       {activeTab === 'threats' && (
-        <div className="space-y-6">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
                 Угрозы безопасности
               </h3>
-              <Button onClick={onRefresh}>
-                <RefreshCw className="w-4 h-4 mr-2" />
+              <MacOSButton onClick={onRefresh}>
+                <RefreshCw style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                 Обновить
-              </Button>
+              </MacOSButton>
             </div>
             
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {threats.map((threat) => {
                 const SeverityIcon = getSeverityIcon(threat.severity);
                 const StatusIcon = getStatusIcon(threat.status);
                 return (
-                  <div key={threat.id} className="p-4 rounded-lg border" 
-                       style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
-                        <SeverityIcon className="w-6 h-6 mt-1" style={{ color: getSeverityColor(threat.severity) }} />
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h4 className="font-medium" style={{ color: 'var(--text-primary)' }}>{threat.type}</h4>
-                            <Badge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
+                  <div key={threat.id} style={{ 
+                    padding: '16px', 
+                    borderRadius: 'var(--mac-radius-md)', 
+                    border: '1px solid var(--mac-border)', 
+                    backgroundColor: 'var(--mac-bg-secondary)' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                        <SeverityIcon style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          marginTop: '4px', 
+                          color: getSeverityColor(threat.severity) 
+                        }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                            <h4 style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>{threat.type}</h4>
+                            <MacOSBadge variant={threat.severity === 'critical' ? 'error' : threat.severity === 'high' ? 'warning' : 'info'}>
                               {getSeverityLabel(threat.severity)}
-                            </Badge>
-                            <Badge variant={threat.status === 'blocked' ? 'success' : 'warning'}>
+                            </MacOSBadge>
+                            <MacOSBadge variant={threat.status === 'blocked' ? 'success' : 'warning'}>
                               {getStatusLabel(threat.status)}
-                            </Badge>
+                            </MacOSBadge>
                           </div>
-                          <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>{threat.description}</p>
-                          <div className="text-xs space-y-1" style={{ color: 'var(--text-tertiary)' }}>
+                          <p style={{ fontSize: 'var(--mac-font-size-sm)', marginBottom: '8px', color: 'var(--mac-text-secondary)', margin: '0 0 8px 0' }}>{threat.description}</p>
+                          <div style={{ fontSize: 'var(--mac-font-size-xs)', display: 'flex', flexDirection: 'column', gap: '4px', color: 'var(--mac-text-tertiary)' }}>
                             <p>Источник: {threat.source}</p>
                             <p>Цель: {threat.target}</p>
                             <p>Время: {formatDateTime(threat.timestamp)}</p>
                           </div>
                           {threat.actions && threat.actions.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Действия:</p>
-                              <div className="flex flex-wrap gap-1">
+                            <div style={{ marginTop: '8px' }}>
+                              <p style={{ fontSize: 'var(--mac-font-size-xs)', fontWeight: 'var(--mac-font-weight-medium)', marginBottom: '4px', color: 'var(--mac-text-secondary)', margin: '0 0 4px 0' }}>Действия:</p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                 {threat.actions.map((action, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs">
+                                  <MacOSBadge key={index} variant="secondary" style={{ fontSize: '12px' }}>
                                     {action}
-                                  </Badge>
+                                  </MacOSBadge>
                                 ))}
                               </div>
                             </div>
@@ -510,151 +665,208 @@ const SecurityMonitor = ({
                 );
               })}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
       )}
 
       {/* Логи безопасности */}
       {activeTab === 'logs' && (
-        <div className="space-y-6">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <MacOSCard style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ 
+                fontSize: 'var(--mac-font-size-lg)', 
+                fontWeight: 'var(--mac-font-weight-semibold)', 
+                color: 'var(--mac-text-primary)',
+                margin: 0
+              }}>
                 Логи безопасности
               </h3>
-              <div className="flex items-center space-x-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                  <input
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search style={{ 
+                    position: 'absolute', 
+                    left: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    width: '16px', 
+                    height: '16px', 
+                    color: 'var(--mac-text-tertiary)' 
+                  }} />
+                  <MacOSInput
                     type="text"
                     placeholder="Поиск в логах..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-64 pl-10 pr-3 py-2 rounded-lg border text-sm"
                     style={{ 
-                      border: '1px solid var(--border-color)', 
-                      background: 'var(--bg-primary)', 
-                      color: 'var(--text-primary)' 
+                      width: '256px',
+                      paddingLeft: '40px',
+                      paddingRight: '12px',
+                      paddingTop: '8px',
+                      paddingBottom: '8px'
                     }}
                   />
                 </div>
-                <select
+                <MacOSSelect
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-2 rounded-lg border text-sm"
+                  options={[
+                    { value: '', label: 'Все статусы' },
+                    { value: 'success', label: 'Успешно' },
+                    { value: 'failed', label: 'Ошибка' },
+                    { value: 'denied', label: 'Отклонено' }
+                  ]}
                   style={{ 
-                    border: '1px solid var(--border-color)', 
-                    background: 'var(--bg-primary)', 
-                    color: 'var(--text-primary)' 
+                    padding: '8px 12px',
+                    minWidth: '120px'
                   }}
-                >
-                  <option value="">Все статусы</option>
-                  <option value="success">Успешно</option>
-                  <option value="failed">Ошибка</option>
-                  <option value="denied">Отклонено</option>
-                </select>
+                />
               </div>
             </div>
             
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {logs.map((log) => {
                 const StatusIcon = getStatusIcon(log.status);
                 return (
-                  <div key={log.id} className="flex items-center justify-between p-3 rounded-lg border" 
-                       style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                    <div className="flex items-center space-x-3">
-                      <StatusIcon className="w-5 h-5" style={{ color: getStatusColor(log.status) }} />
+                  <div key={log.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '12px', 
+                    borderRadius: 'var(--mac-radius-md)', 
+                    border: '1px solid var(--mac-border)', 
+                    backgroundColor: 'var(--mac-bg-secondary)' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <StatusIcon style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        color: getStatusColor(log.status) 
+                      }} />
                       <div>
-                        <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{log.action}</p>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{log.details}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>{log.action}</p>
+                        <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>{log.details}</p>
+                        <p style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', margin: '4px 0 0 0' }}>
                           {log.user} • {log.ip} • {getTimeAgo(log.timestamp)}
                         </p>
                       </div>
                     </div>
-                    <Badge variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}>
+                    <MacOSBadge variant={log.status === 'success' ? 'success' : log.status === 'failed' ? 'error' : 'warning'}>
                       {getStatusLabel(log.status)}
-                    </Badge>
+                    </MacOSBadge>
                   </div>
                 );
               })}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
       )}
 
       {/* Активные сессии */}
       {activeTab === 'sessions' && (
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '16px',
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Активные сессии
             </h3>
             
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {sessions.map((session) => {
                 const StatusIcon = getStatusIcon(session.status);
                 return (
-                  <div key={session.id} className="flex items-center justify-between p-4 rounded-lg border" 
-                       style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center" 
-                           style={{ background: 'var(--accent-color)' }}>
-                        <User className="w-5 h-5 text-white" />
+                  <div key={session.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '16px', 
+                    borderRadius: 'var(--mac-radius-md)', 
+                    border: '1px solid var(--mac-border)', 
+                    backgroundColor: 'var(--mac-bg-secondary)' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ 
+                        width: '40px', 
+                        height: '40px', 
+                        borderRadius: '50%', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        background: 'var(--mac-accent-blue)' 
+                      }}>
+                        <User style={{ width: '20px', height: '20px', color: 'white' }} />
                       </div>
                       <div>
-                        <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>
                           {session.user}
                           {session.isCurrent && (
-                            <Badge variant="success" className="ml-2">Текущая</Badge>
+                            <MacOSBadge variant="success" style={{ marginLeft: '8px' }}>Текущая</MacOSBadge>
                           )}
                         </p>
-                        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>
                           {session.device} • {session.location}
                         </p>
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        <p style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', margin: '4px 0 0 0' }}>
                           IP: {session.ip} • Последняя активность: {getTimeAgo(session.lastActivity)}
                         </p>
                       </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={session.status === 'active' ? 'success' : session.status === 'idle' ? 'warning' : 'secondary'}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MacOSBadge variant={session.status === 'active' ? 'success' : session.status === 'idle' ? 'warning' : 'secondary'}>
                         {getStatusLabel(session.status)}
-                      </Badge>
+                      </MacOSBadge>
                       {!session.isCurrent && (
-                        <Button variant="outline" size="sm">
-                          <XCircle className="w-4 h-4 mr-1" />
+                        <MacOSButton variant="outline" size="sm">
+                          <XCircle style={{ width: '16px', height: '16px', marginRight: '4px' }} />
                           Завершить
-                        </Button>
+                        </MacOSButton>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
       )}
 
       {/* Заблокированные IP */}
       {activeTab === 'blocked' && (
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <MacOSCard style={{ padding: '24px' }}>
+            <h3 style={{ 
+              fontSize: 'var(--mac-font-size-lg)', 
+              fontWeight: 'var(--mac-font-weight-semibold)', 
+              marginBottom: '16px',
+              color: 'var(--mac-text-primary)',
+              margin: 0
+            }}>
               Заблокированные IP адреса
             </h3>
             
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {blockedIPs.map((blocked) => (
-                <div key={blocked.id} className="flex items-center justify-between p-4 rounded-lg border" 
-                     style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}>
-                  <div className="flex items-center space-x-4">
-                    <Globe className="w-6 h-6" style={{ color: 'var(--danger-color)' }} />
+                <div key={blocked.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  padding: '16px', 
+                  borderRadius: 'var(--mac-radius-md)', 
+                  border: '1px solid var(--mac-border)', 
+                  backgroundColor: 'var(--mac-bg-secondary)' 
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <Globe style={{ width: '24px', height: '24px', color: 'var(--mac-danger)' }} />
                     <div>
-                      <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{blocked.ip}</p>
-                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{blocked.reason}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      <p style={{ fontWeight: 'var(--mac-font-weight-medium)', color: 'var(--mac-text-primary)', margin: 0 }}>{blocked.ip}</p>
+                      <p style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-text-secondary)', margin: '4px 0 0 0' }}>{blocked.reason}</p>
+                      <p style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)', margin: '4px 0 0 0' }}>
                         Заблокирован: {formatDateTime(blocked.blockedAt)} • 
                         Попыток: {blocked.attempts} • 
                         Истекает: {formatDateTime(blocked.expiresAt)}
@@ -662,19 +874,19 @@ const SecurityMonitor = ({
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={blocked.status === 'active' ? 'error' : 'secondary'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MacOSBadge variant={blocked.status === 'active' ? 'error' : 'secondary'}>
                       {blocked.status === 'active' ? 'Активен' : 'Истек'}
-                    </Badge>
-                    <Button variant="outline" size="sm">
-                      <Eye className="w-4 h-4 mr-1" />
+                    </MacOSBadge>
+                    <MacOSButton variant="outline" size="sm">
+                      <Eye style={{ width: '16px', height: '16px', marginRight: '4px' }} />
                       Подробнее
-                    </Button>
+                    </MacOSButton>
                   </div>
                 </div>
               ))}
             </div>
-          </Card>
+          </MacOSCard>
         </div>
       )}
     </div>

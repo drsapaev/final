@@ -1,48 +1,25 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import PhoneInput from '../components/ui/PhoneInput';
 import { ToastContainer, toast } from 'react-toastify';
-// import ServiceChecklist from '../components/ServiceChecklist';
-import IntegratedServiceSelector from '../components/registrar/IntegratedServiceSelector';
-import IntegratedDoctorSelector from '../components/registrar/IntegratedDoctorSelector';
-// OnlineQueueManager удален - используется ModernQueueManager
-import AppointmentFlow from '../components/AppointmentFlow';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
 import AppointmentContextMenu from '../components/tables/AppointmentContextMenu';
 import ModernTabs from '../components/navigation/ModernTabs';
-import ResponsiveNavigation from '../components/layout/ResponsiveNavigation';
-import { Button, Card, Badge, Skeleton, AnimatedTransition, AnimatedToast, AnimatedLoader } from '../components/ui';
-import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
+import { Button, Card, CardHeader, CardContent, Badge, Icon, Input } from '../components/ui/macos';
+import { AnimatedTransition, AnimatedLoader } from '../components/ui';
+import { useBreakpoint } from '../hooks/useEnhancedMediaQuery';
 import { useTheme } from '../contexts/ThemeContext';
-import PrintButton from '../components/print/PrintButton';
-import { 
-  Hospital, 
-  Calendar, 
-  Search, 
-  MessageCircle, 
-  HelpCircle, 
-  Plus, 
-  Download, 
-  Sun, 
-  Moon, 
-  LogOut,
-  Home,
-  FileText,
-  Heart,
-  Activity,
-  User,
-  TestTube,
-  Syringe,
-  Settings,
-  Globe,
-  Printer,
-  X,
-  CreditCard
-} from 'lucide-react';
 import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
+
+const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const logger = {
+  info: () => { },
+  warn: () => { },
+  error: () => { },
+};
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -54,44 +31,49 @@ import PrintDialog from '../components/dialogs/PrintDialog';
 import AppointmentWizardV2 from '../components/wizard/AppointmentWizardV2';
 import PaymentManager from '../components/payment/PaymentManager';
 
-// Современные фильтры
-import ModernFilters from '../components/filters/ModernFilters';
-
 // Современная очередь
 import ModernQueueManager from '../components/queue/ModernQueueManager';
 
 // Современная статистика
 import ModernStatistics from '../components/statistics/ModernStatistics';
- 
+
+// Модальное окно редактирования пациента
+// ✨ ЗАКОММЕНТИРОВАНО: Теперь используется AppointmentWizardV2 для редактирования
+// import EditPatientModal from '../components/common/EditPatientModal';
+
+// Утилиты для работы с датами
+import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
+
+// API client
+import { api } from '../api/client';
+
 
 const RegistrarPanel = () => {
-  console.log('🔄 RegistrarPanel component rendered at:', new Date().toISOString());
+  // Рендер компонента (debug отключен)
   // Адаптивные хуки
-  const { isMobile, isTablet, isDesktop } = useBreakpoint();
-  const isTouch = useTouchDevice();
+  const { isMobile, isTablet } = useBreakpoint();
 
   // Основные состояния
   const [activeTab, setActiveTab] = useState(null);
-  const [searchParams] = useSearchParams();
-  const todayStr = new Date().toISOString().split('T')[0];
-  
-  // Параметры поиска и фильтрации
-  const searchDate = searchParams.get('date');
-  const searchQuery = (searchParams.get('q') || '').toLowerCase();
-  const statusFilter = searchParams.get('status');
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = useMemo(() => (searchParams.get('q') || '').toLowerCase(), [searchParams]);
+  const statusFilter = useMemo(() => searchParams.get('status'), [searchParams]);
+  const todayStr = getLocalDateString();
+
+  // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: состояние для хранения отделений из БД
+  const [dynamicDepartments, setDynamicDepartments] = useState([]);
+
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
-  const [printInProgress, setPrintInProgress] = useState(false);
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
-  
+
   const [contextMenu, setContextMenu] = useState({ open: false, row: null, position: { x: 0, y: 0 } });
-  
+
   // Состояния для пагинации
   const [paginationInfo, setPaginationInfo] = useState({ total: 0, hasMore: false, loadingMore: false });
   // Демо-данные вынесены в константу
-  const DEMO_APPOINTMENTS = [
+  const demoAppointments = useMemo(() => ([
     {
       id: 1,
       patient_fio: 'Иванов Иван Иванович',
@@ -351,47 +333,41 @@ const RegistrarPanel = () => {
       confirmed_at: null,
       confirmed_by: null
     }
-  ];
+  ]), [todayStr]);
 
   // Состояния для управления данными
   const [appointments, setAppointments] = useState([]);
   const [dataSource, setDataSource] = useState('loading'); // 'loading' | 'api' | 'demo' | 'error'
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
-  const [showAddressColumn, setShowAddressColumn] = useState(true);
+  const appointmentsCount = appointments.length;
   // ✅ Используется только новый мастер (V2)
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardEditMode, setWizardEditMode] = useState(false);      // ✨ НОВОЕ: Режим редактирования
+  const [wizardInitialData, setWizardInitialData] = useState(null); // ✨ НОВОЕ: Данные для редактирования
   const [showPaymentManager, setShowPaymentManager] = useState(false); // Для модуля оплаты
   const [isProcessing, setIsProcessing] = useState(false); // Состояние обработки
-  const [patientSuggestions, setPatientSuggestions] = useState([]);
-  const [showPatientSuggestions, setShowPatientSuggestions] = useState(false);
-  const [patientErrors, setPatientErrors] = useState({});
-  
-  // Refs для фокуса в мастере
-  const fioRef = useRef(null);
-  const dobRef = useRef(null);
-  const phoneRef = useRef(null);
-  
+
+
   // Отладка состояния мастера удалена - используется AppointmentWizard
 
   // Отладка состояния загрузки
   useEffect(() => {
-    console.log('⏳ appointmentsLoading changed:', appointmentsLoading);
+    // logger.info('⏳ appointmentsLoading changed:', appointmentsLoading);
   }, [appointmentsLoading]);
 
   // Отладка изменений appointments
   useEffect(() => {
-    console.log('📋 appointments changed, count:', appointments.length);
-    if (appointments.length > 0) {
-      console.log('📋 Первая запись в состоянии:', appointments[0]);
-    }
+    // logger.info('📋 appointments changed, count:', appointments.length);
+    // if (appointments.length > 0) {
+    //   logger.info('📋 Первая запись в состоянии:', appointments[0]);
+    // }
 
-    // Тестируем агрегацию пациентов при изменении данных
-    if (appointments.length > 0) {
+    // Тестируем агрегацию пациентов при изменении данных (debug отключен)
+    /*if (appointments.length > 0) {
       setTimeout(() => {
-        console.log('🧪 Тестирование агрегации пациентов:');
-        console.log('Исходные записи:', appointments.length);
+        logger.info('🧪 Тестирование агрегации пациентов:');
+        logger.info('Исходные записи:', appointments.length);
 
         // Простая функция агрегации для тестирования
         const patientGroups = {};
@@ -424,47 +400,35 @@ const RegistrarPanel = () => {
         });
 
         const aggregated = Object.values(patientGroups);
-        console.log('После агрегации:', aggregated.length);
+        logger.info('После агрегации:', aggregated.length);
 
         // Находим первого пациента для тестирования
         const firstPatient = aggregated[0];
         if (firstPatient) {
-          console.log('Первый пациент после агрегации:', firstPatient.patient_fio);
-          console.log('Количество услуг:', firstPatient.services.length);
-          console.log('Услуги:', firstPatient.services);
-          console.log('Отделения:', Array.from(firstPatient.departments));
-          console.log('Общая стоимость:', firstPatient.cost);
+          logger.info('Первый пациент после агрегации:', firstPatient.patient_fio);
+          logger.info('Количество услуг:', firstPatient.services.length);
+          logger.info('Услуги:', firstPatient.services);
+          logger.info('Отделения:', Array.from(firstPatient.departments));
+          logger.info('Общая стоимость:', firstPatient.cost);
         }
       }, 100);
-    }
+    }*/
   }, [appointments]);
 
   // Убираем дублирование - filteredAppointments уже определена ниже в коде
   const [showSlotsModal, setShowSlotsModal] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [showAppointmentFlow, setShowAppointmentFlow] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const autoRefresh = true;
 
-  // Фиксированный хедер убран - теперь используется глобальный хедер
-  
-  // Состояние для выбранного пациента в новом мастере
-  const [selectedPatientId, setSelectedPatientId] = useState(null);
-  
   // Новые состояния для интеграции с админ панелью
   const [doctors, setDoctors] = useState([]);
   const [services, setServices] = useState({});
-  const [queueSettings, setQueueSettings] = useState({});
   const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [selectedServices, setSelectedServices] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [historyDate, setHistoryDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  // Язык (тема теперь централизована)
-  const [language, setLanguage] = useState(() => localStorage.getItem('ui_lang') || 'ru');
-  
-  useEffect(() => { localStorage.setItem('ui_lang', language); }, [language]);
+  const [historyDate, setHistoryDate] = useState(getLocalDateString());
+  const [tempDateInput, setTempDateInput] = useState(getLocalDateString());
+
+  const language = useMemo(() => localStorage.getItem('ui_lang') || 'ru', []);
 
   // Инициализация selectedDoctor первым доступным врачом
   useEffect(() => {
@@ -484,7 +448,7 @@ const RegistrarPanel = () => {
       error: 'Ошибка',
       success: 'Успешно',
       warning: 'Предупреждение',
-      
+
       // Вкладки
       tabs_welcome: 'Главная',
       tabs_appointments: 'Все записи',
@@ -495,7 +459,7 @@ const RegistrarPanel = () => {
       tabs_lab: 'Лаборатория',
       tabs_procedures: 'Процедуры',
       tabs_queue: 'Онлайн-очередь',
-      
+
       // Действия
       new_appointment: 'Новая запись',
       export_csv: 'Экспорт CSV',
@@ -509,7 +473,7 @@ const RegistrarPanel = () => {
       search: 'Поиск',
       filter: 'Фильтр',
       clear_filter: 'Очистить фильтр',
-      
+
       // Мастер
       patient: 'Пациент',
       details: 'Детали',
@@ -524,7 +488,7 @@ const RegistrarPanel = () => {
       tomorrow: 'Завтра',
       select_date: 'Выбрать дату',
       online_payment: 'Онлайн оплата',
-      
+
       // Поля формы
       full_name: 'ФИО',
       birth_date: 'Дата рождения',
@@ -535,7 +499,7 @@ const RegistrarPanel = () => {
       appointment_type: 'Тип обращения',
       payment_method: 'Способ оплаты',
       amount: 'Сумма',
-      
+
       // Статусы
       status_scheduled: 'Запланирован',
       status_confirmed: 'Подтвержден',
@@ -546,14 +510,14 @@ const RegistrarPanel = () => {
       status_no_show: 'Неявка',
       status_paid_pending: 'Ожидает оплаты',
       status_paid: 'Оплачен',
-      
+
       // Статистика
       total_patients: 'Всего пациентов',
       today_appointments: 'Записей сегодня',
       pending_payments: 'Ожидают оплаты',
       active_queues: 'Активные очереди',
       empty_table: 'Нет данных для отображения',
-      
+
       // Сообщения
       appointment_created: 'Запись создана успешно',
       appointment_cancelled: 'Запись отменена',
@@ -572,7 +536,7 @@ const RegistrarPanel = () => {
       error: 'Xatolik',
       success: 'Muvaffaqiyatli',
       warning: 'Ogohlantirish',
-      
+
       // Вкладки
       tabs_welcome: 'Asosiy',
       tabs_appointments: 'yozilganlar',
@@ -583,7 +547,7 @@ const RegistrarPanel = () => {
       tabs_lab: 'Laboratoriya',
       tabs_procedures: 'muolaja',
       tabs_queue: 'navbat',
-      
+
       // Действия
       new_appointment: 'Yangi yozuv',
       export_csv: 'CSV eksport',
@@ -597,7 +561,7 @@ const RegistrarPanel = () => {
       search: 'Qidirish',
       filter: 'Filter',
       clear_filter: 'Filterni tozalash',
-      
+
       // Мастер
       patient: 'Bemor',
       details: 'Tafsilotlar',
@@ -612,7 +576,7 @@ const RegistrarPanel = () => {
       tomorrow: 'Ertaga',
       select_date: 'Sanani tanlash',
       online_payment: 'Onlayn to\'lov',
-      
+
       // Поля формы
       full_name: 'F.I.Sh',
       birth_date: 'Tug\'ilgan sana',
@@ -623,7 +587,7 @@ const RegistrarPanel = () => {
       appointment_type: 'Murojaat turi',
       payment_method: 'To\'lov usuli',
       amount: 'Summa',
-      
+
       // Статусы
       status_scheduled: 'Rejalashtirilgan',
       status_confirmed: 'Tasdiqlangan',
@@ -634,14 +598,14 @@ const RegistrarPanel = () => {
       status_no_show: 'Kelmagan',
       status_paid_pending: 'To\'lovni kutmoqda',
       status_paid: 'To\'langan',
-      
+
       // Статистика
       total_patients: 'Jami bemorlar',
       today_appointments: 'Bugungi yozuvlar',
       pending_payments: 'To\'lovni kutmoqda',
       active_queues: 'Faol navbatlar',
       empty_table: 'Ma\'lumot yo\'q',
-      
+
       // Сообщения
       appointment_created: 'Yozuv muvaffaqiyatli yaratildi',
       appointment_cancelled: 'Yozuv bekor qilindi',
@@ -655,10 +619,12 @@ const RegistrarPanel = () => {
   const t = (key) => (translations[language] && translations[language][key]) || translations.ru[key] || key;
 
   // Используем централизованную тему
-  const { 
+  const {
     theme,
-    isDark, 
-    isLight
+    isDark,
+    getSpacing,
+    getFontSize,
+    getColor
   } = useTheme();
 
   // Адаптивные цвета из централизованной системы темизации
@@ -666,9 +632,6 @@ const RegistrarPanel = () => {
   const textColor = isDark ? 'var(--color-text-primary)' : 'var(--color-text-primary)';
   const borderColor = isDark ? 'var(--color-border-medium)' : 'var(--color-border-light)';
   const accentColor = 'var(--color-primary-500)';
-  const successColor = 'var(--color-success)';
-  const warningColor = 'var(--color-warning)';
-  const dangerColor = 'var(--color-danger)';
 
   // Используем централизованную типографику и отступы
   // Используем CSS переменные вместо getSpacing и getColor
@@ -677,54 +640,20 @@ const RegistrarPanel = () => {
     padding: '0',
     maxWidth: 'none',
     margin: '0',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    fontSize: isMobile ? '14px' : isTablet ? '16px' : '18px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+    fontSize: isMobile ? 'var(--mac-font-size-sm)' : isTablet ? 'var(--mac-font-size-base)' : 'var(--mac-font-size-lg)',
     fontWeight: 400,
     lineHeight: 1.5,
-    background: theme === 'light' 
-      ? 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
-      : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+    background: 'var(--mac-gradient-window)',
+    color: 'var(--mac-text-primary)',
     minHeight: '100vh',
-    position: 'relative'
-  };
-
-  const cardStyle = {
-    background: theme === 'light' 
-      ? 'rgba(255, 255, 255, 0.95)' 
-      : 'rgba(15, 23, 42, 0.8)',
-    backdropFilter: 'blur(20px)',
-    color: textColor,
-    border: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderRadius: '20px',
-    margin: '0 20px 20px 20px',
-    boxShadow: theme === 'light' 
-      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-    overflow: 'hidden',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-  };
-
-  const cardHeaderStyle = {
-    padding: '32px',
-    borderBottom: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'}`,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 50%, var(--color-primary-700) 100%)',
-    color: 'white',
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
     position: 'relative',
-    overflow: 'hidden'
-  };
-
-  const cardContentStyle = {
-    padding: '20px',
-    color: textColor
+    transition: 'background var(--mac-duration-normal) var(--mac-ease)'
   };
 
   // Контейнер таблицы, визуально "сливается" с вкладками
   const tableContainerStyle = {
-    background: theme === 'light' 
+    background: theme === 'light'
       ? 'rgba(255, 255, 255, 0.98)'
       : 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(20px)',
@@ -735,7 +664,7 @@ const RegistrarPanel = () => {
     borderTop: `1px solid ${theme === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)'}`,
     borderRadius: '0 0 20px 20px',
     margin: '0 20px 20px 20px',
-    boxShadow: theme === 'light' 
+    boxShadow: theme === 'light'
       ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
       : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
     overflow: 'hidden'
@@ -779,93 +708,23 @@ const RegistrarPanel = () => {
     transition: 'all 0.2s ease',
     boxShadow: 'none',
   };
-  
 
-  const buttonSuccessStyle = {
-    ...buttonStyle,
-    background: `linear-gradient(135deg, ${'var(--color-success)'} 0%, ${'var(--color-success)'} 100%)`,
-    boxShadow: '0 4px 14px 0 rgba(34, 197, 94, 0.3)'
-  };
-
-  const buttonDangerStyle = {
-    ...buttonStyle,
-    background: `linear-gradient(135deg, ${'var(--color-danger)'} 0%, ${'var(--color-danger)'} 100%)`,
-    boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.3)'
-  };
-
-  const buttonWarningStyle = {
-    ...buttonStyle,
-    background: `linear-gradient(135deg, ${'var(--color-warning)'} 0%, ${'var(--color-warning)'} 100%)`,
-    color: '#212529',
-    boxShadow: '0 4px 14px 0 rgba(245, 158, 11, 0.3)'
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '14px',
-    marginBottom: '16px',
-    transition: 'border-color 0.2s'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: '8px',
-    fontWeight: '500',
-    fontSize: '14px'
-  };
-
-  const tabStyle = {
-    padding: isMobile ? `${'0.25rem'} ${'0.5rem'}` : `${'0.5rem'} ${'2rem'}`,
-    border: 'none',
-    background: 'transparent',
-    cursor: 'pointer',
-    fontSize: isMobile ? '12px' : '14px',
-    fontWeight: '500',
-    lineHeight: '1.25',
-    color: textColor,
-    borderRadius: isMobile ? '8px' : '12px',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    position: 'relative',
-    overflow: 'hidden',
-    minWidth: isMobile ? 'auto' : '120px',
-    justifyContent: isMobile ? 'center' : 'flex-start',
-    whiteSpace: 'nowrap',
-    display: 'flex',
-    alignItems: 'center',
-    gap: isMobile ? '4px' : '0.25rem',
-    borderBottom: '3px solid transparent'
-  };
-
-  const activeTabStyle = {
-    ...tabStyle,
-    background: `linear-gradient(135deg, ${'var(--color-primary-500)'} 0%, ${'var(--color-primary-600)'} 100%)`,
-    color: 'white',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    transform: 'translateY(-2px)',
-    borderBottom: `3px solid ${'var(--color-primary-700)'}`
-  };
-
-  // Базовый URL API
-    const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
 
   // Загрузка данных из админ панели
   const loadIntegratedData = useCallback(async () => {
-    console.log('🔧 loadIntegratedData called at:', new Date().toISOString());
+    logger.info('🔧 loadIntegratedData called at:', new Date().toISOString());
     try {
       // УБИРАЕМ setAppointmentsLoading(true) - это не должно влиять на загрузку записей
       // setAppointmentsLoading(true);
-      
+
       // Сначала устанавливаем fallback данные для врачей и услуг
-      // console.debug('Setting fallback doctors and services data');
+      // logger.info('Setting fallback doctors and services data');
       setDoctors([
         { id: 1, specialty: 'cardiology', user: { full_name: 'Доктор Кардиолог' }, cabinet: '101', price_default: 50000 },
         { id: 2, specialty: 'dermatology', user: { full_name: 'Доктор Дерматолог' }, cabinet: '102', price_default: 45000 },
         { id: 3, specialty: 'stomatology', user: { full_name: 'Доктор Стоматолог' }, cabinet: '103', price_default: 60000 }
       ]);
-      
+
       setServices({
         laboratory: [
           { id: 1, name: 'Общий анализ крови', price: 15000, specialty: 'laboratory', group: 'laboratory' },
@@ -904,117 +763,109 @@ const RegistrarPanel = () => {
           { id: 24, name: 'Ингаляция', price: 15000, specialty: 'procedures', group: 'procedures' }
         ]
       });
-      
+
       // Загружаем врачей, услуги и настройки очередей из админ панели
       try {
-      const token = localStorage.getItem('auth_token');
-      console.log('🔍 RegistrarPanel: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
+        const token = localStorage.getItem('auth_token');
+        logger.info('🔍 RegistrarPanel: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
 
-      // Загружаем данные последовательно, чтобы избежать проблем с Promise.all
-      let doctorsRes, servicesRes, queueRes;
+        // Загружаем данные последовательно, чтобы избежать проблем с Promise.all
+        let doctorsRes, servicesRes, queueRes;
 
-      try {
-        console.log('🔍 Загружаем врачей с токеном:', token ? `${token.substring(0, 30)}...` : 'null');
-        doctorsRes = await fetch(`${API_BASE}/api/v1/registrar/doctors`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        console.log('📊 Ответ врачей:', doctorsRes.status, doctorsRes.statusText);
-      } catch (error) {
-        console.error('❌ Ошибка загрузки врачей:', error.message);
-        doctorsRes = { ok: false };
-      }
-
-      try {
-        console.log('🔍 Загружаем услуги...');
-        servicesRes = await fetch(`${API_BASE}/api/v1/registrar/services`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        console.log('📊 Ответ услуг:', servicesRes.status, servicesRes.statusText);
-      } catch (error) {
-        console.error('❌ Ошибка загрузки услуг:', error.message);
-        servicesRes = { ok: false };
-      }
-
-      try {
-        console.log('🔍 Загружаем настройки очереди...');
-        queueRes = await fetch(`${API_BASE}/api/v1/registrar/queue-settings`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        console.log('📊 Ответ настроек очереди:', queueRes.status, queueRes.statusText);
-      } catch (error) {
-        console.error('❌ Ошибка загрузки настроек очереди:', error.message);
-        queueRes = { ok: false };
-      }
-
-      console.log('🔄 Обрабатываем ответы API...');
-
-      // Проверяем, что все ответы успешны
-      const allSuccess = doctorsRes.ok && servicesRes.ok && queueRes.ok;
-      console.log('📊 Статус ответов:', {
-        doctors: doctorsRes.ok ? 'OK' : 'ERROR',
-        services: servicesRes.ok ? 'OK' : 'ERROR',
-        queueSettings: queueRes.ok ? 'OK' : 'ERROR',
-        allSuccess
-      });
-
-      if (!allSuccess) {
-        console.warn('⚠️ Некоторые API недоступны, но продолжаем работу');
-      }
-
-      if (doctorsRes.ok) {
         try {
-        const doctorsData = await doctorsRes.json();
-        const apiDoctors = doctorsData.doctors || [];
-          console.log('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
-          // Если API вернул данные — используем их
-        if (apiDoctors.length > 0) {
-          setDoctors(apiDoctors);
-            console.log('✅ Врачи обновлены из API');
+          logger.info('🔍 Загружаем врачей с токеном:', token ? `${token.substring(0, 30)}...` : 'null');
+          doctorsRes = await api.get('/registrar/doctors');
+          logger.info('📊 Ответ врачей: OK');
+        } catch (error) {
+          logger.error('❌ Ошибка загрузки врачей:', error.message);
+          doctorsRes = { ok: false };
+        }
+
+        try {
+          logger.info('🔍 Загружаем услуги...');
+          servicesRes = await api.get('/registrar/services');
+          logger.info('📊 Ответ услуг: OK');
+        } catch (error) {
+          logger.error('❌ Ошибка загрузки услуг:', error.message);
+          servicesRes = { ok: false };
+        }
+
+        try {
+          logger.info('🔍 Загружаем настройки очереди...');
+          queueRes = await api.get('/registrar/queue-settings');
+          logger.info('📊 Ответ настроек очереди: OK');
+        } catch (error) {
+          logger.error('❌ Ошибка загрузки настроек очереди:', error.message);
+          queueRes = { ok: false };
+        }
+
+        logger.info('🔄 Обрабатываем ответы API...');
+
+        // Проверяем, что все ответы успешны
+        const allSuccess = doctorsRes && doctorsRes.data && servicesRes && servicesRes.data && queueRes && queueRes.data;
+        logger.info('📊 Статус ответов:', {
+          doctors: (doctorsRes && doctorsRes.data) ? 'OK' : 'ERROR',
+          services: (servicesRes && servicesRes.data) ? 'OK' : 'ERROR',
+          queueSettings: (queueRes && queueRes.data) ? 'OK' : 'ERROR',
+          allSuccess
+        });
+
+        if (!allSuccess) {
+          logger.warn('⚠️ Некоторые API недоступны, но продолжаем работу');
+        }
+
+        if (doctorsRes && doctorsRes.data) {
+          try {
+            const doctorsData = doctorsRes.data;
+            const apiDoctors = doctorsData.doctors || [];
+            logger.info('✅ Данные врачей получены:', apiDoctors.length, 'врачей');
+            // Если API вернул данные — используем их
+            if (apiDoctors.length > 0) {
+              setDoctors(apiDoctors);
+              logger.info('✅ Врачи обновлены из API');
+            }
+          } catch (error) {
+            logger.warn('Ошибка обработки данных врачей:', error.message);
           }
-        } catch (error) {
-          console.warn('Ошибка обработки данных врачей:', error.message);
+        } else {
+          logger.warn('❌ API врачей недоступен, используем демо-данные');
         }
-      } else {
-        console.warn('❌ API врачей недоступен, используем демо-данные');
-      }
 
-      if (servicesRes.ok) {
-        try {
-        const servicesData = await servicesRes.json();
-        const apiServices = servicesData.services_by_group || {};
-          console.log('✅ Данные услуг получены:', Object.keys(apiServices));
-          // Если API вернул данные — используем их
-        if (Object.keys(apiServices).length > 0) {
-          setServices(apiServices);
-            console.log('✅ Услуги обновлены из API');
+        if (servicesRes && servicesRes.data) {
+          try {
+            const servicesData = servicesRes.data;
+            const apiServices = servicesData.services_by_group || {};
+            logger.info('✅ Данные услуг получены:', Object.keys(apiServices));
+            // Если API вернул данные — используем их
+            if (Object.keys(apiServices).length > 0) {
+              setServices(apiServices);
+              logger.info('✅ Услуги обновлены из API');
+            }
+          } catch (error) {
+            logger.warn('Ошибка обработки данных услуг:', error.message);
           }
-        } catch (error) {
-          console.warn('Ошибка обработки данных услуг:', error.message);
+        } else {
+          logger.warn('❌ API услуг недоступен, используем демо-данные');
         }
-      } else {
-        console.warn('❌ API услуг недоступен, используем демо-данные');
-      }
 
-      if (queueRes.ok) {
-        try {
-        const queueData = await queueRes.json();
-        setQueueSettings(queueData);
-          console.log('✅ Настройки очереди обновлены из API');
-        } catch (error) {
-          console.warn('Ошибка обработки данных настроек очереди:', error.message);
+        if (queueRes && queueRes.data) {
+          try {
+            logger.info('✅ Настройки очереди обновлены из API');
+          } catch (error) {
+            logger.warn('Ошибка обработки данных настроек очереди:', error.message);
+          }
+        } else {
+          logger.warn('❌ API настроек очереди недоступен, используем демо-данные');
         }
-      } else {
-        console.warn('❌ API настроек очереди недоступен, используем демо-данные');
-      }
 
-      console.log('🎯 Загрузка интегрированных данных завершена');
+        logger.info('🎯 Загрузка интегрированных данных завершена');
       } catch (fetchError) {
         // Backend недоступен - используем демо-данные (уже установлены выше)
-        console.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
+        logger.warn('Backend недоступен для загрузки интегрированных данных, используем демо-режим:', fetchError.message);
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки интегрированных данных:', error);
+      logger.error('Ошибка загрузки интегрированных данных:', error);
       toast.error('Ошибка загрузки данных из админ панели');
     } finally {
       // УБИРАЕМ setAppointmentsLoading(false) - это не должно влиять на загрузку записей
@@ -1029,46 +880,63 @@ const RegistrarPanel = () => {
       // Возвращаем null для демо-пациентов, так как их данные уже есть в записи
       return null;
     }
-    
+
     const token = localStorage.getItem('auth_token');
     if (!token) return null;
-    
+
     try {
       const response = await fetch(`${API_BASE}/api/v1/patients/${patientId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         return await response.json();
       }
     } catch (error) {
       // Подавляем ошибки для демо-режима
       if (error.message !== 'Failed to fetch') {
-        console.error(`Error fetching patient ${patientId}:`, error);
+        logger.error(`Error fetching patient ${patientId}:`, error);
       }
     }
     return null;
-  }, [API_BASE]);
+  }, []);
 
   // Функция для обогащения записей данными пациентов и недостающими полями
   const enrichAppointmentsWithPatientData = useCallback(async (appointments) => {
     const enrichedAppointments = await Promise.all(appointments.map(async (apt) => {
       let enrichedApt = { ...apt };
-      
+
       // Обогащаем данными пациента
       if (apt.patient_id) {
         const patient = await fetchPatientData(apt.patient_id);
         if (patient) {
+          // ✅ ИСПРАВЛЕНО: Формируем patient_fio безопасно, используя все доступные поля
+          // Если поля пустые, используем fallback
+          let patient_fio = '';
+          if (patient.last_name && patient.first_name) {
+            patient_fio = `${patient.last_name} ${patient.first_name}`;
+            if (patient.middle_name) {
+              patient_fio += ` ${patient.middle_name}`;
+            }
+          } else if (patient.last_name) {
+            patient_fio = patient.last_name;
+          } else if (patient.first_name) {
+            patient_fio = patient.first_name;
+          } else {
+            // Fallback, если все поля пустые (не должно произойти благодаря валидации)
+            patient_fio = `Пациент ID=${patient.id}`;
+          }
+
           enrichedApt = {
             ...enrichedApt,
-            patient_fio: `${patient.last_name || ''} ${patient.first_name || ''} ${patient.middle_name || ''}`.trim(),
+            patient_fio: patient_fio.trim() || `Пациент ID=${patient.id}`,
             patient_phone: patient.phone,
             patient_birth_year: patient.birth_date ? new Date(patient.birth_date).getFullYear() : null,
             address: patient.address || 'Не указан', // Добавляем адрес из данных пациента
           };
         }
       }
-      
+
       // Применяем локальные оверрайды (например, после оплаты), чтобы не было отката
       try {
         const overridesRaw = localStorage.getItem('appointments_local_overrides');
@@ -1076,374 +944,652 @@ const RegistrarPanel = () => {
           const overrides = JSON.parse(overridesRaw);
           const ov = overrides[String(enrichedApt.id)];
           if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-            enrichedApt = { ...enrichedApt, ...ov };
+            // ✅ ИСПРАВЛЕНО: Применяем только определенные поля из оверрайда, сохраняя queue_numbers
+            enrichedApt = {
+              ...enrichedApt,
+              status: ov.status !== undefined ? ov.status : enrichedApt.status,
+              payment_status: ov.payment_status !== undefined ? ov.payment_status : enrichedApt.payment_status
+              // queue_numbers остается из enrichedApt (из API)
+            };
           }
         }
-      } catch(_) {
+      } catch {
         // Игнорируем ошибки парсинга JSON
       }
 
       // Добавляем недостающие поля для таблицы с значениями по умолчанию
+      // ✅ ИСПРАВЛЕНО: Правильно обрабатываем all_free заявки (только одобренные)
+      const isAllFree = enrichedApt.discount_mode === 'all_free' && enrichedApt.approval_status === 'approved';
+
       enrichedApt = {
         ...enrichedApt,
         // Если поля уже есть в API, используем их, иначе значения по умолчанию
-        visit_type: enrichedApt.visit_type || 'paid', // Платный по умолчанию
-        payment_type: enrichedApt.payment_type || (enrichedApt.payment_provider === 'online' ? 'online' : 'cash'), // Определяем по провайдеру
-        // Если пришел payment_status от API — уважаем его; иначе — выводим из payment_processed_at
-        payment_status: enrichedApt.payment_status || (enrichedApt.payment_processed_at ? 'paid' : (enrichedApt.payment_amount > 0 ? 'pending' : 'pending')),
+        // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем visit_type как 'free'
+        visit_type: isAllFree ? 'free' : (enrichedApt.visit_type || 'paid'), // Платный по умолчанию
+        // ✅ Для all_free устанавливаем payment_type как 'free', иначе определяем по провайдеру
+        payment_type: isAllFree ? 'free' : (enrichedApt.payment_type || (enrichedApt.payment_provider === 'online' ? 'online' : 'cash')),
+        // ✅ Если пришел payment_status от API — уважаем его; иначе — выводим из discount_mode или payment_processed_at
+        payment_status: isAllFree ? 'paid' : (enrichedApt.payment_status || (enrichedApt.discount_mode === 'paid' ? 'paid' : (enrichedApt.payment_processed_at ? 'paid' : (enrichedApt.payment_amount > 0 ? 'pending' : 'pending')))),
         services: enrichedApt.services || [], // ✅ ИСПРАВЛЕНО: оставляем пустым если нет услуг
-        // Добавляем поле cost для совместимости с таблицей (используем payment_amount если cost отсутствует)
-        cost: enrichedApt.cost || enrichedApt.payment_amount || 0,
+        // ✅ Для all_free устанавливаем cost = 0, иначе используем payment_amount или cost
+        cost: isAllFree ? 0 : (enrichedApt.cost || enrichedApt.payment_amount || 0),
       };
-      
+
       return enrichedApt;
     }));
     return enrichedAppointments;
   }, [fetchPatientData]);
 
   // Улучшенная загрузка записей с поддержкой тихого режима
-  const loadAppointments = useCallback(async (options = { silent: false }) => {
-    console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
-    const { silent } = options || {};
+  const loadAppointments = useCallback(async (options = {}) => {
+    logger.info('📥 loadAppointments called at:', new Date().toISOString(), options);
+    const { silent = false, source: callSource = 'unknown' } = options || {};
     try {
       if (!silent) {
-      setAppointmentsLoading(true);
-      setDataSource('loading');
+        setAppointmentsLoading(true);
+        setDataSource('loading');
       }
-      
+
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
-      console.log('🔍 loadAppointments: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
+      logger.info('🔍 loadAppointments: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
       if (!token) {
-        console.warn('Токен аутентификации отсутствует, показываем пустое состояние');
+        logger.warn('Токен аутентификации отсутствует, показываем пустое состояние');
         startTransition(() => {
           if (!silent) setDataSource('api');
           setAppointments([]);
         });
         return;
       }
-      
-      console.log('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
+
+      logger.info('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
 
       // Используем новый эндпоинт для получения очередей на указанную дату
       // Если календарь открыт, используем historyDate, иначе сегодня
-      const dateParam = showCalendar && historyDate ? historyDate : new Date().toISOString().split('T')[0];
-      console.log('📅 Параметры для loadAppointments:', {
+      const dateParam = showCalendar && historyDate ? historyDate : getLocalDateString();
+      logger.info('📅 Параметры для loadAppointments:', {
+        source: callSource,
         showCalendar,
         historyDate,
         dateParam,
         activeTab
       });
-      
+
       const params = new URLSearchParams();
       params.append('target_date', dateParam);
-      
-      const queryString = params.toString();
-      const url = `${API_BASE}/api/v1/registrar/queues/today${queryString ? `?${queryString}` : ''}`;
-      
-      console.log('🔍 loadAppointments: requesting URL:', url);
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
 
-        // Новый формат: данные сгруппированы по специальностям
-        let appointmentsData = [];
 
-        if (data && typeof data === 'object') {
-          console.log('📊 Получены данные от сервера:', data);
+      logger.info('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
 
-          // Обрабатываем формат от эндпоинта registrar_integration.py
-          if (data.queues && Array.isArray(data.queues)) {
-            console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+      const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } });
 
-            // Ранее здесь был фильтр по activeTab. Убираем серверную фильтрацию —
-            // всегда объединяем все очереди, вкладки фильтруют на клиенте.
-            // Объединяем все очереди
-            console.log('📊 Объединяем все очереди');
-            data.queues.forEach(queue => {
-              if (queue.entries && Array.isArray(queue.entries)) {
-                queue.entries.forEach((entry, index) => {
-                  try {
-                    const fullEntry = entry;
-                    const patientBirthYear = fullEntry.patient_birth_year || fullEntry.birth_year || null;
-                    const patientPhone = fullEntry.phone || fullEntry.patient_phone || '';
-                    const address = fullEntry.address || '';
-                    const services = Array.isArray(fullEntry.services) ? fullEntry.services : [];
-                    const serviceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
-                    const cost = fullEntry.cost || 0;
-                    const paymentStatus = fullEntry.payment_status || 'pending';
-                    const source = fullEntry.source || 'desk';
-                    const status = fullEntry.status || 'waiting';
-                    const createdAt = fullEntry.created_at || new Date().toISOString();
-                    const calledAt = fullEntry.called_at || null;
-                    const visitTime = fullEntry.visit_time || null;
-                    const discountMode = fullEntry.discount_mode || 'none';
+      // Axios successful response
+      const data = response.data;
 
-                appointmentsData.push({
-                  id: fullEntry.id,
-                  // основной номер для сортировки по колонке "№"
-                  queue_number: fullEntry.number || index + 1,
-                  // совместимость с EnhancedAppointmentsTable: ожидает queue_numbers[]
-                  queue_numbers: [
-                    {
-                      number: fullEntry.number || index + 1,
-                      status: status,
-                      specialty: queue.specialty || null
+      // Новый формат: данные сгруппированы по специальностям
+      let appointmentsData = [];
+
+      if (data && typeof data === 'object') {
+        logger.info('📊 Получены данные от сервера:', data);
+
+        // Обрабатываем формат от эндпоинта registrar_integration.py
+        if (data.queues && Array.isArray(data.queues)) {
+          logger.info('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+
+          // Ранее здесь был фильтр по activeTab. Убираем серверную фильтрацию —
+          // всегда объединяем все очереди, вкладки фильтруют на клиенте.
+          // Объединяем все очереди
+          logger.info('📊 Объединяем все очереди');
+
+          // ✅ ИСПРАВЛЕНО: Используем Map для дедупликации по ID записи
+          const appointmentsMap = new Map(); // id -> appointment object
+
+          data.queues.forEach(queue => {
+            logger.info(`📋 Обработка очереди: ${queue.specialty}, записей: ${queue.entries?.length || 0}`);
+            if (queue.entries && Array.isArray(queue.entries)) {
+              queue.entries.forEach((entry, index) => {
+                try {
+                  const fullEntry = entry;
+                  const entryId = fullEntry.id;
+
+                  // ✅ ИСПРАВЛЕНО: Проверяем, есть ли уже запись с таким ID
+                  if (appointmentsMap.has(entryId)) {
+                    // ✅ ИСПРАВЛЕНО: Если запись уже есть, добавляем номер очереди только если нет очереди с таким queue_tag (нормализованным)
+                    const existingAppointment = appointmentsMap.get(entryId);
+                    const queueNum = fullEntry.number !== undefined && fullEntry.number !== null ? fullEntry.number : (index + 1);
+                    const currentQueueTag = (queue.specialty || queue.queue_tag || '').toString().toLowerCase().trim();
+
+                    const queueTagExists = existingAppointment.queue_numbers.some((qn) => {
+                      const existingTag = (qn.queue_tag || qn.specialty || '').toString().toLowerCase().trim();
+                      // ✅ ИСПРАВЛЕНО: Проверяем только по queue_tag (не по номеру)
+                      // Если очередь с таким tag уже есть, не добавляем (даже если номер другой)
+                      return existingTag && existingTag === currentQueueTag;
+                    });
+
+                    if (!queueTagExists) {
+                      existingAppointment.queue_numbers.push({
+                        number: queueNum,
+                        status: fullEntry.status || 'waiting',
+                        specialty: queue.specialty || queue.queue_tag || null,
+                        queue_name: queue.specialist_name || queue.specialty || 'Очередь',
+                        queue_tag: queue.specialty || queue.queue_tag || null
+                      });
+                      logger.info(`🔄 Добавлен queue_number ${queueNum} (${queue.specialty}) для существующей записи ${entryId}`);
+                    } else {
+                      logger.info(`⏭️ Пропущен дубликат очереди ${queue.specialty} (номер ${queueNum}) для записи ${entryId}`);
                     }
-                  ],
-                      // даты для корректного отображения номера и индикаторов вкладок
-                      date: dateParam,
-                      appointment_date: dateParam,
-                  patient_id: fullEntry.patient_id,
-                  patient_fio: fullEntry.patient_name,
-                  patient_birth_year: patientBirthYear,
-                  patient_phone: patientPhone,
-                  address,
-                  services,
-                  service_codes: serviceCodes,
-                  cost,
-                  payment_status: paymentStatus,
-                  source,
-                  status,
-                  created_at: createdAt,
-                  called_at: calledAt,
-                  visit_time: visitTime,
-                  discount_mode: discountMode,
-                  record_type: fullEntry.record_type || 'visit',
-                  specialty: queue.specialty || null,
-                  department: queue.specialty || null
-                });
-                  } catch (err) {
-                    console.error('❌ Ошибка обработки записи очереди:', err, entry);
+                    return; // Пропускаем добавление дубликата
                   }
-                });
-              }
-            });
-          } else {
-            // Обрабатываем старый формат для совместимости
-            if (activeTab && data[activeTab]) {
-              appointmentsData = Array.isArray(data[activeTab]) ? data[activeTab] : [];
-            } else {
-              // Берем все специальности и объединяем
-              for (const dept in data) {
-                const deptData = data[dept];
-                if (Array.isArray(deptData)) {
-                  appointmentsData.push(...deptData);
+
+                  const patientBirthYear = fullEntry.patient_birth_year || fullEntry.birth_year || null;
+                  const patientPhone = fullEntry.phone || fullEntry.patient_phone || '';
+                  const address = fullEntry.address || '';
+                  const services = Array.isArray(fullEntry.services) ? fullEntry.services : [];
+                  const servicesFull = Array.isArray(fullEntry.services_full) ? fullEntry.services_full : services; // ✅ НОВОЕ: Полный формат для wizard
+                  const serviceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
+
+                  // ✅ ОТЛАДКА: Логируем каждую запись с её service_codes
+                  if (queue.specialty === 'echokg' || serviceCodes.includes('K10')) {
+                    logger.info('🔍 ЭКГ запись найдена:', {
+                      id: fullEntry.id,
+                      patient: fullEntry.patient_name,
+                      specialty: queue.specialty,
+                      services,
+                      serviceCodes,
+                      fullEntry
+                    });
+                  }
+                  const cost = fullEntry.cost || 0;
+                  const paymentStatus = fullEntry.payment_status || 'pending';
+                  const source = fullEntry.source || 'desk';
+                  const status = fullEntry.status || 'waiting';
+                  const createdAt = fullEntry.created_at || new Date().toISOString();
+                  // ⭐ ВАЖНО: Используем queue_time для сортировки (если есть), иначе created_at
+                  const queueTime = fullEntry.queue_time || fullEntry.created_at || new Date().toISOString();
+                  const calledAt = fullEntry.called_at || null;
+                  const visitTime = fullEntry.visit_time || null;
+                  const discountMode = fullEntry.discount_mode || 'none';
+                  const approvalStatus = fullEntry.approval_status || null; // ✅ ДОБАВЛЕНО: approval_status
+
+                  // ✅ ИСПРАВЛЕНИЕ: Используем номер из API (fullEntry.number), который уже отсортирован по времени регистрации
+                  // Если номер отсутствует, используем порядковый номер в отсортированном массиве
+                  const queueNum = fullEntry.number !== undefined && fullEntry.number !== null ? fullEntry.number : (index + 1);
+
+                  // ✅ ОТЛАДКА: Логируем номера для дерматологии
+                  if (queue.specialty === 'dermatology' || queue.specialty === 'derma') {
+                    logger.info(`🔢 Дерматология: Запись ${fullEntry.id} (${fullEntry.patient_name}) - номер из API: ${fullEntry.number}, использован: ${queueNum}, index: ${index}`);
+                  }
+
+                  const appointment = {
+                    id: entryId,
+                    // основной номер для сортировки по колонке "№"
+                    queue_number: queueNum,
+                    // совместимость с EnhancedAppointmentsTable: ожидает queue_numbers[]
+                    queue_numbers: [
+                      {
+                        number: queueNum,
+                        status: status,
+                        specialty: queue.specialty || null,
+                        queue_name: queue.specialist_name || queue.specialty || 'Очередь',  // ✅ ДОБАВЛЕНО: название очереди для tooltip
+                        queue_tag: queue.specialty || null
+                      }
+                    ],
+                    // даты для корректного отображения номера и индикаторов вкладок
+                    date: dateParam,
+                    appointment_date: dateParam,
+                    patient_id: fullEntry.patient_id,
+                    patient_fio: fullEntry.patient_name,
+                    patient_birth_year: patientBirthYear,
+                    patient_phone: patientPhone,
+                    address,
+                    services,
+                    services_full: servicesFull, // ✅ НОВОЕ: Полный формат с метаданными (для wizard)
+                    service_codes: serviceCodes,
+                    cost,
+                    payment_status: paymentStatus,
+                    source,
+                    status,
+                    created_at: createdAt,
+                    queue_time: queueTime,  // ⭐ ВАЖНО: queue_time для сортировки (приоритет над created_at)
+                    called_at: calledAt,
+                    visit_time: visitTime,
+                    discount_mode: discountMode,
+                    approval_status: approvalStatus, // ✅ ДОБАВЛЕНО: approval_status
+                    record_type: fullEntry.record_type || 'visit',
+                    specialty: queue.specialty || null,
+                    department: queue.specialty || null,
+                    department_key: fullEntry.department_key || null  // ✅ ДОБАВЛЕНО: для фильтрации по динамическим отделениям
+                  };
+
+                  // ✅ Сохраняем в Map для дедупликации
+                  appointmentsMap.set(entryId, appointment);
+
+                  // ✅ Отладка: проверяем queue_numbers
+                  logger.info(`✅ Добавлена запись ${entryId} с queue_numbers:`, appointment.queue_numbers);
+                } catch (err) {
+                  logger.error('❌ Ошибка обработки записи очереди:', err, entry);
                 }
-              }
-            }
-          }
-
-          setPaginationInfo({
-            total: appointmentsData.length,
-            hasMore: false,
-            loadingMore: false
-          });
-
-          console.log(`📊 Загружено ${appointmentsData.length} записей для специальности: ${activeTab || 'все'}`);
-
-          // Отладка: показываем ID всех загруженных записей
-          if (appointmentsData.length > 0) {
-            console.log('📋 ID всех загруженных записей:', appointmentsData.map(a => a.id));
-          }
-
-          // ✅ ИСПРАВЛЕНО: Пустая очередь - это нормально, не переключаемся в демо-режим
-          if (appointmentsData.length === 0) {
-            console.log('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
-            // Устанавливаем пустой массив, не выбрасываем ошибку
-            setAppointments([]);
-            setDataSource('api'); // ✅ Указываем, что данные получены от API
-            setAppointmentsLoading(false);
-            return; // ✅ Выходим из функции, не загружаем демо-данные
-          }
-        } else {
-          console.warn('⚠️ Получены некорректные данные от сервера:', data);
-          throw new Error('Некорректные данные от сервера');
-        }
-        
-        if (appointmentsData.length > 0) {
-          // Обогащаем данные записей информацией о пациентах
-          const enriched = await enrichAppointmentsWithPatientData(appointmentsData);
-          
-          // Сохраняем локальные изменения при обновлении
-          startTransition(() => {
-            setAppointments(prev => {
-              const locallyModified = prev.filter(apt => apt._locallyModified);
-              // Также учитываем локальные оверрайды из localStorage (например, после оплаты)
-              let overrides = {};
-              try {
-                const overridesRaw = localStorage.getItem('appointments_local_overrides');
-                overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-              } catch(_) {
-        // Игнорируем ошибки парсинга JSON
-      }
-
-              const enrichedWithLocal = enriched.map(apt => {
-                const localVersion = locallyModified.find(local => local.id === apt.id);
-                const override = overrides[String(apt.id)];
-                let merged = localVersion ? { ...apt, ...localVersion } : apt;
-                if (override && (!override.expiresAt || override.expiresAt > Date.now())) {
-                  merged = { ...merged, ...override };
-                }
-                return merged;
               });
-              // Обновляем только если реально изменилось
-              try {
-                const prevStr = JSON.stringify(prev);
-                const nextStr = JSON.stringify(enrichedWithLocal);
-                if (prevStr === nextStr) return prev;
-              } catch (_) {
-              // Игнорируем ошибки сравнения JSON
             }
-              return enrichedWithLocal;
-            });
-            // Не триггерим обновление, если значение не меняется
-            setDataSource(prev => (prev === 'api' ? prev : 'api'));
           });
-          console.debug('✅ Загружены и обогащены данные из API:', enriched.length, 'записей');
-          console.log('📊 Загруженные данные для даты', dateParam, ':', enriched);
-          console.log('💾 Первая запись после обогащения:', enriched[0]);
+
+          // ✅ ИСПРАВЛЕНО: Преобразуем Map в массив
+          appointmentsData = Array.from(appointmentsMap.values());
+
+          const mergedByPatientKey = new Map();
+
+          const getAppointmentKey = (appointment) => {
+            const patientKey = appointment.patient_id || appointment.patient_phone || appointment.patient_fio || appointment.id;
+            const dateKey = appointment.date || appointment.appointment_date || appointment.visit_date || '';
+            const specialtyKey = (appointment.specialty || appointment.department || '').toString().toLowerCase() || 'unknown';
+
+            // ✅ ИСПРАВЛЕНО: Добавляем specialty в ключ, чтобы одна запись пациента на один день
+            // создавалась отдельно для каждого отделения (cardio, lab, derma и т.д.)
+            return `${patientKey || 'unknown'}__${dateKey}__${specialtyKey}`;
+          };
+
+          const calcPriority = (appointment) => {
+            let priority = 0;
+            const isAllFreeApproved = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
+            const isAllFreePending = appointment.discount_mode === 'all_free' && appointment.approval_status !== 'approved';
+
+            if (isAllFreeApproved) priority += 1000;
+            else if (isAllFreePending) priority += 600;
+
+            if (appointment.discount_mode === 'benefit' && appointment.approval_status === 'approved') {
+              priority += 400;
+            }
+
+            const serviceCodes = Array.isArray(appointment.service_codes) ? appointment.service_codes : [];
+            const serviceNames = Array.isArray(appointment.services) ? appointment.services : [];
+            const uniqueServiceValues = new Set([
+              ...serviceCodes.map(code => String(code).toUpperCase()),
+              ...serviceNames.map(item => (typeof item === 'string' ? item.toUpperCase() : JSON.stringify(item)))
+            ]);
+            priority += uniqueServiceValues.size * 10;
+
+            priority += (appointment.queue_numbers || []).length * 5;
+
+            return priority;
+          };
+
+          const mergeAppointments = (primary, secondary) => {
+            const merged = { ...primary };
+
+            const mergeQueues = (current = [], pending = []) => {
+              const combined = [...current];
+              const seenTags = new Set(current.map(qn => (qn.queue_tag || qn.specialty || '').toLowerCase().trim()));
+
+              pending.forEach(qn => {
+                const tag = (qn.queue_tag || qn.specialty || '').toLowerCase().trim();
+                // ✅ ИСПРАВЛЕНО: Проверяем только по tag, игнорируем number
+                // Если очередь с таким tag уже есть, не добавляем
+                if (!seenTags.has(tag)) {
+                  combined.push({ ...qn });
+                  seenTags.add(tag);
+                }
+              });
+              return combined;
+            };
+
+            const mergeArrays = (base = [], extra = []) => {
+              const result = [];
+              const seen = new Set();
+              [...base, ...extra].forEach(item => {
+                if (item === null || item === undefined) return;
+                const key = typeof item === 'string' ? item : JSON.stringify(item);
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  result.push(item);
+                }
+              });
+              return result;
+            };
+
+            merged.queue_numbers = mergeQueues(primary.queue_numbers, secondary.queue_numbers);
+            merged.service_codes = mergeArrays(primary.service_codes, secondary.service_codes);
+            merged.services = mergeArrays(primary.services, secondary.services);
+
+            if (primary.all_patient_services || secondary.all_patient_services) {
+              merged.all_patient_services = mergeArrays(
+                Array.isArray(primary.all_patient_services) ? primary.all_patient_services : [],
+                Array.isArray(secondary.all_patient_services) ? secondary.all_patient_services : []
+              );
+            }
+
+            const primaryPriority = calcPriority(primary);
+            const secondaryPriority = calcPriority(secondary);
+            const preferred = secondaryPriority > primaryPriority ? secondary : primary;
+
+            merged.discount_mode = preferred.discount_mode;
+            merged.approval_status = preferred.approval_status;
+            if (preferred.total_amount !== undefined) merged.total_amount = preferred.total_amount;
+            if (preferred.payment_type !== undefined) merged.payment_type = preferred.payment_type;
+            if (preferred.payment_status !== undefined) merged.payment_status = preferred.payment_status;
+            if (preferred.cost !== undefined) merged.cost = preferred.cost;
+
+            return merged;
+          };
+
+          appointmentsData.forEach(appointment => {
+            const key = getAppointmentKey(appointment);
+            const existing = mergedByPatientKey.get(key);
+            if (!existing) {
+              mergedByPatientKey.set(key, appointment);
+              return;
+            }
+
+            const existingPriority = calcPriority(existing);
+            const newPriority = calcPriority(appointment);
+
+            if (newPriority > existingPriority) {
+              mergedByPatientKey.set(key, mergeAppointments(appointment, existing));
+            } else {
+              mergedByPatientKey.set(key, mergeAppointments(existing, appointment));
+            }
+          });
+
+          appointmentsData = Array.from(mergedByPatientKey.values());
         } else {
-          // API вернул пустой массив - показываем демо-данные с учетом оверрайдов
-          let demo = DEMO_APPOINTMENTS;
-          try {
-            const overridesRaw = localStorage.getItem('appointments_local_overrides');
-            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-            demo = DEMO_APPOINTMENTS.map(apt => {
-              const ov = overrides[String(apt.id)];
-              if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-                return { ...apt, ...ov };
+          // Обрабатываем старый формат для совместимости
+          if (activeTab && data[activeTab]) {
+            appointmentsData = Array.isArray(data[activeTab]) ? data[activeTab] : [];
+          } else {
+            // Берем все специальности и объединяем
+            for (const dept in data) {
+              const deptData = data[dept];
+              if (Array.isArray(deptData)) {
+                appointmentsData.push(...deptData);
               }
-              return apt;
-            });
-          } catch(_) {
-        // Игнорируем ошибки парсинга JSON
+            }
+          }
+        }
+
+        setPaginationInfo({
+          total: appointmentsData.length,
+          hasMore: false,
+          loadingMore: false
+        });
+
+        logger.info(`📊 Загружено ${appointmentsData.length} записей для специальности: ${activeTab || 'все'}`);
+
+        // Отладка: показываем ID всех загруженных записей
+        if (appointmentsData.length > 0) {
+          logger.info('📋 ID всех загруженных записей:', appointmentsData.map(a => a.id));
+        }
+
+        // ✅ ИСПРАВЛЕНО: Пустая очередь - это нормально, не переключаемся в демо-режим
+        if (appointmentsData.length === 0) {
+          logger.info('📋 Нет записей на сегодня - это нормальная ситуация в начале дня');
+          // Устанавливаем пустой массив, не выбрасываем ошибку
+          setAppointments([]);
+          setDataSource('api'); // ✅ Указываем, что данные получены от API
+          setAppointmentsLoading(false);
+          return; // ✅ Выходим из функции, не загружаем демо-данные
+        }
+      } else {
+        logger.warn('⚠️ Получены некорректные данные от сервера:', data);
+        throw new Error('Некорректные данные от сервера');
       }
-          startTransition(() => {
-            setAppointments(prev => {
-              try {
-                const prevStr = JSON.stringify(prev);
-                const nextStr = JSON.stringify(demo);
-                if (prevStr === nextStr) return prev;
-              } catch (_) {
+
+      if (appointmentsData.length > 0) {
+        // Обогащаем данные записей информацией о пациентах
+        const enriched = await enrichAppointmentsWithPatientData(appointmentsData);
+
+        // Сохраняем локальные изменения при обновлении
+        startTransition(() => {
+          setAppointments(prev => {
+            const locallyModified = prev.filter(apt => apt._locallyModified);
+            // Также учитываем локальные оверрайды из localStorage (например, после оплаты)
+            let overrides = {};
+            try {
+              const overridesRaw = localStorage.getItem('appointments_local_overrides');
+              overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+            } catch {
+              // Игнорируем ошибки парсинга JSON
+            }
+
+            const enrichedWithLocal = enriched.map(apt => {
+              const localVersion = locallyModified.find(local => local.id === apt.id);
+              const override = overrides[String(apt.id)];
+              let merged = localVersion ? { ...apt, ...localVersion } : apt;
+              if (override && (!override.expiresAt || override.expiresAt > Date.now())) {
+                // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                merged = {
+                  ...merged,
+                  status: override.status !== undefined ? override.status : merged.status,
+                  payment_status: override.payment_status !== undefined ? override.payment_status : merged.payment_status
+                };
+              }
+              return merged;
+            });
+            // Обновляем только если реально изменилось
+            try {
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(enrichedWithLocal);
+              if (prevStr === nextStr) return prev;
+            } catch {
               // Игнорируем ошибки сравнения JSON
             }
-              return demo;
-            });
-            setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
+            return enrichedWithLocal;
           });
+          // Не триггерим обновление, если значение не меняется
+          setDataSource(prev => (prev === 'api' ? prev : 'api'));
+        });
+        logger.info('✅ Загружены и обогащены данные из API:', enriched.length, 'записей');
+        logger.info('📊 Загруженные данные для даты', dateParam, ':', enriched);
+        logger.info('💾 Первая запись после обогащения:', enriched[0]);
+      } else {
+        // API вернул пустой массив - показываем демо-данные с учетом оверрайдов
+        let demo = demoAppointments;
+        try {
+          const overridesRaw = localStorage.getItem('appointments_local_overrides');
+          const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+          demo = demoAppointments.map(apt => {
+            const ov = overrides[String(apt.id)];
+            if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
+              // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+              return {
+                ...apt,
+                status: ov.status !== undefined ? ov.status : apt.status,
+                payment_status: ov.payment_status !== undefined ? ov.payment_status : apt.payment_status
+              };
+            }
+            return apt;
+          });
+        } catch {
+          // Игнорируем ошибки парсинга JSON
         }
-      } else if (response.status === 401) {
-        // Токен недействителен
-        console.warn('Токен недействителен (401), очищаем и используем демо-данные');
-        localStorage.removeItem('auth_token');
         startTransition(() => {
-          if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
-          // Применяем оверрайды к демо-данным
-          let demo = DEMO_APPOINTMENTS;
-          try {
-            const overridesRaw = localStorage.getItem('appointments_local_overrides');
-            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-            demo = DEMO_APPOINTMENTS.map(apt => {
-              const ov = overrides[String(apt.id)];
-              if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
-                return { ...apt, ...ov };
-              }
-              return apt;
-            });
-          } catch(_) {
-        // Игнорируем ошибки парсинга JSON
-      }
           setAppointments(prev => {
             try {
               const prevStr = JSON.stringify(prev);
               const nextStr = JSON.stringify(demo);
               if (prevStr === nextStr) return prev;
-            } catch (_) {
+            } catch {
+              // Игнорируем ошибки сравнения JSON
+            }
+            return demo;
+          });
+          setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
+        });
+      }
+    } catch (error) {
+      // Handle axios errors
+      if (error.response?.status === 401) {
+        // Токен недействителен
+        logger.warn('Токен недействителен (401), очищаем и используем демо-данные');
+        localStorage.removeItem('auth_token');
+        startTransition(() => {
+          if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
+          // Применяем оверрайды к демо-данным
+          let demo = demoAppointments;
+          try {
+            const overridesRaw = localStorage.getItem('appointments_local_overrides');
+            const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+            demo = demoAppointments.map(apt => {
+              const ov = overrides[String(apt.id)];
+              if (ov && (!ov.expiresAt || ov.expiresAt > Date.now())) {
+                // ✅ ИСПРАВЛЕНО: Применяем только определенные поля, сохраняя queue_numbers
+                return {
+                  ...apt,
+                  status: ov.status !== undefined ? ov.status : apt.status,
+                  payment_status: ov.payment_status !== undefined ? ov.payment_status : apt.payment_status
+                };
+              }
+              return apt;
+            });
+          } catch {
+            // Игнорируем ошибки парсинга JSON
+          }
+          setAppointments(prev => {
+            try {
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(demo);
+              if (prevStr === nextStr) return prev;
+            } catch {
               // Игнорируем ошибки сравнения JSON
             }
             return demo;
           });
         });
       } else {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('❌ Backend недоступен для загрузки записей, используем демо-режим:', error.message);
-      console.error('❌ Детали ошибки:', error);
+        // Other errors (network, 404, 500, etc.)
+        logger.error('❌ Backend недоступен для загрузки записей, используем демо-режим:', error.message);
+        logger.error('❌ Детали ошибки:', error);
         startTransition(() => {
           if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
           setAppointments(prev => {
             try {
               const prevStr = JSON.stringify(prev);
-              const nextStr = JSON.stringify(DEMO_APPOINTMENTS);
+              const nextStr = JSON.stringify(demoAppointments);
               if (prevStr === nextStr) return prev;
-            } catch (_) {
+            } catch {
               // Игнорируем ошибки сравнения JSON
             }
-            return DEMO_APPOINTMENTS;
+            return demoAppointments;
           });
         });
-      startTransition(() => {
-        if (!silent) setDataSource(prev => (prev === 'demo' ? prev : 'demo'));
-        setAppointments(prev => {
-          try {
-            const prevStr = JSON.stringify(prev);
-            const nextStr = JSON.stringify(DEMO_APPOINTMENTS);
-            if (prevStr === nextStr) return prev;
-          } catch (_) {
-            // Игнорируем ошибки сравнения JSON
-          }
-          return DEMO_APPOINTMENTS;
-        });
-      });
-      
-      // Показываем уведомление пользователю только при первой загрузке
-      if (appointments.length === 0) {
-        toast('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
+
+        // Показываем уведомление пользователю только при первой загрузке
+        if (appointmentsCount === 0) {
+          toast('Backend недоступен. Работаем в демо-режиме.', { icon: 'ℹ️' });
+        }
       }
     } finally {
       if (!silent) setAppointmentsLoading(false);
     }
-  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab]);
+  }, [enrichAppointmentsWithPatientData, showCalendar, historyDate, activeTab, demoAppointments, appointmentsCount]);
+
+  // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: загрузка отделений из БД
+  const loadDynamicDepartments = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE}/api/v1/departments/active`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const departments = await response.json();
+        // Backend returns {success: true, data: [...], count: N}
+        const departmentsArray = departments.data || [];
+        setDynamicDepartments(departmentsArray);
+        logger.info('✅ Загружены динамические отделения:', departmentsArray.map(d => d.key));
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки отделений:', error);
+    }
+  }, []);
 
   // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
   const initialLoadRef = useRef(false);
   useEffect(() => {
     if (initialLoadRef.current) return;
     initialLoadRef.current = true;
-    console.log('🚀 Starting initial data load (guarded)...');
-    loadAppointments();
+    logger.info('🚀 Starting initial data load (guarded)...');
+    loadDynamicDepartments(); // ✅ Загружаем отделения
+    loadAppointments({ source: 'initial_load' });
     loadIntegratedData();
-    setIsInitialLoad(false);
-  }, [loadAppointments, loadIntegratedData]);
+  }, [loadAppointments, loadIntegratedData, loadDynamicDepartments]);
+
+  // Слушаем глобальные события обновления очереди для синхронизации статусов
+  useEffect(() => {
+    const handleQueueUpdate = (event) => {
+      const { action, specialty } = event.detail || {};
+      logger.info('[RegistrarPanel] Получено событие обновления очереди:', { action, specialty, detail: event.detail });
+
+      // Для критических действий обновляем немедленно без silent режима
+      const criticalActions = ['patientCalled', 'visitStarted', 'visitCompleted', 'nextPatientCalled', 'refreshAll', 'entryAdded'];
+      const shouldUpdateImmediately = criticalActions.includes(action);
+
+      if (shouldUpdateImmediately) {
+        logger.info('[RegistrarPanel] Немедленное обновление после действия:', action);
+        logger.info('[RegistrarPanel] Детали события:', event.detail);
+        // Увеличиваем задержку для гарантии сохранения данных в БД (особенно для новых записей)
+        const delay = action === 'entryAdded' || action === 'refreshAll' ? 500 : 300;
+        setTimeout(() => {
+          logger.info('[RegistrarPanel] Выполняем обновление после задержки:', delay, 'ms');
+          loadAppointments({ source: `queue_update_${action}`, silent: false });
+        }, delay);
+      } else {
+        // Для других событий тихое обновление
+        loadAppointments({ source: 'queue_update_event', silent: true });
+      }
+    };
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+
+    return () => {
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+    };
+  }, [loadAppointments]);
 
   // Перезагружаем данные при изменении фильтров
   useEffect(() => {
     if (initialLoadRef.current) {
-      console.log('🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)');
+      logger.info('🔄 Фильтры изменились (поиск/статус), но НЕ перезагружаем данные (дата контролируется календарём)');
       // Не перезагружаем данные - фильтрация происходит на клиенте через useMemo filteredAppointments
     }
   }, [searchQuery, statusFilter]);
 
+  // Синхронизация tempDateInput с historyDate при открытии календаря
+  useEffect(() => {
+    if (showCalendar) {
+      setTempDateInput(historyDate);
+    }
+  }, [showCalendar, historyDate]);
+
+  // Debounce для ввода даты с клавиатуры
+  useEffect(() => {
+    if (!showCalendar) return;
+
+    const timer = setTimeout(() => {
+      // Проверяем, что введённая дата валидна и отличается от текущей
+      if (tempDateInput && tempDateInput !== historyDate) {
+        logger.info('📅 Debounced date input:', tempDateInput);
+        setHistoryDate(tempDateInput);
+      }
+    }, 1000); // Задержка 1 секунда
+
+    return () => clearTimeout(timer);
+  }, [tempDateInput, showCalendar, historyDate]);
+
   // Перезагружаем данные при изменении даты в календаре
   useEffect(() => {
     if (showCalendar && historyDate && initialLoadRef.current) {
-      console.log('📅 Дата календаря изменилась на:', historyDate);
-      loadAppointments({ silent: false });
+      logger.info('📅 Дата календаря изменилась на:', historyDate);
+      logger.info('📅 Вызываем loadAppointments с параметрами:', { showCalendar, historyDate });
+      loadAppointments({ silent: false, source: 'calendar_date_change' });
     }
   }, [historyDate, showCalendar, loadAppointments]);
 
   // Отслеживаем изменения в appointments для отладки
   useEffect(() => {
-    console.log('🔔 appointments state изменился:', {
+    logger.info('🔔 appointments state изменился:', {
       count: appointments.length,
       showCalendar,
       historyDate,
@@ -1454,13 +1600,13 @@ const RegistrarPanel = () => {
   // Функция для загрузки дополнительных записей
   const loadMoreAppointments = useCallback(async () => {
     if (paginationInfo.loadingMore || !paginationInfo.hasMore) return;
-    
+
     setPaginationInfo(prev => ({ ...prev, loadingMore: true }));
-    
+
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) return;
-      
+
       // Используем новый эндпоинт для получения очередей на сегодня
       const response = await fetch(`${API_BASE}/api/v1/registrar/queues/today${activeTab ? `?department=${activeTab}` : ''}`, {
         headers: {
@@ -1468,7 +1614,14 @@ const RegistrarPanel = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
+      // ✅ ИСПРАВЛЕНО: Обработка ошибки 403 (Forbidden) - недостаточно прав
+      if (response.status === 403) {
+        logger.warn('⚠️ Доступ запрещен: недостаточно прав для просмотра очередей');
+        setPaginationInfo(prev => ({ ...prev, loadingMore: false }));
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
 
@@ -1476,7 +1629,7 @@ const RegistrarPanel = () => {
         let newAppointments = [];
 
         if (data && typeof data === 'object') {
-          console.log('📊 Получены данные от сервера (дополнительно):', data);
+          logger.info('📊 Получены данные от сервера (дополнительно):', data);
 
           // Обрабатываем формат от эндпоинта registrar_integration.py
           if (data.queues && Array.isArray(data.queues)) {
@@ -1489,29 +1642,38 @@ const RegistrarPanel = () => {
                 (activeTab === 'derma' && queue.specialty === 'dermatology') ||
                 (activeTab === 'dental' && queue.specialty === 'stomatology') ||
                 (activeTab === 'lab' && queue.specialty === 'laboratory') ||
-                (activeTab === 'procedures' && queue.specialty === 'procedures')
+                (activeTab === 'procedures' && queue.specialty === 'procedures') ||
+                (activeTab === 'echokg' && (queue.specialty === 'echokg' || queue.specialty === 'ecg' || queue.specialty === 'ЭКГ'))
               );
 
               if (targetQueue && targetQueue.entries) {
                 newAppointments = targetQueue.entries.map(entry => ({
                   id: entry.id,
-                  patient_id: null,
+                  patient_id: entry.patient_id || null,
                   patient_fio: entry.patient_name,
                   patient_phone: entry.phone,
+                  patient_birth_year: entry.patient_birth_year || null,
+                  address: entry.address || '',
                   doctor_id: null,
                   department: targetQueue.specialty,
                   appointment_date: data.date,
                   appointment_time: null,
                   status: entry.status,
-                  services: [],
-                  service_codes: [],
+                  services: entry.services || [],  // ✅ ИСПРАВЛЕНО: Берем services из entry
+                  service_codes: entry.service_codes || [],  // ✅ ИСПРАВЛЕНО: Берем service_codes из entry
+                  cost: entry.cost || 0,  // ✅ ДОБАВЛЕНО: Стоимость
+                  payment_status: entry.payment_status || 'pending',  // ✅ ДОБАВЛЕНО: Статус оплаты
+                  discount_mode: entry.discount_mode || 'none',  // ✅ ДОБАВЛЕНО: Режим скидки
                   source: entry.source,
                   created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
+                  visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
+                  record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
                   queue_numbers: [{
                     queue_tag: targetQueue.specialty,
-                    queue_name: targetQueue.specialist_name,
+                    queue_name: targetQueue.specialist_name || targetQueue.specialty || 'Очередь',
                     number: entry.number,
                     status: entry.status,
+                    specialty: targetQueue.specialty,
                     source: entry.source,
                     created_at: entry.created_at
                   }],
@@ -1528,23 +1690,31 @@ const RegistrarPanel = () => {
                 if (queue.entries && Array.isArray(queue.entries)) {
                   const queueAppointments = queue.entries.map(entry => ({
                     id: entry.id,
-                    patient_id: null,
+                    patient_id: entry.patient_id || null,
                     patient_fio: entry.patient_name,
                     patient_phone: entry.phone,
+                    patient_birth_year: entry.patient_birth_year || null,
+                    address: entry.address || '',
                     doctor_id: queue.specialist_id,
                     department: queue.specialty,
                     appointment_date: data.date,
                     appointment_time: null,
                     status: entry.status,
-                    services: [],
-                    service_codes: [],
+                    services: entry.services || [],  // ✅ ИСПРАВЛЕНО: Берем services из entry
+                    service_codes: entry.service_codes || [],  // ✅ ИСПРАВЛЕНО: Берем service_codes из entry
+                    cost: entry.cost || 0,  // ✅ ДОБАВЛЕНО: Стоимость
+                    payment_status: entry.payment_status || 'pending',  // ✅ ДОБАВЛЕНО: Статус оплаты
+                    discount_mode: entry.discount_mode || 'none',  // ✅ ДОБАВЛЕНО: Режим скидки
                     source: entry.source,
                     created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
+                    visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
+                    record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
                     queue_numbers: [{
                       queue_tag: queue.specialty,
-                      queue_name: queue.specialist_name,
+                      queue_name: queue.specialist_name || queue.specialty || 'Очередь',
                       number: entry.number,
                       status: entry.status,
+                      specialty: queue.specialty,
                       source: entry.source,
                       created_at: entry.created_at
                     }],
@@ -1581,24 +1751,19 @@ const RegistrarPanel = () => {
             loadingMore: false
           });
         } else {
-          console.warn('⚠️ Нет дополнительных данных от сервера');
+          logger.warn('⚠️ Нет дополнительных данных от сервера');
           setPaginationInfo(prev => ({ ...prev, loadingMore: false }));
         }
       }
     } catch (error) {
-      console.error('Ошибка загрузки дополнительных записей:', error);
+      logger.error('Ошибка загрузки дополнительных записей:', error);
       setPaginationInfo(prev => ({ ...prev, loadingMore: false }));
     }
-  }, [paginationInfo, appointments.length, activeTab, API_BASE]);
+  }, [paginationInfo, appointments.length, activeTab, enrichAppointmentsWithPatientData]);
 
   // Обработчик события из хедера для открытия мастера записи
   useEffect(() => {
     const handleOpenWizard = () => {
-      // Очищаем данные предыдущего пациента
-      setSelectedPatientId(null);
-      setPatientSuggestions([]);
-      setShowPatientSuggestions(false);
-      // Открываем современный мастер через состояние в AppointmentWizard
       setShowWizard(true);
     };
 
@@ -1608,31 +1773,66 @@ const RegistrarPanel = () => {
     };
   }, []);
 
+  // ✅ Проверка localStorage для обновления после присоединения к очереди (fallback механизм)
+  useEffect(() => {
+    const checkLastQueueJoin = () => {
+      try {
+        const lastJoinStr = localStorage.getItem('lastQueueJoin');
+        if (!lastJoinStr) return;
+
+        const lastJoin = JSON.parse(lastJoinStr);
+        const joinTime = new Date(lastJoin.timestamp);
+        const now = new Date();
+        const diffMs = now - joinTime;
+
+        // Проверяем только если прошло меньше 10 секунд с момента присоединения
+        if (diffMs < 10000 && diffMs > 0) {
+          logger.info('[RegistrarPanel] Обнаружено недавнее присоединение к очереди, обновляем данные');
+          logger.info('[RegistrarPanel] Данные присоединения:', lastJoin);
+          // Удаляем флаг после использования
+          localStorage.removeItem('lastQueueJoin');
+          // Обновляем данные
+          setTimeout(() => {
+            loadAppointments({ source: 'queueJoin_fallback', silent: false });
+          }, 500);
+        }
+      } catch (err) {
+        logger.error('[RegistrarPanel] Ошибка проверки lastQueueJoin:', err);
+      }
+    };
+
+    // Проверяем при монтировании и каждые 2 секунды
+    checkLastQueueJoin();
+    const interval = setInterval(checkLastQueueJoin, 2000);
+
+    return () => clearInterval(interval);
+  }, [loadAppointments]);
+
   // Автообновление очереди с возможностью паузы (в тихом режиме)
   useEffect(() => {
     // Во время мастера записи или модальных окон автообновление отключаем, чтобы не было мерцаний
     if (showWizard || paymentDialog.open || printDialog.open || cancelDialog.open) return;
     if (!autoRefresh) return;
-    
+
     const id = setInterval(() => {
       // Загружаем только записи тихо, без смены индикаторов
-      console.log('⏰ Автообновление: вызов loadAppointments');
-      loadAppointments({ silent: true });
+      logger.info('⏰ Автообновление: вызов loadAppointments');
+      loadAppointments({ silent: true, source: 'auto_refresh' });
     }, 15000);
-    
+
     return () => clearInterval(id);
   }, [autoRefresh, showWizard, paymentDialog.open, printDialog.open, cancelDialog.open, loadAppointments]);
 
   // Функции для жесткого потока
-  const handleStartVisit = async (appointment) => {
+  const handleStartVisit = useCallback(async (appointment) => {
     try {
-      console.log('🔍 handleStartVisit вызван с данными:', appointment);
-      console.log('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
-      
+      logger.info('🔍 handleStartVisit вызван с данными:', appointment);
+      logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
+
       // ✅ ИСПРАВЛЕНО: Используем правильный эндпоинт для queue entries
       const url = `${API_BASE}/api/v1/registrar/queue/${appointment.id}/start-visit`;
-      console.log('🔍 Отправляем запрос на:', url);
-      
+      logger.info('🔍 Отправляем запрос на:', url);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -1643,195 +1843,192 @@ const RegistrarPanel = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Обновленная запись:', result);
-        
+        logger.info('Обновленная запись:', result);
+
         // Обновляем список записей с новым статусом
-        setAppointments(prev => prev.map(apt => 
-          apt.id === appointment.id ? { 
-            ...apt, 
+        setAppointments(prev => prev.map(apt =>
+          apt.id === appointment.id ? {
+            ...apt,
             status: result.entry?.status || 'in_progress',
             _locallyModified: false
           } : apt
         ));
         toast.success('Пациент вызван успешно!');
-        
+
         // Перезагружаем данные для синхронизации с сервером
-        await loadAppointments();
+        await loadAppointments({ source: 'start_visit_success' });
       } else {
         const errorText = await response.text().catch(() => '');
-        console.error('Ошибка API start-visit:', response.status, errorText);
+        logger.error('Ошибка API start-visit:', response.status, errorText);
         throw new Error(`API ${response.status}: ${errorText}`);
       }
     } catch (error) {
-      console.error('RegistrarPanel: Start visit API error:', error);
+      logger.error('RegistrarPanel: Start visit API error:', error);
       toast.error('Не удалось вызвать пациента: ' + error.message);
     }
-  };
+  }, [loadAppointments]);
 
   const handlePayment = async (appointment) => {
     try {
-      console.log('🔍 handlePayment вызван с данными:', appointment);
-      console.log('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
-      console.log('🔍 appointment.record_type:', appointment.record_type);
-      console.log('🔍 Все ключи appointment:', Object.keys(appointment));
-      console.log('🔍 Полный объект appointment:', JSON.stringify(appointment, null, 2));
+      logger.info('🔍 handlePayment вызван с данными:', appointment);
+      logger.info('🔍 appointment.id:', appointment.id, 'тип:', typeof appointment.id);
+      logger.info('🔍 appointment.record_type:', appointment.record_type);
+      logger.info('🔍 Все ключи appointment:', Object.keys(appointment));
+      logger.info('🔍 Полный объект appointment:', JSON.stringify(appointment, null, 2));
 
       // Определяем, является ли это агрегированной записью
       const isAggregated = appointment.departments && appointment.departments instanceof Set;
-      console.log('🔍 Это агрегированная запись:', isAggregated);
+      logger.info('🔍 Это агрегированная запись:', isAggregated);
 
       // Если это агрегированная запись, находим все оригинальные записи пациента
       let recordsToUpdate = [appointment]; // По умолчанию только текущая запись
       if (isAggregated) {
-        console.log('🔍 Ищем все записи пациента:', appointment.patient_fio);
+        logger.info('🔍 Ищем все записи пациента:', appointment.patient_fio);
         // Находим все записи этого пациента в оригинальном массиве
         const allPatientRecords = appointments.filter(apt => apt.patient_fio === appointment.patient_fio);
-        console.log('🔍 Найдено записей пациента:', allPatientRecords.length);
+        logger.info('🔍 Найдено записей пациента:', allPatientRecords.length);
         recordsToUpdate = allPatientRecords;
       }
-      
-      // Проверяем, не оплачена ли уже запись
-      const paymentStatus = (appointment.payment_status || '').toLowerCase();
-      const status = (appointment.status || '').toLowerCase();
-      const discountMode = (appointment.discount_mode || '').toLowerCase();
-      
-      console.log('Текущий статус оплаты:', paymentStatus, 'Статус записи:', status, 'Discount mode:', discountMode);
-      
-      // Проверяем статус оплаты и discount_mode
-      if (paymentStatus === 'paid' || 
-          status === 'paid' || 
+
+      logger.info('Попытка оплатить записи:', recordsToUpdate.map(r => r.id));
+
+      // ✅ ИСПРАВЛЕНИЕ: Оплачиваем ВСЕ записи пациента, а не только первую
+      logger.info('🔍 Оплачиваем ВСЕ записи пациента:', recordsToUpdate.length);
+
+      const paymentResults = [];
+      for (const record of recordsToUpdate) {
+        const recordType = record.record_type || (record.id >= 20000 ? 'visit' : 'appointment');
+        const recordId = record.id;
+
+        // ✅ ИСПРАВЛЕНИЕ: Проверяем статус КАЖДОЙ записи перед попыткой оплаты
+        const paymentStatus = (record.payment_status || '').toLowerCase();
+        const status = (record.status || '').toLowerCase();
+        const discountMode = (record.discount_mode || '').toLowerCase();
+
+        logger.info(`🔍 Запись ${recordId}: статус оплаты=${paymentStatus}, статус=${status}, discount_mode=${discountMode}`);
+
+        // Пропускаем записи, которые уже оплачены
+        if (paymentStatus === 'paid' ||
+          status === 'paid' ||
           status === 'queued' ||
           discountMode === 'paid') {
-        toast.info('Запись уже оплачена');
-        return appointment;
-      }
-      
-      // Определяем источник записи и правильный ID
-      // Используем record_type из API, если есть, иначе определяем по ID
-      const recordType = appointment.record_type || (appointment.id >= 20000 ? 'visit' : 'appointment');
-      const realId = appointment.id;
-      
-      console.log('Попытка оплатить записи:', recordsToUpdate.map(r => r.id), 'Тип записи:', recordType);
-      
-      const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
-      
-      // Используем первую запись для создания платежа (она содержит правильный record_type и ID)
-      const paymentRecord = recordsToUpdate[0];
-      const paymentRecordType = paymentRecord.record_type || (paymentRecord.id >= 20000 ? 'visit' : 'appointment');
-      const paymentRecordId = paymentRecord.id;
-
-      console.log('🔍 Создаем платеж для записи:', paymentRecordId, 'типа:', paymentRecordType);
-
-      // Используем правильный API в зависимости от типа записи
-      let url;
-      if (paymentRecordType === 'visit') {
-        // Для записей из visits используем API visits
-        url = `${API_BASE}/api/v1/registrar/visits/${paymentRecordId}/mark-paid`;
-      } else {
-        // Для записей из appointments используем старый API
-        url = `${API_BASE}/api/v1/appointments/${paymentRecordId}/mark-paid`;
-      }
-      
-      console.log('🔍 Отправляем запрос на:', url);
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          logger.info(`⏭️ Запись ${recordId} уже оплачена, пропускаем`);
+          paymentResults.push({ success: true, recordId, skipped: true, reason: 'already_paid' });
+          continue;
         }
-      });
-      
-      console.log('Ответ сервера:', response.status, response.statusText);
 
-      if (response.ok) {
-        const updatedAppointment = await response.json();
-        console.log('Успешный ответ:', updatedAppointment);
-        
-        console.log('✅ Оплата успешна, обновляем локальное состояние для всех записей пациента');
-        console.log('Обновляем записи:', recordsToUpdate.map(r => r.id));
+        let url;
+        if (recordType === 'visit') {
+          url = `${API_BASE}/api/v1/registrar/visits/${recordId}/mark-paid`;
+        } else if (recordType === 'online_queue') {
+          // ✅ ИСПРАВЛЕНО: Для online_queue используем специальный endpoint
+          url = `${API_BASE}/api/v1/registrar/queue/entry/${recordId}/mark-paid`;
+        } else {
+          url = `${API_BASE}/api/v1/appointments/${recordId}/mark-paid`;
+        }
 
-        // Обновляем статус всех записей пациента
-        recordsToUpdate.forEach(record => {
-          const recordWithQueuedStatus = {
-            ...record,
-          status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
-          payment_status: 'paid',
-          _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
-        };
-        
-          // Сохраняем локальный оверрайд для каждой записи
+        logger.info(`🔍 Оплата записи ${recordId} (${recordType}):`, url);
+
         try {
-          const overridesRaw = localStorage.getItem('appointments_local_overrides');
-          const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-            overrides[String(record.id)] = {
-              status: recordWithQueuedStatus.status,
-              payment_status: recordWithQueuedStatus.payment_status,
-            // TTL 10 минут
-            expiresAt: Date.now() + 10 * 60 * 1000
-          };
-          localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
-        } catch(_) {
-        // Игнорируем ошибки парсинга JSON
-      }
-
-          // Обновляем состояние для каждой записи
-        setAppointments(prev => prev.map(apt => (
-            apt.id === record.id ? recordWithQueuedStatus : apt
-        )));
-        });
-
-        toast.success(`Оплачено ${recordsToUpdate.length} записей пациента и добавлены в очередь!`);
-        // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
-        setTimeout(() => loadAppointments({ silent: true }), 800);
-        return updatedAppointment;
-      } else {
-        const errorText = await response.text();
-        console.error('Ошибка API:', response.status, errorText);
-        
-        let errorMessage = 'Ошибка при оплате';
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.detail) {
-            errorMessage = errorData.detail;
-            // Если запись уже оплачена, обрабатываем как успех
-            if (errorMessage.includes('уже оплачена') || errorMessage.includes('PAID -> PAID')) {
-              toast('Запись уже оплачена', { icon: 'ℹ️' });
-              const updatedAppointment = {
-                ...appointment,
-                status: 'queued',
-                payment_status: 'paid'
-              };
-              // Сохраняем локальный оверрайд
-              try {
-                const overridesRaw = localStorage.getItem('appointments_local_overrides');
-                const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
-                overrides[String(appointment.id)] = {
-                  status: updatedAppointment.status,
-                  payment_status: updatedAppointment.payment_status,
-                  expiresAt: Date.now() + 10 * 60 * 1000
-                };
-                localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
-              } catch(_) {
-        // Игнорируем ошибки парсинга JSON
-      }
-
-              setAppointments(prev => prev.map(apt => (
-                apt.id === appointment.id ? updatedAppointment : apt
-              )));
-              setTimeout(() => loadAppointments({ silent: true }), 800);
-              return updatedAppointment;
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            paymentResults.push({ success: true, recordId, result });
+            logger.info(`✅ Запись ${recordId} успешно оплачена`);
+          } else {
+            const errorText = await response.text();
+            logger.warn(`⚠️ Ошибка оплаты записи ${recordId}:`, errorText);
+            paymentResults.push({ success: false, recordId, error: errorText });
           }
-        } catch (e) {
-          errorMessage = errorText || errorMessage;
+        } catch (error) {
+          logger.error(`❌ Ошибка при оплате записи ${recordId}:`, error);
+          paymentResults.push({ success: false, recordId, error: error.message });
         }
-        
-        toast.error(errorMessage);
-        return null;
+      }
+
+      const successCount = paymentResults.filter(r => r.success && !r.skipped).length;
+      const skippedCount = paymentResults.filter(r => r.success && r.skipped).length;
+      const failedCount = paymentResults.filter(r => !r.success).length;
+
+      logger.info(`✅ Успешно оплачено ${successCount} из ${recordsToUpdate.length} записей`);
+      if (skippedCount > 0) {
+        logger.info(`⏭️ Пропущено уже оплаченных записей: ${skippedCount}`);
+      }
+      if (failedCount > 0) {
+        logger.info(`❌ Ошибок при оплате: ${failedCount}`);
+      }
+
+      if (successCount > 0 || skippedCount > 0) {
+        // Обновляем статус только для записей, которые были реально оплачены (не пропущены)
+        const paidRecordIds = paymentResults
+          .filter(r => r.success && !r.skipped)
+          .map(r => r.recordId);
+
+        logger.info('✅ Оплата успешна, обновляем локальное состояние для оплаченных записей:', paidRecordIds);
+
+        // Обновляем статус только для реально оплаченных записей
+        recordsToUpdate
+          .filter(record => paidRecordIds.includes(record.id))
+          .forEach(record => {
+            const recordWithQueuedStatus = {
+              ...record,
+              status: 'queued', // Принудительно устанавливаем статус "В очереди" после оплаты
+              payment_status: 'paid',
+              _locallyModified: true // Помечаем как локально измененную, чтобы избежать перезаписи при обновлении
+            };
+
+            // Сохраняем локальный оверрайд для каждой записи
+            try {
+              const overridesRaw = localStorage.getItem('appointments_local_overrides');
+              const overrides = overridesRaw ? JSON.parse(overridesRaw) : {};
+              overrides[String(record.id)] = {
+                status: recordWithQueuedStatus.status,
+                payment_status: recordWithQueuedStatus.payment_status,
+                // TTL 10 минут
+                expiresAt: Date.now() + 10 * 60 * 1000
+              };
+              localStorage.setItem('appointments_local_overrides', JSON.stringify(overrides));
+            } catch {
+              // Игнорируем ошибки парсинга JSON
+            }
+
+            // Обновляем состояние для каждой записи
+            setAppointments(prev => prev.map(apt => (
+              apt.id === record.id ? recordWithQueuedStatus : apt
+            )));
+          });
+
+        // Формируем информативное сообщение
+        let message = '';
+        if (successCount > 0 && skippedCount > 0) {
+          message = `Оплачено ${successCount} записей, ${skippedCount} уже были оплачены ранее`;
+        } else if (successCount > 0) {
+          message = `Оплачено ${successCount} записей пациента и добавлены в очередь!`;
+        } else if (skippedCount > 0) {
+          message = 'Все записи уже оплачены';
+        }
+
+        if (failedCount > 0) {
+          message += `. Ошибок: ${failedCount}`;
+        }
+
+        toast.success(message);
+        // Мягко подтянем данные из API, чтобы зафиксировать статус с бэкенда
+        setTimeout(() => loadAppointments({ silent: true, source: 'payment_success' }), 800);
+        return paymentResults;
+      } else {
+        toast.error('Не удалось оплатить записи');
+        return paymentResults;
       }
     } catch (error) {
-      console.error('RegistrarPanel: Payment error:', error);
+      logger.error('RegistrarPanel: Payment error:', error);
       toast.error('Ошибка при оплате');
     }
   };
@@ -1849,13 +2046,13 @@ const RegistrarPanel = () => {
         return;
       }
       let url = '';
-      let method = 'POST';
+      const method = 'POST';
       let body;
-      
+
       // Определяем источник записи и правильный ID
       const isFromVisits = appointmentId >= 20000;
       const realId = isFromVisits ? appointmentId - 20000 : appointmentId;
-      
+
       if (status === 'complete' || status === 'done') {
         if (isFromVisits) {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/complete`;
@@ -1871,10 +2068,10 @@ const RegistrarPanel = () => {
         }
       } else if (status === 'cancelled' || status === 'canceled') {
         // Пока нет API для отмены, обновляем локально
-        console.log('Отмена записи (локально):', appointmentId);
-        setAppointments(prev => prev.map(apt => 
-          apt.id === appointmentId ? { 
-            ...apt, 
+        logger.info('Отмена записи (локально):', appointmentId);
+        setAppointments(prev => prev.map(apt =>
+          apt.id === appointmentId ? {
+            ...apt,
             status: 'cancelled',
             _locallyModified: true,
             _cancelReason: reason
@@ -1884,10 +2081,10 @@ const RegistrarPanel = () => {
         return { id: appointmentId, status: 'cancelled' };
       } else if (status === 'confirmed') {
         // Пока нет API для подтверждения, обновляем локально
-        console.log('Подтверждение записи (локально):', appointmentId);
-        setAppointments(prev => prev.map(apt => 
-          apt.id === appointmentId ? { 
-            ...apt, 
+        logger.info('Подтверждение записи (локально):', appointmentId);
+        setAppointments(prev => prev.map(apt =>
+          apt.id === appointmentId ? {
+            ...apt,
             status: 'confirmed',
             _locallyModified: true
           } : apt
@@ -1896,10 +2093,10 @@ const RegistrarPanel = () => {
         return { id: appointmentId, status: 'confirmed' };
       } else if (status === 'no_show') {
         // Пока нет API для неявки, обновляем локально
-        console.log('Неявка записи (локально):', appointmentId, 'Причина:', reason);
-        setAppointments(prev => prev.map(apt => 
-          apt.id === appointmentId ? { 
-            ...apt, 
+        logger.info('Неявка записи (локально):', appointmentId, 'Причина:', reason);
+        setAppointments(prev => prev.map(apt =>
+          apt.id === appointmentId ? {
+            ...apt,
             status: 'no_show',
             _locallyModified: true,
             _noShowReason: reason
@@ -1911,16 +2108,17 @@ const RegistrarPanel = () => {
         if (isFromVisits) {
           url = `${API_BASE}/api/v1/registrar/visits/${realId}/start-visit`;
         } else {
-          url = `${API_BASE}/api/v1/appointments/${realId}/start-visit`;
+          // Используем эндпоинт для очереди регистратора
+          url = `${API_BASE}/api/v1/registrar/queue/${realId}/start-visit`;
         }
       } else {
-        console.log('Неподдерживаемый статус:', status);
+        logger.info('Неподдерживаемый статус:', status);
         toast.error('Изменение данного статуса не поддерживается');
         return;
       }
-      
-      console.log('Обновляем статус записи:', appointmentId, 'на', status, 'URL:', url);
-      
+
+      logger.info('Обновляем статус записи:', appointmentId, 'на', status, 'URL:', url);
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -1929,53 +2127,36 @@ const RegistrarPanel = () => {
         },
         body
       });
-      
-      console.log('Ответ API обновления статуса:', response.status, response.statusText);
-      
+
+      logger.info('Ответ API обновления статуса:', response.status, response.statusText);
+
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
-        console.error('Ошибка API обновления статуса:', response.status, errText);
+        logger.error('Ошибка API обновления статуса:', response.status, errText);
         throw new Error(errText || `API ${response.status}`);
       }
-      
+
       const updatedAppointment = await response.json();
-      console.log('Обновленная запись:', updatedAppointment);
-      
+      logger.info('Обновленная запись:', updatedAppointment);
+
       // Обновляем локальное состояние
-      setAppointments(prev => prev.map(apt => 
+      setAppointments(prev => prev.map(apt =>
         apt.id === appointmentId ? { ...apt, status: updatedAppointment.status || status } : apt
       ));
-      
-      await loadAppointments();
+
+      await loadAppointments({ source: 'status_update' });
       toast.success('Статус обновлен');
       return updatedAppointment;
     } catch (error) {
-      console.error('RegistrarPanel: Update status error:', error);
+      logger.error('RegistrarPanel: Update status error:', error);
       toast.error('Не удалось обновить статус: ' + error.message);
       return null;
     }
-  }, [API_BASE, loadAppointments]);
-
-  // Функция для определения варианта Badge по статусу
-  const getStatusVariant = (status) => {
-    const variantMap = {
-      'plan': 'primary',
-      'confirmed': 'success',
-      'queued': 'warning',
-      'in_cabinet': 'purple',
-      'done': 'success',
-      'cancelled': 'danger',
-      'no_show': 'orange',
-      'paid_pending': 'warning',
-      'paid': 'success'
-    };
-    return variantMap[status] || 'default';
-  };
+  }, [loadAppointments]);
 
   const handleBulkAction = useCallback(async (action, reason = '') => {
     if (appointmentsSelected.size === 0) return;
-    
-    // Подтверждение для опасных действий
+
     if (['cancelled', 'no_show'].includes(action)) {
       const ok = window.confirm(`Применить действие «${action}» для ${appointmentsSelected.size} записей?`);
       if (!ok) return;
@@ -1993,17 +2174,20 @@ const RegistrarPanel = () => {
     setAppointmentsSelected(new Set());
   }, [appointmentsSelected, updateAppointmentStatus]);
 
+  // ✅ ИСПОЛЬЗУЕМ useRef для хранения filteredAppointments, чтобы избежать ошибки "Cannot access before initialization"
+  const filteredAppointmentsRef = useRef([]);
+
   // Горячие клавиши
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Отладка всех нажатий клавиш
-      console.log('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Target:', e.target.tagName);
-      
+      logger.info('Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Target:', e.target.tagName);
+
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        console.log('Ignoring key press in input/textarea');
+        logger.info('Ignoring key press in input/textarea');
         return;
       }
-      
+
       if (e.key === 'Enter') {
         // Enter в мастере обрабатывается отдельно в полях ввода
         // Здесь не обрабатываем, чтобы избежать конфликтов
@@ -2012,10 +2196,6 @@ const RegistrarPanel = () => {
           e.preventDefault();
         } else if (e.key === 'k') {
           e.preventDefault();
-          // Открываем мастер создания записи
-          setSelectedPatientId(null);
-          setPatientSuggestions([]);
-          setShowPatientSuggestions(false);
           setShowWizard(true);
         } else if (e.key === '1') setActiveTab('welcome');
         else if (e.key === '2') setActiveTab('appointments');
@@ -2024,41 +2204,42 @@ const RegistrarPanel = () => {
         else if (e.key === '5') setActiveTab('queue');
         else if (e.key === 'a') {
           e.preventDefault();
-          console.log('Ctrl+A: Выбрать все записи');
-          const allIds = filteredAppointments.map(a => a.id);
+          logger.info('Ctrl+A: Выбрать все записи');
+          // ✅ ИСПРАВЛЕНО: Используем filteredAppointments из ref
+          const allIds = filteredAppointmentsRef.current.map(a => a.id);
           setAppointmentsSelected(new Set(allIds));
-          console.log('Выбрано записей:', allIds.length);
+          logger.info('Выбрано записей:', allIds.length);
         } else if (e.key === 'd') {
           e.preventDefault();
-          console.log('Ctrl+D: Снять выделение');
+          logger.info('Ctrl+D: Снять выделение');
           setAppointmentsSelected(new Set());
         }
       } else if (e.altKey) {
-        console.log('Alt key pressed with:', e.key, 'Selected rows:', appointmentsSelected.size);
-        if (e.key === '1') { 
-          e.preventDefault(); 
-          console.log('Alt+1: Подтвердить');
+        logger.info('Alt key pressed with:', e.key, 'Selected rows:', appointmentsSelected.size);
+        if (e.key === '1') {
+          e.preventDefault();
+          logger.info('Alt+1: Подтвердить');
           if (appointmentsSelected.size > 0) {
-            handleBulkAction('confirmed'); 
+            handleBulkAction('confirmed');
           } else {
-            console.log('Нет выбранных записей для подтверждения');
+            logger.info('Нет выбранных записей для подтверждения');
           }
-        } else if (e.key === '2') { 
-          e.preventDefault(); 
-          console.log('Alt+2: Отменить');
+        } else if (e.key === '2') {
+          e.preventDefault();
+          logger.info('Alt+2: Отменить');
           if (appointmentsSelected.size > 0) {
             const reason = window.prompt('Причина отмены');
             if (reason) handleBulkAction('cancelled', reason);
           } else {
-            console.log('Нет выбранных записей для отмены');
+            logger.info('Нет выбранных записей для отмены');
           }
-        } else if (e.key === '3') { 
-          e.preventDefault(); 
-          console.log('Alt+3: Неявка');
+        } else if (e.key === '3') {
+          e.preventDefault();
+          logger.info('Alt+3: Неявка');
           if (appointmentsSelected.size > 0) {
-            handleBulkAction('no_show'); 
+            handleBulkAction('no_show');
           } else {
-            console.log('Нет выбранных записей для неявки');
+            logger.info('Нет выбранных записей для неявки');
           }
         }
       } else if (e.key === 'Escape') {
@@ -2074,23 +2255,41 @@ const RegistrarPanel = () => {
 
   // ✅ УНИВЕРСАЛЬНАЯ СИСТЕМА ФИЛЬТРАЦИИ ПО ОТДЕЛАМ
   const isInDepartment = useCallback((appointment, departmentKey) => {
-    console.log('🔍 isInDepartment проверка:', {
-      appointmentId: appointment.id,
-      departmentKey,
-      department: appointment.department,
-      specialty: appointment.doctor_specialty,
-      serviceCodes: appointment.service_codes,
-      services: appointment.services
-    });
-    
+    const standardDepartments = ['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'];
+    const isDynamicDepartment = !standardDepartments.includes(departmentKey);
+
+    // ✅ Нормализуем department_key (null, undefined, "null" -> null)
+    const appointmentDeptKey = (appointment.department_key && appointment.department_key !== "null")
+      ? appointment.department_key
+      : null;
+
+    // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Для нестандартных отделений используем ТОЛЬКО department_key
+    if (isDynamicDepartment) {
+      // Для динамических отделений единственный способ фильтрации - по department_key
+      return appointmentDeptKey === departmentKey;
+    }
+
+    // ✅ Для стандартных отделений: приоритетная проверка по department_key
+    if (appointmentDeptKey) {
+      // Прямое совпадение department_key
+      if (appointmentDeptKey === departmentKey) {
+        return true;
+      }
+      // Если department_key записи - динамическое отделение, не показываем в стандартных вкладках
+      if (!standardDepartments.includes(appointmentDeptKey)) {
+        return false;
+      }
+    }
+
     const dept = (appointment.department?.toLowerCase() || '');
     const specialty = (appointment.doctor_specialty?.toLowerCase() || '');
+
     // Получаем коды услуг из service_codes
     const appointmentServiceCodes = appointment.service_codes || [];
-    
+
     // Получаем услуги (могут быть ID или названия)
     const appointmentServices = appointment.services || [];
-    
+
     // Преобразуем услуги в коды услуг
     const serviceCodesFromServices = appointmentServices.map(service => {
       if (services && typeof services === 'object') {
@@ -2106,7 +2305,7 @@ const RegistrarPanel = () => {
                 return serviceByID.service_code;
               }
             }
-            
+
             // Затем пробуем найти по названию
             const serviceByName = groupServices.find(s => s.name === service);
             if (serviceByName && serviceByName.service_code) {
@@ -2115,12 +2314,18 @@ const RegistrarPanel = () => {
           }
         }
       }
+
+      // ВАЖНО: Если service_code не найден, но название услуги содержит "ЭКГ", возвращаем 'K10'
+      if (typeof service === 'string' && (service.includes('ЭКГ') || service.includes('ЭКг') || service.includes('экг') || service.toUpperCase().includes('ECG'))) {
+        return 'K10';
+      }
+
       return null;
     }).filter(code => code !== null);
-    
+
     // Объединяем коды из service_codes и преобразованные из services
     const allServiceCodes = [...appointmentServiceCodes, ...serviceCodesFromServices];
-    
+
     // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
     const departmentCategoryMapping = {
       'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
@@ -2130,16 +2335,16 @@ const RegistrarPanel = () => {
       'lab': ['L'],              // Лаборатория: все лабораторные услуги
       'procedures': ['P', 'C', 'D_PROC', 'PHYS', 'COSM']  // Процедуры: физио, косметология, дерм.процедуры
     };
-    
+
     // Получаем коды категорий для данного отдела
     const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
-    
+
     // Маппинг кодов услуг к категориям (обновлен согласно новым требованиям)
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
-      
-      // ЭКГ - отдельная категория (только ЭКГ)
-      if (serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
+
+      // ЭКГ - отдельная категория (только ЭКГ) - ВАЖНО: K10 это ЭКГ!
+      if (serviceCode === 'K10' || serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
 
       // ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
       if (serviceCode === 'K11' || serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO') || serviceCode.includes('ЭхоКГ')) return 'ECHO';
@@ -2153,8 +2358,8 @@ const RegistrarPanel = () => {
       // Косметологические процедуры - коды C01-C12
       if (serviceCode.match(/^C\d+$/)) return 'C';
 
-      // Кардиология - коды K01, K11
-      if (serviceCode.match(/^K\d+$/)) return 'K';
+      // Кардиология - коды K01, K11 и т.д. (НО НЕ K10 - это ЭКГ!)
+      if (serviceCode.match(/^K\d+$/) && serviceCode !== 'K10') return 'K';
 
       // Стоматология - коды S01, S10
       if (serviceCode.match(/^S\d+$/)) return 'S';
@@ -2173,59 +2378,216 @@ const RegistrarPanel = () => {
       if (serviceCode.startsWith('COSM_')) return 'C';  // Косметология
       if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
       if (serviceCode.startsWith('DERM_PROC_') || serviceCode.startsWith('DERM_')) return 'D_PROC';  // Дерматологические процедуры
-      
+
       // Дополнительные паттерны для кардиологии
       if (serviceCode.startsWith('CARD_') && !serviceCode.includes('ECG')) return 'K';
-      
+
       return null;
     };
 
-    // Приоритет по услугам: если в услугах есть ЭКГ, то это всегда вкладка 'echokg'
-    const serviceCategories = new Set(
-      allServiceCodes
-        .map(getServiceCategoryByCode)
-        .filter(Boolean)
-    );
+    // ✅ ИСПРАВЛЕНО: Вычисляем категории услуг для дальнейших проверок
+    const serviceCategoriesArray = allServiceCodes.map(getServiceCategoryByCode);
+    const serviceCategories = new Set(serviceCategoriesArray.filter(Boolean));
 
-    // Если есть ECG — жестко относим к echokg и исключаем из cardio
-    if (serviceCategories.has('ECG')) {
-      return departmentKey === 'echokg';
-    }
-    
     // Проверяем различными способами
-    const matchesByDepartment = dept.includes(departmentKey) || 
-                               (departmentKey === 'derma' && (dept.includes('dermat') || dept.includes('dermatology'))) ||
-                               (departmentKey === 'dental' && (dept.includes('dental') || dept.includes('stoma') || dept.includes('dentistry'))) ||
-                               (departmentKey === 'cardio' && dept.includes('cardiology')) ||
-                               (departmentKey === 'echokg' && (dept.includes('ecg') || dept.includes('экг'))) ||
-                               (departmentKey === 'lab' && (dept.includes('lab') || dept.includes('laboratory'))) ||
-                               (departmentKey === 'procedures' && (dept.includes('procedures') || dept.includes('cosmetology')));
-    
+    const matchesByDepartment = dept.includes(departmentKey) ||
+      (departmentKey === 'derma' && (dept.includes('dermat') || dept.includes('dermatology'))) ||
+      (departmentKey === 'dental' && (dept.includes('dental') || dept.includes('stoma') || dept.includes('dentistry'))) ||
+      (departmentKey === 'cardio' && dept.includes('cardiology')) ||
+      (departmentKey === 'echokg' && (dept.includes('ecg') || dept.includes('экг'))) ||
+      (departmentKey === 'lab' && (dept.includes('lab') || dept.includes('laboratory'))) ||
+      (departmentKey === 'procedures' && (dept.includes('procedures') || dept.includes('cosmetology')));
+
     const matchesBySpecialty = specialty.includes(departmentKey) ||
-                              (departmentKey === 'derma' && specialty.includes('dermat')) ||
-                              (departmentKey === 'dental' && (specialty.includes('dental') || specialty.includes('stoma'))) ||
-                              (departmentKey === 'cardio' && specialty.includes('cardio')) ||
-                              (departmentKey === 'echokg' && (specialty.includes('ecg') || specialty.includes('экг'))) ||
-                              (departmentKey === 'lab' && (specialty.includes('lab') || specialty.includes('laboratory')));
-    
+      (departmentKey === 'derma' && specialty.includes('dermat')) ||
+      (departmentKey === 'dental' && (specialty.includes('dental') || specialty.includes('stoma'))) ||
+      (departmentKey === 'cardio' && specialty.includes('cardio')) ||
+      (departmentKey === 'echokg' && (specialty.includes('ecg') || specialty.includes('экг'))) ||
+      (departmentKey === 'lab' && (specialty.includes('lab') || specialty.includes('laboratory')));
+
     // ✅ НОВАЯ ЛОГИКА: проверяем по кодам услуг
     const matchesByServices = allServiceCodes.some(serviceCode => {
       const serviceCategory = getServiceCategoryByCode(serviceCode);
       return targetCategoryCodes.includes(serviceCategory);
     });
-    
-    // Итог: приоритет услуг выше specialty/department
-    const result = matchesByServices || matchesByDepartment || matchesBySpecialty;
-    
-    console.log('🔍 isInDepartment результат:', {
-      appointmentId: appointment.id,
-      departmentKey,
-      matchesByServices,
-      matchesByDepartment,
-      matchesBySpecialty,
-      result
-    });
-    
+
+    // ✅ ИСПРАВЛЕНО: Для echokg показываем записи с ECG
+    // ИЛИ если specialty/department указывает на ЭКГ (для QR без услуг)
+    if (departmentKey === 'echokg') {
+      const hasECGService = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'ECG';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть ECG
+      // Если есть только услуги других категорий - НЕ показываем в echokg
+      if (allServiceCodes.length > 0) {
+        if (hasECGService) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для кардиологии показываем записи с K (кроме K10/ECG) или ECHO
+    // ИЛИ если specialty/department указывает на кардиологию (для QR без услуг)
+    if (departmentKey === 'cardio') {
+      const hasCardiologyServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'K' || category === 'ECHO';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть кардиологическими
+      // Если есть только услуги других категорий - НЕ показываем в cardio
+      if (allServiceCodes.length > 0) {
+        if (hasCardiologyServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для лаборатории показываем записи с L
+    // ИЛИ если specialty/department указывает на лабораторию (для QR без услуг)
+    if (departmentKey === 'lab') {
+      const hasLabServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'L';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть лабораторными
+      // Если есть только услуги других категорий - НЕ показываем в lab
+      if (allServiceCodes.length > 0) {
+        if (hasLabServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для стоматологии показываем записи с S, DENT, STOM
+    // Фильтрация услуг по вкладке выполняется в filterServicesByDepartment
+    // ИЛИ если specialty/department указывает на стоматологию (для QR без услуг)
+    if (departmentKey === 'dental') {
+      // Проверяем наличие стоматологических услуг
+      const hasDentalServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'S' || category === 'DENT' || category === 'STOM';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть стоматологическими
+      // Если есть только услуги других категорий (C, P, D, L, K и т.д.) - НЕ показываем в dental
+      if (allServiceCodes.length > 0) {
+        // Если есть хотя бы одна стоматологическая услуга - показываем
+        // filterServicesByDepartment отфильтрует и покажет только стоматологические
+        if (hasDentalServices) {
+          return true;
+        }
+        // Если есть услуги, но нет стоматологических - НЕ показываем
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для дерматологии показываем записи с D, DERM, DERM_PROC
+    // Фильтрация услуг по вкладке выполняется в filterServicesByDepartment
+    // ИЛИ если specialty/department указывает на дерматологию (для QR без услуг)
+    if (departmentKey === 'derma') {
+      const hasDermaServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'D' || category === 'DERM' || category === 'DERM_PROC';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть дерматологическими
+      // Если есть только услуги других категорий - НЕ показываем в derma
+      if (allServiceCodes.length > 0) {
+        if (hasDermaServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ ИСПРАВЛЕНО: Для процедур показываем записи с P, C, D_PROC, PHYS, COSM
+    // Фильтрация услуг по вкладке выполняется в filterServicesByDepartment
+    // ИЛИ если specialty/department указывает на процедуры (для QR без услуг)
+    if (departmentKey === 'procedures') {
+      const hasProcedureServices = allServiceCodes.some(code => {
+        const category = getServiceCategoryByCode(code);
+        return category === 'P' || category === 'C' || category === 'D_PROC' || category === 'PHYS' || category === 'COSM';
+      });
+
+      // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть процедурными
+      // Если есть только услуги других категорий - НЕ показываем в procedures
+      if (allServiceCodes.length > 0) {
+        if (hasProcedureServices) {
+          return true;
+        }
+        return false;
+      }
+
+      // Fallback: проверяем specialty/department для QR-пациентов БЕЗ услуг
+      return matchesBySpecialty || matchesByDepartment;
+    }
+
+    // ✅ НОВОЕ: Проверяем queue_tag как дополнительный источник (только если нет услуг)
+    // Приоритет: коды услуг > queue_tag > specialty/department
+    const queueTags = appointment.queue_numbers?.map(q => q.queue_tag).filter(Boolean) || [];
+
+    // Маппинг queue_tag → вкладки
+    const queueTagToTab = {
+      'cardiology_common': 'cardio',
+      'cardiology': 'cardio',
+      'cardio': 'cardio',
+      'general': 'cardio',  // Общие очереди попадают в кардиологию (только если нет услуг)
+      'ecg': 'echokg',
+      'echokg': 'cardio', // ЭхоКГ относится к кардиологии (вкладка echokg - это ЭКГ)
+      'lab': 'lab',
+      'laboratory': 'lab',
+      'procedures': 'procedures',
+      'stomatology': 'dental',
+      'dental': 'dental',
+      'dentistry': 'dental',
+      'dermatology': 'derma',
+      'derma': 'derma',
+      'dermat': 'derma',
+      'therapy': 'cardio',
+      'therapist': 'cardio'
+    };
+
+    // Проверяем queue_tag только если услуги не определили отдел
+    const matchesByQueueTag = queueTags.some(tag => queueTagToTab[tag] === departmentKey);
+
+    // ✅ ВАЖНО: Если у записи есть услуги, которые определили какой-то отдел,
+    // то queue_tag 'general' не должен переопределять это
+    // Проверяем, определили ли услуги какой-либо отдел (не обязательно текущий)
+    const hasAnyServiceCategory = serviceCategories.size > 0;
+
+    // Используем queue_tag только если услуг нет или если услуги не определили категорию
+    // Если услуги определили категорию (D, S, L, K и т.д.), то queue_tag игнорируется
+    const shouldUseQueueTag = !hasAnyServiceCategory;
+
+    // Итог: приоритет услуг выше queue_tag, который выше specialty/department
+    // Если услуги определили отдел (matchesByServices = true), используем их результат
+    // Если услуги есть, но не определили текущий отдел, НЕ используем queue_tag (чтобы избежать неправильной категоризации)
+    // Если услуг нет, используем queue_tag
+    // В последнюю очередь используем specialty/department
+    const result = matchesByServices || (shouldUseQueueTag && matchesByQueueTag) || matchesByDepartment || matchesBySpecialty;
+
     // ✅ Возвращаем результат универсальной проверки
     return result;
   }, [services]);
@@ -2233,39 +2595,30 @@ const RegistrarPanel = () => {
   // Мемоизированные счетчики и индикаторы по отделам
   const departmentStats = useMemo(() => {
     const stats = {};
-    const departments = ['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'];
-    
-    departments.forEach(dept => {
+    // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Используем отделения из БД + стандартные как fallback
+    const standardDepartments = ['cardio', 'echokg', 'derma', 'dental', 'lab', 'procedures'];
+    const dynamicDepartmentKeys = dynamicDepartments.map(d => d.key);
+    // Объединяем: динамические отделения имеют приоритет
+    const allDepartments = [...new Set([...dynamicDepartmentKeys, ...standardDepartments])];
+
+    allDepartments.forEach(dept => {
       const deptAppointments = appointments.filter(a => isInDepartment(a, dept));
       const todayAppointments = deptAppointments.filter(a => {
         // Проверяем и текущую дату и поле date
         const appointmentDate = a.date || a.appointment_date;
         return appointmentDate === todayStr;
       });
-      
+
       stats[dept] = {
         todayCount: todayAppointments.length,
-        hasActiveQueue: deptAppointments.some(a => a.status === 'queued'),
+        // ✅ ИСПРАВЛЕНО: Проверяем наличие queue_numbers вместо статуса 'queued'
+        hasActiveQueue: deptAppointments.some(a => a.queue_numbers && a.queue_numbers.length > 0),
         hasPendingPayments: deptAppointments.some(a => a.status === 'paid_pending' || a.payment_status === 'pending')
       };
     });
-    
+
     return stats;
-  }, [appointments, todayStr]);
-
-  // Счетчик «сегодня» по отделам
-  const getDepartmentCount = useCallback((departmentKey) => {
-    return departmentStats[departmentKey]?.todayCount || 0;
-  }, [departmentStats]);
-
-  // Индикаторы статусов по отделу
-  const hasActiveQueue = useCallback((departmentKey) => {
-    return departmentStats[departmentKey]?.hasActiveQueue || false;
-  }, [departmentStats]);
-
-  const hasPendingPayments = useCallback((departmentKey) => {
-    return departmentStats[departmentKey]?.hasPendingPayments || false;
-  }, [departmentStats]);
+  }, [appointments, todayStr, isInDepartment, dynamicDepartments]);
 
   // Функция агрегации пациентов для вкладки "Все отделения"
   const aggregatePatientsForAllDepartments = useCallback((appointments) => {
@@ -2276,6 +2629,9 @@ const RegistrarPanel = () => {
       const patientKey = appointment.patient_fio;
 
       if (!patientGroups[patientKey]) {
+        // ✅ ИСПРАВЛЕНО: Проверяем All Free статус для корректного отображения
+        const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
+
         patientGroups[patientKey] = {
           id: appointment.id,
           patient_id: appointment.patient_id,
@@ -2283,8 +2639,10 @@ const RegistrarPanel = () => {
           patient_birth_year: appointment.patient_birth_year,
           patient_phone: appointment.patient_phone,
           address: appointment.address,
-          visit_type: appointment.visit_type,
-          payment_type: appointment.payment_type,
+          // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем visit_type как 'free'
+          visit_type: isAllFree ? 'free' : appointment.visit_type,
+          // ✅ ИСПРАВЛЕНО: Для all_free устанавливаем payment_type как 'free'
+          payment_type: isAllFree ? 'free' : appointment.payment_type,
           payment_status: appointment.payment_status,
           cost: 0, // Будет суммироваться из всех записей
           status: appointment.status,
@@ -2302,12 +2660,30 @@ const RegistrarPanel = () => {
           confirmation_status: appointment.confirmation_status,
           confirmed_at: appointment.confirmed_at,
           confirmed_by: appointment.confirmed_by,
-          record_type: appointment.record_type // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
+          record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
+          // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
+          discount_mode: appointment.discount_mode,
+          approval_status: appointment.approval_status
         };
+      } else {
+        // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
+        const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
+        const existingIsAllFree = patientGroups[patientKey].discount_mode === 'all_free' &&
+          patientGroups[patientKey].approval_status === 'approved';
+
+        if (isAllFree && !existingIsAllFree) {
+          // Новая запись All Free, а существующая нет — обновляем
+          patientGroups[patientKey].visit_type = 'free';
+          patientGroups[patientKey].payment_type = 'free';
+          patientGroups[patientKey].discount_mode = appointment.discount_mode;
+          patientGroups[patientKey].approval_status = appointment.approval_status;
+        }
       }
 
       // Суммируем стоимость для ВСЕХ записей пациента (включая первую)
-      if (appointment.cost) {
+      // ✅ ИСПРАВЛЕНО: Для All Free не суммируем стоимость, оставляем 0
+      const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
+      if (!isAllFree && appointment.cost) {
         patientGroups[patientKey].cost += appointment.cost;
       }
 
@@ -2338,26 +2714,124 @@ const RegistrarPanel = () => {
   // Мемоизированная фильтрация записей по выбранной вкладке (повторный клик снимает фильтр → activeTab === null)
   // Фильтрация по вкладке + по дате (?date=YYYY-MM-DD) + по поиску (?q=...)
 
-  const filteredAppointments = useMemo(() => {
-    console.log('🔍 filteredAppointments useMemo запущен:', {
-      appointmentsCount: appointments.length,
-      activeTab,
-      statusFilter,
-      searchQuery
+  // ✅ Функция фильтрации услуг по вкладке
+  const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
+    if (!departmentKey || !appointment.services) {
+      return appointment.services; // Если нет вкладки или услуг, возвращаем все
+    }
+
+    const appointmentServiceCodes = appointment.service_codes || [];
+    const appointmentServices = appointment.services || [];
+
+    // ⭐ ВАЖНО: Создаем маппинг service -> service_code для точного сопоставления
+    // Это гарантирует, что каждая услуга сопоставляется с правильным кодом
+    const serviceToCodeMap = new Map();
+
+    appointmentServices.forEach((service, index) => {
+      // Приоритет 1: service_codes по индексу (если массивы совпадают по порядку)
+      if (appointmentServiceCodes[index]) {
+        serviceToCodeMap.set(service, appointmentServiceCodes[index]);
+        return;
+      }
+
+      // Приоритет 2: ищем по ID или названию в справочнике услуг
+      if (services && typeof services === 'object') {
+        for (const groupName in services) {
+          const groupServices = services[groupName];
+          if (Array.isArray(groupServices)) {
+            if (typeof service === 'number' || (typeof service === 'string' && !isNaN(service))) {
+              const serviceId = parseInt(service);
+              const serviceByID = groupServices.find(s => s.id === serviceId);
+              if (serviceByID && serviceByID.service_code) {
+                serviceToCodeMap.set(service, serviceByID.service_code);
+                return;
+              }
+            }
+            const serviceByName = groupServices.find(s => s.name === service);
+            if (serviceByName && serviceByName.service_code) {
+              serviceToCodeMap.set(service, serviceByName.service_code);
+              return;
+            }
+          }
+        }
+      }
     });
-    
+
+    // Маппинг категорий по вкладкам
+    const departmentCategoryMapping = {
+      'cardio': ['K', 'ECHO'],
+      'echokg': ['ECG'],
+      'derma': ['D', 'DERM', 'DERM_PROC'],
+      'dental': ['S', 'DENT', 'STOM'],
+      'lab': ['L'],
+      'procedures': ['P', 'C', 'D_PROC', 'PHYS', 'COSM']
+    };
+
+    const getServiceCategoryByCode = (serviceCode) => {
+      if (!serviceCode) return null;
+      if (serviceCode === 'K10' || serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
+      if (serviceCode === 'K11' || serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO') || serviceCode.includes('ЭхоКГ')) return 'ECHO';
+      if (serviceCode.match(/^P\d+$/)) return 'P';
+      if (serviceCode.match(/^D_PROC\d+$/)) return 'D_PROC';
+      if (serviceCode.match(/^C\d+$/)) return 'C';
+      if (serviceCode.match(/^K\d+$/) && serviceCode !== 'K10') return 'K';
+      if (serviceCode.match(/^S\d+$/)) return 'S';
+      if (serviceCode.match(/^L\d+$/)) return 'L';
+      if (serviceCode === 'D01') return 'D';
+      if (serviceCode.startsWith('CONS_CARD')) return 'K';
+      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'DERM';
+      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'DENT';
+      if (serviceCode.startsWith('LAB_')) return 'L';
+      if (serviceCode.startsWith('COSM_')) return 'C';
+      if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';
+      if (serviceCode.startsWith('DERM_PROC_') || serviceCode.startsWith('DERM_')) return 'D_PROC';
+      if (serviceCode.startsWith('CARD_') && !serviceCode.includes('ECG')) return 'K';
+      return null;
+    };
+
+    const targetCategoryCodes = departmentCategoryMapping[departmentKey] || [];
+
+    // Фильтруем услуги: оставляем только те, которые относятся к текущей вкладке
+    // ⭐ ВАЖНО: Используем маппинг service -> service_code для точного сопоставления
+    const servicesWithCodes = appointmentServices.map((service) => {
+      // Получаем код услуги из маппинга
+      const serviceCode = serviceToCodeMap.get(service) || null;
+
+      return { service, serviceCode };
+    });
+
+    // Теперь фильтруем по категории
+    const filteredServices = servicesWithCodes
+      .filter(({ serviceCode }) => {
+        if (!serviceCode) {
+          // Если код не найден, НЕ показываем (чтобы избежать неправильной категоризации)
+          return false;
+        }
+
+        const category = getServiceCategoryByCode(serviceCode);
+        const shouldShow = targetCategoryCodes.includes(category);
+
+        return shouldShow;
+      })
+      .map(({ service }) => service); // Возвращаем только услуги
+
+    return filteredServices.length > 0 ? filteredServices : appointmentServices; // Если ничего не отфильтровалось, показываем все
+  }, [services]);
+
+  // ✅ filteredAppointments вычисляется здесь и сохраняется в ref
+  const filteredAppointments = useMemo(() => {
     // Если выбрана конкретная вкладка (не "Все отделения"), используем обычную фильтрацию
     if (activeTab) {
-    const filtered = appointments.filter(appointment => {
-      // Фильтр по вкладке (отдел)
+      const filtered = appointments.filter(appointment => {
+        // Фильтр по вкладке (отдел)
         if (!isInDepartment(appointment, activeTab)) {
-        return false;
-      }
+          return false;
+        }
         // Фильтр по статусу (если задан)
-      if (statusFilter && appointment.status !== statusFilter) return false;
+        if (statusFilter && appointment.status !== statusFilter) return false;
         // Поиск по ФИО/телефону/услугам/ID записи (если задан)
-      if (searchQuery) {
-        const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
+        if (searchQuery) {
+          const inFio = (appointment.patient_fio || '').toLowerCase().includes(searchQuery);
 
           // Поиск по ID записи
           const inId = String(appointment.id).includes(searchQuery);
@@ -2368,26 +2842,80 @@ const RegistrarPanel = () => {
           const searchDigits = searchQuery.replace(/\D/g, ''); // Только цифры из поиска
 
           const inPhone = originalPhone.includes(searchQuery) ||
-                         phoneDigits.includes(searchDigits) ||
-                         (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+            phoneDigits.includes(searchDigits) ||
+            (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
 
-        const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
+          const inServices = Array.isArray(appointment.services) && appointment.services.some(s => String(s).toLowerCase().includes(searchQuery));
           if (!inFio && !inPhone && !inServices && !inId) return false;
-      }
-    return true;
-  });
+        }
+        return true;
+      });
 
-      console.log('🔍 Результат фильтрации для вкладки', activeTab, ':', filtered.length, 'записей');
-    return filtered;
+      // ⭐ ВАЖНО: Сортируем по queue_time ASC (согласно cursor.yaml), иначе по created_at
+      // Это обеспечивает правильный порядок записей во вкладках
+      const sorted = filtered.sort((a, b) => {
+        // Приоритет: queue_time > created_at
+        const aTime = (a.queue_time ? new Date(a.queue_time) : (a.created_at ? new Date(a.created_at) : null))?.getTime() || 0;
+        const bTime = (b.queue_time ? new Date(b.queue_time) : (b.created_at ? new Date(b.created_at) : null))?.getTime() || 0;
+        // Если время одинаковое или отсутствует, используем ID как fallback
+        if (aTime === bTime) {
+          return (a.id || 0) - (b.id || 0);
+        }
+        return aTime - bTime; // От раннего к позднему (ASC)
+      });
+
+      // ✅ ИСПРАВЛЕНО: Используем номера из базы данных (queue_numbers), не пересчитываем
+      // Это гарантирует, что номера старых услуг не меняются при добавлении новых
+      const sortedWithNumbers = sorted.map((appointment) => {
+        // Приоритет 1: Используем номер из queue_numbers (из базы данных)
+        const queueNumberFromDB = appointment.queue_numbers?.[0]?.number || null;
+
+        // Приоритет 2: Используем queue_number из appointment (если есть)
+        const queueNumber = queueNumberFromDB || appointment.queue_number || null;
+
+        return {
+          ...appointment,
+          queue_number: queueNumber,  // ⭐ Используем номер из БД, не пересчитываем
+          queue_numbers: appointment.queue_numbers || []  // ⭐ Сохраняем оригинальные номера из БД
+        };
+      });
+
+      logger.info('🔍 Результат фильтрации для вкладки', activeTab, ':', sortedWithNumbers.length, 'записей');
+      logger.info('📅 Первые 5 записей с номерами:', sortedWithNumbers.slice(0, 5).map(a => ({
+        id: a.id,
+        patient: a.patient_fio,
+        number: a.queue_number,
+        created_at: a.created_at,
+        source: a.source
+      })));
+
+      // ✅ Фильтруем услуги по вкладке: показываем только релевантные услуги
+      const withFilteredServices = sortedWithNumbers.map(appointment => ({
+        ...appointment,
+        services: filterServicesByDepartment(appointment, activeTab)
+      }));
+
+      return withFilteredServices;
     }
 
     // Для вкладки "Все отделения" (activeTab === null) - агрегируем пациентов
     if (!activeTab) {
       // Сначала фильтруем по статусу, если задан
-      let filtered = appointments.filter(appointment => {
+      const filtered = appointments.filter(appointment => {
         // Фильтр по статусу (если задан)
         if (statusFilter && appointment.status !== statusFilter) return false;
         return true;
+      });
+
+      // ⭐ ВАЖНО: Сортируем по queue_time ASC (согласно cursor.yaml), иначе по created_at
+      filtered.sort((a, b) => {
+        // Приоритет: queue_time > created_at
+        const aTime = (a.queue_time ? new Date(a.queue_time) : (a.created_at ? new Date(a.created_at) : null))?.getTime() || 0;
+        const bTime = (b.queue_time ? new Date(b.queue_time) : (b.created_at ? new Date(b.created_at) : null))?.getTime() || 0;
+        if (aTime === bTime) {
+          return (a.id || 0) - (b.id || 0);
+        }
+        return aTime - bTime; // От раннего к позднему (ASC)
       });
 
       // Затем агрегируем пациентов
@@ -2395,7 +2923,7 @@ const RegistrarPanel = () => {
 
       // Применяем поиск к агрегированным данным
       if (searchQuery) {
-        return aggregatedPatients.filter(patient => {
+        const searched = aggregatedPatients.filter(patient => {
           const inFio = (patient.patient_fio || '').toLowerCase().includes(searchQuery);
 
           // Поиск по ID записи
@@ -2407,21 +2935,51 @@ const RegistrarPanel = () => {
           const searchDigits = searchQuery.replace(/\D/g, '');
 
           const inPhone = originalPhone.includes(searchQuery) ||
-                         phoneDigits.includes(searchDigits) ||
-                         (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
+            phoneDigits.includes(searchDigits) ||
+            (searchDigits.length >= 3 && phoneDigits.includes(searchDigits));
 
           // Поиск по услугам (теперь ищем в агрегированном списке)
           const inServices = Array.isArray(patient.services) && patient.services.some(s => String(s).toLowerCase().includes(searchQuery));
 
           return inFio || inPhone || inServices || inId;
         });
+        // ✅ ИСПРАВЛЕНИЕ: Сортируем результат поиска по времени регистрации
+        return searched.sort((a, b) => {
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (aTime === bTime) {
+            return (a.id || 0) - (b.id || 0);
+          }
+          return aTime - bTime;
+        });
       }
 
-      return aggregatedPatients;
+      // ⭐ ВАЖНО: Сортируем агрегированных пациентов по queue_time ASC (согласно cursor.yaml)
+      return aggregatedPatients.sort((a, b) => {
+        // Приоритет: queue_time > created_at
+        const aTime = (a.queue_time ? new Date(a.queue_time) : (a.created_at ? new Date(a.created_at) : null))?.getTime() || 0;
+        const bTime = (b.queue_time ? new Date(b.queue_time) : (b.created_at ? new Date(b.created_at) : null))?.getTime() || 0;
+        if (aTime === bTime) {
+          return (a.id || 0) - (b.id || 0);
+        }
+        return aTime - bTime; // От раннего к позднему (ASC)
+      });
     }
 
-    return appointments;
-  }, [appointments, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments]);
+    // ⭐ ВАЖНО: Сортируем все записи по queue_time ASC (согласно cursor.yaml), иначе по created_at
+    return appointments.sort((a, b) => {
+      // Приоритет: queue_time > created_at
+      const aTime = (a.queue_time ? new Date(a.queue_time) : (a.created_at ? new Date(a.created_at) : null))?.getTime() || 0;
+      const bTime = (b.queue_time ? new Date(b.queue_time) : (b.created_at ? new Date(b.created_at) : null))?.getTime() || 0;
+      if (aTime === bTime) {
+        return (a.id || 0) - (b.id || 0);
+      }
+      return aTime - bTime; // От раннего к позднему (ASC)
+    });
+  }, [appointments, activeTab, statusFilter, searchQuery, isInDepartment, aggregatePatientsForAllDepartments, filterServicesByDepartment]);
+
+  // ✅ Сохраняем filteredAppointments в ref для использования в handleKeyDown
+  filteredAppointmentsRef.current = filteredAppointments;
 
   // Мемоизированный компонент индикатора источника данных (для всех вкладок)
   const DataSourceIndicator = memo(({ count }) => {
@@ -2442,8 +3000,8 @@ const RegistrarPanel = () => {
         }}>
           <span>⚠️</span>
           <span>Показаны демо-данные. Проверьте подключение к серверу.</span>
-          <button 
-            onClick={loadAppointments}
+          <button
+            onClick={() => loadAppointments({ source: 'demo_refresh_button' })}
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
               border: 'none',
@@ -2460,7 +3018,7 @@ const RegistrarPanel = () => {
         </div>
       );
     }
-    
+
     if (dataSource === 'api') {
       return (
         <div style={{
@@ -2484,7 +3042,7 @@ const RegistrarPanel = () => {
         </div>
       );
     }
-    
+
     if (dataSource === 'loading') {
       return (
         <div style={{
@@ -2505,10 +3063,10 @@ const RegistrarPanel = () => {
         </div>
       );
     }
-    
+
     return null;
   });
-  
+
   DataSourceIndicator.displayName = 'DataSourceIndicator';
 
   // Функция генерации CSV
@@ -2525,15 +3083,15 @@ const RegistrarPanel = () => {
       row.cost || '',
       row.status || ''
     ]);
-    
+
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
-    
+
     return csvContent;
   };
-  
+
   // Функция скачивания CSV
   const downloadCSV = (content, filename) => {
     const blob = new Blob(['\ufeff' + content], { type: 'text/csv;charset=utf-8;' });
@@ -2547,33 +3105,17 @@ const RegistrarPanel = () => {
     document.body.removeChild(link);
   };
 
-  // Мемоизированная статистика для экрана приветствия
-  const stats = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    return {
-    totalPatients: appointments.length,
-      todayAppointments: appointments.filter(a => a.date === todayStr).length,
-    pendingPayments: appointments.filter(a => a.status === 'paid_pending').length,
-    activeQueues: appointments.filter(a => a.status === 'queued').length
-  };
-  }, [appointments]);
-
-  // Простой режим выбора врача (для 3 специализаций)
-  const simpleDoctorMode = true;
-  const getDoctorBySpecialty = useCallback((spec) => {
-    const found = doctors.find(d => d.specialty === spec) || null;
-    return found;
-  }, [doctors]);
 
   // Обработчик действий контекстного меню
   const handleContextMenuAction = useCallback(async (action, row) => {
     switch (action) {
       case 'view':
-        setSelectedAppointment(row);
-        setShowAppointmentFlow(true);
+        setWizardEditMode(true);
+        setWizardInitialData(row);
+        setShowWizard(true);
         break;
       case 'edit':
-        console.log('Редактирование записи:', row);
+        logger.info('Редактирование записи:', row);
         break;
       case 'in_cabinet':
         await updateAppointmentStatus(row.id, 'in_cabinet');
@@ -2593,7 +3135,6 @@ const RegistrarPanel = () => {
         setPrintDialog({ open: true, type: 'ticket', data: row });
         break;
       case 'reschedule':
-        setSelectedAppointment(row);
         setShowSlotsModal(true);
         break;
       case 'cancel':
@@ -2605,7 +3146,7 @@ const RegistrarPanel = () => {
         }
         break;
       default:
-        console.log('Неизвестное действие:', action);
+        logger.info('Неизвестное действие:', action);
         break;
     }
   }, [updateAppointmentStatus, handleStartVisit]);
@@ -2613,11 +3154,11 @@ const RegistrarPanel = () => {
   return (
     <div style={{ ...pageStyle, overflow: 'hidden' }} role="main" aria-label="Панель регистратора">
       <ToastContainer position="bottom-right" />
-      {/* Фиксированная верхняя часть убрана - используется глобальный хедер */}
+
 
       {/* Skip to content link for screen readers */}
-      <a 
-        href="#main-content" 
+      <a
+        href="#main-content"
         style={{
           position: 'absolute',
           left: '-9999px',
@@ -2653,7 +3194,7 @@ const RegistrarPanel = () => {
             theme={theme}
             language={language}
           />
-      </div>
+        </div>
       )}
 
       {/* Старые вкладки удалены - используется ModernTabs компонент */}
@@ -2663,792 +3204,743 @@ const RegistrarPanel = () => {
         {/* Экран приветствия по параметру view=welcome (с историей: календарь + поиск) */}
         {searchParams.get('view') === 'welcome' && (
           <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" style={{ 
+            <Card variant="default" style={{
               margin: `0 ${'1rem'} ${'2rem'} ${'1rem'}`,
               maxWidth: 'none',
-              width: 'calc(100vw - 32px)'
+              width: 'calc(100vw - 32px)',
+              backgroundColor: 'var(--mac-bg-toolbar)',
+              border: '1px solid var(--mac-separator)',
+              borderRadius: 'var(--mac-radius-lg)',
+              backdropFilter: 'var(--mac-blur-medium)',
+              WebkitBackdropFilter: 'var(--mac-blur-medium)'
             }}>
-              <Card.Header>
+              <CardHeader style={{
+                padding: 'var(--mac-spacing-8)',
+                background: 'var(--mac-gradient-subtle)',
+                borderBottom: '1px solid var(--mac-separator)'
+              }}>
                 <AnimatedTransition type="slide" direction="up" delay={200}>
-                  <h1 style={{ 
-                    margin: 0, 
-                    fontSize: '48px', 
-                    fontWeight: '400', 
-                    lineHeight: '1.25',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px' 
+                  <h1 style={{
+                    margin: 0,
+                    fontSize: '40px',
+                    fontWeight: '700',
+                    lineHeight: '1.2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--mac-spacing-3)',
+                    color: 'var(--mac-text-primary)',
+                    fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif',
+                    letterSpacing: '-0.01em',
+                    textRendering: 'optimizeLegibility'
                   }}>
                     {t('welcome')} в панель регистратора!
-                    <span style={{ fontSize: '32px' }}>👋</span>
+                    <Icon name="person" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={400}>
-                  <div style={{ fontSize: '18px', opacity: 0.9, lineHeight: '1.5' }}>
-                    {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                  <div style={{
+                    fontSize: '20px',
+                    fontWeight: '600',
+                    color: 'var(--mac-text-secondary)',
+                    lineHeight: '1.4',
+                    marginTop: 'var(--mac-spacing-3)',
+                    fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif',
+                    letterSpacing: '0.01em',
+                    opacity: 0.9
+                  }}>
+                    {new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
                     })}
-        </div>
+                  </div>
                 </AnimatedTransition>
-              </Card.Header>
-            
-            <Card.Content>
-              {/* Современная статистика */}
-              <ModernStatistics
-                appointments={appointments}
-                departmentStats={departmentStats}
-                language={language}
-                selectedDate={showCalendar && historyDate ? historyDate : new Date().toISOString().split('T')[0]}
-                onExport={() => {
-                  console.log('Экспорт статистики');
-                }}
-                onRefresh={() => {
-                  loadAppointments();
-                }}
-              />
+              </CardHeader>
 
-              {/* Онлайн-очередь */}
-              <AnimatedTransition type="fade" delay={800}>
-                <div style={{ marginBottom: '32px' }}>
-                  <h2 style={{ fontSize: '24px', marginBottom: '20px', color: accentColor }}>
-                    📱 Онлайн-очередь
-                  </h2>
-                  <ModernQueueManager
-                    selectedDate={selectedDate}
-                    selectedDoctor={selectedDoctor?.id?.toString() || ''}
-                    searchQuery={''}
-                    onQueueUpdate={loadIntegratedData}
-                    language={language}
-                    theme={theme}
-                    doctors={doctors}
-                  />
-                </div>
-              </AnimatedTransition>
+              <CardContent>
+                {/* Современная статистика */}
+                <ModernStatistics
+                  appointments={appointments}
+                  departmentStats={departmentStats}
+                  language={language}
+                  selectedDate={showCalendar && historyDate ? historyDate : getLocalDateString()}
+                  onExport={() => {
+                    logger.info('Экспорт статистики');
+                  }}
+                  onRefresh={() => {
+                    loadAppointments({ source: 'statistics_refresh' });
+                  }}
+                />
 
-              {/* Панель управления и фильтров */}
-              <AnimatedTransition type="fade" delay={1000}>
-                <div style={{ marginBottom: '32px' }}>
-                  <AnimatedTransition type="slide" direction="up" delay={1100}>
-                    <h2 style={{ fontSize: '24px', marginBottom: '20px', color: accentColor }}>
-                      🎛️ Панель управления
-                    </h2>
-                  </AnimatedTransition>
-                  
-                  {/* Быстрые действия */}
-                  <AnimatedTransition type="fade" delay={1200}>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-                      gap: '16px',
-                      alignItems: 'stretch',
-                      marginBottom: '24px'
-                    }}>
-                  <AnimatedTransition type="scale" delay={1300}>
-                    <button 
-                          type="button"
-                          onClick={(e) => {
-                            console.log('Кнопка "Новая запись" нажата');
-                            // Открываем мастер создания записи
-                            setSelectedPatientId(null);
-                            setPatientSuggestions([]);
-                            setShowPatientSuggestions(false);
-                            setShowWizard(true);
-                          }}
-                          aria-label="Create new appointment"
-                      style={{
-                            padding: '12px 16px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                            color: 'white',
-                            border: 'none',
-                            boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-                            transition: 'all 0.2s ease'
-                      }}
-                    >
-                      ➕ {t('new_appointment')}
-                    </button>
-                  </AnimatedTransition>
-
-                  {/* Кнопка модуля оплаты */}
-                  <AnimatedTransition type="scale" delay={1350}>
-                    <button 
-                      type="button"
-                      onClick={() => setShowPaymentManager(true)}
-                      aria-label="Open payment module"
-                      style={{
-                        padding: '12px 16px', 
-                        backgroundColor: '#8b5cf6', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        transition: 'all 0.2s ease',
+                {/* Панель управления и фильтров */}
+                <AnimatedTransition type="fade" delay={800}>
+                  <div style={{ marginBottom: 'var(--mac-spacing-8)' }}>
+                    <AnimatedTransition type="slide" direction="up" delay={900}>
+                      <h2 style={{
+                        fontSize: 'var(--mac-font-size-xl)',
+                        marginBottom: 'var(--mac-spacing-4)',
+                        color: 'var(--mac-text-primary)',
+                        fontWeight: 'var(--mac-font-weight-semibold)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      💳 Модуль оплаты
-                    </button>
-                  </AnimatedTransition>
-                      
-                  <AnimatedTransition type="scale" delay={1400}>
-                    <button 
-                          type="button"
-                      style={{
-                            padding: '12px 16px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'white',
-                            color: '#374151',
-                            border: '1px solid #d1d5db',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Экспорт CSV" нажата');
-                            const csvContent = generateCSV(appointments);
-                            const filename = `appointments_${new Date().toISOString().split('T')[0]}.csv`;
-                            downloadCSV(csvContent, filename);
-                            toast.success(`Экспортировано ${appointments.length} записей`);
-                      }}
-                    >
-                      📊 {t('export_csv')}
-                    </button>
-                  </AnimatedTransition>
-                    </div>
-                  </AnimatedTransition>
+                        gap: 'var(--mac-spacing-2)'
+                      }}>
+                        <Icon name="gear" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                        Панель управления
+                      </h2>
+                    </AnimatedTransition>
 
-                  {/* Фильтры и навигация */}
-                  <AnimatedTransition type="fade" delay={1500}>
-                    <div style={{
-                      background: theme === 'light' ? '#f8f9fa' : '#374151',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      border: `1px solid ${theme === 'light' ? '#e9ecef' : '#4b5563'}`
-                    }}>
-                      <h3 style={{ 
-                        fontSize: '18px', 
-                        marginBottom: '16px', 
-                        color: textColor,
-                        fontWeight: '600'
+                    {/* Быстрые действия */}
+                    <AnimatedTransition type="fade" delay={1000}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                        gap: 'var(--mac-spacing-3)',
+                        alignItems: 'stretch',
+                        marginBottom: 'var(--mac-spacing-6)'
                       }}>
-                        🔍 Фильтры и навигация
-                      </h3>
-                      
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-                        gap: '12px',
-                        alignItems: 'stretch'
-                      }}>
-                    <button 
-                          type="button"
-                      style={{
-                            padding: '10px 14px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: showCalendar ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                            color: 'white',
-                            border: 'none',
-                            boxShadow: '0 2px 4px 0 rgba(245, 158, 11, 0.3)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Календарь" нажата');
-                            setShowCalendar(!showCalendar);
-                          }}
-                        >
-                          📅 Календарь
-                        </button>
-                        
-                        <button 
-                          type="button"
-                          style={{ 
-                            padding: '10px 14px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            border: 'none',
-                            boxShadow: '0 2px 4px 0 rgba(16, 185, 129, 0.3)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Активная очередь" нажата');
-                            // Переходим к таблице с фильтром по статусу "В очереди"
-                            window.location.href = `/registrar-panel?status=queued`;
-                          }}
-                        >
-                          🟢 Активная очередь
-                    </button>
-                        
-                    <button 
-                          type="button"
-                      style={{
-                            padding: '10px 14px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                            color: 'white',
-                            border: 'none',
-                            boxShadow: '0 2px 4px 0 rgba(59, 130, 246, 0.3)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Ожидают оплаты" нажата');
-                            // Переходим к таблице с фильтром по статусу "Ожидает оплаты"
-                            window.location.href = `/registrar-panel?status=paid_pending`;
-                          }}
-                        >
-                          💰 Ожидают оплаты
-                        </button>
-                        
-                        <button 
-                          type="button"
-                          style={{ 
-                            padding: '10px 14px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'white',
-                            color: '#374151',
-                            border: '1px solid #d1d5db',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Все записи" нажата');
-                            // Переходим к основной таблице без фильтров
-                            window.location.href = `/registrar-panel`;
-                          }}
-                        >
-                          📋 Все записи
-                    </button>
-                        
-                        <button 
-                          type="button"
-                          style={{ 
-                            padding: '10px 14px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'white',
-                            color: '#374151',
-                            border: '1px solid #d1d5db',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Онлайн-очередь" нажата');
-                            // Переходим к экрану онлайн-очереди
-                            window.location.href = `/registrar-panel?view=queue`;
-                          }}
-                        >
-                          🌐 Онлайн-очередь
-                        </button>
-                        
-                        <button 
-                          type="button"
-                          style={{ 
-                            padding: '10px 14px', 
-                            borderRadius: 8, 
-                            fontSize: 14, 
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                            background: 'white',
-                            color: '#374151',
-                            border: '1px solid #d1d5db',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onClick={(e) => {
-                            console.log('Кнопка "Обновить данные" нажата');
-                            // Обновляем данные
-                            loadAppointments();
-                            toast.success('Данные обновлены');
-                          }}
-                        >
-                          🔄 Обновить данные
-                        </button>
-                      </div>
-                      
-                      {/* Календарный виджет */}
-                      {showCalendar && (
-                        <div style={{
-                          marginTop: '16px',
-                          padding: '16px',
-                          background: theme === 'light' ? 'white' : '#1f2937',
-                          borderRadius: '12px',
-                          border: `1px solid ${theme === 'light' ? '#e9ecef' : '#4b5563'}`,
-                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                        }}>
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px'
-                          }}>
-                            <label style={{
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              color: textColor,
+                        <AnimatedTransition type="scale" delay={1100}>
+                          <Button
+                            variant="primary"
+                            size="default"
+                            onClick={() => {
+                              logger.info('Кнопка "Новая запись" нажата');
+                              setShowWizard(true);
+                            }}
+                            aria-label="Create new appointment"
+                            style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '8px'
-                            }}>
-                              📅 Выберите дату для просмотра истории:
-                            </label>
-                            <input
-                              type="date"
-                              value={historyDate}
-                              onChange={(e) => {
-                                setHistoryDate(e.target.value);
-                                console.log('Выбрана дата:', e.target.value);
-                              }}
-                              style={{
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                border: `1px solid ${theme === 'light' ? '#d1d5db' : '#4b5563'}`,
-                                background: theme === 'light' ? 'white' : '#374151',
-                                color: textColor,
-                                cursor: 'pointer'
-                              }}
-                            />
+                              gap: 'var(--mac-spacing-2)',
+                              fontWeight: 'var(--mac-font-weight-semibold)'
+                            }}
+                          >
+                            <Icon name="plus" size="small" style={{ color: 'white' }} />
+                            {t('new_appointment')}
+                          </Button>
+                        </AnimatedTransition>
+
+                        {/* Кнопка модуля оплаты */}
+                        <AnimatedTransition type="scale" delay={1350}>
+                          <Button
+                            variant="secondary"
+                            size="default"
+                            onClick={() => setShowPaymentManager(true)}
+                            aria-label="Open payment module"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--mac-spacing-2)'
+                            }}
+                          >
+                            <Icon name="creditcard" size="small" />
+                            Модуль оплаты
+                          </Button>
+                        </AnimatedTransition>
+
+                        <AnimatedTransition type="scale" delay={1400}>
+                          <Button
+                            variant="outline"
+                            size="default"
+                            onClick={() => {
+                              logger.info('Кнопка "Экспорт CSV" нажата');
+                              const csvContent = generateCSV(appointments);
+                              const filename = `appointments_${getLocalDateString()}.csv`;
+                              downloadCSV(csvContent, filename);
+                              toast.success(`Экспортировано ${appointments.length} записей`);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--mac-spacing-2)'
+                            }}
+                          >
+                            <Icon name="square.and.arrow.up" size="small" />
+                            {t('export_csv')}
+                          </Button>
+                        </AnimatedTransition>
+                      </div>
+                    </AnimatedTransition>
+
+                    {/* Фильтры и навигация */}
+                    <AnimatedTransition type="fade" delay={1500}>
+                      <div style={{
+                        background: 'var(--mac-bg-toolbar)',
+                        borderRadius: 'var(--mac-radius-lg)',
+                        padding: 'var(--mac-spacing-5)',
+                        border: '1px solid var(--mac-separator)',
+                        backdropFilter: 'var(--mac-blur-light)',
+                        WebkitBackdropFilter: 'var(--mac-blur-light)'
+                      }}>
+                        <h3 style={{
+                          fontSize: 'var(--mac-font-size-lg)',
+                          marginBottom: 'var(--mac-spacing-4)',
+                          color: 'var(--mac-text-primary)',
+                          fontWeight: 'var(--mac-font-weight-semibold)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--mac-spacing-2)'
+                        }}>
+                          <Icon name="magnifyingglass" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                          Фильтры и навигация
+                        </h3>
+
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                          gap: 'var(--mac-spacing-3)',
+                          alignItems: 'stretch'
+                        }}>
+                          <Button
+                            variant={showCalendar ? 'warning' : 'outline'}
+                            size="default"
+                            onClick={() => {
+                              logger.info('Кнопка "Календарь" нажата');
+                              setShowCalendar(!showCalendar);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 'var(--mac-spacing-2)'
+                            }}
+                          >
+                            <Icon name="magnifyingglass" size="small" style={{ color: showCalendar ? 'white' : 'var(--mac-text-primary)' }} />
+                            Календарь
+                          </Button>
+
+                          <Button
+                            variant="success"
+                            size="default"
+                            onClick={() => window.location.href = '/registrar-panel?status=queued'}
+                            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
+                          >
+                            <Icon name="checkmark.circle" size="small" style={{ color: 'white' }} />
+                            Активная очередь
+                          </Button>
+
+                          <Button
+                            variant="primary"
+                            size="default"
+                            onClick={() => window.location.href = '/registrar-panel?status=paid_pending'}
+                            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
+                          >
+                            <Icon name="creditcard" size="small" style={{ color: 'white' }} />
+                            Ожидают оплаты
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="default"
+                            onClick={() => window.location.href = '/registrar-panel'}
+                            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
+                          >
+                            <Icon name="eye" size="small" />
+                            Все записи
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="default"
+                            onClick={() => window.location.href = '/registrar-panel?view=queue'}
+                            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
+                          >
+                            <Icon name="bell" size="small" />
+                            Онлайн-очередь
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="default"
+                            onClick={() => { loadAppointments({ source: 'manual_refresh_button' }); toast.success('Данные обновлены'); }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 'var(--mac-spacing-2)' }}
+                          >
+                            <Icon name="gear" size="small" />
+                            Обновить данные
+                          </Button>
+                        </div>
+
+                        {/* Календарный виджет */}
+                        {showCalendar && (
+                          <div style={{
+                            marginTop: 'var(--mac-spacing-4)',
+                            padding: 'var(--mac-spacing-5)',
+                            background: 'var(--mac-bg-primary)',
+                            borderRadius: 'var(--mac-radius-lg)',
+                            border: '1px solid var(--mac-separator)',
+                            boxShadow: 'var(--mac-shadow-sm)'
+                          }}>
                             <div style={{
                               display: 'flex',
-                              gap: '8px',
+                              flexDirection: 'column',
+                              gap: 'var(--mac-spacing-3)'
+                            }}>
+                              <label style={{
+                                fontSize: 'var(--mac-font-size-sm)',
+                                fontWeight: 'var(--mac-font-weight-semibold)',
+                                color: 'var(--mac-text-primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 'var(--mac-spacing-2)'
+                              }}>
+                                <Icon name="magnifyingglass" size="small" style={{ color: 'var(--mac-text-secondary)' }} />
+                                Выберите дату для просмотра истории:
+                              </label>
+                              <Input
+                                type="date"
+                                label=""
+                                value={tempDateInput}
+                                onChange={(e) => {
+                                  setTempDateInput(e.target.value);
+                                  logger.info('Введена дата (debounced):', e.target.value);
+                                }}
+                                onBlur={(e) => {
+                                  if (e.target.value && e.target.value !== historyDate) {
+                                    logger.info('📅 Date input blur - applying immediately:', e.target.value);
+                                    setHistoryDate(e.target.value);
+                                  }
+                                }}
+                              />
+                              <div style={{
+                                display: 'flex',
+                                gap: '8px',
+                                flexWrap: 'wrap'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const today = getLocalDateString();
+                                    setTempDateInput(today);
+                                    setHistoryDate(today);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                    color: textColor,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  Сегодня
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const yesterdayStr = getYesterdayDateString();
+                                    setTempDateInput(yesterdayStr);
+                                    setHistoryDate(yesterdayStr);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                    color: textColor,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  Вчера
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const weekAgo = new Date();
+                                    weekAgo.setDate(weekAgo.getDate() - 7);
+                                    const weekAgoStr = getLocalDateString(weekAgo);
+                                    setTempDateInput(weekAgoStr);
+                                    setHistoryDate(weekAgoStr);
+                                  }}
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    background: theme === 'light' ? '#f3f4f6' : '#4b5563',
+                                    color: textColor,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  Неделю назад
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </AnimatedTransition>
+                  </div>
+                </AnimatedTransition>
+
+                {/* История записей */}
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 'var(--mac-spacing-4)',
+                    flexWrap: 'wrap',
+                    gap: 'var(--mac-spacing-3)'
+                  }}>
+                    <h3 style={{
+                      fontSize: 'var(--mac-font-size-xl)',
+                      margin: 0,
+                      color: 'var(--mac-text-primary)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--mac-spacing-2)'
+                    }}>
+                      <Icon name="eye" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+                      История записей
+                    </h3>
+                    {showCalendar && (
+                      <Badge variant="secondary" style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        padding: 'var(--mac-spacing-2) var(--mac-spacing-3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--mac-spacing-2)'
+                      }}>
+                        <Icon name="magnifyingglass" size="small" />
+                        {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </Badge>
+                    )}
+                  </div>
+                  <div style={{
+                    background: 'var(--mac-bg-toolbar)',
+                    border: '1px solid var(--mac-separator)',
+                    borderRadius: 'var(--mac-radius-lg)',
+                    padding: 'var(--mac-spacing-5)',
+                    backdropFilter: 'var(--mac-blur-light)',
+                    WebkitBackdropFilter: 'var(--mac-blur-light)'
+                  }}>
+                    {/* Индикатор источника данных */}
+                    {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
+
+                    {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
+                    {(() => {
+                      const token = localStorage.getItem('auth_token');
+                      const isNoToken = !token;
+                      const isEmptyQueue = !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
+
+                      logger.info('🎯 Empty state render check:', {
+                        appointmentsLoading,
+                        dataSource,
+                        filteredLength: filteredAppointments.length,
+                        appointmentsLength: appointments.length,
+                        hasToken: !!token,
+                        isNoToken,
+                        isEmptyQueue,
+                        shouldShow: isEmptyQueue
+                      });
+
+                      return isEmptyQueue;
+                    })() && (
+                        <div style={{
+                          padding: '60px 20px',
+                          textAlign: 'center',
+                          background: cardBg,
+                          borderRadius: '12px',
+                          border: `1px solid ${borderColor}`
+                        }}>
+                          <div style={{
+                            fontSize: '48px',
+                            marginBottom: '16px',
+                            opacity: 0.3
+                          }}>
+                            {!localStorage.getItem('auth_token') ? '🔐' : '📋'}
+                          </div>
+                          <h3 style={{
+                            fontSize: '20px',
+                            fontWeight: '600',
+                            color: textColor,
+                            marginBottom: '8px'
+                          }}>
+                            {!localStorage.getItem('auth_token') ? 'Сессия истекла' : 'Очередь пуста'}
+                          </h3>
+                          <p style={{
+                            fontSize: '16px',
+                            color: textColor,
+                            opacity: 0.7,
+                            marginBottom: '24px',
+                            lineHeight: '1.5'
+                          }}>
+                            {!localStorage.getItem('auth_token')
+                              ? 'Нажмите "Войти снова", чтобы обновить данные.'
+                              : 'На сегодня нет записей в очереди.'}
+                          </p>
+
+                          {/* Кнопки действий */}
+                          {!localStorage.getItem('auth_token') && (
+                            <div style={{
+                              display: 'flex',
+                              gap: '12px',
+                              justifyContent: 'center',
                               flexWrap: 'wrap'
                             }}>
                               <button
-                                type="button"
                                 onClick={() => {
-                                  const today = new Date().toISOString().split('T')[0];
-                                  setHistoryDate(today);
+                                  // Перенаправляем на страницу входа
+                                  window.location.href = '/login';
                                 }}
                                 style={{
-                                  padding: '8px 12px',
-                                  borderRadius: '6px',
-                                  fontSize: '13px',
-                                  background: theme === 'light' ? '#f3f4f6' : '#4b5563',
-                                  color: textColor,
+                                  padding: '12px 24px',
+                                  background: '#3b82f6',
+                                  color: 'white',
                                   border: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '14px',
+                                  fontWeight: '500',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s'
                                 }}
+                                onMouseOver={(e) => e.target.style.background = '#2563eb'}
+                                onMouseOut={(e) => e.target.style.background = '#3b82f6'}
                               >
-                                Сегодня
+                                🔑 Войти снова
                               </button>
+
                               <button
-                                type="button"
                                 onClick={() => {
-                                  const yesterday = new Date();
-                                  yesterday.setDate(yesterday.getDate() - 1);
-                                  setHistoryDate(yesterday.toISOString().split('T')[0]);
+                                  // Обновляем данные
+                                  loadAppointments({ source: 'manual_refresh_button' });
                                 }}
                                 style={{
-                                  padding: '8px 12px',
-                                  borderRadius: '6px',
-                                  fontSize: '13px',
-                                  background: theme === 'light' ? '#f3f4f6' : '#4b5563',
-                                  color: textColor,
+                                  padding: '12px 24px',
+                                  background: '#10b981',
+                                  color: 'white',
                                   border: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '14px',
+                                  fontWeight: '500',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s'
                                 }}
+                                onMouseOver={(e) => e.target.style.background = '#059669'}
+                                onMouseOut={(e) => e.target.style.background = '#10b981'}
                               >
-                                Вчера
+                                🔄 Обновить данные
                               </button>
+
                               <button
-                                type="button"
                                 onClick={() => {
-                                  const weekAgo = new Date();
-                                  weekAgo.setDate(weekAgo.getDate() - 7);
-                                  setHistoryDate(weekAgo.toISOString().split('T')[0]);
+                                  // Перезапускаем приложение
+                                  window.location.reload();
                                 }}
                                 style={{
-                                  padding: '8px 12px',
-                                  borderRadius: '6px',
-                                  fontSize: '13px',
-                                  background: theme === 'light' ? '#f3f4f6' : '#4b5563',
-                                  color: textColor,
+                                  padding: '12px 24px',
+                                  background: '#6b7280',
+                                  color: 'white',
                                   border: 'none',
+                                  borderRadius: '8px',
+                                  fontSize: '14px',
+                                  fontWeight: '500',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s'
                                 }}
+                                onMouseOver={(e) => e.target.style.background = '#4b5563'}
+                                onMouseOut={(e) => e.target.style.background = '#6b7280'}
                               >
-                                Неделю назад
+                                🔄 Перезапустить приложение
                               </button>
                             </div>
-                          </div>
+                          )}
+                          <p style={{
+                            fontSize: '14px',
+                            color: textColor,
+                            marginBottom: '24px'
+                          }}>
+                            {activeTab
+                              ? `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}`
+                              : 'Сегодня пока нет записей'}
+                          </p>
+                          <Button
+                            variant="primary"
+                            onClick={() => setShowWizard(true)}
+                            style={{
+                              padding: '12px 24px',
+                              fontSize: '14px'
+                            }}
+                          >
+                            ➕ Создать первую запись
+                          </Button>
                         </div>
                       )}
-                    </div>
-                  </AnimatedTransition>
-                </div>
-              </AnimatedTransition>
 
-              {/* История записей */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                    <h3 style={{ fontSize: '20px', margin: 0, color: accentColor }}>
-                      📋 История записей
-                  </h3>
-                    {showCalendar && (
-                      <div style={{
-                        padding: '8px 16px',
-                        background: theme === 'light' ? '#f3f4f6' : '#374151',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        color: textColor,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        📅 {new Date(historyDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </div>
+                    {/* Таблица отображается только если есть данные */}
+                    {(appointmentsLoading || filteredAppointments.length > 0) && (
+                      <EnhancedAppointmentsTable
+                        data={filteredAppointments}
+                        loading={appointmentsLoading}
+                        theme={theme}
+                        language={language}
+                        selectedRows={appointmentsSelected}
+                        outerBorder={true}
+                        services={services}
+                        showCheckboxes={false}  // ✅ Отключаем чекбоксы для регистратуры
+                        onRowSelect={(id, checked) => {
+                          const newSelected = new Set(appointmentsSelected);
+                          if (checked) {
+                            newSelected.add(id);
+                          } else {
+                            newSelected.delete(id);
+                          }
+                          setAppointmentsSelected(newSelected);
+                        }}
+                        onRowClick={(row) => {
+                          logger.info('Открыть детали записи:', row);
+                          // Здесь можно открыть модальное окно с деталями записи
+                        }}
+                        onActionClick={(action, row, event) => {
+                          switch (action) {
+                            case 'view':
+                              logger.info('Просмотр записи:', row);
+                              setWizardEditMode(true);
+                              setWizardInitialData(row);
+                              setShowWizard(true);
+                              break;
+                            case 'edit':
+                              logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
+                              setWizardEditMode(true);
+                              setWizardInitialData(row);
+                              setShowWizard(true);
+                              break;
+                            case 'payment':
+                              logger.info('Открытие модального окна оплаты для записи (welcome):', row);
+                              setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
+                              break;
+                            case 'in_cabinet':
+                              logger.info('Отправка пациента в кабинет (welcome):', row);
+                              updateAppointmentStatus(row.id, 'in_cabinet');
+                              break;
+                            case 'call':
+                              logger.info('Вызов пациента (welcome):', row);
+                              handleStartVisit(row);
+                              break;
+                            case 'complete':
+                              logger.info('Завершение приёма (welcome):', row);
+                              updateAppointmentStatus(row.id, 'done');
+                              break;
+                            case 'print':
+                              logger.info('Печать талона (welcome):', row);
+                              setPrintDialog({ open: true, type: 'ticket', data: row });
+                              break;
+                            case 'more': {
+                              // Показать контекстное меню с дополнительными действиями
+                              const rect = event?.target?.getBoundingClientRect();
+                              setContextMenu({
+                                open: true,
+                                row,
+                                position: {
+                                  x: rect?.right || event?.clientX || 0,
+                                  y: rect?.top || event?.clientY || 0
+                                }
+                              });
+                              break;
+                            }
+                            default:
+                              break;
+                          }
+                        }}
+                      />
                     )}
                   </div>
-                  <div style={{ 
-                    background: cardBg,
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: '8px',
-                    padding: '16px'
-                  }}>
-            {/* Индикатор источника данных */}
-          {appointments.length > 0 && <DataSourceIndicator count={appointments.length} />}
-
-            {/* ✅ ДОБАВЛЕНО: Сообщение при пустой очереди */}
-            {(() => {
-              const token = localStorage.getItem('auth_token');
-              const isNoToken = !token;
-              const isEmptyQueue = !appointmentsLoading && dataSource === 'api' && filteredAppointments.length === 0;
-              
-              console.log('🎯 Empty state render check:', {
-                appointmentsLoading,
-                dataSource,
-                filteredLength: filteredAppointments.length,
-                appointmentsLength: appointments.length,
-                hasToken: !!token,
-                isNoToken,
-                isEmptyQueue,
-                shouldShow: isEmptyQueue
-              });
-              
-              return isEmptyQueue;
-            })() && (
-              <div style={{
-                padding: '60px 20px',
-                textAlign: 'center',
-                background: cardBg,
-                borderRadius: '12px',
-                border: `1px solid ${borderColor}`
-              }}>
-                <div style={{
-                  fontSize: '48px',
-                  marginBottom: '16px',
-                  opacity: 0.3
-                }}>
-                  {!localStorage.getItem('auth_token') ? '🔐' : '📋'}
                 </div>
-                <h3 style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: textColor,
-                  marginBottom: '8px'
-                }}>
-                  {!localStorage.getItem('auth_token') ? 'Сессия истекла' : 'Очередь пуста'}
-                </h3>
-                <p style={{
-                  fontSize: '16px',
-                  color: textColor,
-                  opacity: 0.7,
-                  marginBottom: '24px',
-                  lineHeight: '1.5'
-                }}>
-                  {!localStorage.getItem('auth_token') 
-                    ? 'Нажмите "Войти снова", чтобы обновить данные.' 
-                    : 'На сегодня нет записей в очереди.'}
-                </p>
-                
-                {/* Кнопки действий */}
-                {!localStorage.getItem('auth_token') && (
-                  <div style={{
-                    display: 'flex',
-                    gap: '12px',
-                    justifyContent: 'center',
-                    flexWrap: 'wrap'
-                  }}>
-                    <button
-                      onClick={() => {
-                        // Перенаправляем на страницу входа
-                        window.location.href = '/login';
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        background: '#3b82f6',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => e.target.style.background = '#2563eb'}
-                      onMouseOut={(e) => e.target.style.background = '#3b82f6'}
-                    >
-                      🔑 Войти снова
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        // Обновляем данные
-                        loadAppointments();
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        background: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => e.target.style.background = '#059669'}
-                      onMouseOut={(e) => e.target.style.background = '#10b981'}
-                    >
-                      🔄 Обновить данные
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        // Перезапускаем приложение
-                        window.location.reload();
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        background: '#6b7280',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => e.target.style.background = '#4b5563'}
-                      onMouseOut={(e) => e.target.style.background = '#6b7280'}
-                    >
-                      🔄 Перезапустить приложение
-                    </button>
-                  </div>
-                )}
-                <p style={{
-                  fontSize: '14px',
-                  color: textColor,
-                  marginBottom: '24px'
-                }}>
-                  {activeTab 
-                    ? `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}`
-                    : 'Сегодня пока нет записей'}
-                </p>
-                <Button
-                  variant="primary"
-                  onClick={() => setShowWizard(true)}
-                  style={{
-                    padding: '12px 24px',
-                    fontSize: '14px'
-                  }}
-                >
-                  ➕ Создать первую запись
-                </Button>
-              </div>
-            )}
-
-            {/* Таблица отображается только если есть данные */}
-            {(appointmentsLoading || filteredAppointments.length > 0) && (
-            <EnhancedAppointmentsTable
-              data={filteredAppointments}
-              loading={appointmentsLoading}
-              theme={theme}
-              language={language}
-              selectedRows={appointmentsSelected}
-              outerBorder={true}
-              services={services}
-              showCheckboxes={false}  // ✅ Отключаем чекбоксы для регистратуры
-              onRowSelect={(id, checked) => {
-                const newSelected = new Set(appointmentsSelected);
-                if (checked) {
-                  newSelected.add(id);
-                } else {
-                  newSelected.delete(id);
-                }
-                setAppointmentsSelected(newSelected);
-              }}
-              onRowClick={(row) => {
-                console.log('Открыть детали записи:', row);
-                // Здесь можно открыть модальное окно с деталями записи
-              }}
-              onActionClick={(action, row, event) => {
-                switch (action) {
-                  case 'view':
-                    console.log('Просмотр записи:', row);
-                    // Открыть модальное окно с деталями записи
-                    setSelectedAppointment(row);
-                    setShowAppointmentFlow(true);
-                    break;
-                  case 'edit':
-                    console.log('Редактирование записи:', row);
-                    // Открыть форму редактирования (пока что показываем уведомление)
-                    toast('Функция редактирования записи будет добавлена в следующих версиях', { 
-                      icon: 'ℹ️',
-                      style: {
-                        background: '#3b82f6',
-                        color: 'white'
-                      }
-                    });
-                    break;
-                  case 'payment':
-                    console.log('Открытие модального окна оплаты для записи (welcome):', row);
-                    setPaymentDialog({ open: true, row, paid: false, source: 'welcome' });
-                    break;
-                  case 'in_cabinet':
-                    console.log('Отправка пациента в кабинет (welcome):', row);
-                    updateAppointmentStatus(row.id, 'in_cabinet');
-                    break;
-                  case 'call':
-                    console.log('Вызов пациента (welcome):', row);
-                    handleStartVisit(row);
-                    break;
-                  case 'complete':
-                    console.log('Завершение приёма (welcome):', row);
-                    updateAppointmentStatus(row.id, 'done');
-                    break;
-                  case 'print':
-                    console.log('Печать талона (welcome):', row);
-                    setPrintDialog({ open: true, type: 'ticket', data: row });
-                    break;
-                  case 'more': {
-                    // Показать контекстное меню с дополнительными действиями
-                    const rect = event?.target?.getBoundingClientRect();
-                    setContextMenu({
-                      open: true,
-                      row,
-                      position: {
-                        x: rect?.right || event?.clientX || 0,
-                        y: rect?.top || event?.clientY || 0
-                      }
-                    });
-                    break;
-                  }
-                  default:
-                    break;
-                }
-              }}
-            />
-            )}
-                  </div>
-                </div>
-            </Card.Content>
-          </Card>
+              </CardContent>
+            </Card>
           </AnimatedTransition>
         )}
 
         {/* Онлайн-очередь по параметру view=queue */}
         {searchParams.get('view') === 'queue' && (
           <AnimatedTransition type="fade" delay={100}>
-            <Card variant="default" style={{ margin: `0 ${'2rem'} ${'2rem'} ${'2rem'}` }}>
-              <Card.Header>
+            <Card variant="default" style={{ margin: `0 ${getSpacing('xl')} ${getSpacing('xl')} ${getSpacing('xl')}` }}>
+              <CardHeader>
                 <AnimatedTransition type="slide" direction="up" delay={200}>
-                  <h1 style={{ 
-                    margin: 0, 
-                    fontSize: '48px', 
-                    fontWeight: '400', 
+                  <h1 style={{
+                    margin: 0,
+                    fontSize: getFontSize('3xl'),
+                    fontWeight: '400',
                     lineHeight: '1.25',
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px' 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: getSpacing('sm'),
+                    color: getColor('textPrimary')
                   }}>
                     📱 Онлайн-очередь
                   </h1>
                 </AnimatedTransition>
                 <AnimatedTransition type="fade" delay={400}>
-                  <div style={{ fontSize: '18px', opacity: 0.9, lineHeight: '1.5' }}>
+                  <div style={{
+                    fontSize: getFontSize('lg'),
+                    opacity: 0.9,
+                    lineHeight: '1.5',
+                    color: getColor('textSecondary')
+                  }}>
                     Управление онлайн-записью и QR кодами для очереди
                   </div>
                 </AnimatedTransition>
-              </Card.Header>
-            
-              <Card.Content>
-              <ModernQueueManager 
-                selectedDate={searchParams.get('date') || new Date().toISOString().split('T')[0]}
-                selectedDoctor={searchParams.get('doctor') || selectedDoctor?.id?.toString() || ''}
-                searchQuery={searchParams.get('q') || ''}
-                onQueueUpdate={loadAppointments}
-                language={language}
-                theme={theme}
-                doctors={doctors}
-              />
-              </Card.Content>
+              </CardHeader>
+
+              <CardContent>
+                <ModernQueueManager
+                  selectedDate={searchParams.get('date') || getLocalDateString()}
+                  selectedDoctor={searchParams.get('doctor') || selectedDoctor?.id?.toString() || ''}
+                  searchQuery={searchParams.get('q') || ''}
+                  onQueueUpdate={loadAppointments}
+                  onDateChange={(newDate) => {
+                    logger.info('📅 RegistrarPanel received date change:', newDate);
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.set('date', newDate);
+                    setSearchParams(newParams);
+                  }}
+                  onDoctorChange={(newDoctorId) => {
+                    logger.info('👨‍⚕️ RegistrarPanel received doctor change:', newDoctorId);
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.set('doctor', newDoctorId);
+                    setSearchParams(newParams);
+                  }}
+                  language={language}
+                  theme={theme}
+                  doctors={doctors}
+                />
+              </CardContent>
             </Card>
           </AnimatedTransition>
         )}
 
         {/* Основная панель с записями */}
         {(!searchParams.get('view') || (searchParams.get('view') !== 'welcome' && searchParams.get('view') !== 'queue')) && (
-          <div 
+          <div
             id="main-content"
             role="tabpanel"
             aria-labelledby={activeTab ? `${activeTab}-tab` : undefined}
             style={{
-            ...tableContainerStyle, 
+              ...tableContainerStyle,
               // Убираем отрицательный отступ для идеальной стыковки с вкладками
               margin: `0 ${isMobile ? '1rem' : '1rem'} ${'2rem'} ${isMobile ? '1rem' : '1rem'}`,
-            borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px',
+              borderRadius: isMobile ? '0 0 12px 12px' : '0 0 20px 20px',
               maxWidth: 'none',
               width: 'calc(100vw - 32px)'
-          }}>
+            }}>
             <div style={{
               ...tableContentStyle,
               padding: isMobile ? '0.5rem' : '1rem'
             }}>
-              
+
               {/* Массовые действия */}
               {appointmentsSelected.size > 0 && (
-              <div style={{
-                display: 'flex',
-                  gap: isMobile ? '0.25rem' : '12px', 
-                alignItems: 'center',
+                <div style={{
+                  display: 'flex',
+                  gap: isMobile ? '0.25rem' : '12px',
+                  alignItems: 'center',
                   padding: isMobile ? '0.5rem' : '16px',
                   background: theme === 'light' ? '#f8f9fa' : '#374151',
                   borderRadius: isMobile ? '6px' : '8px',
@@ -3460,8 +3952,8 @@ const RegistrarPanel = () => {
                   <button
                     className="clinic-button clinic-button-success interactive-element hover-lift ripple-effect action-button-hover focus-ring"
                     style={{
-                      padding: '8px 12px', 
-                      borderRadius: 8, 
+                      padding: '8px 12px',
+                      borderRadius: 8,
                       fontSize: 14,
                       cursor: 'pointer',
                       pointerEvents: 'auto'
@@ -3469,7 +3961,7 @@ const RegistrarPanel = () => {
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Кнопка "Подтвердить" нажата через onMouseDown');
+                      logger.info('Кнопка "Подтвердить" нажата через onMouseDown');
                       handleBulkAction('confirmed');
                     }}
                   >
@@ -3478,8 +3970,8 @@ const RegistrarPanel = () => {
                   <button
                     className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
                     style={{
-                      padding: '8px 12px', 
-                      borderRadius: 8, 
+                      padding: '8px 12px',
+                      borderRadius: 8,
                       fontSize: 14,
                       cursor: 'pointer',
                       pointerEvents: 'auto'
@@ -3487,7 +3979,7 @@ const RegistrarPanel = () => {
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Кнопка "Отменить" нажата через onMouseDown');
+                      logger.info('Кнопка "Отменить" нажата через onMouseDown');
                       const reason = prompt(t('reason'));
                       if (reason) handleBulkAction('cancelled', reason);
                     }}
@@ -3497,8 +3989,8 @@ const RegistrarPanel = () => {
                   <button
                     className="clinic-button clinic-button-outline interactive-element hover-lift ripple-effect magnetic-hover focus-ring"
                     style={{
-                      padding: '8px 12px', 
-                      borderRadius: 8, 
+                      padding: '8px 12px',
+                      borderRadius: 8,
                       fontSize: 14,
                       cursor: 'pointer',
                       pointerEvents: 'auto'
@@ -3506,15 +3998,15 @@ const RegistrarPanel = () => {
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Кнопка "Неявка" нажата через onMouseDown');
+                      logger.info('Кнопка "Неявка" нажата через onMouseDown');
                       handleBulkAction('no_show');
                     }}
                   >
                     ⚠️ {!isMobile && t('no_show')}
                   </button>
-        </div>
+                </div>
               )}
-              
+
               {/* Таблица записей */}
               {appointmentsLoading ? (
                 <AnimatedLoader.TableSkeleton rows={8} columns={10} />
@@ -3547,7 +4039,7 @@ const RegistrarPanel = () => {
                     opacity: 0.7,
                     marginBottom: '24px'
                   }}>
-                    {activeTab 
+                    {activeTab
                       ? `Сегодня нет записей в отделении ${activeTab === 'cardio' ? 'Кардиология' : activeTab === 'derma' ? 'Дерматология' : activeTab === 'dental' ? 'Стоматология' : activeTab === 'lab' ? 'Лаборатория' : activeTab}`
                       : 'Сегодня пока нет записей'}
                   </p>
@@ -3586,46 +4078,41 @@ const RegistrarPanel = () => {
                     setAppointmentsSelected(newSelected);
                   }}
                   onRowClick={(row) => {
-                    console.log('Открыть детали записи:', row);
+                    logger.info('Открыть детали записи:', row);
                     // Здесь можно открыть модальное окно с деталями записи
                   }}
                   onActionClick={(action, row, event) => {
                     switch (action) {
                       case 'view':
-                        console.log('Просмотр записи:', row);
-                        // Открыть модальное окно с деталями записи
-                        setSelectedAppointment(row);
-                        setShowAppointmentFlow(true);
+                        logger.info('Просмотр записи:', row);
+                        setWizardEditMode(true);
+                        setWizardInitialData(row);
+                        setShowWizard(true);
                         break;
                       case 'edit':
-                        console.log('Редактирование записи:', row);
-                        // Открыть форму редактирования (пока что показываем уведомление)
-                        toast('Функция редактирования записи будет добавлена в следующих версиях', { 
-                          icon: 'ℹ️',
-                          style: {
-                            background: '#3b82f6',
-                            color: 'white'
-                          }
-                        });
+                        logger.info('[RegistrarPanel] Открытие мастера редактирования для:', row.patient_fio || row.patient_name);
+                        setWizardEditMode(true);
+                        setWizardInitialData(row);
+                        setShowWizard(true);
                         break;
                       case 'payment':
-                        console.log('Открытие модального окна оплаты для записи:', row);
+                        logger.info('Открытие модального окна оплаты для записи:', row);
                         setPaymentDialog({ open: true, row, paid: false, source: 'table' });
                         break;
                       case 'in_cabinet':
-                        console.log('Отправка пациента в кабинет:', row);
+                        logger.info('Отправка пациента в кабинет:', row);
                         updateAppointmentStatus(row.id, 'in_cabinet');
                         break;
                       case 'call':
-                        console.log('Вызов пациента:', row);
+                        logger.info('Вызов пациента:', row);
                         handleStartVisit(row);
                         break;
                       case 'complete':
-                        console.log('Завершение приёма:', row);
+                        logger.info('Завершение приёма:', row);
                         updateAppointmentStatus(row.id, 'done');
                         break;
                       case 'print':
-                        console.log('Печать талона:', row);
+                        logger.info('Печать талона:', row);
                         setPrintDialog({ open: true, type: 'ticket', data: row });
                         break;
                       case 'more': {
@@ -3647,12 +4134,12 @@ const RegistrarPanel = () => {
                   }}
                 />
               )}
-              
+
               {/* Кнопка загрузки дополнительных записей */}
               {paginationInfo.hasMore && (
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
                   padding: '16px',
                   borderTop: `1px solid ${theme === 'light' ? '#e5e7eb' : '#374151'}`
                 }}>
@@ -3663,8 +4150,8 @@ const RegistrarPanel = () => {
                       padding: '12px 24px',
                       borderRadius: '8px',
                       border: 'none',
-                      background: paginationInfo.loadingMore 
-                        ? '#9ca3af' 
+                      background: paginationInfo.loadingMore
+                        ? '#9ca3af'
                         : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                       color: 'white',
                       fontSize: '14px',
@@ -3697,15 +4184,15 @@ const RegistrarPanel = () => {
                   </button>
                 </div>
               )}
-              
+
               {/* Старая таблица и legacy-конфигурация удалены - используется EnhancedAppointmentsTable */}
-      </div>
+            </div>
           </div>
         )}
       </div> {/* Закрытие скроллируемого контента */}
 
       {/* Мастер создания записи */}
-      
+
       {/* Современные диалоги */}
       <CancelDialog
         isOpen={cancelDialog.open}
@@ -3713,7 +4200,7 @@ const RegistrarPanel = () => {
         appointment={cancelDialog.row}
         onCancel={async (appointmentId, reason) => {
           // Локальное обновление статуса
-          setAppointments(prev => prev.map(apt => 
+          setAppointments(prev => prev.map(apt =>
             apt.id === appointmentId ? {
               ...apt,
               status: 'canceled',
@@ -3728,25 +4215,43 @@ const RegistrarPanel = () => {
         isOpen={paymentDialog.open}
         onClose={() => setPaymentDialog({ open: false, row: null, paid: false, source: null })}
         appointment={paymentDialog.row}
-        onPaymentSuccess={async (paymentData) => {
+        onPaymentSuccess={async () => {
           // ✅ ИСПРАВЛЕНО: используем реальный API вызов через handlePayment
           const appointment = paymentDialog.row;
           if (appointment) {
             const updated = await handlePayment(appointment);
             if (updated) {
               // Статус уже правильно установлен в handlePayment (status: 'queued')
-              console.log('PaymentDialog: Оплата успешна, статус обновлен:', updated);
+              logger.info('PaymentDialog: Оплата успешна, статус обновлен:', updated);
             }
           }
         }}
         onPrintTicket={(appointment) => {
-          setPrintDialog({ 
-            open: true, 
-            type: 'ticket', 
-            data: appointment 
+          setPrintDialog({
+            open: true,
+            type: 'ticket',
+            data: appointment
           });
         }}
       />
+
+      {/* Модальное окно редактирования пациента */}
+      {/* ✨ ЗАКОММЕНТИРОВАНО: Теперь используется AppointmentWizardV2 для редактирования */}
+      {/*
+      {editPatientModal.open && (
+        <EditPatientModal
+          isOpen={editPatientModal.open}
+          onClose={() => setEditPatientModal({ open: false, patient: null })}
+          patient={editPatientModal.patient}
+          onSave={async () => {
+            // Обновляем список записей после сохранения
+            logger.info('[RegistrarPanel] EditPatientModal: onSave вызван, обновляем список');
+            await loadAppointments({ source: 'edit_patient_save', silent: false });
+          }}
+          theme={{ isDark, getColor, getSpacing, getFontSize }}
+        />
+      )}
+      */}
 
       <PrintDialog
         isOpen={printDialog.open}
@@ -3754,46 +4259,61 @@ const RegistrarPanel = () => {
         documentType={printDialog.type}
         documentData={printDialog.data}
         onPrint={async (printerName, docType, docData) => {
-          console.log('Printing:', { printerName, docType, docData });
+          logger.info('Printing:', { printerName, docType, docData });
           // Здесь можно добавить реальную логику печати
         }}
       />
 
       {/* ✅ Используется только новый мастер (V2) */}
-          <AppointmentWizardV2
-            isOpen={showWizard}
-            onClose={() => {
-              console.log('AppointmentWizardV2 closing');
-              setShowWizard(false);
-            }}
-            isProcessing={isProcessing}
-            setIsProcessing={setIsProcessing}
-            onComplete={async (wizardData) => {
-              console.log('AppointmentWizardV2 completed successfully:', wizardData);
-              
-              // Новый мастер уже создал корзину, просто обновляем данные
-              try {
-                // Обновляем данные
-                await Promise.all([
-                  loadAppointments(),
-                  loadIntegratedData()
-                ]);
-                
-                setShowWizard(false);
-                toast.success('Запись успешно создана!');
-              } catch (error) {
-                console.error('Error refreshing data after wizard completion:', error);
-                // Не показываем ошибку пользователю, так как запись уже создана
-                setShowWizard(false);
-                toast.success('Запись создана! Обновите страницу для отображения изменений.');
-              }
-            }}
-          />
+      <AppointmentWizardV2
+        isOpen={showWizard}
+        editMode={wizardEditMode}              // ✨ НОВОЕ: Передаем режим
+        initialData={wizardInitialData}        // ✨ НОВОЕ: Передаем данные
+        activeTab={activeTab}                   // ✅ ПЕРЕДАЕМ activeTab для фильтрации услуг
+        onClose={() => {
+          logger.info('AppointmentWizardV2 closing');
+          setShowWizard(false);
+          setWizardEditMode(false);            // ✨ Сброс режима
+          setWizardInitialData(null);          // ✨ Сброс данных
+        }}
+        isProcessing={isProcessing}
+        setIsProcessing={setIsProcessing}
+        onComplete={async (wizardData) => {
+          logger.info('AppointmentWizardV2 completed successfully:', wizardData);
+
+          // Обновляем данные (работает и для создания, и для редактирования)
+          try {
+            // ⭐ Увеличена задержка перед обновлением данных
+            // чтобы backend успел обновить базу данных и все связанные записи
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Принудительное обновление данных
+            await Promise.all([
+              loadAppointments({ silent: false, source: 'wizard-complete', force: true }),
+              loadIntegratedData()
+            ]);
+
+            setShowWizard(false);
+            setWizardEditMode(false);            // ✨ Сброс режима
+            setWizardInitialData(null);          // ✨ Сброс данных
+
+            const message = wizardEditMode
+              ? 'Запись успешно обновлена!'
+              : 'Запись успешно создана!';
+            toast.success(message);
+          } catch (error) {
+            logger.error('Error refreshing data after wizard completion:', error);
+            // Не показываем ошибку пользователю, так как запись уже создана
+            setShowWizard(false);
+            toast.success('Запись создана! Обновите страницу для отображения изменений.');
+          }
+        }}
+      />
 
       {/* Старые диалоги удалены - используются современные компоненты CancelDialog, PaymentDialog, PrintDialog */}
       {/* Встроенное модальное окно оплаты удалено - используется PaymentDialog компонент */}
       {/* Встроенный мастер удален - используется AppointmentWizard компонент */}
-      
+
       {/* Модальное окно слотов */}
       {showSlotsModal && (
         <div style={{
@@ -3834,7 +4354,7 @@ const RegistrarPanel = () => {
           </div>
         </div>
       )}
-      
+
       {/* Модальное окно QR */}
       {showQRModal && (
         <div style={{
@@ -3858,28 +4378,28 @@ const RegistrarPanel = () => {
             textAlign: 'center'
           }}>
             <h3 style={{ margin: '0 0 16px 0' }}>📱 QR-код для пациента</h3>
-            <div style={{ 
-              background: 'white', 
-              padding: '20px', 
-              borderRadius: '8px', 
+            <div style={{
+              background: 'white',
+              padding: '20px',
+              borderRadius: '8px',
               margin: '16px 0',
               display: 'inline-block'
             }}>
               {/* Здесь будет QR-код */}
-            <div style={{ 
-              width: '200px', 
-              height: '200px', 
-              background: '#f0f0f0', 
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              <div style={{
+                width: '200px',
+                height: '200px',
+                background: '#f0f0f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontSize: '14px',
                 color: '#666'
-            }}>
+              }}>
                 QR-код
+              </div>
             </div>
-            </div>
-            <button 
+            <button
               onClick={() => setShowQRModal(false)}
               style={{
                 padding: '8px 16px',

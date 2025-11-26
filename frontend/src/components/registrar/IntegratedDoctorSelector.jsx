@@ -62,7 +62,7 @@ const IntegratedDoctorSelector = ({
       // Загружаем врачей и настройки очередей
       const token = localStorage.getItem('auth_token');
       const [doctorsRes, queueRes] = await Promise.all([
-        fetch(`/api/v1/registrar/doctors`, {
+        fetch('/api/v1/registrar/doctors', {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch('/api/v1/registrar/queue-settings', {

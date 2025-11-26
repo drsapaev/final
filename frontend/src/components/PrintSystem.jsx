@@ -168,7 +168,7 @@ const PrintSystem = () => {
             <label className="block text-sm font-medium mb-1">Тип подключения</label>
             <select
               value={printerSettings.type}
-              onChange={(e) => setPrinterSettings({...printerSettings, type: e.target.value})}
+              onChange={(e) => setPrinterSettings({ ...printerSettings, type: e.target.value })}
               className="w-full p-2 border border-gray-300 rounded-lg"
             >
               <option value="network">Сетевой</option>
@@ -184,7 +184,7 @@ const PrintSystem = () => {
                 <input
                   type="text"
                   value={printerSettings.networkHost}
-                  onChange={(e) => setPrinterSettings({...printerSettings, networkHost: e.target.value})}
+                  onChange={(e) => setPrinterSettings({ ...printerSettings, networkHost: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                   placeholder="192.168.1.100"
                 />
@@ -194,7 +194,7 @@ const PrintSystem = () => {
                 <input
                   type="text"
                   value={printerSettings.networkPort}
-                  onChange={(e) => setPrinterSettings({...printerSettings, networkPort: e.target.value})}
+                  onChange={(e) => setPrinterSettings({ ...printerSettings, networkPort: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                   placeholder="9100"
                 />
@@ -206,7 +206,7 @@ const PrintSystem = () => {
             <label className="block text-sm font-medium mb-1">Ширина бумаги</label>
             <select
               value={printerSettings.paperWidth}
-              onChange={(e) => setPrinterSettings({...printerSettings, paperWidth: parseInt(e.target.value)})}
+              onChange={(e) => setPrinterSettings({ ...printerSettings, paperWidth: parseInt(e.target.value) })}
               className="w-full p-2 border border-gray-300 rounded-lg"
             >
               <option value={58}>58 мм</option>

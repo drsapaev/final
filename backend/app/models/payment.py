@@ -10,8 +10,54 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
 
+class PaymentVisit(Base):
+    """
+    Связь между платежом и визитами.
+    Позволяет одному платежу покрывать несколько визитов.
+    """
+    __tablename__ = "payment_visits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    payment_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("payments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    visit_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("visits.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=0,
+        comment="Часть общей суммы платежа за этот конкретный визит"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    # Relationships
+    payment: Mapped["Payment"] = relationship("Payment", back_populates="payment_visits")
+    visit: Mapped["Visit"] = relationship("Visit", foreign_keys=[visit_id])
+
+
 class Payment(Base):
     __tablename__ = "payments"
+    # ✅ ИСПРАВЛЕНО: Явно указываем только нужные поля, чтобы избежать конфликта с BillingPayment
+    __mapper_args__ = {
+        'include_properties': [
+            'id', 'visit_id', 'amount', 'currency', 'method', 'status',
+            'receipt_no', 'note', 'provider', 'provider_payment_id',
+            'provider_transaction_id', 'payment_url', 'provider_data',
+            'commission', 'created_at', 'updated_at', 'paid_at'
+        ]
+    }
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     visit_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
@@ -51,6 +97,14 @@ class Payment(Base):
     )
     paid_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Relationships
+    payment_visits: Mapped[list["PaymentVisit"]] = relationship(
+        "PaymentVisit",
+        back_populates="payment",
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
     
     # Связи (временно отключены для отладки)

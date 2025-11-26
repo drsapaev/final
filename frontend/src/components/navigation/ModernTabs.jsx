@@ -1,38 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Heart, 
-  Activity, 
-  UserCheck, 
-  Smile, 
-  FlaskConical, 
+import {
+  Heart,
+  Activity,
+  UserCheck,
+  Smile,
+  FlaskConical,
   Syringe,
   Calendar,
   Clock,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Package,
+  Stethoscope,
+  TestTube,
+  Scissors,
+  FolderTree
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { api } from '../../api/client';
 import './ModernTabs.css';
 
-const ModernTabs = ({ 
-  activeTab, 
-  onTabChange, 
-  departmentStats = {}, 
+// Маппинг иконок из lucide-react
+const iconMap = {
+  Heart,
+  Activity,
+  UserCheck,
+  Smile,
+  FlaskConical,
+  Syringe,
+  Calendar,
+  Package,
+  Stethoscope,
+  TestTube,
+  Scissors,
+  FolderTree
+};
+
+const ModernTabs = ({
+  activeTab,
+  onTabChange,
+  departmentStats = {},
   theme = 'light',
-  language = 'ru' 
+  language = 'ru'
 }) => {
   const [indicatorStyle, setIndicatorStyle] = useState({});
+  const [tabs, setTabs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const tabsRef = useRef(null);
 
   // Переводы
   const t = {
     ru: {
-      cardio: 'Кардиолог',
-      echokg: 'ЭКГ', 
-      derma: 'Дерматолог',
-      dental: 'Стоматолог',
-      lab: 'Лаборатория',
-      procedures: 'Процедуры',
       today: 'Сегодня',
       queue: 'В очереди',
       pending: 'Ожидают',
@@ -40,55 +58,85 @@ const ModernTabs = ({
     }
   }[language] || {};
 
-  // Конфигурация вкладок
-  const tabs = [
-    {
-      key: 'cardio',
-      label: t.cardio,
-      icon: Heart,
-      color: '#ef4444',
-      gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
-    },
-    {
-      key: 'echokg', 
-      label: t.echokg,
-      icon: Activity,
-      color: '#ec4899',
-      gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
-    },
-    {
-      key: 'derma',
-      label: t.derma, 
-      icon: UserCheck,
-      color: '#f59e0b',
-      gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
-    },
-    {
-      key: 'dental',
-      label: t.dental,
-      icon: Smile,
-      color: '#3b82f6',
-      gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
-    },
-    {
-      key: 'lab',
-      label: t.lab,
-      icon: FlaskConical,
-      color: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981, #059669)'
-    },
-    {
-      key: 'procedures',
-      label: t.procedures,
-      icon: Syringe,
-      color: '#8b5cf6',
-      gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
-    }
-  ];
+  // Загрузка отделений из БД
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get('/departments?active_only=true');
+
+        // Backend returns {success: true, data: [...], count: N}
+        // axios response.data contains the backend response body
+        const departments = response.data.data || [];
+
+        // Преобразуем данные из БД в формат для вкладок
+        const departmentsData = departments.map(dept => ({
+          key: dept.key,
+          label: language === 'uz' ? (dept.name_uz || dept.name_ru) : dept.name_ru,
+          icon: iconMap[dept.icon] || Package, // Fallback на Package если иконка не найдена
+          color: dept.color,
+          gradient: dept.gradient || `linear-gradient(135deg, ${dept.color}, ${dept.color})`
+        }));
+
+        setTabs(departmentsData);
+      } catch (error) {
+        console.error('Ошибка загрузки отделений:', error);
+        // Fallback на hardcoded вкладки если API не работает
+        setTabs([
+          {
+            key: 'cardio',
+            label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
+            icon: Heart,
+            color: '#ef4444',
+            gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
+          },
+          {
+            key: 'echokg',
+            label: language === 'uz' ? 'EKG' : 'ЭКГ',
+            icon: Activity,
+            color: '#ec4899',
+            gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
+          },
+          {
+            key: 'derma',
+            label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
+            icon: UserCheck,
+            color: '#f59e0b',
+            gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
+          },
+          {
+            key: 'dental',
+            label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
+            icon: Smile,
+            color: '#3b82f6',
+            gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
+          },
+          {
+            key: 'lab',
+            label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
+            icon: FlaskConical,
+            color: '#10b981',
+            gradient: 'linear-gradient(135deg, #10b981, #059669)'
+          },
+          {
+            key: 'procedures',
+            label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
+            icon: Syringe,
+            color: '#8b5cf6',
+            gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDepartments();
+  }, [language]);
 
   // Используем ту же систему цветов, что и таблица
   const { isDark } = useTheme();
-  
+
   const colors = {
     bg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.98)',
     bgSecondary: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.98)',
@@ -106,7 +154,7 @@ const ModernTabs = ({
       if (activeButton) {
         const rect = activeButton.getBoundingClientRect();
         const containerRect = tabsRef.current.getBoundingClientRect();
-        
+
         setIndicatorStyle({
           left: rect.left - containerRect.left,
           width: rect.width,
@@ -172,9 +220,35 @@ const ModernTabs = ({
     return indicators;
   };
 
+  // Показываем заглушку пока загружаются вкладки
+  if (loading) {
+    return (
+      <div className={`modern-tabs ${isDark ? 'dark' : 'light'}`}>
+        <div
+          className="tabs-container"
+          style={{
+            background: colors.bg,
+            backdropFilter: 'blur(20px)',
+            borderTop: `1px solid ${colors.border}`,
+            borderLeft: `1px solid ${colors.border}`,
+            borderRight: `1px solid ${colors.border}`,
+            borderBottom: `1px solid ${colors.border}`,
+            borderRadius: '12px 12px 0 0',
+            padding: '8px 16px',
+            boxShadow: 'none'
+          }}
+        >
+          <div style={{ padding: '12px', textAlign: 'center', color: colors.textSecondary }}>
+            Загрузка отделений...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`modern-tabs ${isDark ? 'dark' : 'light'}`}>
-      <div 
+      <div
         className="tabs-container"
         style={{
           background: colors.bg,
@@ -203,7 +277,7 @@ const ModernTabs = ({
         </button>
 
         {/* Разделитель */}
-        <div 
+        <div
           className="tabs-divider"
           style={{ backgroundColor: colors.border }}
         />
@@ -211,7 +285,7 @@ const ModernTabs = ({
         {/* Контейнер для вкладок отделений */}
         <div className="department-tabs" ref={tabsRef}>
           {/* Анимированный индикатор */}
-          <div 
+          <div
             className="tab-indicator"
             style={{
               ...indicatorStyle,
@@ -243,7 +317,7 @@ const ModernTabs = ({
                     <Icon size={16} />
                   </div>
                   <span className="tab-label">{tab.label}</span>
-                  
+
                   {/* Индикаторы статуса */}
                   <div className="status-indicators">
                     {renderStatusIndicators(tab.key)}

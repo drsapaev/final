@@ -1,24 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Users, 
-  Calendar, 
-  Clock, 
-  CreditCard, 
-  TrendingUp, 
-  TrendingDown,
-  Activity,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Download,
-  RefreshCw,
-  BarChart3,
-  PieChart,
-  Eye,
-  Filter
-} from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import './ModernStatistics.css';
+import { Button, Card, Icon } from '../ui/macos';
 
 const ModernStatistics = ({
   appointments = [],
@@ -30,7 +12,7 @@ const ModernStatistics = ({
   className = '',
   ...props
 }) => {
-  const { theme, getColor } = useTheme();
+  const { theme, getColor, getSpacing, getFontSize } = useTheme();
   const [animatedValues, setAnimatedValues] = useState({});
   const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [showDetails, setShowDetails] = useState(false);
@@ -158,14 +140,14 @@ const ModernStatistics = ({
     };
   }, [statistics]);
 
-  // Данные для карточек статистики
+  // Данные для карточек статистики с правильными иконками
   const statCards = [
     {
       id: 'totalPatients',
       title: t.totalPatients,
       value: animatedValues.totalPatients || 0,
-      icon: Users,
-      color: getColor('primary'),
+      iconName: 'person',
+      color: '#007aff',
       trend: statistics.trends.patients,
       trendValue: statistics.trendValues.patients,
       suffix: ''
@@ -174,8 +156,8 @@ const ModernStatistics = ({
       id: 'todayAppointments',
       title: t.todayAppointments,
       value: animatedValues.todayAppointments || 0,
-      icon: Calendar,
-      color: getColor('success'),
+      iconName: 'calendar',
+      color: '#34c759',
       trend: statistics.trends.appointments,
       trendValue: statistics.trendValues.appointments,
       suffix: ''
@@ -184,8 +166,8 @@ const ModernStatistics = ({
       id: 'completedToday',
       title: t.completedToday,
       value: animatedValues.completedToday || 0,
-      icon: CheckCircle,
-      color: getColor('info'),
+      iconName: 'checkmark.circle',
+      color: '#5ac8fa',
       trend: statistics.trends.appointments,
       trendValue: statistics.trendValues.appointments,
       suffix: ''
@@ -194,9 +176,9 @@ const ModernStatistics = ({
       id: 'pendingPayments',
       title: t.pendingPayments,
       value: animatedValues.pendingPayments || 0,
-      icon: CreditCard,
-      color: getColor('warning'),
-      trend: 'down', // для pending payments down - это хорошо
+      iconName: 'creditcard',
+      color: '#ff9500',
+      trend: 'down',
       trendValue: Math.floor(Math.random() * 5) + 1,
       suffix: ''
     },
@@ -204,8 +186,8 @@ const ModernStatistics = ({
       id: 'revenue',
       title: t.revenue,
       value: animatedValues.revenue || 0,
-      icon: TrendingUp,
-      color: getColor('success'),
+      iconName: 'creditcard',
+      color: '#34c759',
       trend: statistics.trends.revenue,
       trendValue: statistics.trendValues.revenue,
       suffix: ' ' + t.sum,
@@ -215,8 +197,8 @@ const ModernStatistics = ({
       id: 'averageWaitTime',
       title: t.averageWaitTime,
       value: statistics.averageWaitTime,
-      icon: Clock,
-      color: getColor('info'),
+      iconName: 'clock',
+      color: '#5ac8fa',
       trend: statistics.trends.waitTime,
       trendValue: statistics.trendValues.waitTime,
       suffix: ' ' + t.minutes
@@ -231,249 +213,136 @@ const ModernStatistics = ({
     return value.toLocaleString('ru-RU');
   };
 
-  // Получение иконки тренда
-  const getTrendIcon = (trend) => {
-    return trend === 'up' ? TrendingUp : TrendingDown;
-  };
-
   // Получение цвета тренда
   const getTrendColor = (trend, isGoodWhenDown = false) => {
     if (isGoodWhenDown) {
-      return trend === 'down' ? getColor('success') : getColor('danger');
+      return trend === 'down' ? '#34c759' : '#ff3b30';
     }
-    return trend === 'up' ? getColor('success') : getColor('danger');
+    return trend === 'up' ? '#34c759' : '#ff3b30';
   };
 
   return (
-    <div className={`modern-statistics ${className}`} {...props}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--mac-spacing-5)' }} {...props}>
       {/* Заголовок */}
-      <div className="stats-header">
-        <div className="stats-title">
-          <BarChart3 size={24} style={{ color: getColor('primary') }} />
-          <h2 style={{ color: getColor('textPrimary') }}>{t.statistics}</h2>
-        </div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 'var(--mac-spacing-4)'
+      }}>
+        <h2 style={{ 
+          color: 'var(--mac-text-primary)', 
+          fontSize: 'var(--mac-font-size-xl)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          margin: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--mac-spacing-2)'
+        }}>
+          <Icon name="chart.bar" size="default" style={{ color: 'var(--mac-accent-blue)' }} />
+          {t.statistics}
+        </h2>
         
-        <div className="stats-controls">
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="period-select"
-            style={{
-              backgroundColor: getColor('cardBg'),
-              color: getColor('textPrimary'),
-              borderColor: getColor('border')
-            }}
-          >
-            <option value="today">{t.today}</option>
-            <option value="week">{t.week}</option>
-            <option value="month">{t.month}</option>
-            <option value="year">{t.year}</option>
-          </select>
-          
-          <button
-            type="button"
-            className="stats-action-btn"
-            onClick={onRefresh}
-            title={t.refresh}
-            style={{
-              backgroundColor: getColor('cardBg'),
-              color: getColor('textPrimary'),
-              borderColor: getColor('border')
-            }}
-          >
-            <RefreshCw size={16} />
-          </button>
-          
-          <button
-            type="button"
-            className="stats-action-btn"
-            onClick={onExport}
-            title={t.export}
-            style={{
-              backgroundColor: getColor('primary'),
-              color: 'white'
-            }}
-          >
-            <Download size={16} />
-          </button>
-          
-          <button
-            type="button"
-            className="stats-action-btn"
-            onClick={() => setShowDetails(!showDetails)}
-            title={t.details}
-            style={{
-              backgroundColor: showDetails ? getColor('primary') : getColor('cardBg'),
-              color: showDetails ? 'white' : getColor('textPrimary'),
-              borderColor: getColor('border')
-            }}
-          >
-            <Eye size={16} />
-          </button>
+        <div style={{ display: 'flex', gap: 'var(--mac-spacing-2)' }}>
+          <Button variant="ghost" size="small" onClick={onRefresh} title={t.refresh}>
+            <Icon name="gear" size="small" />
+          </Button>
+          <Button variant="primary" size="small" onClick={onExport} title={t.export}>
+            <Icon name="square.and.arrow.up" size="small" style={{ color: 'white' }} />
+          </Button>
         </div>
       </div>
 
-      {/* Основные карточки статистики */}
-      <div className="stats-grid">
-        {statCards.map((card, index) => {
-          const TrendIcon = getTrendIcon(card.trend);
+      {/* Основные карточки статистики с улучшенной видимостью */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: 'var(--mac-spacing-4)'
+      }}>
+        {statCards.map((card) => {
           const isGoodWhenDown = card.id === 'pendingPayments' || card.id === 'averageWaitTime';
           
           return (
-            <div
+            <Card
               key={card.id}
-              className="stat-card"
               style={{
-                backgroundColor: getColor('cardBg'),
-                borderColor: getColor('border'),
-                animationDelay: `${index * 100}ms`
+                padding: 'var(--mac-spacing-6)',
+                backgroundColor: 'var(--mac-bg-toolbar)',
+                border: '2px solid var(--mac-separator)',
+                borderRadius: 'var(--mac-radius-lg)',
+                boxShadow: 'var(--mac-shadow-md)',
+                backdropFilter: 'var(--mac-blur-light)',
+                WebkitBackdropFilter: 'var(--mac-blur-light)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--mac-spacing-4)'
               }}
             >
-              <div className="stat-card-header">
-                <div 
-                  className="stat-icon"
-                  style={{ backgroundColor: card.color }}
-                >
-                  <card.icon size={24} />
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Icon name={card.iconName} size="xlarge" style={{ color: card.color }} />
                 
-                <div className="stat-trend">
-                  <TrendIcon 
-                    size={16} 
-                    style={{ 
-                      color: getTrendColor(card.trend, isGoodWhenDown)
-                    }} 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '32px', // 32px как у левой иконки
+                  fontWeight: 'var(--mac-font-weight-bold)',
+                  color: getTrendColor(card.trend, isGoodWhenDown)
+                }}>
+                  <Icon 
+                    name={card.trend === 'up' ? 'checkmark.circle' : 'xmark.circle'} 
+                    size="xlarge" // xlarge для ровного размера с левой иконкой
+                    style={{ color: getTrendColor(card.trend, isGoodWhenDown) }} 
                   />
-                  <span 
-                    style={{ 
-                      color: getTrendColor(card.trend, isGoodWhenDown),
-                      fontSize: '12px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    {card.trendValue}%
-                  </span>
+                  {card.trendValue}%
                 </div>
               </div>
               
-              <div className="stat-content">
-                <div 
-                  className="stat-value"
-                  style={{ color: getColor('textPrimary') }}
-                >
+              <div>
+                <div style={{
+                  fontSize: '42px',
+                  fontWeight: 'var(--mac-font-weight-bold)',
+                  color: 'var(--mac-text-primary)',
+                  lineHeight: 1.1,
+                  marginBottom: 'var(--mac-spacing-2)'
+                }}>
                   {formatValue(card.value, card.format)}
-                  <span className="stat-suffix">{card.suffix}</span>
+                  <span style={{ fontSize: '28px', fontWeight: 'var(--mac-font-weight-semibold)', marginLeft: '8px' }}>
+                    {card.suffix}
+                  </span>
                 </div>
                 
-                <div 
-                  className="stat-label"
-                  style={{ color: getColor('textSecondary') }}
-                >
+                <div style={{
+                  fontSize: 'var(--mac-font-size-base)',
+                  color: 'var(--mac-text-secondary)',
+                  fontWeight: 'var(--mac-font-weight-semibold)'
+                }}>
                   {card.title}
                 </div>
               </div>
               
-              <div className="stat-progress">
-                <div 
-                  className="stat-progress-bar"
-                  style={{
-                    backgroundColor: card.color,
-                    width: `${Math.min((card.value / (card.value + 10)) * 100, 100)}%`
-                  }}
-                />
+              {/* Прогресс бар */}
+              <div style={{
+                height: '4px',
+                backgroundColor: 'var(--mac-separator)',
+                borderRadius: 'var(--mac-radius-full)',
+                overflow: 'hidden',
+                marginTop: 'var(--mac-spacing-2)'
+              }}>
+                <div style={{
+                  height: '100%',
+                  backgroundColor: card.color,
+                  width: `${Math.min((card.value / (card.value + 10)) * 100, 100)}%`,
+                  borderRadius: 'var(--mac-radius-full)',
+                  transition: 'width var(--mac-duration-normal) var(--mac-ease)'
+                }} />
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>
 
-      {/* Детальная статистика */}
-      {showDetails && (
-        <div className="stats-details" style={{ backgroundColor: getColor('cardBg') }}>
-          <div className="details-header">
-            <h3 style={{ color: getColor('textPrimary') }}>
-              {t.departmentLoad}
-            </h3>
-          </div>
-          
-          <div className="department-stats">
-            {Object.entries(departmentStats).map(([dept, stats]) => {
-              const departmentNames = {
-                cardio: 'Кардиология',
-                echokg: 'ЭКГ',
-                derma: 'Дерматология',
-                dental: 'Стоматология',
-                lab: 'Лаборатория',
-                procedures: 'Процедуры'
-              };
-              
-              return (
-                <div 
-                  key={dept}
-                  className="department-stat"
-                  style={{ borderColor: getColor('border') }}
-                >
-                  <div className="department-info">
-                    <span 
-                      className="department-name"
-                      style={{ color: getColor('textPrimary') }}
-                    >
-                      {departmentNames[dept] || dept}
-                    </span>
-                    
-                    <div className="department-indicators">
-                      {stats.hasActiveQueue && (
-                        <span 
-                          className="indicator queue"
-                          style={{ backgroundColor: getColor('warning') }}
-                          title="Активная очередь"
-                        >
-                          <Clock size={12} />
-                        </span>
-                      )}
-                      
-                      {stats.hasPendingPayments && (
-                        <span 
-                          className="indicator payment"
-                          style={{ backgroundColor: getColor('danger') }}
-                          title="Ожидают оплаты"
-                        >
-                          <AlertCircle size={12} />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="department-count">
-                    <span 
-                      className="count-value"
-                      style={{ color: getColor('textPrimary') }}
-                    >
-                      {stats.todayCount || 0}
-                    </span>
-                    <span 
-                      className="count-label"
-                      style={{ color: getColor('textSecondary') }}
-                    >
-                      {t.appointments}
-                    </span>
-                  </div>
-                  
-                  <div className="department-progress">
-                    <div 
-                      className="progress-bar"
-                      style={{
-                        backgroundColor: getColor('primary'),
-                        width: `${Math.min((stats.todayCount / 20) * 100, 100)}%`
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Детальная статистика удалена - для упрощения UI */}
     </div>
   );
 };

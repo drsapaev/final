@@ -10,34 +10,26 @@ import {
   CardContent,
   Typography,
   Button,
-  Grid,
   Alert,
-  LinearProgress,
-  Chip,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Paper,
-  Divider,
-  Rating,
+  Progress,
+  Badge,
   CircularProgress,
-} from '@mui/material';
+} from '../ui/macos';
 import {
-  Analytics,
-  Face,
-  Warning,
+  BarChart3,
+  Smile,
+  AlertCircle,
   CheckCircle,
   TrendingUp,
   TrendingDown,
   Lightbulb,
-  LocalFireDepartment,
-  WaterDrop,
-  Brightness5,
-  Texture,
-  ColorLens,
-  AutoFixHigh,
-} from '@mui/icons-material';
+  Flame,
+  Droplets,
+  Sun,
+  Layers,
+  Palette,
+  Sparkles,
+} from 'lucide-react';
 import { api } from '../../api/client';
 
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
@@ -116,12 +108,12 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   // Получение иконки для типа проблемы
   const getProblemIcon = (type) => {
     switch (type) {
-      case 'acne': return <LocalFireDepartment color="error" />;
-      case 'wrinkles': return <Texture color="warning" />;
-      case 'pigmentation': return <ColorLens color="action" />;
-      case 'dryness': return <WaterDrop color="info" />;
-      case 'oiliness': return <Brightness5 color="warning" />;
-      default: return <Face />;
+      case 'acne': return <Flame style={{ color: 'var(--mac-accent-red)' }} />;
+      case 'wrinkles': return <Layers style={{ color: 'var(--mac-accent-orange)' }} />;
+      case 'pigmentation': return <Palette style={{ color: 'var(--mac-accent-blue)' }} />;
+      case 'dryness': return <Droplets style={{ color: 'var(--mac-accent-blue)' }} />;
+      case 'oiliness': return <Sun style={{ color: 'var(--mac-accent-orange)' }} />;
+      default: return <Smile />;
     }
   };
 
@@ -134,36 +126,38 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
 
   // Рендер метрики
   const renderMetric = (label, value, icon, trend = null) => (
-    <Paper sx={{ p: 2, textAlign: 'center' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+    <div style={{ padding: 16, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
         {icon}
-      </Box>
+      </div>
       <Typography variant="h4" gutterBottom>
         {value}
       </Typography>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="textSecondary">
         {label}
       </Typography>
       {trend !== null && (
-        <Box sx={{ mt: 1 }}>
+        <div style={{ marginTop: 8 }}>
           {trend > 0 ? (
-            <Chip
-              size="small"
-              label={`+${trend}%`}
-              color="success"
-              icon={<TrendingUp />}
-            />
+            <Badge
+              variant="success"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+            >
+              <TrendingUp style={{ width: 12, height: 12 }} />
+              +{trend}%
+            </Badge>
           ) : (
-            <Chip
-              size="small"
-              label={`${trend}%`}
-              color="error"
-              icon={<TrendingDown />}
-            />
+            <Badge
+              variant="danger"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+            >
+              <TrendingDown style={{ width: 12, height: 12 }} />
+              {trend}%
+            </Badge>
           )}
-        </Box>
+        </div>
       )}
-    </Paper>
+    </div>
   );
 
   if (!photos || ((!photos.before || photos.before.length === 0) && (!photos.after || photos.after.length === 0))) {
@@ -183,67 +177,66 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            <Analytics sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <BarChart3 style={{ marginRight: 8, verticalAlign: 'middle' }} />
             AI Анализ кожи
           </Typography>
 
           {/* Кнопки анализа */}
-          <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {photos.before && photos.before.length > 0 && (
               <Button
-                variant="contained"
-                startIcon={<AutoFixHigh />}
+                variant="primary"
                 onClick={() => startAnalysis('before')}
                 disabled={analyzing}
               >
+                <Sparkles style={{ width: 16, height: 16, marginRight: 8 }} />
                 Анализировать ДО
               </Button>
             )}
             
             {photos.after && photos.after.length > 0 && (
               <Button
-                variant="contained"
-                startIcon={<AutoFixHigh />}
+                variant="primary"
                 onClick={() => startAnalysis('after')}
                 disabled={analyzing}
               >
+                <Sparkles style={{ width: 16, height: 16, marginRight: 8 }} />
                 Анализировать ПОСЛЕ
               </Button>
             )}
             
             {photos.before?.length > 0 && photos.after?.length > 0 && (
               <Button
-                variant="contained"
-                color="secondary"
-                startIcon={<Analytics />}
+                variant="secondary"
                 onClick={startComparativeAnalysis}
                 disabled={analyzing}
               >
+                <BarChart3 style={{ width: 16, height: 16, marginRight: 8 }} />
                 Сравнительный анализ
               </Button>
             )}
-          </Box>
+          </div>
 
           {/* Прогресс анализа */}
           {analyzing && (
-            <Box sx={{ mt: 3 }}>
-              <LinearProgress />
-              <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
+            <div style={{ marginTop: 24 }}>
+              <Progress />
+              <Typography variant="body2" color="textSecondary" style={{ textAlign: 'center', marginTop: 8 }}>
                 Анализ изображения с помощью AI...
               </Typography>
-            </Box>
+            </div>
           )}
 
           {/* Результаты анализа */}
           {analysisResult && !analysisResult.error && (
-            <Box sx={{ mt: 3 }}>
+            <div style={{ marginTop: 24 }}>
               {/* Общая оценка */}
               {analysisResult.overall_score !== undefined && (
-                <Paper sx={{ p: 3, mb: 3, textAlign: 'center' }}>
+                <div style={{ padding: 24, marginBottom: 24, textAlign: 'center', border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
                     Общее состояние кожи
                   </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
                     <CircularProgress
                       variant="determinate"
                       value={analysisResult.overall_score}
@@ -251,202 +244,185 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
                       thickness={4}
                       color={getScoreColor(analysisResult.overall_score)}
                     />
-                    <Box>
+                    <div>
                       <Typography variant="h3">
                         {analysisResult.overall_score}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="textSecondary">
                         из 100
                       </Typography>
-                    </Box>
-                  </Box>
-                  <Chip
-                    label={analysisResult.skin_type || 'Нормальная кожа'}
-                    color="primary"
-                    sx={{ mt: 2 }}
-                  />
-                </Paper>
+                    </div>
+                  </div>
+                  <Badge
+                    variant="primary"
+                    style={{ marginTop: 16 }}
+                  >
+                    {analysisResult.skin_type || 'Нормальная кожа'}
+                  </Badge>
+                </div>
               )}
 
               {/* Метрики */}
               {analysisResult.metrics && (
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={6} md={3}>
-                    {renderMetric(
-                      'Увлажненность',
-                      `${analysisResult.metrics.hydration || 0}%`,
-                      <WaterDrop color="info" />,
-                      analysisResult.metrics.hydration_trend
-                    )}
-                  </Grid>
-                  <Grid item xs={6} md={3}>
-                    {renderMetric(
-                      'Жирность',
-                      `${analysisResult.metrics.oiliness || 0}%`,
-                      <Brightness5 color="warning" />,
-                      analysisResult.metrics.oiliness_trend
-                    )}
-                  </Grid>
-                  <Grid item xs={6} md={3}>
-                    {renderMetric(
-                      'Текстура',
-                      `${analysisResult.metrics.texture || 0}%`,
-                      <Texture color="action" />,
-                      analysisResult.metrics.texture_trend
-                    )}
-                  </Grid>
-                  <Grid item xs={6} md={3}>
-                    {renderMetric(
-                      'Тон',
-                      `${analysisResult.metrics.tone || 0}%`,
-                      <ColorLens color="secondary" />,
-                      analysisResult.metrics.tone_trend
-                    )}
-                  </Grid>
-                </Grid>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+                  {renderMetric(
+                    'Увлажненность',
+                    `${analysisResult.metrics.hydration || 0}%`,
+                    <Droplets style={{ color: 'var(--mac-accent-blue)' }} />,
+                    analysisResult.metrics.hydration_trend
+                  )}
+                  {renderMetric(
+                    'Жирность',
+                    `${analysisResult.metrics.oiliness || 0}%`,
+                    <Sun style={{ color: 'var(--mac-accent-orange)' }} />,
+                    analysisResult.metrics.oiliness_trend
+                  )}
+                  {renderMetric(
+                    'Текстура',
+                    `${analysisResult.metrics.texture || 0}%`,
+                    <Layers style={{ color: 'var(--mac-accent-blue)' }} />,
+                    analysisResult.metrics.texture_trend
+                  )}
+                  {renderMetric(
+                    'Тон',
+                    `${analysisResult.metrics.tone || 0}%`,
+                    <Palette style={{ color: 'var(--mac-accent-purple)' }} />,
+                    analysisResult.metrics.tone_trend
+                  )}
+                </div>
               )}
 
               {/* Обнаруженные проблемы */}
               {analysisResult.problems && analysisResult.problems.length > 0 && (
-                <Paper sx={{ p: 2, mb: 3 }}>
+                <div style={{ padding: 16, marginBottom: 24, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
                     Обнаруженные проблемы
                   </Typography>
-                  <List>
+                  <div>
                     {analysisResult.problems.map((problem, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon>
+                      <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+                        <div style={{ marginTop: 4 }}>
                           {getProblemIcon(problem.type)}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={problem.name}
-                          secondary={
-                            <Box>
-                              <Typography variant="caption">
-                                {problem.description}
-                              </Typography>
-                              <Box sx={{ mt: 1 }}>
-                                <Chip
-                                  size="small"
-                                  label={`Степень: ${problem.severity}`}
-                                  color={problem.severity === 'high' ? 'error' : 'warning'}
-                                />
-                                {problem.area && (
-                                  <Chip
-                                    size="small"
-                                    label={`Зона: ${problem.area}`}
-                                    sx={{ ml: 1 }}
-                                  />
-                                )}
-                              </Box>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <Typography variant="body1" style={{ fontWeight: 500 }}>
+                            {problem.name}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginTop: 4 }}>
+                            {problem.description}
+                          </Typography>
+                          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                            <Badge
+                              variant={problem.severity === 'high' ? 'danger' : 'warning'}
+                            >
+                              Степень: {problem.severity}
+                            </Badge>
+                            {problem.area && (
+                              <Badge variant="info">
+                                Зона: {problem.area}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </List>
-                </Paper>
+                  </div>
+                </div>
               )}
 
               {/* Улучшения (для сравнительного анализа) */}
               {analysisResult.improvements && analysisResult.improvements.length > 0 && (
-                <Alert severity="success" sx={{ mb: 3 }}>
+                <Alert severity="success" style={{ marginBottom: 24 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Положительные изменения:
                   </Typography>
-                  <List dense>
+                  <div>
                     {analysisResult.improvements.map((improvement, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon>
-                          <CheckCircle color="success" />
-                        </ListItemIcon>
-                        <ListItemText primary={improvement} />
-                      </ListItem>
+                      <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <CheckCircle style={{ width: 16, height: 16, color: 'var(--mac-accent-green)' }} />
+                        <Typography variant="body2">{improvement}</Typography>
+                      </div>
                     ))}
-                  </List>
+                  </div>
                 </Alert>
               )}
 
               {/* Рекомендации */}
               {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
-                <Paper sx={{ p: 2, mb: 3 }}>
+                <div style={{ padding: 16, marginBottom: 24, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
-                    <Lightbulb sx={{ mr: 1, verticalAlign: 'middle', color: 'warning.main' }} />
+                    <Lightbulb style={{ marginRight: 8, verticalAlign: 'middle', color: 'var(--mac-accent-orange)' }} />
                     Рекомендации
                   </Typography>
-                  <List>
+                  <div>
                     {analysisResult.recommendations.map((rec, index) => (
-                      <React.Fragment key={index}>
-                        {index > 0 && <Divider />}
-                        <ListItem>
-                          <ListItemText
-                            primary={rec.title}
-                            secondary={
-                              <Box>
-                                <Typography variant="body2" paragraph>
-                                  {rec.description}
-                                </Typography>
-                                {rec.procedures && rec.procedures.length > 0 && (
-                                  <Box sx={{ mt: 1 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                      Рекомендуемые процедуры:
-                                    </Typography>
-                                    <Box sx={{ mt: 0.5 }}>
-                                      {rec.procedures.map((proc, i) => (
-                                        <Chip
-                                          key={i}
-                                          label={proc}
-                                          size="small"
-                                          sx={{ mr: 0.5, mb: 0.5 }}
-                                        />
-                                      ))}
-                                    </Box>
-                                  </Box>
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      </React.Fragment>
+                      <div key={index} style={{ marginBottom: 16 }}>
+                        <Typography variant="body1" style={{ fontWeight: 500, marginBottom: 8 }}>
+                          {rec.title}
+                        </Typography>
+                        <Typography variant="body2" style={{ marginBottom: 8 }}>
+                          {rec.description}
+                        </Typography>
+                        {rec.procedures && rec.procedures.length > 0 && (
+                          <div style={{ marginTop: 8 }}>
+                            <Typography variant="caption" color="textSecondary" style={{ display: 'block', marginBottom: 4 }}>
+                              Рекомендуемые процедуры:
+                            </Typography>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {rec.procedures.map((proc, i) => (
+                                <Badge
+                                  key={i}
+                                  variant="info"
+                                >
+                                  {proc}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {index < analysisResult.recommendations.length - 1 && (
+                          <div style={{ height: 1, backgroundColor: 'var(--mac-border)', margin: '16px 0' }} />
+                        )}
+                      </div>
                     ))}
-                  </List>
-                </Paper>
+                  </div>
+                </div>
               )}
 
               {/* Рекомендуемый уход */}
               {analysisResult.care_routine && (
-                <Paper sx={{ p: 2 }}>
+                <div style={{ padding: 16, border: '1px solid var(--mac-border)', borderRadius: 8 }}>
                   <Typography variant="h6" gutterBottom>
                     Домашний уход
                   </Typography>
-                  <Grid container spacing={2}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
                     {['morning', 'evening'].map((time) => (
                       analysisResult.care_routine[time] && (
-                        <Grid item xs={12} md={6} key={time}>
+                        <div key={time}>
                           <Typography variant="subtitle2" gutterBottom>
                             {time === 'morning' ? 'Утренний уход' : 'Вечерний уход'}
                           </Typography>
-                          <List dense>
+                          <div>
                             {analysisResult.care_routine[time].map((step, index) => (
-                              <ListItem key={index}>
-                                <ListItemText
-                                  primary={`${index + 1}. ${step}`}
-                                />
-                              </ListItem>
+                              <div key={index} style={{ marginBottom: 8 }}>
+                                <Typography variant="body2">
+                                  {index + 1}. {step}
+                                </Typography>
+                              </div>
                             ))}
-                          </List>
-                        </Grid>
+                          </div>
+                        </div>
                       )
                     ))}
-                  </Grid>
-                </Paper>
+                  </div>
+                </div>
               )}
-            </Box>
+            </div>
           )}
 
           {/* Ошибка анализа */}
           {analysisResult?.error && (
-            <Alert severity="error" sx={{ mt: 2 }}>
+            <Alert severity="error" style={{ marginTop: 16 }}>
               {analysisResult.error}
             </Alert>
           )}

@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { useBreakpoint, useTouchDevice } from '../hooks/useMediaQuery';
-import { Button, AnimatedTransition, Badge, Card } from '../components/ui/native';
+import { Button, Badge, Card } from '../components/ui/macos';
 import auth from '../stores/auth.js';
 import AIAssistant from '../components/ai/AIAssistant';
 import TeethChart from '../components/dental/TeethChart';
@@ -18,38 +17,22 @@ import ProtocolTemplates from '../components/dental/ProtocolTemplates';
 import ReportsAndAnalytics from '../components/dental/ReportsAndAnalytics';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable';
+import QueueIntegration from '../components/QueueIntegration';
+import { queueService } from '../services/queue';
+import EMRSystem from '../components/medical/EMRSystem';
 import { 
-  User, 
   Calendar, 
-  Clock, 
   Stethoscope, 
   FileText, 
-  Pill, 
-  Activity,
-  Brain, 
-  Heart,
   Eye,
-  Zap,
   Search,
-  Filter,
   Plus,
   Edit,
-  Trash2,
-  CheckCircle,
   XCircle,
-  AlertCircle,
-  Printer,
-  Download,
-  Settings,
-  Bell,
-  LogOut,
   Stethoscope as Tooth,
   Smile,
-  Shield,
-  Camera,
   BarChart3,
   RefreshCw,
-  TrendingUp,
   Users,
   DollarSign,
   Scissors,
@@ -57,6 +40,12 @@ import {
   Building
 } from 'lucide-react';
 import '../styles/animations.css';
+
+const logger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
 
 /**
  * Объединенная стоматологическая панель с полным функционалом
@@ -68,9 +57,6 @@ import '../styles/animations.css';
  * - Современный UI
  */
 const DentistPanelUnified = () => {
-  // Всегда вызываем хуки первыми
-  const { isMobile, isTablet, isDesktop } = useBreakpoint();
-  const isTouch = useTouchDevice();
   const location = useLocation();
   const navigate = useNavigate();
   const [authState, setAuthState] = useState(auth.getState());
@@ -83,13 +69,13 @@ const DentistPanelUnified = () => {
   const user = authState.profile;
   
   // Синхронизация активной вкладки с URL
-  const getActiveTabFromURL = () => {
+  const getActiveTabFromURL = useCallback(() => {
     const params = new URLSearchParams(location.search);
     return params.get('tab') || 'appointments';
-  };
+  }, [location.search]);
   
   // Состояние
-  const [activeTab, setActiveTab] = useState(getActiveTabFromURL());
+  const [activeTab, setActiveTab] = useState(() => getActiveTabFromURL());
   
   // Синхронизация URL с активной вкладкой
   useEffect(() => {
@@ -97,7 +83,7 @@ const DentistPanelUnified = () => {
     if (urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
-  }, [location.search]);
+  }, [activeTab, getActiveTabFromURL]);
   
   // Функция для изменения активной вкладки с обновлением URL
   const handleTabChange = (tabId) => {
@@ -105,19 +91,17 @@ const DentistPanelUnified = () => {
     navigate(`/dentist?tab=${tabId}`, { replace: true });
   };
   const [patients, setPatients] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [dentalExaminations, setDentalExaminations] = useState([]);
   const [treatmentPlans, setTreatmentPlans] = useState([]);
   const [prosthetics, setProsthetics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
+  const [emr, setEmr] = useState(null);
   
   // Состояния для таблицы записей
   const [appointmentsTableData, setAppointmentsTableData] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
-  const [appointmentsSelected, setAppointmentsSelected] = useState(new Set());
-  const [showPatientModal, setShowPatientModal] = useState(false);
+  const [services, setServices] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showDentalChart, setShowDentalChart] = useState(false);
@@ -136,7 +120,6 @@ const DentistPanelUnified = () => {
   // Состояние для DentalPriceManager
   const [showPriceManager, setShowPriceManager] = useState(false);
   const [selectedServiceForPrice, setSelectedServiceForPrice] = useState(null);
-  const [currentTreatmentPlan, setCurrentTreatmentPlan] = useState(null);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const [toothModalOpen, setToothModalOpen] = useState(false);
 
@@ -182,46 +165,34 @@ const DentistPanelUnified = () => {
   });
 
   // Refs
-  const headerRef = React.useRef(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Используем централизованную систему темизации
   const { 
     isDark, 
-    isLight, 
     getColor, 
     getSpacing, 
-    getFontSize, 
-    getShadow,
-    designTokens 
+    getFontSize
   } = useTheme();
 
-  // Цвета и стили
-  const primaryColor = getColor('primary', 500);
-  const successColor = getColor('success', 500);
-  const warningColor = getColor('warning', 500);
-  const dangerColor = getColor('danger', 500);
-  const accentColor = getColor('info', 500);
-
   // Загрузка данных
-  const loadData = async () => {
-    setLoading(true);
+  // Загрузка услуг для правильного отображения в tooltips
+  const loadServices = useCallback(async () => {
     try {
-      await Promise.all([
-        loadPatients(),
-        loadDentalExaminations(),
-        loadTreatmentPlans(),
-        loadProsthetics()
-      ]);
+      const token = localStorage.getItem('auth_token');
+      if (!token) return;
+      const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/v1/registrar/services`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const servicesData = data.services_by_group || {};
+        setServices(servicesData);
+        logger.info('[Dentist] Услуги загружены:', Object.keys(servicesData).length, 'групп');
+      }
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
-    } finally {
-      setLoading(false);
+      logger.error('[Dentist] Ошибка загрузки услуг:', error);
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
 
   // Функция для получения всех услуг пациента из всех записей
@@ -247,12 +218,12 @@ const DentistPanelUnified = () => {
   }, []);
 
   // Загрузка записей стоматолога
-  const loadDentistryAppointments = async () => {
+  const loadDentistryAppointments = useCallback(async () => {
     setAppointmentsLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.log('Нет токена аутентификации');
+        logger.info('Нет токена аутентификации');
         setAppointmentsLoading(false);
         return;
       }
@@ -276,6 +247,7 @@ const DentistPanelUnified = () => {
               queue.entries.forEach(entry => {
                 allAppointments.push({
                   id: entry.id,
+                  visit_id: entry.id, // Добавляем visit_id для сопоставления с БД
                   patient_id: entry.patient_id,
                   patient_fio: entry.patient_name || `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`.trim(),
                   patient_phone: entry.phone || '',
@@ -286,7 +258,7 @@ const DentistPanelUnified = () => {
                   services: entry.services || [],
                   service_codes: entry.service_codes || [],
                   payment_type: entry.payment_status || 'Не оплачено',
-                  payment_status: entry.payment_status || 'pending',
+                  payment_status: entry.payment_status || (entry.discount_mode === 'paid' ? 'paid' : 'pending'), // ✅ ИСПРАВЛЕНО: берем из entry
                   doctor: entry.doctor_name || 'Врач',
                   specialty: queue.specialty,
                   created_at: entry.created_at,
@@ -301,9 +273,57 @@ const DentistPanelUnified = () => {
         }
 
         // Фильтруем только стоматологические записи для отображения
-        const appointmentsData = allAppointments.filter(apt => 
+        const appointmentsData = allAppointments.filter(apt =>
           apt.specialty === 'dental' || apt.specialty === 'dentist' || apt.specialty === 'dentistry'
         );
+
+        // 2. Получаем актуальный payment_status из БД через all-appointments
+        const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const today = new Date().toISOString().split('T')[0];
+        try {
+          const appointmentsResponse = await fetch(`${API_BASE}/api/v1/registrar/all-appointments?date_from=${today}&date_to=${today}&limit=500`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (appointmentsResponse.ok) {
+            const appointmentsDBResponse = await appointmentsResponse.json();
+            const appointmentsDBData = appointmentsDBResponse.data || appointmentsDBResponse || [];  // ✅ ИСПРАВЛЕНО: Извлекаем data из ответа
+            logger.info('[Dentist] Получены appointments из БД:', appointmentsDBData.length);
+
+            // Создаем карту id -> payment_status
+            const paymentStatusMap = new Map();
+            appointmentsDBData.forEach(apt => {
+              if (apt.id) {
+                paymentStatusMap.set(apt.id, apt.payment_status || 'pending');
+              }
+              if (apt.patient_id && apt.appointment_date) {
+                const key = `${apt.patient_id}_${apt.appointment_date}`;
+                paymentStatusMap.set(key, apt.payment_status || 'pending');
+              }
+            });
+
+            // Обновляем payment_status в наших записях
+            allAppointments = allAppointments.map(apt => {
+              let paymentStatus = paymentStatusMap.get(apt.id);
+              if (!paymentStatus && apt.patient_id && apt.appointment_date) {
+                const key = `${apt.patient_id}_${apt.appointment_date}`;
+                paymentStatus = paymentStatusMap.get(key);
+              }
+              return {
+                ...apt,
+                payment_status: paymentStatus || apt.payment_status || 'pending',
+                payment_type: paymentStatus || apt.payment_type
+              };
+            });
+
+            logger.info('[Dentist] Обновлены payment_status для', allAppointments.length, 'записей');
+          }
+        } catch (err) {
+          logger.warn('[Dentist] Не удалось загрузить payment_status из БД:', err);
+        }
 
         // Добавляем информацию о всех услугах пациента в каждую запись
         const enrichedAppointmentsData = appointmentsData.map(apt => {
@@ -314,26 +334,39 @@ const DentistPanelUnified = () => {
             all_patient_service_codes: allPatientServices.service_codes
           };
         });
-        
+
         setAppointmentsTableData(enrichedAppointmentsData);
       }
     } catch (error) {
-      console.error('Ошибка загрузки записей стоматолога:', error);
+      logger.error('Ошибка загрузки записей стоматолога:', error);
     } finally {
       setAppointmentsLoading(false);
     }
-  };
+  }, [getAllPatientServices]);
 
   // Загружаем записи при переключении на вкладку
   useEffect(() => {
     if (activeTab === 'appointments') {
       loadDentistryAppointments();
     }
-  }, [activeTab]);
+    
+    // Слушаем глобальные события обновления очереди
+    const handleQueueUpdate = (event) => {
+      logger.info('[Dentist] Получено событие обновления очереди:', event.detail);
+      if (activeTab === 'appointments') {
+        loadDentistryAppointments();
+      }
+    };
+    window.addEventListener('queueUpdated', handleQueueUpdate);
+    
+    return () => {
+      window.removeEventListener('queueUpdated', handleQueueUpdate);
+    };
+  }, [activeTab, loadDentistryAppointments]);
 
   // Обработчики для таблицы записей
   const handleAppointmentRowClick = (row) => {
-    console.log('Клик по записи:', row);
+    logger.info('Клик по записи:', row);
     // Можно открыть детали записи или переключиться на прием
     if (row.patient_fio) {
       // Создаем объект пациента для переключения на прием
@@ -349,38 +382,61 @@ const DentistPanelUnified = () => {
     }
   };
 
-  const handleAppointmentActionClick = (action, row, event) => {
-    console.log('Действие с записью:', action, row);
+  const handleAppointmentActionClick = async (action, row, event) => {
+    logger.info('[Dentist] handleAppointmentActionClick:', action, row);
     event.stopPropagation();
-    
+
     switch (action) {
       case 'view':
         handleAppointmentRowClick(row);
         break;
-      case 'call': {
-        // Завершение приема аналогично кардио/дерма
-        (async () => {
-          try {
-            const token = localStorage.getItem('auth_token') || '';
-            if (!token) throw new Error('Нет токена');
-            const payload = { notes: 'Dentist: завершение приема' };
-            const res = await fetch(`http://localhost:8000/api/v1/doctor/queue/${row.id}/complete`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify(payload)
-            });
-            if (!res.ok) throw new Error(await res.text());
-            // Обновляем список
-            loadDentistryAppointments();
-          } catch (e) {
-            console.error('Ошибка завершения приема стоматолога:', e);
+      case 'call':
+        // Вызвать пациента
+        try {
+          const apiUrl = `http://localhost:8000/api/v1/registrar/queue/${row.id}/start-visit`;
+          const token = localStorage.getItem('auth_token');
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            logger.info('[Dentist] Пациент вызван:', row.patient_fio);
+            await loadDentistryAppointments();
           }
-        })();
+        } catch (error) {
+          logger.error('[Dentist] Ошибка вызова пациента:', error);
+        }
         break;
-      }
+      case 'payment':
+        logger.info('[Dentist] Открытие окна оплаты для:', row.patient_fio);
+        alert(`Оплата для пациента: ${row.patient_fio}\nФункция будет реализована позже`);
+        break;
+      case 'print':
+        logger.info('[Dentist] Печать талона для:', row.patient_fio);
+        window.print();
+        break;
+      case 'complete':
+        // Завершить приём
+        try {
+          const patient = {
+            id: row.id,
+            patient_name: row.patient_fio,
+            phone: row.patient_phone,
+            number: row.id,
+            source: 'appointments',
+            status: 'in_cabinet'
+          };
+          logger.info('[Dentist] Завершение приёма для:', patient.patient_name);
+          setSelectedPatient(patient);
+          handleTabChange('examinations');
+        } catch (error) {
+          logger.error('[Dentist] Ошибка при завершении приёма:', error);
+        }
+        break;
       case 'edit':
         // Логика редактирования записи
         break;
@@ -394,18 +450,12 @@ const DentistPanelUnified = () => {
 
   // Проверяем демо-режим после всех хуков
   const isDemoMode = window.location.pathname.includes('/medilab-demo');
-  
-  // В демо-режиме не рендерим компонент
-  if (isDemoMode) {
-    console.log('DentistPanelUnified: Skipping render in demo mode');
-    return null;
-  }
 
-  const authHeader = () => ({
+  const authHeader = useCallback(() => ({
     Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`,
-  });
+  }), []);
 
-  const loadPatients = async () => {
+  const loadPatients = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:8000/api/v1/patients?department=Dental&limit=100', { headers: authHeader() });
       if (response.ok) {
@@ -413,59 +463,125 @@ const DentistPanelUnified = () => {
         setPatients(Array.isArray(data) ? data : []);
       }
     } catch (e) {
-      console.error('Ошибка загрузки пациентов:', e);
+      logger.error('Ошибка загрузки пациентов:', e);
     }
-  };
+  }, [authHeader]);
 
-  const loadAppointments = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/v1/appointments?department=Dental&limit=100', { headers: authHeader() });
-      if (response.ok) {
-        const data = await response.json();
-        setAppointments(Array.isArray(data) ? data : []);
-      }
-    } catch (e) {
-      console.error('Ошибка загрузки записей:', e);
-    }
-  };
-
-  const loadDentalExaminations = async () => {
-    try {
-      // TODO: Implement dental examinations endpoint
-      // const res = await fetch('http://localhost:8000/api/v1/dental/examinations?limit=100', { headers: authHeader() });
-      // if (res.ok) setDentalExaminations(await res.json());
-      console.log('Dental examinations endpoint not implemented yet');
-    } catch {
-      // Игнорируем ошибки загрузки обследований
-    }
-  };
-
-  const loadTreatmentPlans = async () => {
+  const loadTreatmentPlans = useCallback(async () => {
     try {
       // TODO: Implement treatment plans endpoint
       // const res = await fetch('http://localhost:8000/api/v1/dental/treatments?limit=100', { headers: authHeader() });
       // if (res.ok) setTreatmentPlans(await res.json());
-      console.log('Treatment plans endpoint not implemented yet');
+      setTreatmentPlans([]);
+      logger.info('Treatment plans endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки планов лечения
     }
-  };
+  }, []);
 
-  const loadProsthetics = async () => {
+  const loadProsthetics = useCallback(async () => {
     try {
       // TODO: Implement prosthetics endpoint
       // const res = await fetch('http://localhost:8000/api/v1/dental/prosthetics?limit=100', { headers: authHeader() });
       // if (res.ok) setProsthetics(await res.json());
-      console.log('Prosthetics endpoint not implemented yet');
+      setProsthetics([]);
+      logger.info('Prosthetics endpoint not implemented yet');
     } catch {
       // Игнорируем ошибки загрузки протезирования
     }
-  };
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadPatients(),
+        loadTreatmentPlans(),
+        loadProsthetics()
+      ]);
+    } catch (error) {
+      logger.error('Ошибка загрузки данных:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadPatients, loadProsthetics, loadTreatmentPlans]);
+
+  useEffect(() => {
+    loadData();
+    loadServices();
+  }, [loadData, loadServices]);
 
   // Обработчики
   const handlePatientSelect = (patient) => {
     setSelectedPatient(patient);
-    setShowPatientCard(true);
+    // Переключаемся на вкладку визита для работы с EMR
+    handleTabChange('visits');
+  };
+
+  // Сохранение EMR
+  const saveEMR = async (emrData) => {
+    try {
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
+      if (!selectedPatient?.id) {
+        logger.warn('[Dentist] saveEMR: нет selectedPatient.id');
+        return;
+      }
+      
+      const appointmentForEMR = {
+        id: selectedPatient.id,
+        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+        patient_name: selectedPatient.patient_name || selectedPatient.name
+      };
+      
+      const response = await fetch(`/api/v1/appointments/${appointmentForEMR.id}/emr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(emrData)
+      });
+
+      if (response.ok) {
+        const savedEMR = await response.json();
+        setEmr(savedEMR);
+        logger.info('[Dentist] saveEMR: успешно', savedEMR);
+      } else {
+        const error = await response.json();
+        logger.error('[Dentist] saveEMR: ошибка', error);
+        throw new Error(error.detail || 'Ошибка при сохранении EMR');
+      }
+    } catch (error) {
+      logger.error('DentistPanel: Save EMR error:', error);
+      throw error;
+    }
+  };
+
+  // Завершение визита
+  const handleCompleteVisit = async () => {
+    if (!selectedPatient) return;
+    
+    try {
+      const visitPayload = {
+        patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+        notes: 'Стоматологический прием завершен'
+      };
+      
+      await queueService.completeVisit(selectedPatient.id, visitPayload);
+      
+      // Автоматически вызвать следующего пациента
+      try {
+        await queueService.callNextWaiting('dentist');
+      } catch (err) {
+        logger.warn('[Dentist] callNextWaiting failed:', err);
+      }
+      
+      setSelectedPatient(null);
+      setEmr(null);
+      handleTabChange('queue');
+    } catch (error) {
+      logger.error('[Dentist] handleCompleteVisit: error', error);
+    }
   };
 
   const handleExamination = (patient) => {
@@ -517,26 +633,7 @@ const DentistPanelUnified = () => {
 
   const handleTreatmentPlanner = (patient) => {
     setSelectedPatient(patient);
-    setCurrentTreatmentPlan(patient.treatmentPlan || null);
     setShowTreatmentPlanner(true);
-  };
-
-  const handleSaveDentalChart = (chartData) => {
-    // Сохранение схемы зубов
-    console.log('Сохранение схемы зубов:', chartData);
-    // Здесь будет API вызов для сохранения
-  };
-
-  const handleSaveTreatmentPlan = (planData) => {
-    // Сохранение плана лечения
-    console.log('Сохранение плана лечения:', planData);
-    // Здесь будет API вызов для сохранения
-  };
-
-  const handleSendToPatient = (planData) => {
-    // Отправка плана пациенту
-    console.log('Отправка плана пациенту:', planData);
-    // Здесь будет API вызов для отправки
   };
 
   // Обработчики отправки форм
@@ -555,10 +652,10 @@ const DentistPanelUnified = () => {
           periodontal_status: '', occlusion: '', missing_teeth: '', dental_plaque: '', 
           gingival_bleeding: '', diagnosis: '', recommendations: '' 
         });
-        loadDentalExaminations();
+        loadDentistryAppointments();
       }
     } catch (e) { 
-      console.error('Ошибка сохранения осмотра:', e); 
+      logger.error('Ошибка сохранения осмотра:', e); 
     }
   };
 
@@ -580,7 +677,7 @@ const DentistPanelUnified = () => {
         loadTreatmentPlans();
       }
     } catch (e) { 
-      console.error('Ошибка сохранения лечения:', e); 
+      logger.error('Ошибка сохранения лечения:', e); 
     }
   };
 
@@ -602,7 +699,7 @@ const DentistPanelUnified = () => {
         loadProsthetics();
       }
     } catch (e) { 
-      console.error('Ошибка сохранения протеза:', e); 
+      logger.error('Ошибка сохранения протеза:', e); 
     }
   };
 
@@ -618,150 +715,461 @@ const DentistPanelUnified = () => {
   });
 
   // Статистика
-  const stats = {
-    totalPatients: patients.length,
-    todayAppointments: appointments.filter(apt => 
-      new Date(apt.date).toDateString() === new Date().toDateString()
-    ).length,
-    activeTreatmentPlans: treatmentPlans.filter(plan => plan.status === 'active').length,
-    completedProsthetics: prosthetics.filter(prosthetic => prosthetic.status === 'completed').length
-  };
+  const stats = useMemo(() => {
+    const todayString = new Date().toDateString();
+    const todayAppointmentsCount = appointmentsTableData.filter(apt => {
+      if (!apt.appointment_date) {
+        return false;
+      }
+      return new Date(apt.appointment_date).toDateString() === todayString;
+    }).length;
+
+    const activePlansFromState = treatmentPlans.filter(plan => plan.status === 'active').length;
+    const activePlansDerived = appointmentsTableData.filter(apt => apt.status === 'in_progress' || apt.status === 'waiting').length;
+    const activeTreatmentPlansCount = activePlansFromState || activePlansDerived;
+
+    const completedProstheticsFromState = prosthetics.filter(prosthetic => prosthetic.status === 'completed').length;
+    const completedProstheticsDerived = appointmentsTableData.filter(apt => apt.status === 'completed').length;
+    const completedProstheticsCount = completedProstheticsFromState || completedProstheticsDerived;
+
+    return {
+      totalPatients: patients.length,
+      todayAppointments: todayAppointmentsCount,
+      activeTreatmentPlans: activeTreatmentPlansCount,
+      completedProsthetics: completedProstheticsCount
+    };
+  }, [appointmentsTableData, patients, prosthetics, treatmentPlans]);
 
   // Вкладки
-  const tabs = [
-    { id: 'dashboard', label: 'Дашборд', icon: BarChart3 },
-    { id: 'patients', label: 'Пациенты', icon: Users },
-    { id: 'appointments', label: 'Записи', icon: Calendar },
-    { id: 'examinations', label: 'Осмотры', icon: Eye },
-    { id: 'diagnoses', label: 'Диагнозы', icon: Stethoscope },
-    { id: 'visits', label: 'Протоколы', icon: FileText },
-    { id: 'photos', label: 'Архив', icon: Camera },
-    { id: 'templates', label: 'Шаблоны', icon: FileText },
-    { id: 'reports', label: 'Отчеты', icon: BarChart3 },
-    { id: 'dental-chart', label: 'Схемы зубов', icon: Tooth },
-    { id: 'treatment-plans', label: 'Планы лечения', icon: FileText },
-    { id: 'prosthetics', label: 'Протезирование', icon: Smile },
-    { id: 'ai-assistant', label: 'AI Помощник', icon: Brain }
-  ];
-
   // Рендер дашборда
   const renderDashboard = () => (
-    <div className="space-y-8">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Статистические карточки */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 mb-1">Всего пациентов</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.totalPatients}</p>
-              <p className="text-xs text-green-600 mt-1">+12% за месяц</p>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Users className="h-7 w-7 text-white" />
-            </div>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: '24px'
+      }}>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-xl)',
+          padding: '24px',
+          boxShadow: 'var(--mac-shadow-sm)',
+          border: '1px solid var(--mac-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}>
+          <div>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-secondary)',
+              marginBottom: '4px' 
+            }}>Всего пациентов</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-text-primary)' 
+            }}>{stats.totalPatients}</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-success)',
+              marginTop: '4px' 
+            }}>+12% за месяц</p>
+          </div>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: 'var(--mac-accent-blue)',
+            borderRadius: 'var(--mac-radius-xl)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--mac-shadow-lg)'
+          }}>
+            <Users style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 mb-1">Записей сегодня</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.todayAppointments}</p>
-              <p className="text-xs text-blue-600 mt-1">8 из 12 слотов</p>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Calendar className="h-7 w-7 text-white" />
-            </div>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-xl)',
+          padding: '24px',
+          boxShadow: 'var(--mac-shadow-sm)',
+          border: '1px solid var(--mac-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}>
+          <div>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-secondary)',
+              marginBottom: '4px' 
+            }}>Записей сегодня</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-text-primary)' 
+            }}>{stats.todayAppointments}</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-accent-blue)',
+              marginTop: '4px' 
+            }}>8 из 12 слотов</p>
+          </div>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: 'var(--mac-success)',
+            borderRadius: 'var(--mac-radius-xl)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--mac-shadow-lg)'
+          }}>
+            <Calendar style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 mb-1">Активные планы</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.activeTreatmentPlans}</p>
-              <p className="text-xs text-purple-600 mt-1">+8% к прошлому месяцу</p>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <FileText className="h-7 w-7 text-white" />
-            </div>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-xl)',
+          padding: '24px',
+          boxShadow: 'var(--mac-shadow-sm)',
+          border: '1px solid var(--mac-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}>
+          <div>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-secondary)',
+              marginBottom: '4px' 
+            }}>Активные планы</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-text-primary)' 
+            }}>{stats.activeTreatmentPlans}</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-accent-purple)',
+              marginTop: '4px' 
+            }}>+8% к прошлому месяцу</p>
+          </div>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: 'var(--mac-accent-purple)',
+            borderRadius: 'var(--mac-radius-xl)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--mac-shadow-lg)'
+          }}>
+            <FileText style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600 mb-1">Протезы</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.completedProsthetics}</p>
-              <p className="text-xs text-orange-600 mt-1">+15% к прошлому месяцу</p>
-            </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Smile className="h-7 w-7 text-white" />
-            </div>
+        <div style={{
+          background: 'var(--mac-bg-primary)',
+          borderRadius: 'var(--mac-radius-xl)',
+          padding: '24px',
+          boxShadow: 'var(--mac-shadow-sm)',
+          border: '1px solid var(--mac-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+          e.currentTarget.style.transform = 'translateY(-2px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}>
+          <div>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              fontWeight: 'var(--mac-font-weight-medium)', 
+              color: 'var(--mac-text-secondary)',
+              marginBottom: '4px' 
+            }}>Протезы</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-3xl)', 
+              fontWeight: 'var(--mac-font-weight-bold)', 
+              color: 'var(--mac-text-primary)' 
+            }}>{stats.completedProsthetics}</p>
+            <p style={{ 
+              fontSize: 'var(--mac-font-size-xs)', 
+              color: 'var(--mac-warning)',
+              marginTop: '4px' 
+            }}>+15% к прошлому месяцу</p>
+          </div>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: 'var(--mac-warning)',
+            borderRadius: 'var(--mac-radius-xl)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'var(--mac-shadow-lg)'
+          }}>
+            <Smile style={{ height: '28px', width: '28px', color: 'white' }} />
           </div>
         </div>
       </div>
 
       {/* Быстрые действия */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-slate-900">Быстрые действия</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+      <div style={{
+        background: 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-xl)',
+        padding: '24px',
+        boxShadow: 'var(--mac-shadow-sm)',
+        border: '1px solid var(--mac-border)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '24px'
+        }}>
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-text-primary)'
+          }}>Быстрые действия</h3>
+          <Button
+            variant="text"
+            size="sm"
+            onClick={() => {}}
+            style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-accent-blue)'
+            }}
+          >
             Показать все
-          </button>
+          </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '24px'
+        }}>
+          <Button
             onClick={() => handleTabChange('patients')}
-            className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm"
+            variant="primary"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '16px 24px',
+              borderRadius: 'var(--mac-radius-lg)',
+              boxShadow: 'var(--mac-shadow-sm)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+              background: 'var(--mac-accent-blue)',
+              color: 'white',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
-            <Plus className="h-5 w-5" />
-            <span className="font-medium">Новый пациент</span>
-          </button>
-          <button
+            <Plus style={{ height: '20px', width: '20px' }} />
+            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Новый пациент</span>
+          </Button>
+          <Button
             onClick={() => handleTabChange('appointments')}
-            className="flex items-center gap-3 px-6 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm"
+            variant="outline"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '16px 24px',
+              borderRadius: 'var(--mac-radius-lg)',
+              boxShadow: 'var(--mac-shadow-sm)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+              border: '1px solid var(--mac-border)',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
-            <Calendar className="h-5 w-5" />
-            <span className="font-medium">Записать на прием</span>
-          </button>
-          <button
+            <Calendar style={{ height: '20px', width: '20px' }} />
+            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Записать на прием</span>
+          </Button>
+          <Button
             onClick={() => handleTabChange('dental-chart')}
-            className="flex items-center gap-3 px-6 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all duration-200 shadow-sm"
+            variant="outline"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '16px 24px',
+              borderRadius: 'var(--mac-radius-lg)',
+              boxShadow: 'var(--mac-shadow-sm)',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+              border: '1px solid var(--mac-border)',
+              fontWeight: 'var(--mac-font-weight-medium)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-md)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
-            <Tooth className="h-5 w-5" />
-            <span className="font-medium">Схема зубов</span>
-          </button>
+            <Tooth style={{ height: '20px', width: '20px' }} />
+            <span style={{ fontWeight: 'var(--mac-font-weight-medium)' }}>Схема зубов</span>
+          </Button>
         </div>
       </div>
 
       {/* Последние записи */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-slate-900">Последние записи</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+      <div style={{
+        background: 'var(--mac-bg-primary)',
+        borderRadius: 'var(--mac-radius-xl)',
+        padding: '24px',
+        boxShadow: 'var(--mac-shadow-sm)',
+        border: '1px solid var(--mac-border)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '24px'
+        }}>
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-text-primary)'
+          }}>Последние записи</h3>
+          <Button
+            variant="text"
+            size="sm"
+            onClick={() => {}}
+            style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
+              color: 'var(--mac-accent-blue)'
+            }}
+          >
             Показать все
-          </button>
+          </Button>
         </div>
-        <div className="space-y-3">
-          {appointments.slice(0, 5).map(appointment => (
-            <div key={appointment.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <span className="text-white text-sm font-bold">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {appointmentsTableData.slice(0, 5).map(appointment => (
+            <div 
+              key={appointment.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '24px',
+                background: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-lg)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  background: 'var(--mac-accent-blue)',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 'var(--mac-shadow-sm)'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-bold)'
+                  }}>
                     {appointment.patientName?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">{appointment.patientName}</p>
-                  <p className="text-sm text-slate-600">{appointment.date} {appointment.time}</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{appointment.patientName}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>{appointment.date} {appointment.time}</p>
                 </div>
               </div>
-              <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                appointment.status === 'confirmed' 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-yellow-100 text-yellow-700'
-              }`}>
+              <div style={{
+                padding: '4px 12px',
+                borderRadius: 'var(--mac-radius-full)',
+                fontSize: 'var(--mac-font-size-xs)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                background: appointment.status === 'confirmed' ? 'var(--mac-success-bg)' : 'var(--mac-warning-bg)',
+                color: appointment.status === 'confirmed' ? 'var(--mac-success)' : 'var(--mac-warning)'
+              }}>
                 {appointment.status}
               </div>
             </div>
@@ -773,26 +1181,75 @@ const DentistPanelUnified = () => {
 
   // Рендер пациентов
   const renderPatients = () => (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Поиск и фильтры */}
-      <Card className="p-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <Card padding="lg">
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                height: '16px',
+                width: '16px',
+                color: 'var(--mac-text-tertiary)'
+              }} />
               <input
                 type="text"
                 placeholder="Поиск пациентов..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '16px',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  fontSize: 'var(--mac-font-size-base)',
+                  fontFamily: 'inherit',
+                  backgroundColor: 'var(--mac-bg-primary)',
+                  color: 'var(--mac-text-primary)',
+                  transition: 'all var(--mac-duration-fast) var(--mac-ease)'
+                }}
+                onFocus={(e) => {
+                  e.target.style.outline = 'var(--mac-focus-ring)';
+                  e.target.style.outlineOffset = '2px';
+                  e.target.style.borderColor = 'var(--mac-accent-blue)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.outline = 'none';
+                  e.target.style.borderColor = 'var(--mac-border)';
+                }}
               />
             </div>
           </div>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{
+              padding: '8px 16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              fontSize: 'var(--mac-font-size-base)',
+              fontFamily: 'inherit',
+              backgroundColor: 'var(--mac-bg-primary)',
+              color: 'var(--mac-text-primary)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-fast) var(--mac-ease)'
+            }}
+            onFocus={(e) => {
+              e.target.style.outline = 'var(--mac-focus-ring)';
+              e.target.style.outlineOffset = '2px';
+              e.target.style.borderColor = 'var(--mac-accent-blue)';
+            }}
+            onBlur={(e) => {
+              e.target.style.outline = 'none';
+              e.target.style.borderColor = 'var(--mac-border)';
+            }}
           >
             <option value="all">Все статусы</option>
             <option value="active">Активные</option>
@@ -802,19 +1259,58 @@ const DentistPanelUnified = () => {
       </Card>
 
       {/* Список пациентов */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: '24px'
+      }}>
         {filteredPatients.map(patient => (
-          <Card key={patient.id} className="p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-lg font-medium">
+          <Card 
+            key={patient.id} 
+            padding="lg"
+            style={{
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)',
+              cursor: 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-lg)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'var(--mac-shadow-sm)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'var(--mac-accent-blue)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-lg)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">{patient.name}</h3>
-                  <p className="text-gray-600">{patient.phone}</p>
+                  <h3 style={{
+                    fontWeight: 'var(--mac-font-weight-semibold)',
+                    fontSize: 'var(--mac-font-size-lg)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '4px'
+                  }}>{patient.name}</h3>
+                  <p style={{
+                    color: 'var(--mac-text-secondary)',
+                    fontSize: 'var(--mac-font-size-sm)'
+                  }}>{patient.phone}</p>
                 </div>
               </div>
               <Badge variant={patient.status === 'active' ? 'success' : 'warning'}>
@@ -822,22 +1318,28 @@ const DentistPanelUnified = () => {
               </Badge>
             </div>
 
-            <div className="space-y-2 mb-4">
-              <p className="text-sm text-gray-600">
-                <strong>Возраст:</strong> {patient.age} лет
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
+                <strong style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Возраст:</strong> {patient.age} лет
               </p>
-              <p className="text-sm text-gray-600">
-                <strong>Последний визит:</strong> {patient.lastVisit || 'Не было'}
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                color: 'var(--mac-text-secondary)'
+              }}>
+                <strong style={{ fontWeight: 'var(--mac-font-weight-semibold)' }}>Последний визит:</strong> {patient.lastVisit || 'Не было'}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
               <Button
                 size="sm"
                 onClick={() => handlePatientSelect(patient)}
-                className="col-span-2"
+                style={{ gridColumn: 'span 2', marginBottom: '8px' }}
               >
-                <Edit className="h-4 w-4 mr-1" />
+                <Edit style={{ height: '16px', width: '16px', marginRight: '4px' }} />
                 Карточка пациента
               </Button>
               <Button
@@ -845,48 +1347,54 @@ const DentistPanelUnified = () => {
                 variant="outline"
                 onClick={() => handleExamination(patient)}
                 title="Осмотр"
+                style={{ padding: '8px' }}
               >
-                <Eye className="h-4 w-4" />
+                <Eye style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleDiagnosis(patient)}
                 title="Диагнозы"
+                style={{ padding: '8px' }}
               >
-                <Stethoscope className="h-4 w-4" />
+                <Stethoscope style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleVisitProtocol(patient)}
                 title="Протокол визита"
+                style={{ padding: '8px' }}
               >
-                <FileText className="h-4 w-4" />
+                <FileText style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleDentalChart(patient)}
                 title="Схема зубов"
+                style={{ padding: '8px' }}
               >
-                <Tooth className="h-4 w-4" />
+                <Tooth style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleTreatment(patient)}
                 title="Лечение"
+                style={{ padding: '8px' }}
               >
-                <Scissors className="h-4 w-4" />
+                <Scissors style={{ height: '16px', width: '16px' }} />
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => handleProsthetic(patient)}
                 title="Протезирование"
+                style={{ padding: '8px' }}
               >
-                <Smile className="h-4 w-4" />
+                <Smile style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </Card>
@@ -911,22 +1419,44 @@ const DentistPanelUnified = () => {
         boxSizing: 'border-box',
         overflow: 'hidden'
       }}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium flex items-center">
-            <Calendar size={20} className="mr-2 text-green-600" />
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}>
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-medium)',
+            display: 'flex',
+            alignItems: 'center',
+            color: 'var(--mac-text-primary)'
+          }}>
+            <Calendar size={20} style={{ marginRight: '8px', color: 'var(--mac-success)' }} />
             Записи к стоматологу
           </h3>
-          <div className="flex items-center gap-2">
-            <Badge variant="info">
-              Всего: {appointmentsTableData.length}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Badge variant="info">Всего: {appointmentsTableData.length}</Badge>
+            <Badge variant="warning">
+              Ожидают: {appointmentsTableData.filter(a => a.status === 'waiting' || a.status === 'confirmed' || a.status === 'pending').length}
             </Badge>
-            <Button 
-              variant="secondary" 
+            <Badge variant="primary">
+              Вызваны: {appointmentsTableData.filter(a => a.status === 'called' || a.status === 'in_progress').length}
+            </Badge>
+            <Badge variant="success">
+              Приняты: {appointmentsTableData.filter(a => a.status === 'completed' || a.status === 'done').length}
+            </Badge>
+            <Button
+              variant="secondary"
               size="sm"
               onClick={loadDentistryAppointments}
               disabled={appointmentsLoading}
             >
-              <RefreshCw size={16} className="mr-1" />
+              <RefreshCw size={16} style={{ marginRight: '4px' }} />
               Обновить
             </Button>
           </div>
@@ -940,7 +1470,7 @@ const DentistPanelUnified = () => {
           view="doctor"
           selectedRows={new Set()}
           outerBorder={false}
-          services={{}}
+          services={services}
           showCheckboxes={false}
           onRowSelect={() => {}}
           onRowClick={handleAppointmentRowClick}
@@ -952,29 +1482,73 @@ const DentistPanelUnified = () => {
 
   // Рендер осмотров
   const renderExaminations = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Объективные осмотры</h3>
-        <p className="text-gray-600 mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>Объективные осмотры</h3>
+        <p style={{
+          color: 'var(--mac-text-secondary)',
+          marginBottom: '16px',
+          fontSize: 'var(--mac-font-size-base)'
+        }}>
           Выберите пациента для проведения или просмотра объективного осмотра
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          gap: '16px'
+        }}>
           {patients.map(patient => (
             <div
               key={patient.id}
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              style={{
+                padding: '24px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-lg)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
               onClick={() => handleExamination(patient)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  background: 'var(--mac-success)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium">{patient.name}</p>
-                  <p className="text-sm text-gray-600">Провести осмотр</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{patient.name}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>Провести осмотр</p>
                 </div>
               </div>
             </div>
@@ -986,29 +1560,73 @@ const DentistPanelUnified = () => {
 
   // Рендер диагнозов
   const renderDiagnoses = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Диагнозы и назначения</h3>
-        <p className="text-gray-600 mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>Диагнозы и назначения</h3>
+        <p style={{
+          color: 'var(--mac-text-secondary)',
+          marginBottom: '16px',
+          fontSize: 'var(--mac-font-size-base)'
+        }}>
           Выберите пациента для постановки диагнозов и назначений
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          gap: '16px'
+        }}>
           {patients.map(patient => (
             <div
               key={patient.id}
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              style={{
+                padding: '24px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-lg)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
               onClick={() => handleDiagnosis(patient)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  background: 'var(--mac-accent-blue)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium">{patient.name}</p>
-                  <p className="text-sm text-gray-600">Поставить диагноз</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{patient.name}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>Поставить диагноз</p>
                 </div>
               </div>
             </div>
@@ -1019,64 +1637,201 @@ const DentistPanelUnified = () => {
   );
 
   // Рендер протоколов визитов
-  const renderVisits = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Протоколы визитов</h3>
-        <p className="text-gray-600 mb-4">
-          Выберите пациента для создания или просмотра протокола визита
-        </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {patients.map(patient => (
-            <div
-              key={patient.id}
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-              onClick={() => handleVisitProtocol(patient)}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
-                    {patient.name?.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium">{patient.name}</p>
-                  <p className="text-sm text-gray-600">Создать протокол</p>
+  const renderVisits = () => {
+    // Если выбран пациент из очереди - показываем EMR
+    if (selectedPatient) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <Card padding="lg">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Stethoscope size={20} />
+                Прием пациента: {selectedPatient.patient_name || selectedPatient.name || `№${selectedPatient.number}`}
+              </h3>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedPatient(null);
+                  handleTabChange('queue');
+                }}
+              >
+                Вернуться в очередь
+              </Button>
+            </div>
+            
+            {/* EMR System */}
+            <EMRSystem
+              appointment={{
+                id: selectedPatient.id,
+                patient_id: selectedPatient.patient?.id || selectedPatient.patient_id || selectedPatient.id,
+                patient_name: selectedPatient.patient_name || selectedPatient.name,
+                specialty: 'dentist',
+                status: selectedPatient.status || 'in_visit'
+              }}
+              emr={emr}
+              onSave={saveEMR}
+              onComplete={handleCompleteVisit}
+            />
+          </Card>
+        </div>
+      );
+    }
+    
+    // Иначе показываем список пациентов для выбора протокола
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <Card padding="lg">
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            marginBottom: '16px',
+            color: 'var(--mac-text-primary)'
+          }}>Протоколы визитов</h3>
+          <p style={{
+            color: 'var(--mac-text-secondary)',
+            marginBottom: '16px',
+            fontSize: 'var(--mac-font-size-base)'
+          }}>
+            Выберите пациента из очереди или выберите из списка для создания протокола визита
+          </p>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gap: '16px'
+          }}>
+            {patients.map(patient => (
+              <div
+                key={patient.id}
+                style={{
+                  padding: '24px',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-lg)',
+                  cursor: 'pointer',
+                  transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+                }}
+                onClick={() => handleVisitProtocol(patient)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    background: 'var(--mac-accent-purple)',
+                    borderRadius: 'var(--mac-radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <span style={{
+                      color: 'white',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: 'var(--mac-font-weight-medium)'
+                    }}>
+                      {patient.name?.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <p style={{
+                      fontWeight: 'var(--mac-font-weight-medium)',
+                      color: 'var(--mac-text-primary)',
+                      fontSize: 'var(--mac-font-size-base)'
+                    }}>{patient.name}</p>
+                    <p style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-secondary)'
+                    }}>Создать протокол</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  );
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  };
 
   // Рендер фото архива
   const renderPhotos = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Фото и рентген архив</h3>
-        <p className="text-gray-600 mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>Фото и рентген архив</h3>
+        <p style={{
+          color: 'var(--mac-text-secondary)',
+          marginBottom: '16px',
+          fontSize: 'var(--mac-font-size-base)'
+        }}>
           Выберите пациента для просмотра и управления фото и рентгеновскими снимками
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          gap: '16px'
+        }}>
           {patients.map(patient => (
             <div
               key={patient.id}
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              style={{
+                padding: '24px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-lg)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
               onClick={() => handlePhotoArchive(patient)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  background: 'var(--mac-warning)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium">{patient.name}</p>
-                  <p className="text-sm text-gray-600">Открыть архив</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{patient.name}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>Открыть архив</p>
                 </div>
               </div>
             </div>
@@ -1088,90 +1843,225 @@ const DentistPanelUnified = () => {
 
   // Рендер шаблонов
   const renderTemplates = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
           <div>
-            <h3 className="text-lg font-semibold">Шаблоны протоколов</h3>
-            <p className="text-gray-600 text-sm">
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>Шаблоны протоколов</h3>
+            <p style={{
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
               Стандартные протоколы для быстрого создания протоколов визитов
             </p>
           </div>
           <Button
             onClick={handleProtocolTemplates}
-            className="flex items-center gap-2"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
-            <FileText className="h-4 w-4" />
+            <FileText style={{ height: '16px', width: '16px' }} />
             Управление шаблонами
           </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Scissors className="h-5 w-5 text-blue-600" />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '16px'
+        }}>
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-accent-blue-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Scissors style={{ height: '20px', width: '20px', color: 'var(--mac-accent-blue)' }} />
               </div>
               <div>
-                <h4 className="font-medium">Лечение кариеса</h4>
-                <p className="text-sm text-gray-600">60 мин</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>Лечение кариеса</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>60 мин</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700 mb-3">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '12px'
+            }}>
               Стандартный протокол лечения кариеса с анестезией и пломбированием
             </p>
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1">
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button size="sm" style={{ flex: 1 }}>
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
-                <Edit className="h-4 w-4" />
+                <Edit style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </div>
           
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <Scissors className="h-5 w-5 text-red-600" />
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-danger-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Scissors style={{ height: '20px', width: '20px', color: 'var(--mac-danger)' }} />
               </div>
               <div>
-                <h4 className="font-medium">Эндодонтическое лечение</h4>
-                <p className="text-sm text-gray-600">120 мин</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>Эндодонтическое лечение</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>120 мин</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700 mb-3">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '12px'
+            }}>
               Протокол лечения корневых каналов с инструментальной обработкой
             </p>
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1">
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button size="sm" style={{ flex: 1 }}>
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
-                <Edit className="h-4 w-4" />
+                <Edit style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </div>
           
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Scissors className="h-5 w-5 text-green-600" />
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-success-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Scissors style={{ height: '20px', width: '20px', color: 'var(--mac-success)' }} />
               </div>
               <div>
-                <h4 className="font-medium">Профессиональная гигиена</h4>
-                <p className="text-sm text-gray-600">75 мин</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>Профессиональная гигиена</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>75 мин</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700 mb-3">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '12px'
+            }}>
               Протокол профессиональной гигиены полости рта
             </p>
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1">
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button size="sm" style={{ flex: 1 }}>
                 Использовать
               </Button>
               <Button size="sm" variant="outline">
-                <Edit className="h-4 w-4" />
+                <Edit style={{ height: '16px', width: '16px' }} />
               </Button>
             </div>
           </div>
@@ -1182,81 +2072,254 @@ const DentistPanelUnified = () => {
 
   // Рендер отчетов
   const renderReports = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '16px'
+        }}>
           <div>
-            <h3 className="text-lg font-semibold">Отчеты и аналитика</h3>
-            <p className="text-gray-600 text-sm">
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
+              marginBottom: '4px'
+            }}>Отчеты и аналитика</h3>
+            <p style={{
+              color: 'var(--mac-text-secondary)',
+              fontSize: 'var(--mac-font-size-sm)'
+            }}>
               Статистика по пациентам, врачам, процедурам и клинике
             </p>
           </div>
           <Button
             onClick={handleReports}
-            className="flex items-center gap-2"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
           >
-            <BarChart3 className="h-4 w-4" />
+            <BarChart3 style={{ height: '16px', width: '16px' }} />
             Открыть отчеты
           </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={handleReports}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: '16px'
+        }}>
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onClick={handleReports}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-accent-blue-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <BarChart3 style={{ height: '20px', width: '20px', color: 'var(--mac-accent-blue)' }} />
               </div>
               <div>
-                <h4 className="font-medium">Общий обзор</h4>
-                <p className="text-sm text-gray-600">Основные показатели</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>Общий обзор</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>Основные показатели</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               Общая статистика по всем направлениям деятельности
             </p>
           </div>
           
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={handleReports}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="h-5 w-5 text-green-600" />
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onClick={handleReports}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-success-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Users style={{ height: '20px', width: '20px', color: 'var(--mac-success)' }} />
               </div>
               <div>
-                <h4 className="font-medium">По пациентам</h4>
-                <p className="text-sm text-gray-600">Демография и активность</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>По пациентам</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>Демография и активность</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               Анализ пациентской базы и их активности
             </p>
           </div>
           
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={handleReports}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Stethoscope className="h-5 w-5 text-purple-600" />
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onClick={handleReports}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-accent-purple-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Stethoscope style={{ height: '20px', width: '20px', color: 'var(--mac-accent-purple)' }} />
               </div>
               <div>
-                <h4 className="font-medium">По врачам</h4>
-                <p className="text-sm text-gray-600">Производительность</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>По врачам</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>Производительность</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               Статистика работы врачей и их специализаций
             </p>
           </div>
           
-          <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={handleReports}>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Building className="h-5 w-5 text-orange-600" />
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid var(--mac-border)',
+              borderRadius: 'var(--mac-radius-lg)',
+              cursor: 'pointer',
+              transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+            }}
+            onClick={handleReports}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                background: 'var(--mac-warning-bg)',
+                borderRadius: 'var(--mac-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Building style={{ height: '20px', width: '20px', color: 'var(--mac-warning)' }} />
               </div>
               <div>
-                <h4 className="font-medium">По клинике</h4>
-                <p className="text-sm text-gray-600">Оборудование и загруженность</p>
+                <h4 style={{
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  fontSize: 'var(--mac-font-size-base)'
+                }}>По клинике</h4>
+                <p style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-secondary)'
+                }}>Оборудование и загруженность</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700">
+            <p style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              color: 'var(--mac-text-primary)'
+            }}>
               Анализ работы клиники и состояния оборудования
             </p>
           </div>
@@ -1267,29 +2330,73 @@ const DentistPanelUnified = () => {
 
   // Рендер схем зубов
   const renderDentalChart = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Схемы зубов</h3>
-        <p className="text-gray-600 mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>Схемы зубов</h3>
+        <p style={{
+          color: 'var(--mac-text-secondary)',
+          marginBottom: '16px',
+          fontSize: 'var(--mac-font-size-base)'
+        }}>
           Выберите пациента для просмотра и редактирования схемы зубов
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          gap: '16px'
+        }}>
           {patients.map(patient => (
             <div
               key={patient.id}
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              style={{
+                padding: '24px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-lg)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
               onClick={() => handleDentalChart(patient)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  background: 'var(--mac-accent-blue)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium">{patient.name}</p>
-                  <p className="text-sm text-gray-600">Открыть схему</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{patient.name}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>Открыть схему</p>
                 </div>
               </div>
             </div>
@@ -1301,29 +2408,73 @@ const DentistPanelUnified = () => {
 
   // Рендер планов лечения
   const renderTreatmentPlans = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Планы лечения</h3>
-        <p className="text-gray-600 mb-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>Планы лечения</h3>
+        <p style={{
+          color: 'var(--mac-text-secondary)',
+          marginBottom: '16px',
+          fontSize: 'var(--mac-font-size-base)'
+        }}>
           Выберите пациента для создания или редактирования плана лечения
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+          gap: '16px'
+        }}>
           {patients.map(patient => (
             <div
               key={patient.id}
-              className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              style={{
+                padding: '24px',
+                border: '1px solid var(--mac-border)',
+                borderRadius: 'var(--mac-radius-lg)',
+                cursor: 'pointer',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
               onClick={() => handleTreatmentPlanner(patient)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  background: 'var(--mac-success)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <span style={{
+                    color: 'white',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)'
+                  }}>
                     {patient.name?.charAt(0)}
                   </span>
                 </div>
                 <div>
-                  <p className="font-medium">{patient.name}</p>
-                  <p className="text-sm text-gray-600">Открыть план</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{patient.name}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>Открыть план</p>
                 </div>
               </div>
             </div>
@@ -1335,19 +2486,56 @@ const DentistPanelUnified = () => {
 
   // Рендер протезирования
   const renderProsthetics = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Протезирование</h3>
-        <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>Протезирование</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {prosthetics.map(prosthetic => (
-            <div key={prosthetic.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center">
-                  <Smile className="h-5 w-5 text-white" />
+            <div
+              key={prosthetic.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px',
+                background: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-lg)',
+                transition: 'all var(--mac-duration-normal) var(--mac-ease)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--mac-bg-secondary)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  background: 'var(--mac-warning)',
+                  borderRadius: 'var(--mac-radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Smile style={{ height: '20px', width: '20px', color: 'white' }} />
                 </div>
                 <div>
-                  <p className="font-medium">{prosthetic.patientName}</p>
-                  <p className="text-sm text-gray-600">{prosthetic.type}</p>
+                  <p style={{
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    fontSize: 'var(--mac-font-size-base)'
+                  }}>{prosthetic.patientName}</p>
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    color: 'var(--mac-text-secondary)'
+                  }}>{prosthetic.type}</p>
                 </div>
               </div>
               <Badge variant={prosthetic.status === 'completed' ? 'success' : 'warning'}>
@@ -1362,13 +2550,18 @@ const DentistPanelUnified = () => {
 
   // Рендер AI помощника
   const renderAIAssistant = () => (
-    <div className="space-y-6">
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">AI Помощник</h3>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <Card padding="lg">
+        <h3 style={{
+          fontSize: 'var(--mac-font-size-lg)',
+          fontWeight: 'var(--mac-font-weight-semibold)',
+          marginBottom: '16px',
+          color: 'var(--mac-text-primary)'
+        }}>AI Помощник</h3>
         <AIAssistant
           context="dental"
           onSuggestion={(suggestion) => {
-            console.log('AI предложение:', suggestion);
+            logger.info('AI предложение:', suggestion);
           }}
         />
       </Card>
@@ -1380,6 +2573,17 @@ const DentistPanelUnified = () => {
     switch (activeTab) {
       case 'dashboard':
         return renderDashboard();
+      case 'queue':
+        return (
+          <QueueIntegration
+            specialist="Стоматолог"
+            onPatientSelect={handlePatientSelect}
+            onStartVisit={(appointment) => {
+              setSelectedPatient(appointment);
+              handleTabChange('visits');
+            }}
+          />
+        );
       case 'patients':
         return renderPatients();
       case 'appointments':
@@ -1409,14 +2613,34 @@ const DentistPanelUnified = () => {
     }
   };
 
+  if (isDemoMode) {
+    logger.info('DentistPanelUnified: Skipping render in demo mode');
+    return null;
+  }
+
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{
+            height: '32px',
+            background: 'var(--mac-bg-secondary)',
+            borderRadius: 'var(--mac-radius-md)',
+            width: '25%',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }}></div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '24px'
+          }}>
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              <div key={i} style={{
+                height: '96px',
+                background: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-md)',
+                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+              }}></div>
             ))}
           </div>
         </div>
@@ -1426,9 +2650,8 @@ const DentistPanelUnified = () => {
 
   return (
     <div className="dentist-panel" style={{
-      padding: '20px',
+      padding: '0px', // Убираем padding, так как он уже есть в main контейнере
       boxSizing: 'border-box',
-      overflow: 'hidden',
       width: '100%',
       position: 'relative',
       zIndex: 1,
@@ -1436,18 +2659,19 @@ const DentistPanelUnified = () => {
       maxWidth: '100%',
       margin: 0,
       minHeight: '100vh',
-      background: '#f8fafc'
+      background: 'var(--mac-gradient-window)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif',
+      color: 'var(--mac-text-primary)',
+      transition: 'background var(--mac-duration-normal) var(--mac-ease)'
     }}>
-      <AnimatedTransition>
-        {renderContent()}
-      </AnimatedTransition>
+      {renderContent()}
 
       {/* Модальные окна */}
       {showPatientCard && selectedPatient && (
         <PatientCard
           patient={selectedPatient}
           onSave={(updatedPatient) => {
-            console.log('Сохранение пациента:', updatedPatient);
+            logger.info('Сохранение пациента:', updatedPatient);
             setShowPatientCard(false);
           }}
           onClose={() => setShowPatientCard(false)}
@@ -1459,7 +2683,7 @@ const DentistPanelUnified = () => {
           patientId={selectedPatient.id}
           initialData={selectedPatient.examinationData}
           onSave={(examinationData) => {
-            console.log('Сохранение осмотра:', examinationData);
+            logger.info('Сохранение осмотра:', examinationData);
             setShowExaminationForm(false);
           }}
           onClose={() => setShowExaminationForm(false)}
@@ -1472,7 +2696,7 @@ const DentistPanelUnified = () => {
           patientName={selectedPatient.name}
           initialData={selectedPatient.diagnosisData}
           onSave={(diagnosisData) => {
-            console.log('Сохранение диагнозов:', diagnosisData);
+            logger.info('Сохранение диагнозов:', diagnosisData);
             setShowDiagnosisForm(false);
           }}
           onClose={() => setShowDiagnosisForm(false)}
@@ -1486,7 +2710,7 @@ const DentistPanelUnified = () => {
           visitId={Date.now()}
           initialData={selectedPatient.visitData}
           onSave={(visitData) => {
-            console.log('Сохранение протокола визита:', visitData);
+            logger.info('Сохранение протокола визита:', visitData);
             setShowVisitProtocol(false);
           }}
           onClose={() => setShowVisitProtocol(false)}
@@ -1499,7 +2723,7 @@ const DentistPanelUnified = () => {
           patientName={selectedPatient.name}
           initialData={selectedPatient.photoArchive}
           onSave={(archiveData) => {
-            console.log('Сохранение фото архива:', archiveData);
+            logger.info('Сохранение фото архива:', archiveData);
             setShowPhotoArchive(false);
           }}
           onClose={() => setShowPhotoArchive(false)}
@@ -1509,7 +2733,7 @@ const DentistPanelUnified = () => {
       {showProtocolTemplates && (
         <ProtocolTemplates
           onSelectTemplate={(template) => {
-            console.log('Выбран шаблон:', template);
+            logger.info('Выбран шаблон:', template);
             // Здесь можно открыть протокол визита с выбранным шаблоном
           }}
           onClose={() => setShowProtocolTemplates(false)}
@@ -1523,7 +2747,7 @@ const DentistPanelUnified = () => {
           clinicId={user?.clinic_id}
           initialData={null}
           onSave={(reportData) => {
-            console.log('Сохранение отчета:', reportData);
+            logger.info('Сохранение отчета:', reportData);
             setShowReports(false);
           }}
           onClose={() => setShowReports(false)}
@@ -1531,24 +2755,69 @@ const DentistPanelUnified = () => {
       )}
 
       {showDentalChart && selectedPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-6xl h-full max-h-[90vh] overflow-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div style={{
+            background: 'var(--mac-bg-primary)',
+            borderRadius: 'var(--mac-radius-xl)',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '1152px',
+            height: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: 'var(--mac-shadow-xl)',
+            border: '1px solid var(--mac-border)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px'
+            }}>
+              <h2 style={{
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)'
+              }}>
                 Схема зубов: {selectedPatient.name}
               </h2>
               <button
                 onClick={() => setShowDentalChart(false)}
-                className="text-gray-500 hover:text-gray-700"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--mac-text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all var(--mac-duration-fast) var(--mac-ease)',
+                  padding: '4px',
+                  borderRadius: 'var(--mac-radius-sm)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                  e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                  e.target.style.backgroundColor = 'transparent';
+                }}
               >
-                <XCircle className="h-6 w-6" />
+                <XCircle style={{ height: '24px', width: '24px' }} />
               </button>
             </div>
             <TeethChart
               patientId={selectedPatient.id}
               initialData={dentalChartData}
               onToothClick={(toothNumber, toothData) => {
-                console.log('Клик по зубу:', toothNumber, toothData);
+                logger.info('Клик по зубу:', toothNumber, toothData);
                 setSelectedTooth({ number: toothNumber, data: toothData });
                 setToothModalOpen(true);
               }}
@@ -1559,17 +2828,62 @@ const DentistPanelUnified = () => {
       )}
 
       {showTreatmentPlanner && selectedPatient && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-6xl h-full max-h-[90vh] overflow-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div style={{
+            background: 'var(--mac-bg-primary)',
+            borderRadius: 'var(--mac-radius-xl)',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '1152px',
+            height: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: 'var(--mac-shadow-xl)',
+            border: '1px solid var(--mac-border)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px'
+            }}>
+              <h2 style={{
+                fontSize: 'var(--mac-font-size-xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)'
+              }}>
                 План лечения: {selectedPatient.name}
               </h2>
               <button
                 onClick={() => setShowTreatmentPlanner(false)}
-                className="text-gray-500 hover:text-gray-700"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--mac-text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all var(--mac-duration-fast) var(--mac-ease)',
+                  padding: '4px',
+                  borderRadius: 'var(--mac-radius-sm)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = 'var(--mac-text-primary)';
+                  e.target.style.backgroundColor = 'var(--mac-bg-secondary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = 'var(--mac-text-secondary)';
+                  e.target.style.backgroundColor = 'transparent';
+                }}
               >
-                <XCircle className="h-6 w-6" />
+                <XCircle style={{ height: '24px', width: '24px' }} />
               </button>
             </div>
             <TreatmentPlanner
@@ -1577,8 +2891,7 @@ const DentistPanelUnified = () => {
               visitId={selectedPatient.visitId || 'demo-visit-1'}
               teethData={dentalChartData || {}}
               onUpdate={(plan) => {
-                console.log('План лечения обновлен:', plan);
-                setCurrentTreatmentPlan(plan);
+                logger.info('План лечения обновлен:', plan);
               }}
             />
           </div>
@@ -2080,7 +3393,7 @@ const DentistPanelUnified = () => {
           toothNumber={selectedTooth.number}
           toothData={selectedTooth.data}
           onSave={(toothNumber, data) => {
-            console.log('Сохранение данных зуба:', toothNumber, data);
+            logger.info('Сохранение данных зуба:', toothNumber, data);
             // Обновляем данные зубной карты
             setDentalChartData(prev => ({
               ...prev,
@@ -2106,7 +3419,7 @@ const DentistPanelUnified = () => {
             setSelectedServiceForPrice(null);
           }}
           onPriceSet={(priceData) => {
-            console.log('Price set:', priceData);
+            logger.info('Price set:', priceData);
             // Можно добавить логику обновления состояния
           }}
         />

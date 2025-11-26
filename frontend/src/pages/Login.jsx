@@ -1,17 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { login, me, setToken } from '../api/client';
 import { setProfile } from '../stores/auth';
 import auth from '../stores/auth.js';
-import { useTheme } from '../contexts/ThemeContext';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
 import ForgotPassword from '../components/auth/ForgotPassword';
+import SMSEmail2FA from '../components/security/SMSEmail2FA';
+import {
+  Lock,
+  User,
+  Key,
+  ArrowLeft,
+  Sun,
+  Moon,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  RefreshCw,
+  ChevronDown
+} from 'lucide-react';
 
-/**
- * Логин по OAuth2 Password (FastAPI):
- * POST /login с application/x-www-form-urlencoded полями:
- *   username, password, grant_type=password, scope, client_id, client_secret
- */
+const translations = {
+  RU: {
+    title: 'Вход в систему',
+    subtitle: 'Войдите в свой аккаунт для продолжения работы',
+    selectRole: 'Выбрать роль',
+    username: 'Логин',
+    password: 'Пароль',
+    login: 'Войти',
+    loggingIn: 'Входим...',
+    forgotPassword: 'Забыли пароль?',
+    backToHome: 'На главную',
+    note: 'По умолчанию админ создаётся скриптом create_admin.py (admin/admin123).',
+    flagUrl: 'https://flagcdn.com/w80/ru.png'
+  },
+  UZ: {
+    title: 'Tizimga kirish',
+    subtitle: 'Ishni davom ettirish uchun akkauntingizga kiring',
+    selectRole: 'Rolni tanlang',
+    username: 'Login',
+    password: 'Parol',
+    login: 'Kirish',
+    loggingIn: 'Kirilmoqda...',
+    forgotPassword: 'Parolni unutdingizmi?',
+    backToHome: 'Bosh sahifaga',
+    note: 'Odatiy holda admin create_admin.py skripti bilan yaratiladi (admin/admin123).',
+    flagUrl: 'https://flagcdn.com/w80/uz.png'
+  },
+  EN: {
+    title: 'System Login',
+    subtitle: 'Sign in to your account to continue',
+    selectRole: 'Select Role',
+    username: 'Username',
+    password: 'Password',
+    login: 'Sign In',
+    loggingIn: 'Signing in...',
+    forgotPassword: 'Forgot password?',
+    backToHome: 'Back to Home',
+    note: 'By default, admin is created by create_admin.py script (admin/admin123).',
+    flagUrl: 'https://flagcdn.com/w80/gb.png'
+  }
+};
+
 export default function Login() {
   const roleOptions = ROLE_OPTIONS;
 
@@ -22,62 +72,37 @@ export default function Login() {
   const [err, setErr] = useState('');
   const [language, setLanguage] = useState('RU');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Используем централизованную систему темизации
-  const { 
-    theme, 
-    isDark, 
-    isLight, 
-    toggleTheme, 
-    getColor, 
-    getSpacing, 
-    getFontSize 
-  } = useTheme();
+  // 2FA состояние
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [pending2FAToken, setPending2FAToken] = useState('');
+  const [twoFAMethod, setTwoFAMethod] = useState('sms');
 
-  const translations = {
-    RU: {
-      title: 'Вход в систему',
-      subtitle: 'Войдите в свой аккаунт для продолжения работы',
-      selectRole: 'Выбрать роль',
-      username: 'Логин',
-      password: 'Пароль',
-      login: 'Войти',
-      loggingIn: 'Входим...',
-      forgotPassword: 'Забыли пароль?',
-      rememberMe: 'Запомнить меня',
-      backToHome: 'На главную',
-      note: 'По умолчанию админ создаётся скриптом create_admin.py (admin/admin123).'
-    },
-    UZ: {
-      title: 'Tizimga kirish',
-      subtitle: 'Ishni davom ettirish uchun akkauntingizga kiring',
-      selectRole: 'Rolni tanlang',
-      username: 'Login',
-      password: 'Parol',
-      login: 'Kirish',
-      loggingIn: 'Kirilmoqda...',
-      forgotPassword: 'Parolni unutdingizmi?',
-      rememberMe: 'Meni eslab qol',
-      backToHome: 'Bosh sahifaga',
-      note: 'Odatiy holda admin create_admin.py skripti bilan yaratiladi (admin/admin123).'
-    },
-    EN: {
-      title: 'System Login',
-      subtitle: 'Sign in to your account to continue',
-      selectRole: 'Select Role',
-      username: 'Username',
-      password: 'Password',
-      login: 'Sign In',
-      loggingIn: 'Signing in...',
-      forgotPassword: 'Forgot password?',
-      rememberMe: 'Remember me',
-      backToHome: 'Back to Home',
-      note: 'By default, admin is created by create_admin.py script (admin/admin123).'
-    }
+  // Theme handling
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const systemIsDark = mediaQuery.matches;
+    setIsDarkMode(systemIsDark);
+    document.documentElement.setAttribute('data-theme', systemIsDark ? 'dark' : 'light');
+
+    const handler = (e) => {
+      setIsDarkMode(e.matches);
+      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    document.documentElement.setAttribute('data-theme', newMode ? 'dark' : 'light');
   };
 
   const t = translations[language];
-
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
@@ -90,46 +115,64 @@ export default function Login() {
 
   async function performLogin(u, p) {
     try {
-      // Используем централизованный API клиент
       const data = await login(u, p);
+
+      // Проверяем, требуется ли 2FA
+      if (data?.requires_2fa && data?.pending_2fa_token) {
+        setPending2FAToken(data.pending_2fa_token);
+        setTwoFAMethod(data.method || 'sms');
+        setRequires2FA(true);
+        return { requires2FA: true };
+      }
+
       const token = data?.access_token;
       if (!token) throw new Error('В ответе не найден access_token');
-      
-      // Устанавливаем токен (interceptor автоматически добавит его в заголовки)
       setToken(token);
-      
       try {
-        // Получаем профиль пользователя
         const profile = await me();
         setProfile(profile);
       } catch (profileError) {
         console.warn('Не удалось получить профиль:', profileError);
         setProfile(null);
       }
+      return { requires2FA: false };
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     }
   }
 
-  function pickRouteForRoleCached(defaultPath) {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) return defaultPath;
-      
+  async function handle2FASuccess(data) {
+    const token = data?.access_token;
+    if (token) {
+      setToken(token);
+      try {
+        const profile = await me();
+        setProfile(profile);
+      } catch (profileError) {
+        console.warn('Не удалось получить профиль:', profileError);
+        setProfile(null);
+      }
+
       const state = auth.getState ? auth.getState() : { profile: null };
-      return getRouteForProfile(state?.profile) || defaultPath;
-    } catch (error) {
-      console.error('pickRouteForRoleCached error:', error);
-      return defaultPath;
+      const profile = state?.profile || null;
+      const computedRoute = getRouteForProfile(profile);
+      navigate(computedRoute, { replace: true });
     }
+    setRequires2FA(false);
+    setPending2FAToken('');
   }
 
+  function handle2FACancel() {
+    setRequires2FA(false);
+    setPending2FAToken('');
+    setErr('');
+  }
 
   function isProtectedPanelPath(pathname) {
     const prefixes = [
-      '/admin','/registrar-panel','/doctor-panel','/lab-panel','/cashier-panel',
-      '/cardiologist','/dermatologist','/dentist'
+      '/admin', '/registrar-panel', '/doctor-panel', '/lab-panel', '/cashier-panel',
+      '/cardiologist', '/dermatologist', '/dentist'
     ];
     return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
   }
@@ -140,9 +183,14 @@ export default function Login() {
     setBusy(true);
     setErr('');
     try {
-      await performLogin(username, password);
+      const result = await performLogin(username, password);
 
-      // Небольшая задержка для обновления профиля в auth store
+      // Если требуется 2FA, не продолжаем навигацию
+      if (result?.requires2FA) {
+        setBusy(false);
+        return;
+      }
+
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const state = auth.getState ? auth.getState() : { profile: null };
@@ -150,21 +198,16 @@ export default function Login() {
       const computedRoute = getRouteForProfile(profile);
       const fromClean = from || '/';
 
-      // Если from ведёт на другой защищённый раздел панели — игнорируем его
       let target = computedRoute;
       if (fromClean && fromClean !== '/' && fromClean !== '/login') {
         if (isProtectedPanelPath(fromClean)) {
           if (fromClean === computedRoute) target = fromClean;
         } else {
-          // Нефреймовый/просмотровый маршрут (детали визита и т.п.) — разрешаем возврат
           target = fromClean;
         }
       }
-
-      console.log('Login redirect:', { from: fromClean, computedRoute, target, profile });
       navigate(target, { replace: true });
     } catch (e2) {
-      // Используем нормализованное сообщение об ошибке
       const errorMessage = e2?.normalizedMessage || e2?.message || 'Ошибка входа';
       setErr(errorMessage);
     } finally {
@@ -172,309 +215,280 @@ export default function Login() {
     }
   }
 
-  const textColor = isLight ? getColor('secondary', 700) : getColor('secondary', 200);
-
-  const pageStyle = {
-    minHeight: '100vh',
-    background: isLight 
-      ? `linear-gradient(135deg, ${getColor('primary', 50)} 0%, ${getColor('secondary', 50)} 100%)`
-      : `linear-gradient(135deg, ${getColor('secondary', 900)} 0%, ${getColor('secondary', 800)} 100%)`,
-    padding: getSpacing('lg'),
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    color: textColor,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center'
+  const handleLanguageSwitch = () => {
+    const langs = ['RU', 'UZ', 'EN'];
+    const currentIndex = langs.indexOf(language);
+    const nextIndex = (currentIndex + 1) % langs.length;
+    setLanguage(langs[nextIndex]);
   };
 
-  const cardStyle = {
-    background: theme === 'light' 
-      ? 'rgba(255, 255, 255, 0.9)' 
-      : 'rgba(15, 23, 42, 0.9)',
-    border: `1px solid ${theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-    borderRadius: '20px',
-    padding: getSpacing('2xl'),
-    boxShadow: theme === 'light' 
-      ? '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-      : '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-    backdropFilter: 'blur(10px)',
-    maxWidth: '450px',
-    width: '100%'
-  };
+  // Экран 2FA верификации
+  if (requires2FA) {
+    return (
+      <div className="landing-container">
+        <div className="noise-overlay" />
+        <div className="mesh-background" />
 
-  const buttonStyle = {
-    padding: `${getSpacing('md')} ${getSpacing('lg')}`,
-    background: `linear-gradient(135deg, ${getColor('primary', 500)} 0%, ${getColor('primary', 600)} 100%)`,
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.3)',
-    width: '100%',
-    disabled: busy
-  };
+        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '500px' }}>
+          <button
+            onClick={handle2FACancel}
+            className="btn-premium btn-glass"
+            style={{ marginBottom: '24px', padding: '12px 24px' }}
+          >
+            <ArrowLeft size={18} />
+            Назад к входу
+          </button>
 
-  const buttonSecondaryStyle = {
-    padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    background: 'transparent',
-    color: textColor,
-    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    transition: 'all 0.3s ease',
-    textDecoration: 'none',
-    display: 'inline-block',
-    textAlign: 'center'
-  };
+          <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <SMSEmail2FA
+              method={twoFAMethod}
+              pendingToken={pending2FAToken}
+              onSuccess={handle2FASuccess}
+              onCancel={handle2FACancel}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const inputStyle = {
-    width: '100%',
-    padding: `${getSpacing('md')} ${getSpacing('md')}`,
-    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-    borderRadius: '12px',
-    fontSize: '16px',
-    background: theme === 'light' ? 'white' : getColor('gray', 800),
-    color: textColor,
-    outline: 'none',
-    transition: 'all 0.3s ease',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle = {
-    display: 'block',
-    marginBottom: getSpacing('xs'),
-    fontWeight: '500',
-    fontSize: '14px',
-    color: textColor
-  };
-
-  const errorStyle = {
-    color: getColor('danger', 600),
-    background: theme === 'light' ? '#fee2e2' : 'rgba(239, 68, 68, 0.1)',
-    border: `1px solid ${getColor('danger', 500)}`,
-    borderRadius: '8px',
-    padding: getSpacing('sm'),
-    marginBottom: getSpacing('md'),
-    fontSize: '14px'
-  };
-
-  const toggleButtonStyle = {
-    padding: getSpacing('xs'),
-    background: 'transparent',
-    border: `1px solid ${theme === 'light' ? getColor('gray', 300) : getColor('gray', 600)}`,
-    borderRadius: '8px',
-    cursor: 'pointer',
-    color: textColor,
-    marginLeft: getSpacing('sm')
-  };
-
-  const headerStyle = {
-    fontSize: '32px',
-    fontWeight: '800',
-    marginBottom: getSpacing('sm'),
-    background: `linear-gradient(135deg, ${getColor('primary', 600)} 0%, ${getColor('primary', 400)} 100%)`,
-    backgroundClip: 'text',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    textAlign: 'center'
-  };
-
-  const subtitleStyle = {
-    fontSize: '16px',
-    opacity: 0.8,
-    marginBottom: getSpacing('xl'),
-    textAlign: 'center',
-    lineHeight: '1.5'
-  };
-
-  // Если показываем форму восстановления пароля
   if (showForgotPassword) {
     return (
-      <div style={pageStyle}>
-        {/* Переключатели темы и языка */}
-        <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
-          <button 
-            onClick={() => toggleTheme()}
-            style={toggleButtonStyle}
-            title="Переключить тему"
-          >
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
-          <select 
-            value={language} 
-            onChange={(e) => setLanguage(e.target.value)}
-            style={{
-              ...toggleButtonStyle,
-              marginLeft: getSpacing('sm'),
-              background: theme === 'light' ? 'white' : getColor('gray', 800)
-            }}
-          >
-            <option value="RU">RU</option>
-            <option value="UZ">UZ</option>
-            <option value="EN">EN</option>
-          </select>
-        </div>
+      <div className="landing-container">
+        <div className="noise-overlay" />
+        <div className="mesh-background" />
 
-        <ForgotPassword
-          language={language}
-          onBack={() => setShowForgotPassword(false)}
-          onSuccess={() => {
-            setShowForgotPassword(false);
-            setErr('');
-          }}
-        />
+        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '500px' }}>
+          <button
+            onClick={() => setShowForgotPassword(false)}
+            className="btn-premium btn-glass"
+            style={{ marginBottom: '24px', padding: '12px 24px' }}
+          >
+            <ArrowLeft size={18} />
+            {t.backToHome}
+          </button>
+
+          {/* Removed glass-panel wrapper to avoid double card effect */}
+          <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+            <ForgotPassword
+              language={language}
+              onBack={() => setShowForgotPassword(false)}
+              onSuccess={() => {
+                setShowForgotPassword(false);
+                setErr('');
+              }}
+            />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={pageStyle}>
-      {/* Переключатели темы и языка */}
-      <div style={{ position: 'absolute', top: getSpacing('lg'), right: getSpacing('lg'), display: 'flex', alignItems: 'center' }}>
-        <button 
-          onClick={() => toggleTheme()}
-          style={toggleButtonStyle}
-          title="Переключить тему"
+    <div className="landing-container">
+      <div className="noise-overlay" />
+      <div className="mesh-background" />
+
+      {/* Top Bar */}
+      <div style={{
+        position: 'absolute',
+        top: '24px',
+        left: '24px',
+        right: '24px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        zIndex: 20
+      }}>
+        <button
+          onClick={() => navigate('/')}
+          className="btn-premium btn-glass"
+          style={{ padding: '10px 20px', fontSize: '14px', borderRadius: '16px' }}
         >
-          {theme === 'light' ? '🌙' : '☀️'}
+          <ArrowLeft size={16} />
+          {t.backToHome}
         </button>
-        <select 
-          value={language} 
-          onChange={(e) => setLanguage(e.target.value)}
-          style={{
-            ...toggleButtonStyle,
-            marginLeft: getSpacing('sm'),
-            background: theme === 'light' ? 'white' : getColor('gray', 800)
-          }}
-        >
-          <option value="RU">RU</option>
-          <option value="UZ">UZ</option>
-          <option value="EN">EN</option>
-        </select>
+
+        <div className="glass-panel" style={{ padding: '8px 16px', borderRadius: '20px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <button
+            onClick={toggleTheme}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mac-text-primary)', display: 'flex', alignItems: 'center' }}
+            aria-label="Toggle theme"
+          >
+            {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
+          <div style={{ width: '1px', height: '20px', background: 'var(--glass-border)' }} />
+          <button
+            onClick={handleLanguageSwitch}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, borderRadius: '50%', overflow: 'hidden', width: '24px', height: '24px' }}
+            aria-label="Switch language"
+          >
+            <img src={t.flagUrl} alt={language} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </button>
+        </div>
       </div>
 
-      {/* Кнопка "На главную" */}
-      <div style={{ position: 'absolute', top: getSpacing('lg'), left: getSpacing('lg') }}>
-        <button 
-          onClick={() => navigate('/')} 
-          style={buttonSecondaryStyle}
-        >
-          ← {t.backToHome}
-        </button>
-      </div>
+      {/* Login Card */}
+      <div className="glass-panel spotlight-card" style={{
+        width: '100%',
+        maxWidth: '420px',
+        padding: '48px',
+        position: 'relative',
+        zIndex: 10,
+        animation: 'fadeIn 0.5s ease-out'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            background: 'rgba(0, 122, 255, 0.1)',
+            borderRadius: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px',
+            color: '#007aff',
+            boxShadow: '0 0 20px rgba(0, 122, 255, 0.2)'
+          }}>
+            <Lock size={32} />
+          </div>
+          <h1 style={{
+            fontSize: '32px',
+            fontWeight: '800',
+            marginBottom: '12px',
+            background: 'linear-gradient(135deg, var(--mac-text-primary) 30%, var(--mac-text-secondary) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            {t.title}
+          </h1>
+          <p style={{ color: 'var(--mac-text-secondary)', fontSize: '16px', lineHeight: '1.5' }}>
+            {t.subtitle}
+          </p>
+        </div>
 
-      {/* Форма входа */}
-      <div style={cardStyle}>
-        <div style={headerStyle}>🔐 {t.title}</div>
-        <div style={subtitleStyle}>{t.subtitle}</div>
-        
-        {err && <div style={errorStyle}>{err}</div>}
-        
-        <form onSubmit={(e) => { e.preventDefault(); onLoginClick(); }}>
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <label style={labelStyle}>
-              {t.selectRole}
+        {err && (
+          <div className="status-message status-error">
+            <AlertCircle size={18} />
+            {err}
+          </div>
+        )}
+
+        <form onSubmit={onLoginClick}>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
+              {t.selectRole.toUpperCase()}
             </label>
-            <select
-              value={selectedRoleKey}
-              onChange={(e) => onSelectRole(e.target.value)}
-              style={{
-                ...inputStyle,
-                background: theme === 'light' ? 'white' : getColor('gray', 800)
-              }}
-              disabled={busy}
-            >
-              {roleOptions.map((opt) => (
-                <option key={opt.key} value={opt.key}>{opt.label}</option>
-              ))}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <User size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)', pointerEvents: 'none' }} />
+              <select
+                value={selectedRoleKey}
+                onChange={(e) => onSelectRole(e.target.value)}
+                disabled={busy}
+                className="glass-input"
+                style={{ paddingLeft: '44px', paddingRight: '40px', appearance: 'none', cursor: 'pointer' }}
+              >
+                {roleOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key} style={{ color: 'black' }}>{opt.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={16} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)', pointerEvents: 'none' }} />
+            </div>
           </div>
 
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <label style={labelStyle}>
-              {t.username}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
+              {t.username.toUpperCase()}
             </label>
-            <input 
-              value={username} 
-              onChange={(e) => setUsername(e.target.value)} 
-              style={{
-                ...inputStyle,
-                opacity: 0.7,
-                cursor: 'not-allowed'
-              }}
-              autoComplete="username" 
-              disabled 
-              readOnly 
-            />
+            <div style={{ position: 'relative' }}>
+              <User size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="glass-input"
+                style={{ paddingLeft: '44px', opacity: 0.7 }}
+                disabled
+                readOnly
+              />
+            </div>
           </div>
 
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <label style={labelStyle}>
-              {t.password}
+          <div style={{ marginBottom: '32px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', marginLeft: '4px' }}>
+              {t.password.toUpperCase()}
             </label>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              style={inputStyle}
-              autoComplete="current-password" 
-              disabled={busy}
-              placeholder="••••••••"
-            />
+            <div style={{ position: 'relative' }}>
+              <Key size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--mac-text-secondary)' }} />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="glass-input"
+                style={{ paddingLeft: '44px', paddingRight: '44px' }}
+                disabled={busy}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--mac-text-secondary)',
+                  padding: '4px'
+                }}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
-          <div style={{ marginBottom: getSpacing('lg') }}>
-            <button 
-              type="submit" 
-              disabled={busy} 
-              style={{
-                ...buttonStyle,
-                opacity: busy ? 0.7 : 1,
-                cursor: busy ? 'not-allowed' : 'pointer'
-              }}
-              onMouseOver={(e) => !busy && (e.target.style.transform = 'translateY(-2px)')}
-              onMouseOut={(e) => !busy && (e.target.style.transform = 'translateY(0)')}
-            >
-              {busy ? t.loggingIn : t.login}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={busy}
+            className="btn-premium btn-primary"
+            style={{ width: '100%', justifyContent: 'center', marginBottom: '20px' }}
+          >
+            {busy ? (
+              <>
+                <RefreshCw size={20} className="spin" />
+                {t.loggingIn}
+              </>
+            ) : (
+              <>
+                {t.login}
+                <ArrowLeft size={18} style={{ transform: 'rotate(180deg)' }} />
+              </>
+            )}
+          </button>
 
-          <div style={{ textAlign: 'center', marginBottom: getSpacing('md') }}>
-            <a 
-              href="#" 
-              style={{ 
-                color: getColor('primary', 600), 
-                textDecoration: 'none',
-                fontSize: '14px'
-              }}
+          <div style={{ textAlign: 'center' }}>
+            <button
               onClick={(e) => { e.preventDefault(); setShowForgotPassword(true); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--mac-text-secondary)',
+                fontSize: '14px',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                opacity: 0.8
+              }}
             >
               {t.forgotPassword}
-            </a>
+            </button>
           </div>
         </form>
 
-        <div style={{ 
-          fontSize: '12px', 
-          opacity: 0.7, 
-          lineHeight: '1.4', 
-          textAlign: 'center',
-          padding: getSpacing('sm'),
-          background: theme === 'light' ? getColor('gray', 50) : getColor('gray', 800),
-          borderRadius: '8px',
-          border: `1px solid ${theme === 'light' ? getColor('gray', 200) : getColor('gray', 700)}`
-        }}>
+        <div className="info-panel" style={{ marginTop: '32px', textAlign: 'center' }}>
           💡 {t.note}
         </div>
       </div>
     </div>
   );
 }
-
-
-

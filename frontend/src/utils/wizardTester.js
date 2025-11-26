@@ -41,22 +41,22 @@ class WizardTester {
     
     const defaultTestData = {
       patient: {
-        full_name: "Тестовый Пациент",
-        phone: "+998901234567",
-        date_of_birth: "1990-01-01",
-        address: "Тестовый адрес"
+        full_name: 'Тестовый Пациент',
+        phone: '+998901234567',
+        date_of_birth: '1990-01-01',
+        address: 'Тестовый адрес'
       },
       visits: [
         {
           service_id: 1,
-          visit_type: "regular",
+          visit_type: 'regular',
           visit_date: new Date().toISOString().split('T')[0],
-          visit_time: "10:00",
-          notes: "Тестовая запись"
+          visit_time: '10:00',
+          notes: 'Тестовая запись'
         }
       ],
       payment: {
-        method: "cash",
+        method: 'cash',
         total_amount: 50000
       }
     };
@@ -145,8 +145,8 @@ class WizardTester {
     
     const testData = {
       step: 2,
-      patient: { full_name: "Тест Автосохранения" },
-      services: [{ id: 1, name: "Тестовая услуга" }],
+      patient: { full_name: 'Тест Автосохранения' },
+      services: [{ id: 1, name: 'Тестовая услуга' }],
       timestamp: Date.now()
     };
 
@@ -251,100 +251,100 @@ class WizardTester {
     const scenarios = {
       basic: {
         patient: {
-          full_name: "Иванов Иван Иванович",
-          phone: "+998901234567",
-          date_of_birth: "1985-05-15",
-          address: "г. Ташкент, ул. Тестовая, 123"
+          full_name: 'Иванов Иван Иванович',
+          phone: '+998901234567',
+          date_of_birth: '1985-05-15',
+          address: 'г. Ташкент, ул. Тестовая, 123'
         },
         visits: [
           {
             service_id: 1,
-            visit_type: "regular",
+            visit_type: 'regular',
             visit_date: new Date().toISOString().split('T')[0],
-            visit_time: "10:00",
-            notes: "Плановый осмотр"
+            visit_time: '10:00',
+            notes: 'Плановый осмотр'
           }
         ],
         payment: {
-          method: "cash",
+          method: 'cash',
           total_amount: 50000
         }
       },
       
       repeat: {
         patient: {
-          full_name: "Петров Петр Петрович",
-          phone: "+998901234568",
-          date_of_birth: "1980-03-20"
+          full_name: 'Петров Петр Петрович',
+          phone: '+998901234568',
+          date_of_birth: '1980-03-20'
         },
         visits: [
           {
             service_id: 2, // Консультация кардиолога
-            visit_type: "repeat",
+            visit_type: 'repeat',
             visit_date: new Date().toISOString().split('T')[0],
-            visit_time: "11:00",
-            notes: "Повторная консультация"
+            visit_time: '11:00',
+            notes: 'Повторная консультация'
           }
         ],
         payment: {
-          method: "cash",
+          method: 'cash',
           total_amount: 0 // Бесплатно для повторного
         }
       },
       
       benefit: {
         patient: {
-          full_name: "Сидоров Сидор Сидорович",
-          phone: "+998901234569",
-          date_of_birth: "1975-12-10"
+          full_name: 'Сидоров Сидор Сидорович',
+          phone: '+998901234569',
+          date_of_birth: '1975-12-10'
         },
         visits: [
           {
             service_id: 2,
-            visit_type: "benefit",
+            visit_type: 'benefit',
             visit_date: new Date().toISOString().split('T')[0],
-            visit_time: "12:00",
-            notes: "Льготная консультация"
+            visit_time: '12:00',
+            notes: 'Льготная консультация'
           }
         ],
         payment: {
-          method: "cash",
+          method: 'cash',
           total_amount: 0 // Бесплатно для льготного
         }
       },
       
       cart: {
         patient: {
-          full_name: "Многоуслугов Много Услугович",
-          phone: "+998901234570",
-          date_of_birth: "1990-07-25"
+          full_name: 'Многоуслугов Много Услугович',
+          phone: '+998901234570',
+          date_of_birth: '1990-07-25'
         },
         visits: [
           {
             service_id: 1, // ЭКГ
-            visit_type: "regular",
+            visit_type: 'regular',
             visit_date: new Date().toISOString().split('T')[0],
-            visit_time: "09:00",
-            notes: "ЭКГ"
+            visit_time: '09:00',
+            notes: 'ЭКГ'
           },
           {
             service_id: 3, // ЭхоКГ
             doctor_id: 1,
-            visit_type: "regular",
+            visit_type: 'regular',
             visit_date: new Date().toISOString().split('T')[0],
-            visit_time: "10:00",
-            notes: "ЭхоКГ с кардиологом"
+            visit_time: '10:00',
+            notes: 'ЭхоКГ с кардиологом'
           },
           {
             service_id: 4, // Анализы
-            visit_type: "regular",
+            visit_type: 'regular',
             visit_date: new Date().toISOString().split('T')[0],
-            visit_time: "08:00",
-            notes: "Лабораторные анализы"
+            visit_time: '08:00',
+            notes: 'Лабораторные анализы'
           }
         ],
         payment: {
-          method: "online_click",
+          method: 'online_click',
           total_amount: 150000
         }
       }

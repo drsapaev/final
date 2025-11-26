@@ -2,6 +2,8 @@
  * API утилиты для работы с очередями
  */
 
+import { useState } from 'react';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 /**
@@ -115,11 +117,11 @@ export const formatQueueData = (serverQueue) => {
 /**
  * Хук для работы с очередью
  */
-export const useQueueManager = (specialistId, specialist) => {
-  const [queue, setQueue] = React.useState([]);
-  const [queueId, setQueueId] = React.useState(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
+export const useQueueManager = (specialistId) => {
+  const [queue, setQueue] = useState([]);
+  const [queueId, setQueueId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const loadQueue = async () => {
     if (!specialistId) return;

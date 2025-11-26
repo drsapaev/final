@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.services.analytics_visualization_service import get_analytics_visualization_service, AnalyticsVisualizationService
+from app.services.analytics import AnalyticsService
 from app.services.advanced_analytics import get_advanced_analytics_service, AdvancedAnalyticsService
 
 router = APIRouter()
@@ -88,9 +89,8 @@ async def get_kpi_visualization(
             status_code=400, detail="Начальная дата должна быть раньше конечной"
         )
 
-    # Получаем KPI данные
-    analytics_service = get_advanced_analytics_service()
-    kpi_data = analytics_service.get_kpi_metrics(db, start, end, department)
+    # Получаем KPI данные через SSOT
+    kpi_data = AnalyticsService.calculate_statistics(db, start, end, department)
     
     # Создаем визуализацию
     viz_service = get_analytics_visualization_service()
@@ -233,9 +233,8 @@ async def get_revenue_analytics_visualization(
             status_code=400, detail="Начальная дата должна быть раньше конечной"
         )
 
-    # Получаем данные по доходам
-    analytics_service = get_advanced_analytics_service()
-    revenue_data = analytics_service.get_revenue_analytics(db, start, end, department)
+    # Получаем данные по доходам через SSOT
+    revenue_data = AnalyticsService.calculate_revenue(db, start, end, department)
     
     # Создаем визуализацию
     viz_service = get_analytics_visualization_service()
@@ -293,10 +292,10 @@ async def get_comprehensive_visualization(
             "department": department or "all",
             "generated_at": datetime.utcnow().isoformat()
         },
-        "kpi_metrics": analytics_service.get_kpi_metrics(db, start, end, department),
+        "kpi_metrics": AnalyticsService.calculate_statistics(db, start, end, department),
         "doctor_performance": analytics_service.get_doctor_performance(db, start, end, department),
         "patient_analytics": analytics_service.get_patient_analytics(db, start, end),
-        "revenue_analytics": analytics_service.get_revenue_analytics(db, start, end, department)
+        "revenue_analytics": AnalyticsService.calculate_revenue(db, start, end, department)
     }
     
     if include_predictive:

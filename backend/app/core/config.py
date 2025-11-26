@@ -28,12 +28,22 @@ class Settings(BaseSettings):
     # --- CORS (при необходимости) ---
     BACKEND_CORS_ORIGINS: list[str] = Field(
         default_factory=lambda: [
-            "http://localhost:5173", 
+            "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:8080",
             "http://127.0.0.1:8080"
         ]
     )
+
+    # --- Frontend URL для QR кодов и ссылок ---
+    # Для локальной сети (WiFi): оставьте значение по умолчанию или локальный IP
+    # Для доступа через интернет (мобильные данные): задайте публичный домен/IP
+    # Примеры:
+    #   - Локальная сеть: "http://192.168.1.9:5173" (автоматически определится)
+    #   - Публичный доступ: "https://clinic.example.com" или "http://123.45.67.89:5173"
+    #   - Туннель (ngrok): "https://abc123.ngrok.io"
+    # Установите через переменную окружения: FRONTEND_URL=https://your-domain.com
+    FRONTEND_URL: str = Field(default="http://192.168.1.9:5173", env="FRONTEND_URL")
 
     # --- Queue / Time ---
     TIMEZONE: str = "Asia/Tashkent"

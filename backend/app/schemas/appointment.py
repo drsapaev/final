@@ -63,3 +63,4 @@ class Appointment(AppointmentBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    patient_name: Optional[str] = None  # Имя пациента (обогащается на бэкенде)

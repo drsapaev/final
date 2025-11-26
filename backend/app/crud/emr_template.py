@@ -132,19 +132,35 @@ class CRUDEMRVersion(CRUDBase[EMRVersion, EMRVersionCreate, None]):
         changed_by: Optional[int] = None
     ) -> EMRVersion:
         """Создать новую версию EMR"""
+        from datetime import datetime
+        
+        # Функция для преобразования datetime в ISO строки
+        def convert_datetimes_to_iso(obj):
+            """Рекурсивно преобразует все datetime объекты в ISO строки"""
+            if isinstance(obj, dict):
+                return {k: convert_datetimes_to_iso(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_datetimes_to_iso(item) for item in obj]
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            return obj
+        
+        # Преобразуем все datetime объекты в version_data в ISO строки
+        version_data_clean = convert_datetimes_to_iso(version_data)
+        
         # Получаем номер следующей версии
         latest = self.get_latest_version(db, emr_id=emr_id)
         next_version = (latest.version_number + 1) if latest else 1
         
-        version_data = EMRVersionCreate(
+        version_create = EMRVersionCreate(
             emr_id=emr_id,
-            version_data=version_data,
+            version_data=version_data_clean,
             version_number=next_version,
             change_type=change_type,
             change_description=change_description,
             changed_by=changed_by
         )
-        return self.create(db, obj_in=version_data)
+        return self.create(db, obj_in=version_create)
 
     def restore_version(
         self, db: Session, *, version_id: int, restored_by: int

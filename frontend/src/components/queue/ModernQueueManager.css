@@ -1,705 +1,363 @@
-/* Современный менеджер очереди */
+/**
+ * ModernQueueManager Styles
+ * Modern, clean design for queue management interface
+ */
+
 .modern-queue-manager {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0;
 }
 
-/* Заголовок */
-.queue-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+/* Statistics Grid */
+.mqm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 8px;
 }
 
-.queue-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
+.mqm-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-md);
+    transition: all var(--mac-duration-normal) var(--mac-ease);
 }
 
-.queue-actions {
-  display: flex;
-  gap: 12px;
+.mqm-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--mac-shadow-lg);
 }
 
-.queue-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.mqm-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--mac-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
-.queue-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.mqm-stat-icon.primary {
+    background: linear-gradient(135deg, var(--mac-accent-blue), #0066cc);
 }
 
-.queue-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+.mqm-stat-icon.warning {
+    background: linear-gradient(135deg, var(--mac-warning), #d97706);
 }
 
-/* Статистические карточки */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.mqm-stat-icon.success {
+    background: linear-gradient(135deg, var(--mac-success), #059669);
 }
 
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  animation: slideInUp 0.3s ease-out;
+.mqm-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--mac-text-primary);
+    line-height: 1;
+    margin-bottom: 4px;
 }
 
-.dark .stat-card {
-  border-color: rgba(255, 255, 255, 0.1);
+.mqm-stat-label {
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    font-weight: 500;
 }
 
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+/* Card Styles */
+.mqm-card {
+    background: var(--mac-bg-secondary);
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--mac-shadow-sm);
 }
 
-.dark .stat-card:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+.mqm-controls-card {
+    padding: 24px;
 }
 
-.stat-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  color: white;
+.mqm-controls-header {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
-.stat-content {
-  flex: 1;
+.mqm-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--mac-text-primary);
+    margin: 0;
 }
 
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1;
-  margin-bottom: 4px;
+/* Controls Grid */
+.mqm-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    align-items: end;
 }
 
-.stat-label {
-  font-size: 14px;
-  font-weight: 500;
-  opacity: 0.8;
+.mqm-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-/* Панель управления */
-.queue-controls {
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  padding: 24px;
+.mqm-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--mac-text-secondary);
 }
 
-.dark .queue-controls {
-  border-color: rgba(255, 255, 255, 0.1);
+.mqm-input,
+.mqm-select {
+    padding: 10px 14px;
+    border: 1px solid var(--mac-border);
+    border-radius: var(--mac-radius-sm);
+    background: var(--mac-bg-primary);
+    color: var(--mac-text-primary);
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    transition: all var(--mac-duration-fast) var(--mac-ease);
+    outline: none;
 }
 
-.controls-section h3 {
-  margin: 0 0 20px 0;
-  font-size: 18px;
-  font-weight: 600;
+.mqm-input:focus,
+.mqm-select:focus {
+    border-color: var(--mac-accent-blue);
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
-.controls-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  align-items: center;
+.mqm-input:hover,
+.mqm-select:hover {
+    border-color: var(--mac-border-secondary);
 }
 
-.control-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border: 2px solid transparent;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  min-height: 44px;
+/* Actions */
+.mqm-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
-.control-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.mqm-button-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.control-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+.mqm-reception-btn {
+    min-width: 160px;
 }
 
-.btn-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-left: 8px;
+/* Queue Header */
+.mqm-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
 }
 
-.auto-refresh-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 14px;
-  font-weight: 500;
+/* Queue Table Container */
+.queue-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-.auto-refresh-control input[type="checkbox"] {
-  display: none;
+.queue-table-container table {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.checkbox-custom {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 2px solid;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+.queue-table-container th {
+    position: sticky;
+    top: 0;
+    background: var(--mac-bg-tertiary);
+    z-index: 10;
 }
 
-.auto-refresh-control:hover .checkbox-custom {
-  transform: scale(1.1);
+/* QR Modal */
+.mqm-qr-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 8px;
 }
 
-/* Список очереди */
-.queue-list {
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+.mqm-qr-badge-container {
+    display: flex;
+    justify-content: center;
 }
 
-.dark .queue-list {
-  border-color: rgba(255, 255, 255, 0.1);
+.mqm-qr-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: var(--mac-radius-full);
+    font-weight: 600;
+    font-size: 14px;
 }
 
-.queue-list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+.mqm-qr-info-card {
+    background: var(--mac-bg-tertiary);
+    border-radius: var(--mac-radius-md);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.dark .queue-list-header {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
+.mqm-qr-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
 }
 
-.queue-list-header h3 {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+.mqm-qr-label {
+    font-size: 13px;
+    color: var(--mac-text-secondary);
+    font-weight: 500;
 }
 
-/* Контейнер статуса очереди */
-.queue-status-container {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+.mqm-qr-value {
+    font-size: 14px;
+    color: var(--mac-text-primary);
+    font-weight: 600;
+    text-align: right;
 }
 
-.queue-status {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.mqm-qr-value.highlight {
+    color: var(--mac-accent-blue);
+    font-size: 16px;
 }
 
-.time-info {
-  display: flex;
-  align-items: center;
-  margin-top: 4px;
-  font-size: 11px;
-  opacity: 0.8;
+.mqm-qr-code-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: white;
+    border-radius: var(--mac-radius-lg);
+    min-height: 280px;
 }
 
-.queue-summary {
-  display: flex;
-  gap: 16px;
-  font-size: 14px;
+.mqm-qr-image,
+.mqm-qr-svg {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--mac-radius-sm);
 }
 
-.queue-content {
-  padding: 24px;
+.mqm-qr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--mac-text-secondary);
 }
 
-/* Сообщения очереди */
-.queue-message {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 40px 20px;
-  text-align: center;
-}
-
-.queue-message p {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.message-action-btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.message-action-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Таблица очереди */
-.queue-table {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.dark .queue-table {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.queue-table-header {
-  display: grid;
-  grid-template-columns: 60px 1fr 140px 100px 120px 100px;
-  gap: 16px;
-  padding: 16px 20px;
-  background: rgba(59, 130, 246, 0.1);
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e40af;
-}
-
-.dark .queue-table-header {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-}
-
-.queue-table-body {
-  display: flex;
-  flex-direction: column;
-}
-
-.queue-row {
-  display: grid;
-  grid-template-columns: 60px 1fr 140px 100px 120px 100px;
-  gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
-  animation: slideInLeft 0.3s ease-out;
-}
-
-.dark .queue-row {
-  border-bottom-color: rgba(255, 255, 255, 0.05);
-}
-
-.queue-row:hover {
-  background: rgba(59, 130, 246, 0.05);
-}
-
-.dark .queue-row:hover {
-  background: rgba(59, 130, 246, 0.1);
-}
-
-.queue-row.called {
-  background: rgba(245, 158, 11, 0.1);
-  animation: pulse 2s infinite;
-}
-
-.dark .queue-row.called {
-  background: rgba(245, 158, 11, 0.2);
-}
-
-.queue-col {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-}
-
-.queue-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.queue-number.pulsing {
-  animation: pulse 2s infinite;
-}
-
-.patient-info,
-.phone-info,
-.time-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover {
-  transform: scale(1.1);
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.called-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-/* Диалоги */
-.qr-dialog-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.qr-info {
-  padding: 16px;
-  background: rgba(59, 130, 246, 0.1);
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-.qr-info p {
-  margin: 0 0 8px 0;
-}
-
-.qr-info p:last-child {
-  margin-bottom: 0;
-}
-
-.qr-code-container {
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-}
-
-.qr-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 40px;
-  border: 2px dashed rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-}
-
-.dark .qr-placeholder {
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.qr-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.qr-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 2px solid;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.qr-action-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Диалог статистики */
-.stats-dialog-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.stats-detailed-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-}
-
-.stats-card {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.dark .stats-card {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.stats-card-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background: rgba(59, 130, 246, 0.1);
-  font-weight: 600;
-  color: #1e40af;
-}
-
-.dark .stats-card-header {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-}
-
-.stats-card-body {
-  padding: 20px;
-}
-
-.stats-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  font-size: 14px;
-}
-
-.dark .stats-item {
-  border-bottom-color: rgba(255, 255, 255, 0.05);
-}
-
-.stats-item:last-child {
-  border-bottom: none;
-}
-
-/* Анимации */
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+.mqm-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--mac-border);
+    border-top-color: var(--mac-accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-.spinning {
-  animation: spin 1s linear infinite;
+.mqm-qr-footer-info {
+    text-align: center;
+    color: var(--mac-text-secondary);
 }
 
-.pulsing {
-  animation: pulse 2s infinite;
+.mqm-qr-instruction {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+    font-weight: 500;
 }
 
-/* Адаптивность */
-@media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .controls-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .queue-table-header,
-  .queue-row {
-    grid-template-columns: 50px 1fr 120px 80px 100px 80px;
+.mqm-qr-expiry {
+    font-size: 12px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--mac-text-tertiary);
+}
+
+.mqm-qr-actions {
+    display: flex;
     gap: 12px;
-    padding: 12px 16px;
-  }
+    justify-content: center;
 }
 
+.mqm-qr-action-btn {
+    min-width: 120px;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-  .modern-queue-manager {
-    gap: 16px;
-  }
-  
-  .queue-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .queue-summary {
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .queue-table-header,
-  .queue-row {
-    grid-template-columns: 40px 1fr 100px 80px;
-    gap: 8px;
-    padding: 12px;
-  }
-  
-  .queue-col--phone,
-  .queue-col--time {
-    display: none;
-  }
-  
-  .stats-detailed-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .qr-actions {
-    flex-direction: column;
-  }
+    .mqm-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mqm-controls-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mqm-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .mqm-actions button {
+        width: 100%;
+    }
+
+    .mqm-queue-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .mqm-qr-info-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .mqm-qr-value {
+        text-align: left;
+    }
+
+    .mqm-qr-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .mqm-qr-action-btn {
+        width: 100%;
+    }
 }
 
-@media (max-width: 480px) {
-  .queue-controls {
-    padding: 16px;
-  }
-  
-  .queue-content {
-    padding: 16px;
-  }
-  
-  .queue-list-header {
-    padding: 16px;
-  }
-  
-  .queue-table-header,
-  .queue-row {
-    grid-template-columns: 40px 1fr 80px;
-    gap: 8px;
-  }
-  
-  .queue-col--status {
-    display: none;
-  }
-  
-  .stat-card {
-    padding: 16px;
-  }
-  
-  .stat-icon {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .stat-value {
-    font-size: 24px;
-  }
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .mqm-qr-code-container {
+        background: rgba(255, 255, 255, 0.95);
+    }
+}
