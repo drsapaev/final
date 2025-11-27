@@ -27,7 +27,8 @@
       "Bash(find:*)",
       "Bash(git cherry-pick:*)",
       "Bash(git -c core.hooksPath=/dev/null cherry-pick:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git -c core.hooksPath=/dev/null commit -m \"chore: Update settings after recovery\")"
     ],
     "deny": [],
     "ask": []
