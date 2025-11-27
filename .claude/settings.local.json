@@ -23,7 +23,8 @@
       "Bash(Where-Object {$_rocessName -eq \"python\"})",
       "Bash(Select-Object -First 5 Id,ProcessName,StartTime)",
       "Bash(Format-Table -AutoSize)",
-      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")"
+      "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
