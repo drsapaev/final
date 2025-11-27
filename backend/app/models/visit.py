@@ -38,7 +38,10 @@ class Visit(Base):
     )
     visit_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
-    department: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    department_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
     
     # ✅ ПОЛЯ ДЛЯ ПОДТВЕРЖДЕНИЯ ВИЗИТОВ
     confirmation_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
@@ -50,17 +53,20 @@ class Visit(Base):
     services: Mapped[list["VisitService"]] = relationship(
         back_populates="visit", cascade="all, delete-orphan"
     )
-    
+
     # Связь с изменениями цен врачами
     price_overrides: Mapped[list["DoctorPriceOverride"]] = relationship(
         "DoctorPriceOverride", back_populates="visit", cascade="all, delete-orphan"
     )
-    
+
     # Связь с корзиной через промежуточную таблицу
     payment_invoice_visits: Mapped[list["PaymentInvoiceVisit"]] = relationship(
         back_populates="visit", cascade="all, delete-orphan"
     )
-    
+
+    # Связь с отделением
+    department: Mapped[Optional["Department"]] = relationship(back_populates="visits")
+
     # Связь с врачом
     doctor: Mapped[Optional["Doctor"]] = relationship(back_populates="visits")
 

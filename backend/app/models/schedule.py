@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import Boolean, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Integer, String, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
@@ -24,8 +24,9 @@ class ScheduleTemplate(Base):
     __tablename__ = "schedule_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    department: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True, index=True
+    department_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True, index=True
     )
     doctor_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
     weekday: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
@@ -34,3 +35,6 @@ class ScheduleTemplate(Base):
     room: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     capacity_per_hour: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Relationships
+    department: Mapped[Optional["Department"]] = relationship(back_populates="schedules")
