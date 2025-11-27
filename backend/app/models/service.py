@@ -20,7 +20,10 @@ class Service(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
-    department: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    department_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
     unit: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[Optional[str]] = mapped_column(
@@ -61,6 +64,7 @@ class Service(Base):
 
     # Relationships
     category = relationship("ServiceCategory", back_populates="services")
+    department = relationship("Department")
     doctor = relationship("Doctor", back_populates="services")
     price_overrides = relationship("DoctorPriceOverride", back_populates="service")
     # department_rel = relationship("Department", back_populates="services")  # Disabled: Department model missing

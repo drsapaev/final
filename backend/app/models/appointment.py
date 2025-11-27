@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional, List
 
-from sqlalchemy import Date, DateTime, Float, Integer, String, Text, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, DateTime, Float, Integer, String, Text, JSON, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
@@ -15,7 +15,10 @@ class Appointment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     doctor_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
-    department: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    department_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     appointment_time: Mapped[Optional[str]] = mapped_column(
         String(8), nullable=True
@@ -48,3 +51,6 @@ class Appointment(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # Relationships
+    department: Mapped["Department"] = relationship(back_populates="appointments")
