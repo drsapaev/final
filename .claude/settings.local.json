@@ -24,7 +24,10 @@
       "Bash(Select-Object -First 5 Id,ProcessName,StartTime)",
       "Bash(Format-Table -AutoSize)",
       "Bash(powershell -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git -c core.hooksPath=/dev/null cherry-pick:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
