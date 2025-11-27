@@ -31,6 +31,7 @@ class Doctor(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True, index=True)
     specialty = Column(String(100), nullable=False, index=True)  # cardiology, dermatology, stomatology
     cabinet = Column(String(20), nullable=True)
     price_default = Column(Numeric(10, 2), nullable=True)
@@ -43,6 +44,7 @@ class Doctor(Base):
     
     # Relationships
     user = relationship("User", foreign_keys=[user_id])
+    department = relationship("Department", back_populates="doctors")
     schedules = relationship("Schedule", back_populates="doctor", cascade="all, delete-orphan")
     services = relationship("Service", back_populates="doctor")
     visits = relationship("Visit", back_populates="doctor")
