@@ -17,7 +17,21 @@ import {
   Option,
   Switch,
   Checkbox,
+  Grid,
+  List,
+  Table,
 } from './ui/macos';
+import {
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+} from './ui/macos/Table';
+import {
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+} from './ui/macos/List';
 import {
   Plus,
   Edit,
@@ -29,6 +43,7 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  Telegram,
 } from 'lucide-react';
 
 const TelegramManager = () => {
@@ -129,7 +144,7 @@ const TelegramManager = () => {
         </Typography>
         <Button
           variant="outlined"
-          startIcon={<Refresh />}
+          startIcon={<RefreshCw />}
           onClick={loadTelegramData}
         >
           Обновить
@@ -163,11 +178,12 @@ const TelegramManager = () => {
                     primary="Бот активен"
                     secondary={botStatus?.bot_active ? 'Да' : 'Нет'}
                   />
-                  <Chip
-                    label={botStatus?.bot_active ? 'Активен' : 'Неактивен'}
-                    color={botStatus?.bot_active ? 'success' : 'error'}
+                  <Badge
+                    variant={botStatus?.bot_active ? 'success' : 'error'}
                     size="small"
-                  />
+                  >
+                    {botStatus?.bot_active ? 'Активен' : 'Неактивен'}
+                  </Badge>
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
@@ -177,11 +193,12 @@ const TelegramManager = () => {
                     primary="Webhook настроен"
                     secondary={botStatus?.webhook_configured ? 'Да' : 'Нет'}
                   />
-                  <Chip
-                    label={botStatus?.webhook_configured ? 'Настроен' : 'Не настроен'}
-                    color={botStatus?.webhook_configured ? 'success' : 'warning'}
+                  <Badge
+                    variant={botStatus?.webhook_configured ? 'success' : 'warning'}
                     size="small"
-                  />
+                  >
+                    {botStatus?.webhook_configured ? 'Настроен' : 'Не настроен'}
+                  </Badge>
                 </ListItem>
                 <ListItem>
                   <ListItemIcon>
@@ -255,18 +272,20 @@ const TelegramManager = () => {
                       <TableRow key={template.id} hover>
                         <TableCell>{template.name}</TableCell>
                         <TableCell>
-                          <Chip
-                            label={template.message_type}
-                            color="primary"
+                          <Badge
+                            variant="primary"
                             size="small"
-                          />
+                          >
+                            {template.message_type}
+                          </Badge>
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={template.is_active ? 'Активен' : 'Неактивен'}
-                            color={template.is_active ? 'success' : 'default'}
+                          <Badge
+                            variant={template.is_active ? 'success' : 'default'}
                             size="small"
-                          />
+                          >
+                            {template.is_active ? 'Активен' : 'Неактивен'}
+                          </Badge>
                         </TableCell>
                         <TableCell align="right">
                           <IconButton>

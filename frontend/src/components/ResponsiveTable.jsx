@@ -39,6 +39,20 @@ const ResponsiveTable = ({
     }
   };
 
+  // Предварительно вычисляем оффсеты для фиксированных колонок (для планшета/десктопа)
+  // Должно быть до любого условного return
+  const visibleColumns = React.useMemo(() => columns.filter(c => !c.hidden), [columns]);
+  const selectionOffset = onRowSelect ? 50 : 0; // ширина колонки чекбокса
+  const leftOffsets = React.useMemo(() => {
+    let currentLeft = selectionOffset;
+    return visibleColumns.map((col) => {
+      const left = col.fixed ? currentLeft : null;
+      const widthValue = typeof col.minWidth === 'string' ? parseInt(col.minWidth, 10) : (col.minWidth || 120);
+      if (col.fixed) currentLeft += widthValue;
+      return left;
+    });
+  }, [visibleColumns, selectionOffset]);
+
   // Мобильный вид - карточки
   if (isMobile) {
     return (
@@ -160,18 +174,6 @@ const ResponsiveTable = ({
   }
 
   // Планшетный и десктопный вид - таблица
-  // Предварительно вычисляем оффсеты для фиксированных колонок
-  const visibleColumns = React.useMemo(() => columns.filter(c => !c.hidden), [columns]);
-  const selectionOffset = onRowSelect ? 50 : 0; // ширина колонки чекбокса
-  const leftOffsets = React.useMemo(() => {
-    let currentLeft = selectionOffset;
-    return visibleColumns.map((col) => {
-      const left = col.fixed ? currentLeft : null;
-      const widthValue = typeof col.minWidth === 'string' ? parseInt(col.minWidth, 10) : (col.minWidth || 120);
-      if (col.fixed) currentLeft += widthValue;
-      return left;
-    });
-  }, [visibleColumns, selectionOffset]);
   return (
     <div className={`responsive-table-container ${className}`} style={style}>
       {/* Отладочная информация */}
