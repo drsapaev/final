@@ -1128,7 +1128,11 @@ const AppointmentWizardV2 = ({
 
         if (patientResponse.ok) {
           const patient = await patientResponse.json();
-          cartData.patient_id = patient.id;
+          // Обновляем wizardData с созданным patient_id
+          setWizardData(prev => ({
+            ...prev,
+            patient: { ...prev.patient, id: patient.id }
+          }));
           console.log('✅ Пациент создан успешно:', patient.id);
         } else if (patientResponse.status === 400) {
           // Получаем детальную информацию об ошибке
