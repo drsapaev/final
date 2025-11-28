@@ -43,7 +43,6 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Telegram,
 } from 'lucide-react';
 
 const TelegramManager = () => {
@@ -172,7 +171,11 @@ const TelegramManager = () => {
               <List>
                 <ListItem>
                   <ListItemIcon>
-                    <Telegram color={botStatus?.bot_active ? 'success' : 'error'} />
+                    <MessageSquare 
+                      style={{ 
+                        color: botStatus?.bot_active ? 'var(--mac-success, #28a745)' : 'var(--mac-error, #dc3545)' 
+                      }} 
+                    />
                   </ListItemIcon>
                   <ListItemText
                     primary="Бот активен"
