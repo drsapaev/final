@@ -141,12 +141,12 @@ const AppointmentWizardV2 = ({
 
         setWizardData({
           patient: {
-            id: initialData.patient_id || null, // 🚨 FIX: Никогда не используем initialData.id (это ID записи!), только patient_id
-            fio: initialData.patient_fio || initialData.patient_name || '',
+            id: initialData.patient_id || initialData.patient?.id || null, // ✅ ИСПРАВЛЕНО: Добавлена проверка patient?.id
+            fio: initialData.patient_fio || initialData.patient_name || initialData.patient?.fio || '',
             birth_date: birthDate, // ✅ ИСПРАВЛЕНО: Приоритет полной даты
-            phone: initialData.phone || initialData.patient_phone || '',
-            address: initialData.address || '',
-            gender: initialData.patient_gender || initialData.gender || ''
+            phone: initialData.phone || initialData.patient_phone || initialData.patient?.phone || '',
+            address: initialData.address || initialData.patient?.address || '',
+            gender: initialData.patient_gender || initialData.gender || initialData.patient?.gender || '' // ✅ ИСПРАВЛЕНО: Полная проверка пола
           },
           cart: {
             items: (() => {
@@ -654,9 +654,12 @@ const AppointmentWizardV2 = ({
         }
 
         // ✅ ИСПРАВЛЕНО: Поиск по service_code (приоритет) и по name
+        // Приводим к верхнему регистру для сравнения кодов
+        const searchNameUpper = String(searchName).toUpperCase();
         const foundService = servicesData.find(s =>
-          s.service_code === searchName || // Сначала ищем по коду (K01, L01, etc)
-          s.name === searchName            // Потом по названию
+          (s.service_code && String(s.service_code).toUpperCase() === searchNameUpper) || // Сначала ищем по коду (K01, L01, S01, etc)
+          s.name === searchName || // Потом по названию
+          s.name === searchNameUpper // Или по названию в верхнем регистре
         );
 
         if (foundService) {
@@ -2357,7 +2360,17 @@ const CartStepV2 = ({
           alignContent: 'start'
         }}>
           {displayedServices.map(service => {
-            const isInCart = cart?.items?.some(item => item.service_id === service.id);
+            // ✅ ИСПРАВЛЕНО: Проверяем также по service_code для edit режима (когда service_id еще null)
+            const isInCart = cart?.items?.some(item => {
+              if (item.service_id === service.id) return true;
+              // Если service_id еще не разрешен, проверяем по коду
+              if (!item.service_id && service.service_code) {
+                const itemCode = String(item.service_name || item._temp_name || '').toUpperCase();
+                const serviceCode = String(service.service_code).toUpperCase();
+                return itemCode === serviceCode;
+              }
+              return false;
+            });
             return (
               <label
                 key={service.id}
@@ -2453,7 +2466,8 @@ const CartStepV2 = ({
                   <X size={14} />
                 </button>
               </div>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div style={{ fontSize: 'var(--mac-font-size-xs)', color: 'var(--mac-text-tertiary)' }}>
