@@ -44,7 +44,7 @@ def get_admin_stats(
         # Доход (успешные платежи; amount хранится в тийинах)
         total_revenue_cents = (
             db.query(func.coalesce(func.sum(PaymentWebhook.amount), 0))
-            .filter(PaymentWebhook.status == "success")
+            .filter(PaymentWebhook.status == "processed")
             .scalar()
             or 0
         )
@@ -55,13 +55,18 @@ def get_admin_stats(
             db.query(Appointment).filter(Appointment.appointment_date == today).count()
         )
 
-        # Используем func.date() для извлечения даты из datetime (SQLite совместимо)
-        # func.date() возвращает строку 'YYYY-MM-DD', поэтому сравниваем со строкой
-        today_str = today.strftime('%Y-%m-%d')
+        # Используем сравнение datetime для SQLite совместимости
+        today_start = datetime.combine(today, time.min)
+        today_end = datetime.combine(today, time.max)
         
         visits_today = (
             db.query(Visit)
-            .filter(func.date(Visit.created_at) == today_str)
+            .filter(
+                and_(
+                    Visit.created_at >= today_start,
+                    Visit.created_at <= today_end
+                )
+            )
             .count()
         )
 
@@ -73,7 +78,12 @@ def get_admin_stats(
         # Новые пациенты за сегодня
         new_patients_today = (
             db.query(Patient)
-            .filter(func.date(Patient.created_at) == today_str)
+            .filter(
+                and_(
+                    Patient.created_at >= today_start,
+                    Patient.created_at <= today_end
+                )
+            )
             .count()
         )
 
@@ -116,19 +126,30 @@ def get_quick_stats(
 ) -> Dict[str, Any]:
     try:
         today: date = datetime.utcnow().date()
-        today_str = today.strftime('%Y-%m-%d')
 
-        # Используем func.date() для извлечения даты из datetime (SQLite совместимо)
-        # func.date() возвращает строку 'YYYY-MM-DD', поэтому сравниваем со строкой
+        # Используем сравнение datetime для SQLite совместимости
+        today_start = datetime.combine(today, time.min)
+        today_end = datetime.combine(today, time.max)
+        
         today_visits = (
             db.query(Visit)
-            .filter(func.date(Visit.created_at) == today_str)
+            .filter(
+                and_(
+                    Visit.created_at >= today_start,
+                    Visit.created_at <= today_end
+                )
+            )
             .count()
         )
 
         today_patients = (
             db.query(Patient)
-            .filter(func.date(Patient.created_at) == today_str)
+            .filter(
+                and_(
+                    Patient.created_at >= today_start,
+                    Patient.created_at <= today_end
+                )
+            )
             .count()
         )
 
@@ -136,8 +157,9 @@ def get_quick_stats(
             db.query(PaymentWebhook)
             .filter(
                 and_(
-                    PaymentWebhook.status == "success",
-                    func.date(PaymentWebhook.created_at) == today_str
+                    PaymentWebhook.status == "processed",
+                    PaymentWebhook.created_at >= today_start,
+                    PaymentWebhook.created_at <= today_end
                 )
             )
             .all()
@@ -169,6 +191,7 @@ def get_recent_activities(
     try:
         activities = []
         now = datetime.now(timezone.utc)
+
 
         # Последние записи (appointments) - фильтруем только записи с created_at
         recent_appointments = (
@@ -235,7 +258,7 @@ def get_recent_activities(
             db.query(PaymentWebhook)
             .filter(
                 and_(
-                    PaymentWebhook.status == "success",
+                    PaymentWebhook.status == "processed",
                     PaymentWebhook.created_at.isnot(None)
                 )
             )
@@ -356,9 +379,10 @@ def get_activity_chart(
 
         current_date = start_date
         while current_date <= end_date:
-            # Используем func.date() для извлечения даты из datetime (SQLite совместимо)
-            # func.date() возвращает строку 'YYYY-MM-DD', поэтому сравниваем со строкой
-            date_str = current_date.strftime('%Y-%m-%d')
+            # Используем сравнение datetime для SQLite совместимости
+            # Создаем начало и конец дня как naive datetime (без timezone)
+            day_start = datetime.combine(current_date, time.min)
+            day_end = datetime.combine(current_date, time.max)
             
             # Подсчет записей за день
             appointments_count = (
@@ -366,7 +390,8 @@ def get_activity_chart(
                 .filter(
                     and_(
                         Appointment.created_at.isnot(None),
-                        func.date(Appointment.created_at) == date_str
+                        Appointment.created_at >= day_start,
+                        Appointment.created_at <= day_end
                     )
                 )
                 .count()
@@ -377,9 +402,10 @@ def get_activity_chart(
                 db.query(PaymentWebhook)
                 .filter(
                     and_(
-                        PaymentWebhook.status == "success",
+                        PaymentWebhook.status == "processed",
                         PaymentWebhook.created_at.isnot(None),
-                        func.date(PaymentWebhook.created_at) == date_str
+                        PaymentWebhook.created_at >= day_start,
+                        PaymentWebhook.created_at <= day_end
                     )
                 )
                 .count()
@@ -391,7 +417,8 @@ def get_activity_chart(
                 .filter(
                     and_(
                         User.created_at.isnot(None),
-                        func.date(User.created_at) == date_str
+                        User.created_at >= day_start,
+                        User.created_at <= day_end
                     )
                 )
                 .count()
@@ -458,30 +485,29 @@ def get_analytics_overview(
             start_date = today - timedelta(days=7)
             end_date = today
 
-        # Используем func.date() для извлечения даты из datetime (SQLite совместимо)
-        # func.date() возвращает строку 'YYYY-MM-DD', поэтому сравниваем со строками
-        start_date_str = start_date.strftime('%Y-%m-%d')
-        end_date_str = end_date.strftime('%Y-%m-%d')
+        # Используем сравнение datetime для SQLite совместимости
+        start_datetime = datetime.combine(start_date, time.min)
+        end_datetime = datetime.combine(end_date, time.max)
         
         appointments_query = db.query(Appointment).filter(
             and_(
-                func.date(Appointment.created_at) >= start_date_str,
-                func.date(Appointment.created_at) <= end_date_str
+                Appointment.created_at >= start_datetime,
+                Appointment.created_at <= end_datetime
             )
         )
         
         payments_query = db.query(PaymentWebhook).filter(
             and_(
-                PaymentWebhook.status == "success",
-                func.date(PaymentWebhook.created_at) >= start_date_str,
-                func.date(PaymentWebhook.created_at) <= end_date_str
+                PaymentWebhook.status == "processed",
+                PaymentWebhook.created_at >= start_datetime,
+                PaymentWebhook.created_at <= end_datetime
             )
         )
 
         patients_query = db.query(Patient).filter(
             and_(
-                func.date(Patient.created_at) >= start_date_str,
-                func.date(Patient.created_at) <= end_date_str
+                Patient.created_at >= start_datetime,
+                Patient.created_at <= end_datetime
             )
         )
 
@@ -601,12 +627,15 @@ def get_analytics_charts(
 
         current_date = start_date
         while current_date <= end_date:
-            # Используем func.date() для извлечения даты из datetime (SQLite совместимо)
-            # func.date() возвращает строку 'YYYY-MM-DD', поэтому сравниваем со строкой
-            date_str = current_date.strftime('%Y-%m-%d')
+            # Используем сравнение datetime для SQLite совместимости
+            day_start = datetime.combine(current_date, time.min)
+            day_end = datetime.combine(current_date, time.max)
             
             appointments_query = db.query(Appointment).filter(
-                func.date(Appointment.created_at) == date_str
+                and_(
+                    Appointment.created_at >= day_start,
+                    Appointment.created_at <= day_end
+                )
             )
             if department and department != "all":
                 appointments_query = appointments_query.filter(Appointment.department == department)
@@ -617,8 +646,9 @@ def get_analytics_charts(
                 db.query(PaymentWebhook)
                 .filter(
                     and_(
-                        PaymentWebhook.status == "success",
-                        func.date(PaymentWebhook.created_at) == date_str
+                        PaymentWebhook.status == "processed",
+                        PaymentWebhook.created_at >= day_start,
+                        PaymentWebhook.created_at <= day_end
                     )
                 )
                 .all()
