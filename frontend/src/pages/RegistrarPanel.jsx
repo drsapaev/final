@@ -2593,7 +2593,8 @@ const RegistrarPanel = () => {
     if (departmentKey === 'procedures') {
       const hasProcedureServices = allServiceCodes.some(code => {
         const category = getServiceCategoryByCode(code);
-        return category === 'P' || category === 'C' || category === 'D_PROC' || category === 'PHYS' || category === 'COSM';
+        // ✅ getServiceCategoryByCode возвращает 'P' для физиотерапии, 'C' для косметологии, 'D_PROC' для дерматологических процедур
+        return category === 'P' || category === 'C' || category === 'D_PROC';
       });
 
       // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть процедурными
