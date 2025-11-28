@@ -2382,7 +2382,11 @@ const RegistrarPanel = () => {
     }).filter(code => code !== null);
 
     // Объединяем коды из service_codes и преобразованные из services
-    const allServiceCodes = [...appointmentServiceCodes, ...serviceCodesFromServices];
+    // ✅ НОРМАЛИЗУЕМ КОДЫ К ВЕРХНЕМУ РЕГИСТРУ для единообразия
+    const allServiceCodes = [
+      ...appointmentServiceCodes.map(code => String(code).toUpperCase()),
+      ...serviceCodesFromServices.map(code => String(code).toUpperCase())
+    ];
 
     // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
     const departmentCategoryMapping = {
@@ -2401,44 +2405,47 @@ const RegistrarPanel = () => {
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
 
+      // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ для корректного распознавания
+      const normalizedCode = String(serviceCode).toUpperCase();
+
       // ЭКГ - отдельная категория (только ЭКГ) - ВАЖНО: K10 это ЭКГ!
-      if (serviceCode === 'K10' || serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
+      if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
 
       // ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
-      if (serviceCode === 'K11' || serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO') || serviceCode.includes('ЭхоКГ')) return 'ECHO';
+      if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
 
       // Физиотерапия (дерматологическая) - коды P01-P05
-      if (serviceCode.match(/^P\d+$/)) return 'P';
+      if (normalizedCode.match(/^P\d+$/)) return 'P';
 
       // Дерматологические процедуры - коды D_PROC01-D_PROC04
-      if (serviceCode.match(/^D_PROC\d+$/)) return 'D_PROC';
+      if (normalizedCode.match(/^D_PROC\d+$/)) return 'D_PROC';
 
       // Косметологические процедуры - коды C01-C12
-      if (serviceCode.match(/^C\d+$/)) return 'C';
+      if (normalizedCode.match(/^C\d+$/)) return 'C';
 
       // Кардиология - коды K01, K11 и т.д. (НО НЕ K10 - это ЭКГ!)
-      if (serviceCode.match(/^K\d+$/) && serviceCode !== 'K10') return 'K';
+      if (normalizedCode.match(/^K\d+$/) && normalizedCode !== 'K10') return 'K';
 
       // Стоматология - коды S01, S10
-      if (serviceCode.match(/^S\d+$/)) return 'S';
+      if (normalizedCode.match(/^S\d+$/)) return 'S';
 
       // Лаборатория - коды L01-L65
-      if (serviceCode.match(/^L\d+$/)) return 'L';
+      if (normalizedCode.match(/^L\d+$/)) return 'L';
 
       // Дерматология - только консультации (D01)
-      if (serviceCode === 'D01') return 'D';
+      if (normalizedCode === 'D01') return 'D';
 
       // Старый формат кодов (префиксы) - обновленный
-      if (serviceCode.startsWith('CONS_CARD')) return 'K';  // Консультации кардиолога
-      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'DERM';  // Дерматология-косметология
-      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'DENT';  // Стоматология
-      if (serviceCode.startsWith('LAB_')) return 'L';  // Лаборатория
-      if (serviceCode.startsWith('COSM_')) return 'C';  // Косметология
-      if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
-      if (serviceCode.startsWith('DERM_PROC_') || serviceCode.startsWith('DERM_')) return 'D_PROC';  // Дерматологические процедуры
+      if (normalizedCode.startsWith('CONS_CARD')) return 'K';  // Консультации кардиолога
+      if (normalizedCode.startsWith('CONS_DERM') || normalizedCode.startsWith('DERMA_')) return 'DERM';  // Дерматология-косметология
+      if (normalizedCode.startsWith('CONS_DENT') || normalizedCode.startsWith('DENT_') || normalizedCode.startsWith('STOM_')) return 'DENT';  // Стоматология
+      if (normalizedCode.startsWith('LAB_')) return 'L';  // Лаборатория
+      if (normalizedCode.startsWith('COSM_')) return 'C';  // Косметология
+      if (normalizedCode.startsWith('PHYSIO_') || normalizedCode.startsWith('PHYS_')) return 'P';  // Физиотерапия
+      if (normalizedCode.startsWith('DERM_PROC_') || normalizedCode.startsWith('DERM_')) return 'D_PROC';  // Дерматологические процедуры
 
       // Дополнительные паттерны для кардиологии
-      if (serviceCode.startsWith('CARD_') && !serviceCode.includes('ECG')) return 'K';
+      if (normalizedCode.startsWith('CARD_') && !normalizedCode.includes('ECG')) return 'K';
 
       return null;
     };
@@ -2787,8 +2794,9 @@ const RegistrarPanel = () => {
 
     appointmentServices.forEach((service, index) => {
       // Приоритет 1: service_codes по индексу (если массивы совпадают по порядку)
+      // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ
       if (appointmentServiceCodes[index]) {
-        serviceToCodeMap.set(service, appointmentServiceCodes[index]);
+        serviceToCodeMap.set(service, String(appointmentServiceCodes[index]).toUpperCase());
         return;
       }
 
@@ -2827,23 +2835,27 @@ const RegistrarPanel = () => {
 
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
-      if (serviceCode === 'K10' || serviceCode === 'ECG01' || serviceCode === 'CARD_ECG' || serviceCode.includes('ECG') || serviceCode.includes('ЭКГ')) return 'ECG';
-      if (serviceCode === 'K11' || serviceCode === 'CARD_ECHO' || serviceCode.includes('ECHO') || serviceCode.includes('ЭхоКГ')) return 'ECHO';
-      if (serviceCode.match(/^P\d+$/)) return 'P';
-      if (serviceCode.match(/^D_PROC\d+$/)) return 'D_PROC';
-      if (serviceCode.match(/^C\d+$/)) return 'C';
-      if (serviceCode.match(/^K\d+$/) && serviceCode !== 'K10') return 'K';
-      if (serviceCode.match(/^S\d+$/)) return 'S';
-      if (serviceCode.match(/^L\d+$/)) return 'L';
-      if (serviceCode === 'D01') return 'D';
-      if (serviceCode.startsWith('CONS_CARD')) return 'K';
-      if (serviceCode.startsWith('CONS_DERM') || serviceCode.startsWith('DERMA_')) return 'DERM';
-      if (serviceCode.startsWith('CONS_DENT') || serviceCode.startsWith('DENT_') || serviceCode.startsWith('STOM_')) return 'DENT';
-      if (serviceCode.startsWith('LAB_')) return 'L';
-      if (serviceCode.startsWith('COSM_')) return 'C';
-      if (serviceCode.startsWith('PHYSIO_') || serviceCode.startsWith('PHYS_')) return 'P';
-      if (serviceCode.startsWith('DERM_PROC_') || serviceCode.startsWith('DERM_')) return 'D_PROC';
-      if (serviceCode.startsWith('CARD_') && !serviceCode.includes('ECG')) return 'K';
+      
+      // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ для корректного распознавания
+      const normalizedCode = String(serviceCode).toUpperCase();
+      
+      if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
+      if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
+      if (normalizedCode.match(/^P\d+$/)) return 'P';
+      if (normalizedCode.match(/^D_PROC\d+$/)) return 'D_PROC';
+      if (normalizedCode.match(/^C\d+$/)) return 'C';
+      if (normalizedCode.match(/^K\d+$/) && normalizedCode !== 'K10') return 'K';
+      if (normalizedCode.match(/^S\d+$/)) return 'S';
+      if (normalizedCode.match(/^L\d+$/)) return 'L';
+      if (normalizedCode === 'D01') return 'D';
+      if (normalizedCode.startsWith('CONS_CARD')) return 'K';
+      if (normalizedCode.startsWith('CONS_DERM') || normalizedCode.startsWith('DERMA_')) return 'DERM';
+      if (normalizedCode.startsWith('CONS_DENT') || normalizedCode.startsWith('DENT_') || normalizedCode.startsWith('STOM_')) return 'DENT';
+      if (normalizedCode.startsWith('LAB_')) return 'L';
+      if (normalizedCode.startsWith('COSM_')) return 'C';
+      if (normalizedCode.startsWith('PHYSIO_') || normalizedCode.startsWith('PHYS_')) return 'P';
+      if (normalizedCode.startsWith('DERM_PROC_') || normalizedCode.startsWith('DERM_')) return 'D_PROC';
+      if (normalizedCode.startsWith('CARD_') && !normalizedCode.includes('ECG')) return 'K';
       return null;
     };
 

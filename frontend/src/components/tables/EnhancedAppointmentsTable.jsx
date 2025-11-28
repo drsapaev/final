@@ -514,9 +514,9 @@ const EnhancedAppointmentsTable = ({
     
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
     const compactCodes = servicesList.map((serviceName, index) => {
-      // Если это уже код (K01, D02, D_PROC03, etc), возвращаем как есть
+      // Если это уже код (K01, D02, D_PROC03, etc), возвращаем в верхнем регистре
       if (isServiceCode(serviceName)) {
-        return serviceName;
+        return String(serviceName).toUpperCase();
       }
       
       // Если это название, ищем услугу и получаем её код
@@ -526,11 +526,11 @@ const EnhancedAppointmentsTable = ({
           if (foundService) {
             // Используем service_code если есть, иначе генерируем из category_code
             if (foundService.service_code) {
-              return foundService.service_code;
+              return String(foundService.service_code).toUpperCase();
             }
             // Если есть category_code но нет service_code, генерируем временный код
             if (foundService.category_code) {
-              return `${foundService.category_code}${String(foundService.id).padStart(2, '0')}`;
+              return `${String(foundService.category_code).toUpperCase()}${String(foundService.id).padStart(2, '0')}`;
             }
           }
         }
