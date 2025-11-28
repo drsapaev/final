@@ -2809,13 +2809,15 @@ const RegistrarPanel = () => {
               const serviceId = parseInt(service);
               const serviceByID = groupServices.find(s => s.id === serviceId);
               if (serviceByID && serviceByID.service_code) {
-                serviceToCodeMap.set(service, serviceByID.service_code);
+                // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ
+                serviceToCodeMap.set(service, String(serviceByID.service_code).toUpperCase());
                 return;
               }
             }
             const serviceByName = groupServices.find(s => s.name === service);
             if (serviceByName && serviceByName.service_code) {
-              serviceToCodeMap.set(service, serviceByName.service_code);
+              // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ
+              serviceToCodeMap.set(service, String(serviceByName.service_code).toUpperCase());
               return;
             }
           }
