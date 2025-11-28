@@ -39,7 +39,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11.10'
+        python-version: '3.11.1'
     
     - name: Install dependencies
       run: |
@@ -70,6 +70,8 @@ jobs:
         python -c "import sqlalchemy; print('SQLAlchemy version:', sqlalchemy.__version__)"
         
         echo "🔍 Проверка импорта приложения..."
+        python -c "import app; print('✅ app package imported')"
+        python -c "import app.main; print('✅ app.main module imported')"
         python -c "from app.main import app; print('✅ app import ok')"
     
     - name: Setup test database
