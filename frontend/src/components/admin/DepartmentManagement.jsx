@@ -1,5 +1,6 @@
 /**
  * DepartmentManagement Component
+<<<<<<< HEAD
  * Управление отделениями, вкладками и интеграциями очередей/услуг
  */
 
@@ -88,10 +89,22 @@ const STATUS_OPTIONS = [
     { value: 'active', label: 'Активные' },
     { value: 'inactive', label: 'Неактивные' },
 ];
+=======
+ * Manages departments/specialties in the system
+ */
+
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Card, Button, Badge, Input } from '../ui/macos';
+import { toast } from 'react-toastify';
+
+const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
+>>>>>>> origin/main
 
 const DepartmentManagement = () => {
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
+<<<<<<< HEAD
     const [error, setError] = useState(null);
 
     const [formData, setFormData] = useState(DEFAULT_FORM);
@@ -476,11 +489,66 @@ const DepartmentManagement = () => {
             // Импорт данных
             const token = localStorage.getItem('auth_token');
             const response = await fetch(`${API_BASE}/api/v1/admin/departments/bulk`, {
+=======
+    const [editingId, setEditingId] = useState(null);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [formData, setFormData] = useState({
+        name_ru: '',
+        name_uz: '',
+        key: '',
+        description: '',
+        color: '#0066cc',
+        icon: '🏥',
+        display_order: 999,
+        active: true
+    });
+
+    useEffect(() => {
+        loadDepartments();
+    }, []);
+
+    const loadDepartments = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/v1/admin/departments`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                // Backend returns {success: true, data: [...], count: N}
+                setDepartments(result.data || []);
+            } else {
+                toast.error('Не удалось загрузить отделения');
+            }
+        } catch (error) {
+            console.error('Error loading departments:', error);
+            toast.error('Ошибка загрузки отделений');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAdd = async () => {
+        if (!formData.name_ru || !formData.key) {
+            toast.error('Заполните обязательные поля');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/v1/admin/departments`, {
+>>>>>>> origin/main
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
+<<<<<<< HEAD
                 body: JSON.stringify({ departments: importedDepartments })
             });
 
@@ -607,16 +675,109 @@ const DepartmentManagement = () => {
     if (loading) {
         return (
             <MacOSCard>
+=======
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                toast.success('Отделение добавлено');
+                setShowAddForm(false);
+                setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
+                loadDepartments();
+            } else {
+                toast.error('Ошибка при добавлении отделения');
+            }
+        } catch (error) {
+            console.error('Error adding department:', error);
+            toast.error('Ошибка при добавлении отделения');
+        }
+    };
+
+    const handleEdit = (dept) => {
+        setEditingId(dept.id);
+        setFormData({
+            name_ru: dept.name_ru || dept.name,
+            name_uz: dept.name_uz || '',
+            key: dept.key || dept.code,
+            description: dept.description || '',
+            color: dept.color || '#0066cc',
+            icon: dept.icon || '🏥',
+            display_order: dept.display_order || 999,
+            active: dept.active !== undefined ? dept.active : true
+        });
+    };
+
+    const handleUpdate = async (id) => {
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/v1/admin/departments/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                toast.success('Отделение обновлено');
+                setEditingId(null);
+                setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
+                loadDepartments();
+            } else {
+                toast.error('Ошибка при обновлении отделения');
+            }
+        } catch (error) {
+            console.error('Error updating department:', error);
+            toast.error('Ошибка при обновлении отделения');
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm('Вы уверены, что хотите удалить это отделение?')) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE}/api/v1/admin/departments/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                toast.success('Отделение удалено');
+                loadDepartments();
+            } else {
+                toast.error('Ошибка при удалении отделения');
+            }
+        } catch (error) {
+            console.error('Error deleting department:', error);
+            toast.error('Ошибка при удалении отделения');
+        }
+    };
+
+    if (loading) {
+        return (
+            <Card>
+>>>>>>> origin/main
                 <div style={{ padding: '40px', textAlign: 'center' }}>
                     <div className="spinner" style={{ margin: '0 auto 16px' }}></div>
                     <p style={{ color: 'var(--mac-text-secondary)' }}>Загрузка отделений...</p>
                 </div>
+<<<<<<< HEAD
             </MacOSCard>
+=======
+            </Card>
+>>>>>>> origin/main
         );
     }
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+<<<<<<< HEAD
             {/* Статистика отделений */}
             <div style={{
                 display: 'grid',
@@ -702,6 +863,9 @@ const DepartmentManagement = () => {
             </div>
 
             <MacOSCard>
+=======
+            <Card>
+>>>>>>> origin/main
                 <div style={{ padding: '24px' }}>
                     <div style={{
                         display: 'flex',
@@ -717,6 +881,7 @@ const DepartmentManagement = () => {
                         }}>
                             Управление отделениями
                         </h2>
+<<<<<<< HEAD
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <MacOSButton
                                 variant="primary"
@@ -812,6 +977,16 @@ const DepartmentManagement = () => {
                         >
                             {sortOrder === 'asc' ? '↑' : '↓'}
                         </MacOSButton>
+=======
+                        <Button
+                            variant="primary"
+                            size="default"
+                            onClick={() => setShowAddForm(!showAddForm)}
+                        >
+                            <Plus size={16} style={{ marginRight: '8px' }} />
+                            Добавить отделение
+                        </Button>
+>>>>>>> origin/main
                     </div>
 
                     {showAddForm && (
@@ -830,6 +1005,7 @@ const DepartmentManagement = () => {
                                 Новое отделение
                             </h3>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+<<<<<<< HEAD
                                 <div>
                                     <MacOSInput
                                         placeholder="Название (русский)"
@@ -958,16 +1134,65 @@ const DepartmentManagement = () => {
                                     Сохранить
                                 </MacOSButton>
                                 <MacOSButton variant="secondary" onClick={() => {
+=======
+                                <Input
+                                    placeholder="Название (русский)"
+                                    value={formData.name_ru}
+                                    onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Название (узбекский)"
+                                    value={formData.name_uz}
+                                    onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Ключ (например, cardio)"
+                                    value={formData.key}
+                                    onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+                                    style={{ gridColumn: '1' }}
+                                />
+                                <Input
+                                    type="number"
+                                    placeholder="Порядок отображения"
+                                    value={formData.display_order}
+                                    onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) })}
+                                    style={{ gridColumn: '2' }}
+                                />
+                                <Input
+                                    placeholder="Иконка (emoji)"
+                                    value={formData.icon}
+                                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                                    style={{ gridColumn: '1' }}
+                                />
+                                <Input
+                                    type="color"
+                                    value={formData.color}
+                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                    style={{ gridColumn: '2' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                                <Button variant="primary" onClick={handleAdd}>
+                                    <Save size={16} style={{ marginRight: '8px' }} />
+                                    Сохранить
+                                </Button>
+                                <Button variant="secondary" onClick={() => {
+>>>>>>> origin/main
                                     setShowAddForm(false);
                                     setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
                                 }}>
                                     <X size={16} style={{ marginRight: '8px' }} />
                                     Отмена
+<<<<<<< HEAD
                                 </MacOSButton>
+=======
+                                </Button>
+>>>>>>> origin/main
                             </div>
                         </div>
                     )}
 
+<<<<<<< HEAD
                     {/* Панель массовых операций */}
                     {selectedDepartments.length > 0 && (
                         <div style={{
@@ -1053,6 +1278,10 @@ const DepartmentManagement = () => {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {paginatedDepartments.map((dept) => (
+=======
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {departments.map((dept) => (
+>>>>>>> origin/main
                             <div
                                 key={dept.id}
                                 style={{
@@ -1065,6 +1294,7 @@ const DepartmentManagement = () => {
                                     justifyContent: 'space-between'
                                 }}
                             >
+<<<<<<< HEAD
                                 <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -1075,6 +1305,27 @@ const DepartmentManagement = () => {
                                         checked={selectedDepartments.includes(dept.id)}
                                         onChange={(e) => handleSelectDepartment(dept.id, e.target.checked)}
                                     />
+=======
+                                {editingId === dept.id ? (
+                                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                        <Input
+                                            placeholder="Название (RU)"
+                                            value={formData.name_ru}
+                                            onChange={(e) => setFormData({ ...formData, name_ru: e.target.value })}
+                                        />
+                                        <Input
+                                            placeholder="Название (UZ)"
+                                            value={formData.name_uz}
+                                            onChange={(e) => setFormData({ ...formData, name_uz: e.target.value })}
+                                        />
+                                        <Input
+                                            placeholder="Ключ"
+                                            value={formData.key}
+                                            onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+                                        />
+                                    </div>
+                                ) : (
+>>>>>>> origin/main
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
                                         <div
                                             style={{
@@ -1090,7 +1341,11 @@ const DepartmentManagement = () => {
                                         >
                                             {dept.icon || '🏥'}
                                         </div>
+<<<<<<< HEAD
                                         <div style={{ flex: 1 }}>
+=======
+                                        <div>
+>>>>>>> origin/main
                                             <h4 style={{
                                                 fontSize: '16px',
                                                 fontWeight: '600',
@@ -1099,6 +1354,7 @@ const DepartmentManagement = () => {
                                             }}>
                                                 {dept.name_ru || dept.name}
                                             </h4>
+<<<<<<< HEAD
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                 <MacOSBadge variant="secondary">{dept.key || dept.code}</MacOSBadge>
                                                 {dept.active === false && <MacOSBadge variant="danger">Неактивно</MacOSBadge>}
@@ -1136,6 +1392,53 @@ const DepartmentManagement = () => {
                                     >
                                         <Trash2 size={16} />
                                     </MacOSButton>
+=======
+                                            <Badge variant="secondary">{dept.key || dept.code}</Badge>
+                                            {dept.active === false && <Badge variant="danger" style={{ marginLeft: '8px' }}>Неактивно</Badge>}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    {editingId === dept.id ? (
+                                        <>
+                                            <Button
+                                                size="sm"
+                                                variant="primary"
+                                                onClick={() => handleUpdate(dept.id)}
+                                            >
+                                                <Save size={16} />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => {
+                                                    setEditingId(null);
+                                                    setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
+                                                }}
+                                            >
+                                                <X size={16} />
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => handleEdit(dept)}
+                                            >
+                                                <Edit2 size={16} />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="danger"
+                                                onClick={() => handleDelete(dept.id)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        </>
+                                    )}
+>>>>>>> origin/main
                                 </div>
                             </div>
                         ))}
@@ -1150,6 +1453,7 @@ const DepartmentManagement = () => {
                             <p>Нет отделений. Добавьте первое отделение.</p>
                         </div>
                     )}
+<<<<<<< HEAD
 
                     {departments.length > 0 && filteredDepartments.length === 0 && (
                         <div style={{
@@ -1374,6 +1678,10 @@ const DepartmentManagement = () => {
                     </MacOSButton>
                 </div>
             </MacOSModal>
+=======
+                </div>
+            </Card>
+>>>>>>> origin/main
         </div>
     );
 };
