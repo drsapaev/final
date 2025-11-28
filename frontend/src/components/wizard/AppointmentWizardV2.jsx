@@ -782,14 +782,25 @@ const AppointmentWizardV2 = ({
         return item;
       });
 
-      // Проверяем, изменилось ли что-то
+      // ✅ ИСПРАВЛЕНО: Проверяем изменения, включая service_name
       const hasChanges = updatedItems.some((item, index) => {
         const prevItem = wizardData.cart.items[index];
-        return item.service_id !== prevItem.service_id || item.service_price !== prevItem.service_price;
+        return item.service_id !== prevItem.service_id || 
+               item.service_price !== prevItem.service_price ||
+               item.service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
       });
 
       if (hasChanges) {
         console.log('✅ Updating cart with resolved services:', updatedItems.length);
+        // ✅ УЛУЧШЕНО: Логируем какие услуги были разрешены
+        const resolved = updatedItems.filter((item, index) => {
+          const prevItem = wizardData.cart.items[index];
+          return item.service_id !== prevItem.service_id;
+        });
+        if (resolved.length > 0) {
+          console.log('📋 Resolved services:', resolved.map(item => `${item._temp_name || item.service_name} -> ${item.service_name} (ID: ${item.service_id})`));
+        }
+        
         setWizardData(prev => ({
           ...prev,
           cart: {
