@@ -2437,7 +2437,12 @@ const CartStepV2 = ({
             overflowX: 'auto',
             paddingBottom: '4px'
           }}>
-            {cart.items.map(item => (
+            {cart.items.map(item => {
+              // ✅ ИСПРАВЛЕНО: Получаем полное название услуги из servicesData
+              const service = servicesData?.find(s => s.id === item.service_id);
+              const displayName = service?.name || item.service_name || 'Неизвестная услуга';
+              
+              return (
               <div key={item.id} style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -2449,8 +2454,8 @@ const CartStepV2 = ({
                 fontSize: 'var(--mac-font-size-xs)',
                 whiteSpace: 'nowrap'
               }}>
-                <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.service_name}
+                <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
+                  {displayName}
                 </span>
                 <button
                   onClick={() => onRemoveFromCart(item.id)}
@@ -2466,7 +2471,8 @@ const CartStepV2 = ({
                   <X size={14} />
                 </button>
               </div>
-            );
+              );
+            })}
             })}
           </div>
         ) : (
