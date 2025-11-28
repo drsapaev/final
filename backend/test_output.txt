@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "C:\final\backend\test_cart_error_debug.py", line 15, in <module>
-    print("\U0001f510 └тЄюЁшчрЎш ...")
-  File "C:\Program Files\Python311\Lib\encodings\cp1251.py", line 19, in encode
-    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f510' in position 0: character maps to <undefined>
