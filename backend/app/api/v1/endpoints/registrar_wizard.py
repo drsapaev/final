@@ -558,7 +558,7 @@ def create_cart_appointments(
                 discount_mode=cart_data.discount_mode
             )
             visit_amount = Decimal(str(total_info["total"]))
-            
+
             invoice_visit = PaymentInvoiceVisit(
                 invoice_id=invoice.id,
                 visit_id=visit.id,
@@ -677,7 +677,7 @@ def create_cart_appointments(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания корзины: {str(e)}"
+            detail=f"Ошибка создания корзины: {str(e)}\nTRACE: {traceback.format_exc()}"
         )
 
 

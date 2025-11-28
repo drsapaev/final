@@ -70,7 +70,7 @@ from .file_system import (
 from .telegram_config import TelegramConfig, TelegramTemplate, TelegramUser, TelegramMessage
 from .doctor_price_override import DoctorPriceOverride
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-# from .department import Department  # ВРЕМЕННО ОТКЛЮЧЕНО: модуль не существует
+from .department import Department, DepartmentService, DepartmentQueueSettings, DepartmentRegistrationSettings
 
 # Make sure all models are available
 __all__ = [
@@ -150,4 +150,7 @@ __all__ = [
     "PaymentInvoice",
     "PaymentInvoiceVisit",
     "Department",
+    "DepartmentService",
+    "DepartmentQueueSettings",
+    "DepartmentRegistrationSettings",
 ]

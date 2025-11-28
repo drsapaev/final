@@ -84,7 +84,7 @@ const ServiceCatalog = () => {
         api.get('/services'),
         api.get('/services/categories'),
         api.get('/services/admin/doctors'),
-        api.get('/departments/')
+        api.get('/departments')
       ]);
 
       if (servicesRes.status === 'fulfilled') {

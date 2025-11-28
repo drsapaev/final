@@ -40,7 +40,7 @@ const FeatureCard = ({ icon, title, description, color, bgColor }) => {
         transition: 'all 0.3s ease',
         border: `1px solid ${isHovered ? color : 'transparent'}`,
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
-        boxShadow: isHovered ? `0 8px 25px rgba(0, 0, 0, 0.1)` : 'none'
+        boxShadow: isHovered ? '0 8px 25px rgba(0, 0, 0, 0.1)' : 'none'
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

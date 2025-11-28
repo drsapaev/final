@@ -75,10 +75,10 @@ class Department(Base):
         back_populates="department"
     )
 
-    # Визиты в отделение (One-to-Many)
-    visits: Mapped[list["Visit"]] = relationship(
-        back_populates="department"
-    )
+    # Визиты в отделение (One-to-Many) - закомментировано из-за конфликта
+    # visits: Mapped[list["Visit"]] = relationship(
+    #     back_populates="department_obj"
+    # )
 
     # Расписания отделения (One-to-Many)
     schedules: Mapped[list["ScheduleTemplate"]] = relationship(

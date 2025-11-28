@@ -59,80 +59,91 @@ const ModernTabs = ({
   }[language] || {};
 
   // Загрузка отделений из БД
+  const loadDepartments = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/departments?active_only=true');
+
+      // Backend returns {success: true, data: [...], count: N}
+      // axios response.data contains the backend response body
+      const departments = response.data.data || [];
+
+      // Преобразуем данные из БД в формат для вкладок
+      const departmentsData = departments.map(dept => ({
+        key: dept.key,
+        label: language === 'uz' ? (dept.name_uz || dept.name_ru) : dept.name_ru,
+        icon: iconMap[dept.icon] || Package, // Fallback на Package если иконка не найдена
+        color: dept.color,
+        gradient: dept.gradient || `linear-gradient(135deg, ${dept.color}, ${dept.color})`
+      }));
+
+      setTabs(departmentsData);
+    } catch (error) {
+      console.error('Ошибка загрузки отделений:', error);
+      // Fallback на hardcoded вкладки если API не работает
+      setTabs([
+        {
+          key: 'cardio',
+          label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
+          icon: Heart,
+          color: '#ef4444',
+          gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
+        },
+        {
+          key: 'echokg',
+          label: language === 'uz' ? 'EKG' : 'ЭКГ',
+          icon: Activity,
+          color: '#ec4899',
+          gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
+        },
+        {
+          key: 'derma',
+          label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
+          icon: UserCheck,
+          color: '#f59e0b',
+          gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
+        },
+        {
+          key: 'dental',
+          label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
+          icon: Smile,
+          color: '#3b82f6',
+          gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
+        },
+        {
+          key: 'lab',
+          label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
+          icon: FlaskConical,
+          color: '#10b981',
+          gradient: 'linear-gradient(135deg, #10b981, #059669)'
+        },
+        {
+          key: 'procedures',
+          label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
+          icon: Syringe,
+          color: '#8b5cf6',
+          gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadDepartments = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/departments?active_only=true');
-
-        // Backend returns {success: true, data: [...], count: N}
-        // axios response.data contains the backend response body
-        const departments = response.data.data || [];
-
-        // Преобразуем данные из БД в формат для вкладок
-        const departmentsData = departments.map(dept => ({
-          key: dept.key,
-          label: language === 'uz' ? (dept.name_uz || dept.name_ru) : dept.name_ru,
-          icon: iconMap[dept.icon] || Package, // Fallback на Package если иконка не найдена
-          color: dept.color,
-          gradient: dept.gradient || `linear-gradient(135deg, ${dept.color}, ${dept.color})`
-        }));
-
-        setTabs(departmentsData);
-      } catch (error) {
-        console.error('Ошибка загрузки отделений:', error);
-        // Fallback на hardcoded вкладки если API не работает
-        setTabs([
-          {
-            key: 'cardio',
-            label: language === 'uz' ? 'Kardiolog' : 'Кардиолог',
-            icon: Heart,
-            color: '#ef4444',
-            gradient: 'linear-gradient(135deg, #ef4444, #dc2626)'
-          },
-          {
-            key: 'echokg',
-            label: language === 'uz' ? 'EKG' : 'ЭКГ',
-            icon: Activity,
-            color: '#ec4899',
-            gradient: 'linear-gradient(135deg, #ec4899, #db2777)'
-          },
-          {
-            key: 'derma',
-            label: language === 'uz' ? 'Dermatolog' : 'Дерматолог',
-            icon: UserCheck,
-            color: '#f59e0b',
-            gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
-          },
-          {
-            key: 'dental',
-            label: language === 'uz' ? 'Stomatolog' : 'Стоматолог',
-            icon: Smile,
-            color: '#3b82f6',
-            gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
-          },
-          {
-            key: 'lab',
-            label: language === 'uz' ? 'Laboratoriya' : 'Лаборатория',
-            icon: FlaskConical,
-            color: '#10b981',
-            gradient: 'linear-gradient(135deg, #10b981, #059669)'
-          },
-          {
-            key: 'procedures',
-            label: language === 'uz' ? 'Muolajalar' : 'Процедуры',
-            icon: Syringe,
-            color: '#8b5cf6',
-            gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
-          }
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadDepartments();
   }, [language]);
+
+  // Слушаем обновления отделений
+  useEffect(() => {
+    const handleDepartmentsUpdate = (event) => {
+      console.log('ModernTabs: Получено обновление отделений', event.detail);
+      loadDepartments();
+    };
+
+    window.addEventListener('departments:updated', handleDepartmentsUpdate);
+    return () => window.removeEventListener('departments:updated', handleDepartmentsUpdate);
+  }, []);
 
   // Используем ту же систему цветов, что и таблица
   const { isDark } = useTheme();

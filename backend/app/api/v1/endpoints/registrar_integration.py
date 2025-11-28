@@ -15,12 +15,72 @@ from app.crud import clinic as crud_clinic
 from app.crud import online_queue as crud_queue
 from app.services.queue_service import queue_service
 from app.services.service_mapping import get_service_code
+from app.models.department import Department, DepartmentService
+from app.models.service import Service
 
 # [OK] Используем прямой SQL вместо импорта модели для избежания конфликта DailyQueue
 # Проблема: DailyQueue определен в двух местах (queue_old.py и online_queue.py)
 # Решение: используем прямой SQL запрос через text() для доступа к queue_entries без импорта модели
 
 router = APIRouter()
+
+# ===================== ОТДЕЛЕНИЯ ДЛЯ РЕГИСТРАТУРЫ =====================
+
+@router.get("/registrar/departments")
+def get_registrar_departments(
+    active_only: bool = Query(True, description="Только активные отделения"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "Cashier"))
+):
+    """
+    Получить список отделений для регистратуры
+    Доступен для регистраторов, в отличие от admin endpoint
+    """
+    try:
+        query = db.query(Department)
+        
+        if active_only:
+            query = query.filter(Department.active == True)
+        
+        # Сортируем по display_order
+        query = query.order_by(Department.display_order)
+        
+        departments = query.all()
+        
+        # Формируем ответ
+        result = []
+        for dept in departments:
+            # Получаем queue_prefix из настроек очереди
+            from app.models.department import DepartmentQueueSettings
+            queue_settings = db.query(DepartmentQueueSettings).filter(
+                DepartmentQueueSettings.department_id == dept.id
+            ).first()
+            
+            result.append({
+                "id": dept.id,
+                "key": dept.key,
+                "name_ru": dept.name_ru,
+                "name_uz": dept.name_uz,
+                "icon": dept.icon,
+                "color": dept.color,
+                "gradient": dept.gradient,
+                "display_order": dept.display_order,
+                "active": dept.active,
+                "description": dept.description,
+                "queue_prefix": queue_settings.queue_prefix if queue_settings else dept.key.upper()[0]
+            })
+        
+        return {
+            "success": True,
+            "data": result,
+            "count": len(result)
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения отделений: {str(e)}"
+        )
 
 # ===================== СПРАВОЧНИК УСЛУГ ДЛЯ РЕГИСТРАТУРЫ =====================
 
@@ -41,13 +101,25 @@ def get_registrar_services(
         categories = crud_clinic.get_service_categories(db, specialty=specialty, active_only=active_only)
         
         # Получаем услуги из основной таблицы
-        from app.models.service import Service
         query = db.query(Service)
         
         if active_only:
             query = query.filter(Service.active == True)
         
         services = query.all()
+
+        # Получаем маппинг услуг к отделениям
+        dept_services = db.query(DepartmentService).options(
+            # joinedload(DepartmentService.department) # Если нужно
+        ).all()
+        
+        # Создаем словарь service_id -> department_key
+        service_dept_map = {}
+        for ds in dept_services:
+            # Загружаем department если он не загружен (lazy load)
+            if ds.department:
+                service_dept_map[ds.service_id] = ds.department.key
+
         
         # Группируем услуги по категориям согласно документации
         grouped_services = {
@@ -70,7 +142,9 @@ def get_registrar_services(
                 "duration_minutes": service.duration_minutes or 30,
                 "category_id": service.category_id,
                 "doctor_id": service.doctor_id,
-                "department_key": getattr(service, 'department_key', None),  # [OK] ДОБАВЛЯЕМ department_key
+                "category_id": service.category_id,
+                "doctor_id": service.doctor_id,
+                "department_key": service_dept_map.get(service.id) or getattr(service, 'department_key', None),  # [OK] Берем из маппинга или поля
                 # [OK] НОВЫЕ ПОЛЯ ДЛЯ КЛАССИФИКАЦИИ
                 "category_code": getattr(service, 'category_code', None),
                 "service_code": getattr(service, 'service_code', None),

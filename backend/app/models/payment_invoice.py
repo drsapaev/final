@@ -80,4 +80,4 @@ class PaymentInvoiceVisit(Base):
 
     # Связи
     invoice: Mapped[PaymentInvoice] = relationship(back_populates="visits")
-    visit: Mapped["Visit"] = relationship()  # Forward reference для Visit
+    visit: Mapped["Visit"] = relationship(back_populates="invoices")  # Forward reference для Visit
