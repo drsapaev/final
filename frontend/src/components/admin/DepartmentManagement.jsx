@@ -5,454 +5,312 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Plus,
-  RefreshCw,
-  Save,
-  Trash2,
-  Search,
-  ShieldCheck,
-  AlertTriangle,
-  CheckCircle,
+    Plus,
+    RefreshCw,
+    Save,
+    Trash2,
+    Search,
+    ShieldCheck,
+    AlertTriangle,
+    CheckCircle,
+    Download,
+    Upload,
+    Edit2,
+    X,
+    XCircle,
 } from 'lucide-react';
 import {
-  MacOSCard,
-  MacOSButton,
-  MacOSBadge,
-  MacOSInput,
-  MacOSSelect,
-  MacOSTextarea,
-  MacOSCheckbox,
-  MacOSPagination,
-  MacOSModal,
-  MacOSAlert,
+    MacOSCard,
+    MacOSButton,
+    MacOSBadge,
+    MacOSInput,
+    MacOSSelect,
+    MacOSTextarea,
+    MacOSCheckbox,
+    MacOSPagination,
+    MacOSModal,
+    MacOSAlert,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const DEFAULT_STATS = {
-  appointments_today: 0,
-  visits_today: 0,
-  queue_entries_today: 0,
-  services: 0,
-  doctors: 0,
+    appointments_today: 0,
+    visits_today: 0,
+    queue_entries_today: 0,
+    services: 0,
+    doctors: 0,
 };
 
 const DEFAULT_TOTALS = {
-  departments: 0,
-  active: 0,
-  queue_enabled: 0,
-  appointments_today: 0,
-  visits_today: 0,
+    departments: 0,
+    active: 0,
+    queue_enabled: 0,
+    appointments_today: 0,
+    visits_today: 0,
 };
 
 const DEFAULT_FORM = {
-  name_ru: '',
-  name_uz: '',
-  key: '',
-  description: '',
-  color: '#0066cc',
-  icon: '🏥',
-  display_order: 999,
-  active: true,
+    name_ru: '',
+    name_uz: '',
+    key: '',
+    description: '',
+    color: '#0066cc',
+    icon: '🏥',
+    display_order: 999,
+    active: true,
 };
 
 const DEFAULT_INTEGRATION_OPTIONS = {
-  queue_prefix: '',
-  start_number: '',
-  max_daily_queue: '',
-  service_name: '',
-  service_code: '',
-  service_category_code: '',
-  service_price: '',
-  service_currency: 'UZS',
+    queue_prefix: '',
+    start_number: '',
+    max_daily_queue: '',
+    service_name: '',
+    service_code: '',
+    service_category_code: '',
+    service_price: '',
+    service_currency: 'UZS',
 };
 
 const CATEGORY_OPTIONS = [
-  { value: '', label: 'Категория (авто)' },
-  { value: 'K', label: 'Кардиология (K)' },
-  { value: 'D', label: 'Дерматология (D)' },
-  { value: 'S', label: 'Стоматология (S)' },
-  { value: 'L', label: 'Лаборатория (L)' },
-  { value: 'O', label: 'Процедуры (O)' },
+    { value: '', label: 'Категория (авто)' },
+    { value: 'K', label: 'Кардиология (K)' },
+    { value: 'D', label: 'Дерматология (D)' },
+    { value: 'S', label: 'Стоматология (S)' },
+    { value: 'L', label: 'Лаборатория (L)' },
+    { value: 'O', label: 'Процедуры (O)' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'Все' },
-  { value: 'active', label: 'Активные' },
-  { value: 'inactive', label: 'Неактивные' },
+    { value: 'all', label: 'Все' },
+    { value: 'active', label: 'Активные' },
+    { value: 'inactive', label: 'Неактивные' },
 ];
 
 const DepartmentManagement = () => {
-  const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+    const [departments, setDepartments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  const [formData, setFormData] = useState(DEFAULT_FORM);
-  const [integrationForm, setIntegrationForm] = useState(DEFAULT_INTEGRATION_OPTIONS);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState(null);
-  const [validationErrors, setValidationErrors] = useState({});
+    const [formData, setFormData] = useState(DEFAULT_FORM);
+    const [integrationForm, setIntegrationForm] = useState(DEFAULT_INTEGRATION_OPTIONS);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingDepartment, setEditingDepartment] = useState(null);
+    const [validationErrors, setValidationErrors] = useState({});
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('display_order');
-  const [sortOrder, setSortOrder] = useState('asc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('display_order');
+    const [sortOrder, setSortOrder] = useState('asc');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const [selectedDepartments, setSelectedDepartments] = useState([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [syncingId, setSyncingId] = useState(null);
-  const [totals, setTotals] = useState(DEFAULT_TOTALS);
+    const [selectedDepartments, setSelectedDepartments] = useState([]);
+    const [selectAll, setSelectAll] = useState(false);
+    const [syncingId, setSyncingId] = useState(null);
+    const [totals, setTotals] = useState(DEFAULT_TOTALS);
 
-  const broadcastDepartmentsUpdate = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent('departments:updated', { detail: { updatedAt: Date.now() } }),
+    const broadcastDepartmentsUpdate = useCallback(() => {
+        window.dispatchEvent(
+            new CustomEvent('departments:updated', { detail: { updatedAt: Date.now() } }),
+        );
+    }, []);
+
+    const sanitizeIntegrationPayload = useCallback((payload) => {
+        if (!payload) return undefined;
+        const sanitized = {};
+        Object.entries(payload).forEach(([key, value]) => {
+            if (value === '' || value === null || value === undefined) return;
+            if (['start_number', 'max_daily_queue'].includes(key)) {
+                const numeric = Number(value);
+                if (!Number.isNaN(numeric)) {
+                    sanitized[key] = numeric;
+                }
+                return;
+            }
+            if (key === 'service_price') {
+                const price = Number(value);
+                if (!Number.isNaN(price)) {
+                    sanitized[key] = price;
+                }
+                return;
+            }
+            sanitized[key] = value;
+        });
+        return Object.keys(sanitized).length ? sanitized : undefined;
+    }, []);
+
+    const loadDepartments = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [listResponse, overviewResponse] = await Promise.all([
+                api.get('/admin/departments'),
+                api.get('/admin/departments/overview'),
+            ]);
+
+            const list = listResponse.data?.data ?? [];
+            const overview = overviewResponse.data?.data ?? {};
+            const statsMap = {};
+            (overview.departments || []).forEach((item) => {
+                statsMap[item.key] = item;
+            });
+
+            const enriched = list.map((dept) => {
+                const stats = statsMap[dept.key] || {};
+                return {
+                    ...dept,
+                    stats: stats.stats || DEFAULT_STATS,
+                    integrations: stats.integrations || {},
+                };
+            });
+
+            setDepartments(enriched);
+            setTotals({
+                ...DEFAULT_TOTALS,
+                ...(overview.totals || {}),
+            });
+        } catch (err) {
+            console.error('Ошибка загрузки отделений:', err);
+            setError('Не удалось загрузить отделения');
+            toast.error('Не удалось загрузить отделения');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadDepartments();
+    }, [loadDepartments]);
+
+    useEffect(() => {
+        const handleExternalUpdate = () => loadDepartments();
+        window.addEventListener('departments:updated', handleExternalUpdate);
+        return () => window.removeEventListener('departments:updated', handleExternalUpdate);
+    }, [loadDepartments]);
+
+    const validateDepartment = useCallback(
+        (data, currentId = null) => {
+            const errors = {};
+            if (!data.name_ru || data.name_ru.trim().length < 2) {
+                errors.name_ru = 'Название обязательно и должно быть длиннее 2 символов';
+            }
+            if (!data.key || data.key.trim().length < 2) {
+                errors.key = 'Ключ обязателен (минимум 2 символа)';
+            } else {
+                const duplicate = departments.find((dept) => dept.key === data.key && dept.id !== currentId);
+                if (duplicate) {
+                    errors.key = 'Отделение с таким ключом уже существует';
+                }
+            }
+            return errors;
+        },
+        [departments],
     );
-  }, []);
 
-  const sanitizeIntegrationPayload = useCallback((payload) => {
-    if (!payload) return undefined;
-    const sanitized = {};
-    Object.entries(payload).forEach(([key, value]) => {
-      if (value === '' || value === null || value === undefined) return;
-      if (['start_number', 'max_daily_queue'].includes(key)) {
-        const numeric = Number(value);
-        if (!Number.isNaN(numeric)) {
-          sanitized[key] = numeric;
-        }
-        return;
-      }
-      if (key === 'service_price') {
-        const price = Number(value);
-        if (!Number.isNaN(price)) {
-          sanitized[key] = price;
-        }
-        return;
-      }
-      sanitized[key] = value;
-    });
-    return Object.keys(sanitized).length ? sanitized : undefined;
-  }, []);
+    const clearValidationErrors = useCallback(() => {
+        setValidationErrors({});
+    }, []);
 
-  const loadDepartments = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [listResponse, overviewResponse] = await Promise.all([
-        api.get('/admin/departments'),
-        api.get('/admin/departments/overview'),
-      ]);
-
-      const list = listResponse.data?.data ?? [];
-      const overview = overviewResponse.data?.data ?? {};
-      const statsMap = {};
-      (overview.departments || []).forEach((item) => {
-        statsMap[item.key] = item;
-      });
-
-      const enriched = list.map((dept) => {
-        const stats = statsMap[dept.key] || {};
-        return {
-          ...dept,
-          stats: stats.stats || DEFAULT_STATS,
-          integrations: stats.integrations || {},
-        };
-      });
-
-      setDepartments(enriched);
-      setTotals({
-        ...DEFAULT_TOTALS,
-        ...(overview.totals || {}),
-      });
-    } catch (err) {
-      console.error('Ошибка загрузки отделений:', err);
-      setError('Не удалось загрузить отделения');
-      toast.error('Не удалось загрузить отделения');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadDepartments();
-  }, [loadDepartments]);
-
-  useEffect(() => {
-    const handleExternalUpdate = () => loadDepartments();
-    window.addEventListener('departments:updated', handleExternalUpdate);
-    return () => window.removeEventListener('departments:updated', handleExternalUpdate);
-  }, [loadDepartments]);
-
-  const validateDepartment = useCallback(
-    (data, currentId = null) => {
-      const errors = {};
-      if (!data.name_ru || data.name_ru.trim().length < 2) {
-        errors.name_ru = 'Название обязательно и должно быть длиннее 2 символов';
-      }
-      if (!data.key || data.key.trim().length < 2) {
-        errors.key = 'Ключ обязателен (минимум 2 символа)';
-      } else {
-        const duplicate = departments.find((dept) => dept.key === data.key && dept.id !== currentId);
-        if (duplicate) {
-          errors.key = 'Отделение с таким ключом уже существует';
-        }
-      }
-      return errors;
-    },
-    [departments],
-  );
-
-  const handleAddDepartment = async () => {
-    const errors = validateDepartment(formData);
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      toast.error('Исправьте ошибки в форме');
-      return;
-    }
-    setValidationErrors({});
-
-    try {
-      const payload = {
-        ...formData,
-        display_order: Number(formData.display_order) || 999,
-        integration: sanitizeIntegrationPayload(integrationForm),
-      };
-      await api.post('/admin/departments', payload);
-      toast.success('Отделение создано и синхронизировано');
-      setShowAddForm(false);
-      setFormData(DEFAULT_FORM);
-      setIntegrationForm(DEFAULT_INTEGRATION_OPTIONS);
-      await loadDepartments();
-      broadcastDepartmentsUpdate();
-    } catch (err) {
-      console.error('Ошибка создания отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось создать отделение');
-    }
-  };
-
-  const openEditModal = (dept) => {
-    setEditingDepartment(dept);
-    setFormData({
-      name_ru: dept.name_ru || '',
-      name_uz: dept.name_uz || '',
-      key: dept.key || '',
-      description: dept.description || '',
-      color: dept.color || '#0066cc',
-      icon: dept.icon || '🏥',
-      display_order: dept.display_order || 999,
-      active: dept.active ?? true,
-    });
-    setValidationErrors({});
-    setShowEditModal(true);
-  };
-
-  const handleUpdateDepartment = async () => {
-    if (!editingDepartment) return;
-    const errors = validateDepartment(formData, editingDepartment.id);
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      toast.error('Исправьте ошибки в форме');
-      return;
-    }
-    try {
-      await api.put(`/admin/departments/${editingDepartment.id}`, formData);
-      toast.success('Отделение обновлено');
-      setShowEditModal(false);
-      setEditingDepartment(null);
-      await loadDepartments();
-      broadcastDepartmentsUpdate();
-    } catch (err) {
-      console.error('Ошибка обновления отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось обновить отделение');
-    }
-  };
-
-  const handleDeleteDepartment = async (id) => {
-    if (!window.confirm('Удалить отделение? Это действие необратимо.')) return;
-    try {
-      await api.delete(`/admin/departments/${id}`);
-      toast.success('Отделение удалено');
-      await loadDepartments();
-      broadcastDepartmentsUpdate();
-    } catch (err) {
-      console.error('Ошибка удаления отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось удалить отделение');
-    }
-  };
-
-  const runIntegration = async (department) => {
-    setSyncingId(department.id);
-    try {
-      const payload = sanitizeIntegrationPayload({
-        queue_prefix: department.integrations?.queue_prefix,
-        start_number: department.integrations?.start_number,
-        max_daily_queue: department.integrations?.max_per_day,
-      });
-      await api.post(`/admin/departments/${department.id}/initialize`, payload);
-      toast.success('Интеграция обновлена');
-      await loadDepartments();
-      broadcastDepartmentsUpdate();
-    } catch (err) {
-      console.error('Ошибка синхронизации отделения:', err);
-      toast.error(err.response?.data?.detail || 'Не удалось обновить интеграцию');
-    } finally {
-      setSyncingId(null);
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedDepartments.length === 0) return;
-    if (!window.confirm(`Удалить выбранные (${selectedDepartments.length}) отделения?`)) return;
-    for (const id of selectedDepartments) {
-      await handleDeleteDepartment(id);
-    }
-    setSelectedDepartments([]);
-    setSelectAll(false);
-  };
-
-  const handleBulkToggle = async () => {
-    if (selectedDepartments.length === 0) return;
-    for (const id of selectedDepartments) {
-      try {
-        await api.post(`/admin/departments/${id}/toggle`);
-      } catch (err) {
-        console.error('Ошибка переключения активности:', err);
-      }
-    }
-    toast.success('Активность обновлена');
-    setSelectedDepartments([]);
-    setSelectAll(false);
-    await loadDepartments();
-    broadcastDepartmentsUpdate();
-  };
-
-    const handleAdd = async () => {
-        // Валидация данных
-        const errors = validateDepartment(formData, false);
+    const handleAddDepartment = async () => {
+        const errors = validateDepartment(formData);
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
             toast.error('Исправьте ошибки в форме');
             return;
         }
-
-        // Очистка ошибок
-        clearValidationErrors();
+        setValidationErrors({});
 
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE}/api/v1/admin/departments`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                toast.success('Отделение добавлено');
-                setShowAddForm(false);
-                setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
-                loadDepartments();
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-                console.error('Ошибка добавления отделения:', errorData);
-                toast.error(`Ошибка при добавлении отделения: ${errorMessage}`);
-            }
-        } catch (error) {
-            console.error('Error adding department:', error);
-            toast.error('Ошибка при добавлении отделения');
+            const payload = {
+                ...formData,
+                display_order: Number(formData.display_order) || 999,
+                integration: sanitizeIntegrationPayload(integrationForm),
+            };
+            await api.post('/admin/departments', payload);
+            toast.success('Отделение создано и синхронизировано');
+            setShowAddForm(false);
+            setFormData(DEFAULT_FORM);
+            setIntegrationForm(DEFAULT_INTEGRATION_OPTIONS);
+            await loadDepartments();
+            broadcastDepartmentsUpdate();
+        } catch (err) {
+            console.error('Ошибка создания отделения:', err);
+            toast.error(err.response?.data?.detail || 'Не удалось создать отделение');
         }
     };
 
-    const handleEdit = (dept) => {
+
+    const openEditModal = (dept) => {
         setEditingDepartment(dept);
         setFormData({
-            name_ru: dept.name_ru || dept.name,
+            name_ru: dept.name_ru || '',
             name_uz: dept.name_uz || '',
-            key: dept.key || dept.code,
+            key: dept.key || '',
             description: dept.description || '',
             color: dept.color || '#0066cc',
             icon: dept.icon || '🏥',
             display_order: dept.display_order || 999,
-            active: dept.active !== undefined ? dept.active : true
+            active: dept.active ?? true,
         });
-        clearValidationErrors();
+        setValidationErrors({});
         setShowEditModal(true);
     };
 
-    const handleUpdate = async () => {
+    const handleUpdateDepartment = async () => {
         if (!editingDepartment) return;
-
-        // Валидация данных
-        const errors = validateDepartment(formData, true, editingDepartment.id);
+        const errors = validateDepartment(formData, editingDepartment.id);
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
             toast.error('Исправьте ошибки в форме');
             return;
         }
-
-        // Очистка ошибок
-        clearValidationErrors();
-
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE}/api/v1/admin/departments/${editingDepartment.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (response.ok) {
-                toast.success('Отделение обновлено');
-                setShowEditModal(false);
-                setEditingDepartment(null);
-                setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
-                loadDepartments();
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-                console.error('Ошибка обновления отделения:', errorData);
-                toast.error(`Ошибка при обновлении отделения: ${errorMessage}`);
-            }
-        } catch (error) {
-            console.error('Error updating department:', error);
-            toast.error('Ошибка при обновлении отделения');
+            await api.put(`/admin/departments/${editingDepartment.id}`, formData);
+            toast.success('Отделение обновлено');
+            setShowEditModal(false);
+            setEditingDepartment(null);
+            await loadDepartments();
+            broadcastDepartmentsUpdate();
+        } catch (err) {
+            console.error('Ошибка обновления отделения:', err);
+            toast.error(err.response?.data?.detail || 'Не удалось обновить отделение');
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm('Вы уверены, что хотите удалить это отделение?')) {
-            return;
-        }
-
+    const handleDeleteDepartment = async (id) => {
+        if (!window.confirm('Удалить отделение? Это действие необратимо.')) return;
         try {
-            const token = localStorage.getItem('auth_token');
-            const response = await fetch(`${API_BASE}/api/v1/admin/departments/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            await api.delete(`/admin/departments/${id}`);
+            toast.success('Отделение удалено');
+            await loadDepartments();
+            broadcastDepartmentsUpdate();
+        } catch (err) {
+            console.error('Ошибка удаления отделения:', err);
+            toast.error(err.response?.data?.detail || 'Не удалось удалить отделение');
+        }
+    };
 
-            if (response.ok) {
-                toast.success('Отделение удалено');
-                loadDepartments();
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMessage = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-                console.error('Ошибка удаления отделения:', errorData);
-                toast.error(`Ошибка при удалении отделения: ${errorMessage}`);
-            }
-        } catch (error) {
-            console.error('Error deleting department:', error);
-            toast.error('Ошибка при удалении отделения');
+    const runIntegration = async (department) => {
+        setSyncingId(department.id);
+        try {
+            const payload = sanitizeIntegrationPayload({
+                queue_prefix: department.integrations?.queue_prefix,
+                start_number: department.integrations?.start_number,
+                max_daily_queue: department.integrations?.max_per_day,
+            });
+            await api.post(`/admin/departments/${department.id}/initialize`, payload);
+            toast.success('Интеграция обновлена');
+            await loadDepartments();
+            broadcastDepartmentsUpdate();
+        } catch (err) {
+            console.error('Ошибка синхронизации отделения:', err);
+            toast.error(err.response?.data?.detail || 'Не удалось обновить интеграцию');
+        } finally {
+            setSyncingId(null);
         }
     };
 
@@ -509,71 +367,6 @@ const DepartmentManagement = () => {
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, statusFilter, sortBy, sortOrder]);
-
-    // Функция валидации данных отделения
-    const validateDepartment = (data, isEdit = false, currentId = null) => {
-        const errors = {};
-
-        // Обязательные поля
-        if (!data.name_ru?.trim()) {
-            errors.name_ru = 'Название на русском обязательно';
-        } else if (data.name_ru.length < 2) {
-            errors.name_ru = 'Название должно содержать минимум 2 символа';
-        } else if (data.name_ru.length > 100) {
-            errors.name_ru = 'Название не должно превышать 100 символов';
-        }
-
-        if (!data.key?.trim()) {
-            errors.key = 'Ключ обязателен';
-        } else {
-            // Проверка формата ключа (только буквы, цифры, подчеркивания)
-            if (!/^[a-zA-Z0-9_]+$/.test(data.key)) {
-                errors.key = 'Ключ может содержать только буквы, цифры и подчеркивания';
-            } else if (data.key.length < 2) {
-                errors.key = 'Ключ должен содержать минимум 2 символа';
-            } else if (data.key.length > 50) {
-                errors.key = 'Ключ не должен превышать 50 символов';
-            } else {
-                // Проверка уникальности ключа
-                const existing = departments.find(dept =>
-                    dept.key === data.key && (!isEdit || dept.id !== currentId)
-                );
-                if (existing) {
-                    errors.key = 'Отделение с таким ключом уже существует';
-                }
-            }
-        }
-
-        // Валидация названия на узбекском (опционально, но если заполнено)
-        if (data.name_uz && data.name_uz.length > 100) {
-            errors.name_uz = 'Название на узбекском не должно превышать 100 символов';
-        }
-
-        // Валидация описания
-        if (data.description && data.description.length > 500) {
-            errors.description = 'Описание не должно превышать 500 символов';
-        }
-
-        // Валидация порядка отображения
-        if (data.display_order !== undefined && data.display_order !== null) {
-            const order = Number(data.display_order);
-            if (isNaN(order) || order < 0 || order > 9999) {
-                errors.display_order = 'Порядок отображения должен быть числом от 0 до 9999';
-            }
-        }
-
-        // Валидация иконки (emoji)
-        if (data.icon && data.icon.length > 10) {
-            errors.icon = 'Иконка не должна превышать 10 символов';
-        }
-
-        return errors;
-    };
-
-    // Функция очистки ошибок валидации
-    const clearValidationErrors = () => {
-        setValidationErrors({});
-    };
 
     // Функция экспорта отделений в CSV
     const handleExport = () => {
@@ -1133,34 +926,34 @@ const DepartmentManagement = () => {
                                     )}
                                 </div>
                                 <div>
-                                <MacOSInput
-                                    type="color"
-                                    value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                    style={{ gridColumn: '2' }}
-                                />
-                                <div style={{ gridColumn: '1 / -1' }}>
-                                    <MacOSTextarea
-                                        placeholder="Описание отделения (опционально)"
-                                        value={formData.description || ''}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        rows={3}
-                                        style={{ borderColor: validationErrors.description ? 'var(--mac-error)' : undefined }}
+                                    <MacOSInput
+                                        type="color"
+                                        value={formData.color}
+                                        onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                        style={{ gridColumn: '2' }}
                                     />
-                                    {validationErrors.description && (
-                                        <div style={{
-                                            color: 'var(--mac-error)',
-                                            fontSize: '12px',
-                                            marginTop: '4px'
-                                        }}>
-                                            {validationErrors.description}
-                                        </div>
-                                    )}
+                                    <div style={{ gridColumn: '1 / -1' }}>
+                                        <MacOSTextarea
+                                            placeholder="Описание отделения (опционально)"
+                                            value={formData.description || ''}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                            rows={3}
+                                            style={{ borderColor: validationErrors.description ? 'var(--mac-error)' : undefined }}
+                                        />
+                                        {validationErrors.description && (
+                                            <div style={{
+                                                color: 'var(--mac-error)',
+                                                fontSize: '12px',
+                                                marginTop: '4px'
+                                            }}>
+                                                {validationErrors.description}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            </div>
                             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                                <MacOSButton variant="primary" onClick={handleAdd}>
+                                <MacOSButton variant="primary" onClick={handleAddDepartment}>
                                     <Save size={16} style={{ marginRight: '8px' }} />
                                     Сохранить
                                 </MacOSButton>
@@ -1282,55 +1075,55 @@ const DepartmentManagement = () => {
                                         checked={selectedDepartments.includes(dept.id)}
                                         onChange={(e) => handleSelectDepartment(dept.id, e.target.checked)}
                                     />
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                                    <div
-                                        style={{
-                                            width: '48px',
-                                            height: '48px',
-                                            borderRadius: 'var(--mac-radius-md)',
-                                            background: dept.color || '#0066cc',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '24px'
-                                        }}
-                                    >
-                                        {dept.icon || '🏥'}
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <h4 style={{
-                                            fontSize: '16px',
-                                            fontWeight: '600',
-                                            margin: '0 0 4px 0',
-                                            color: 'var(--mac-text-primary)'
-                                        }}>
-                                            {dept.name_ru || dept.name}
-                                        </h4>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                            <MacOSBadge variant="secondary">{dept.key || dept.code}</MacOSBadge>
-                                            {dept.active === false && <MacOSBadge variant="danger">Неактивно</MacOSBadge>}
-                                            {dept.description && (
-                                                <span style={{
-                                                    fontSize: '12px',
-                                                    color: 'var(--mac-text-secondary)',
-                                                    maxWidth: '200px',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    {dept.description}
-                                                </span>
-                                            )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                                        <div
+                                            style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: 'var(--mac-radius-md)',
+                                                background: dept.color || '#0066cc',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '24px'
+                                            }}
+                                        >
+                                            {dept.icon || '🏥'}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <h4 style={{
+                                                fontSize: '16px',
+                                                fontWeight: '600',
+                                                margin: '0 0 4px 0',
+                                                color: 'var(--mac-text-primary)'
+                                            }}>
+                                                {dept.name_ru || dept.name}
+                                            </h4>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <MacOSBadge variant="secondary">{dept.key || dept.code}</MacOSBadge>
+                                                {dept.active === false && <MacOSBadge variant="danger">Неактивно</MacOSBadge>}
+                                                {dept.description && (
+                                                    <span style={{
+                                                        fontSize: '12px',
+                                                        color: 'var(--mac-text-secondary)',
+                                                        maxWidth: '200px',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {dept.description}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <MacOSButton
                                         size="sm"
                                         variant="secondary"
-                                        onClick={() => handleEdit(dept)}
+                                        onClick={() => openEditModal(dept)}
                                         title="Редактировать отделение"
                                     >
                                         <Edit2 size={16} />
@@ -1338,7 +1131,7 @@ const DepartmentManagement = () => {
                                     <MacOSButton
                                         size="sm"
                                         variant="danger"
-                                        onClick={() => handleDelete(dept.id)}
+                                        onClick={() => handleDeleteDepartment(dept.id)}
                                         title="Удалить отделение"
                                     >
                                         <Trash2 size={16} />
@@ -1574,7 +1367,7 @@ const DepartmentManagement = () => {
                     </MacOSButton>
                     <MacOSButton
                         variant="primary"
-                        onClick={handleUpdate}
+                        onClick={handleUpdateDepartment}
                     >
                         <Save size={16} style={{ marginRight: '8px' }} />
                         Сохранить изменения

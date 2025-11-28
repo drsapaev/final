@@ -43,10 +43,10 @@ class PaymentWebhook(Base):
     signature: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # подпись для верификации
     
     # Результат обработки
-    payment_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # статус платежа после обработки
+    # payment_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # статус платежа после обработки
     
     # Связи
-    payment_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("payments.id"), nullable=True, index=True)
+    # payment_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("payments.id"), nullable=True, index=True)
     visit_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
     patient_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
 
