@@ -146,7 +146,13 @@ const AppointmentWizardV2 = ({
             birth_date: birthDate, // ✅ ИСПРАВЛЕНО: Приоритет полной даты
             phone: initialData.phone || initialData.patient_phone || initialData.patient?.phone || '',
             address: initialData.address || initialData.patient?.address || '',
-            gender: initialData.patient_gender || initialData.gender || initialData.patient?.gender || '' // ✅ ИСПРАВЛЕНО: Полная проверка пола
+            gender: (() => {
+              // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F) в формат формы (male/female)
+              const genderValue = initialData.patient_gender || initialData.gender || initialData.patient?.gender || '';
+              if (genderValue === 'M' || genderValue === 'm') return 'male';
+              if (genderValue === 'F' || genderValue === 'f') return 'female';
+              return genderValue; // Если уже в формате male/female, оставляем как есть
+            })()
           },
           cart: {
             items: (() => {
@@ -965,6 +971,35 @@ const AppointmentWizardV2 = ({
         return;
       }
 
+      // ✅ ИСПРАВЛЕНО: Создаем cartData перед использованием
+      const visits = groupCartItemsByVisit();
+      if (!visits || visits.length === 0) {
+        toast.error('Корзина пуста или содержит невалидные услуги. Пожалуйста, проверьте выбранные услуги.');
+        return;
+      }
+
+      // Проверяем, что все визиты имеют хотя бы одну услугу с service_id
+      const invalidVisits = visits.filter(visit => 
+        !visit.services || 
+        visit.services.length === 0 || 
+        visit.services.some(s => !s.service_id)
+      );
+
+      if (invalidVisits.length > 0) {
+        console.error('❌ Найдены визиты с невалидными услугами:', invalidVisits);
+        toast.error('Некоторые услуги не могут быть обработаны. Пожалуйста, перезагрузите страницу и попробуйте снова.');
+        return;
+      }
+
+      const cartData = {
+        patient_id: wizardData.patient.id,
+        visits: visits,
+        discount_mode: wizardData.cart.discount_mode,
+        payment_method: wizardData.payment.method,
+        all_free: wizardData.cart.all_free,
+        notes: wizardData.cart.notes
+      };
+
       // === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===
 
       // В режиме EDIT MODE с QR-пациентом (patient_id = null)
@@ -1012,8 +1047,15 @@ const AppointmentWizardV2 = ({
         }
 
         if (foundPatient) {
-          cartData.patient_id = foundPatient.id;
-          console.log('✅ Found existing patient:', foundPatient.id);
+          // cartData будет создан позже, пока просто сохраняем patient_id
+          const foundPatientId = foundPatient.id;
+          console.log('✅ Found existing patient:', foundPatientId);
+          
+          // Обновляем wizardData с найденным patient_id
+          setWizardData(prev => ({
+            ...prev,
+            patient: { ...prev.patient, id: foundPatientId }
+          }));
 
           // Обновляем данные пациента если нужно
           const needsUpdate =
@@ -2363,11 +2405,16 @@ const CartStepV2 = ({
             // ✅ ИСПРАВЛЕНО: Проверяем также по service_code для edit режима (когда service_id еще null)
             const isInCart = cart?.items?.some(item => {
               if (item.service_id === service.id) return true;
-              // Если service_id еще не разрешен, проверяем по коду
+              // Если service_id еще не разрешен, проверяем по коду (включая варианты с нулями: p09, P09, P9)
               if (!item.service_id && service.service_code) {
-                const itemCode = String(item.service_name || item._temp_name || '').toUpperCase();
-                const serviceCode = String(service.service_code).toUpperCase();
-                return itemCode === serviceCode;
+                const itemCode = String(item.service_name || item._temp_name || '').toUpperCase().trim();
+                const serviceCode = String(service.service_code).toUpperCase().trim();
+                // Прямое сравнение
+                if (itemCode === serviceCode) return true;
+                // Сравнение без ведущих нулей (p09 = p9)
+                const itemCodeNoZero = itemCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                const serviceCodeNoZero = serviceCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                if (itemCodeNoZero === serviceCodeNoZero) return true;
               }
               return false;
             });
