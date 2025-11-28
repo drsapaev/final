@@ -2220,20 +2220,20 @@ const CartStepV2 = ({
 
     // 2. Фильтрация по категории (если нет поиска)
     return filtered.filter(service => {
-      const normalizedCategoryCode = service.category_code ? normalizeCategoryCode(service.category_code) : '';
+      const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
       const isConsultation = service.name.toLowerCase().includes('консультация');
 
       switch (activeCategory) {
         case 'specialists':
           return isConsultation;
         case 'laboratory':
-          return normalizedCategoryCode === 'L';
+          return normalizedCategory === 'laboratory';
         case 'procedures':
-          // Косметология (C), Процедуры (P, D_PROC), ЭКГ и т.д.
-          return ['C', 'P', 'D_PROC', 'O'].includes(normalizedCategoryCode) && !isConsultation;
+          // Процедуры (нормализованные значения: 'procedures')
+          return normalizedCategory === 'procedures' && !isConsultation;
         case 'other':
-          // Всё остальное
-          return !isConsultation && !['L', 'C', 'P', 'D_PROC', 'O'].includes(normalizedCategoryCode);
+          // Всё остальное (не консультации и не лаборатория и не процедуры)
+          return !isConsultation && normalizedCategory === 'other';
         default:
           return true;
       }
