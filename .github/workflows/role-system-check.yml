@@ -69,10 +69,17 @@ jobs:
         python -c "import uvicorn; print('Uvicorn version:', uvicorn.__version__)"
         python -c "import sqlalchemy; print('SQLAlchemy version:', sqlalchemy.__version__)"
         
+        echo "🔍 Проверка структуры приложения..."
+        echo "Checking app directory structure:"
+        ls -la app/ | head -20 || echo "⚠️ Cannot list app/ directory"
+        echo "Checking app/main.py exists:"
+        test -f app/main.py && echo "✅ app/main.py exists" || { echo "❌ app/main.py not found"; exit 1; }
+        
         echo "🔍 Проверка импорта приложения..."
-        python -c "import app; print('✅ app package imported')"
-        python -c "import app.main; print('✅ app.main module imported')"
-        python -c "from app.main import app; print('✅ app import ok')"
+        set -e  # Exit on error
+        python -c "import app; print('✅ app package imported')" || { echo "❌ Failed to import app package"; python -c "import sys; print('sys.path:', sys.path)"; exit 1; }
+        python -c "import app.main; print('✅ app.main module imported')" || { echo "❌ Failed to import app.main module"; python -c "import traceback; traceback.print_exc()"; exit 1; }
+        python -c "from app.main import app; print('✅ app import ok')" || { echo "❌ Failed to import app from app.main"; python -c "import traceback; traceback.print_exc()"; exit 1; }
     
     - name: Setup test database
       run: |
