@@ -271,9 +271,8 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        # Extra deps required for imports during server startup in CI
-        pip install pytest pytest-asyncio httpx requests pandas packaging google-generativeai \
-          google-api-core google-auth grpcio proto-plus protobuf psutil
+        # Test dependencies
+        pip install pytest pytest-asyncio httpx
     
     - name: 🗄️ Подготовка тестовой базы
       env:
@@ -458,9 +457,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'develop')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     
     steps:
     - uses: actions/checkout@v4
@@ -479,9 +476,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker, security, docs, integration]
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
     - uses: actions/checkout@v4

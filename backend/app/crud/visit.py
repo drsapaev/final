@@ -118,12 +118,27 @@ def create_visit(
         raise ValueError("Некорректная дата или время визита")
     
     # Создаем визит
+    # ⚠️ ИСПРАВЛЕНИЕ: department - это relationship, нужно использовать department_id
+    # Если передан department как строка (key), найдем соответствующий department_id
+    department_id_value = None
+    if visit_data.get("department"):
+        dept_key = visit_data.get("department")
+        # Если это число, используем как department_id
+        if isinstance(dept_key, int):
+            department_id_value = dept_key
+        # Если это строка (key), ищем department по key
+        elif isinstance(dept_key, str):
+            from app.models.department import Department
+            dept = db.query(Department).filter(Department.key == dept_key).first()
+            if dept:
+                department_id_value = dept.id
+    
     visit = Visit(
         patient_id=visit_data["patient_id"],
         doctor_id=visit_data.get("doctor_id"),
         visit_date=visit_data["visit_date"],
         visit_time=visit_data.get("visit_time"),
-        department=visit_data.get("department"),
+        department_id=department_id_value,  # ✅ ИСПРАВЛЕНО: используем department_id
         discount_mode=visit_data.get("discount_mode", "none"),
         notes=visit_data.get("notes"),
         status=status or ("open" if auto_status else "pending"),

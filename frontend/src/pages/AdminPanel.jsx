@@ -2130,7 +2130,7 @@ const AdminPanel = () => {
           }}>
             <MacOSStatCard
               title="Всего записей"
-              value={analyticsData?.metrics?.totalAppointments?.toLocaleString() || "0"}
+              value={analyticsData?.metrics?.totalAppointments?.toLocaleString() || '0'}
               icon={Calendar}
               color="var(--mac-accent-blue)"
               loading={analyticsLoading}
@@ -2146,7 +2146,7 @@ const AdminPanel = () => {
             
             <MacOSStatCard
               title="Пациенты"
-              value={analyticsData?.metrics?.totalPatients?.toLocaleString() || "0"}
+              value={analyticsData?.metrics?.totalPatients?.toLocaleString() || '0'}
               icon={Users}
               color="var(--mac-info)"
               loading={analyticsLoading}

@@ -45,8 +45,8 @@ const DoctorModal = ({
   const loadDepartments = async () => {
     try {
       setLoadingDepartments(true);
-      // Используем эндпоинт /departments/active чтобы избежать редиректа 307
-      const response = await api.get('/departments/active');
+      // Используем публичный эндпоинт /departments с параметром active_only
+      const response = await api.get('/departments', { params: { active_only: true } });
       // Backend returns {success: true, data: [...], count: N}
       const departments = response.data?.data || [];
       if (departments.length > 0) {
@@ -197,7 +197,7 @@ const DoctorModal = ({
     console.log(`🔵 handleChange: ${field} =`, value, typeof value);
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-      console.log(`🔵 Новый formData:`, newData);
+      console.log('🔵 Новый formData:', newData);
       return newData;
     });
     if (errors[field]) {

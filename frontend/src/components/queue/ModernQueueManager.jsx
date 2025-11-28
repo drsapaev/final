@@ -462,10 +462,10 @@ const ModernQueueManager = ({
               <div
                 style={{ cursor: 'pointer' }}
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                title={autoRefresh ? "Автообновление включено" : "Автообновление выключено"}
+                title={autoRefresh ? 'Автообновление включено' : 'Автообновление выключено'}
               >
                 <Icon
-                  name={autoRefresh ? "arrow.clockwise.circle.fill" : "arrow.clockwise.circle"}
+                  name={autoRefresh ? 'arrow.clockwise.circle.fill' : 'arrow.clockwise.circle'}
                   size="medium"
                   style={{ color: autoRefresh ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' }}
                 />
@@ -504,7 +504,7 @@ const ModernQueueManager = ({
       <ModernDialog
         isOpen={showQrDialog}
         onClose={() => setShowQrDialog(false)}
-        title={qrData?.is_clinic_wide ? "Общий QR код клиники" : "QR код для записи"}
+        title={qrData?.is_clinic_wide ? 'Общий QR код клиники' : 'QR код для записи'}
         maxWidth="32rem"
       >
         <div className="mqm-qr-modal-content">
@@ -528,13 +528,13 @@ const ModernQueueManager = ({
             <div className="mqm-qr-info-row">
               <span className="mqm-qr-label">Специалист:</span>
               <span className="mqm-qr-value highlight">
-                {qrData?.specialist_name || (qrData?.is_clinic_wide ? "Все специалисты" : "Не указан")}
+                {qrData?.specialist_name || (qrData?.is_clinic_wide ? 'Все специалисты' : 'Не указан')}
               </span>
             </div>
             <div className="mqm-qr-info-row">
               <span className="mqm-qr-label">Отделение:</span>
               <span className="mqm-qr-value">
-                {qrData?.department_name || (qrData?.is_clinic_wide ? "Клиника" : qrData?.department)}
+                {qrData?.department_name || (qrData?.is_clinic_wide ? 'Клиника' : qrData?.department)}
               </span>
             </div>
             {qrData?.target_date && (

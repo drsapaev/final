@@ -799,6 +799,17 @@ const RegistrarPanel = () => {
           queueRes = { ok: false };
         }
 
+        // Загружаем отделения
+        let departmentsRes;
+        try {
+          logger.info('🔍 Загружаем отделения...');
+          departmentsRes = await api.get('/registrar/departments?active_only=true');
+          logger.info('📊 Ответ отделений: OK', departmentsRes.data);
+        } catch (error) {
+          logger.error('❌ Ошибка загрузки отделений:', error);
+          departmentsRes = { success: false };
+        }
+
         logger.info('🔄 Обрабатываем ответы API...');
 
         // Проверяем, что все ответы успешны
@@ -829,6 +840,15 @@ const RegistrarPanel = () => {
           }
         } else {
           logger.warn('❌ API врачей недоступен, используем демо-данные');
+        }
+
+        // Обработка отделений
+        if (departmentsRes && departmentsRes.data) {
+          const depts = departmentsRes.data.data || [];
+          if (Array.isArray(depts) && depts.length > 0) {
+            setDynamicDepartments(depts);
+            logger.info('✅ Отделения обновлены из API:', depts.length);
+          }
         }
 
         if (servicesRes && servicesRes.data) {
@@ -1505,6 +1525,17 @@ const RegistrarPanel = () => {
       console.error('Ошибка загрузки отделений:', error);
     }
   }, []);
+
+  // Слушаем обновления отделений от админ-панели
+  useEffect(() => {
+    const handleDepartmentsUpdate = (event) => {
+      logger.info('RegistrarPanel: Получено обновление отделений, перезагружаю...', event.detail);
+      loadDynamicDepartments();
+    };
+
+    window.addEventListener('departments:updated', handleDepartmentsUpdate);
+    return () => window.removeEventListener('departments:updated', handleDepartmentsUpdate);
+  }, [loadDynamicDepartments]);
 
   // Первичная загрузка данных (однократно) с защитой от двойного вызова в React 18
   const initialLoadRef = useRef(false);
@@ -2259,7 +2290,7 @@ const RegistrarPanel = () => {
     const isDynamicDepartment = !standardDepartments.includes(departmentKey);
 
     // ✅ Нормализуем department_key (null, undefined, "null" -> null)
-    const appointmentDeptKey = (appointment.department_key && appointment.department_key !== "null")
+    const appointmentDeptKey = (appointment.department_key && appointment.department_key !== 'null')
       ? appointment.department_key
       : null;
 
@@ -2267,6 +2298,33 @@ const RegistrarPanel = () => {
     if (isDynamicDepartment) {
       // Для динамических отделений единственный способ фильтрации - по department_key
       return appointmentDeptKey === departmentKey;
+    }
+
+    // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Проверка по услугам
+    // Если хотя бы одна услуга привязана к этому отделению через department_key
+    const hasServiceInDepartment = appointment.services.some(service => {
+      if (services && typeof services === 'object') {
+        for (const groupName in services) {
+          const groupServices = services[groupName];
+          if (Array.isArray(groupServices)) {
+            let serviceObj = null;
+            if (typeof service === 'number' || (typeof service === 'string' && !isNaN(service))) {
+              serviceObj = groupServices.find(s => s.id === parseInt(service));
+            } else if (typeof service === 'string') {
+              serviceObj = groupServices.find(s => s.name === service);
+            }
+
+            if (serviceObj && serviceObj.department_key === departmentKey) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    });
+
+    if (hasServiceInDepartment) {
+      return true;
     }
 
     // ✅ Для стандартных отделений: приоритетная проверка по department_key
@@ -2288,10 +2346,10 @@ const RegistrarPanel = () => {
     const appointmentServiceCodes = appointment.service_codes || [];
 
     // Получаем услуги (могут быть ID или названия)
-    const appointmentServices = appointment.services || [];
+    const appointmentServicesList = appointment.services || [];
 
     // Преобразуем услуги в коды услуг
-    const serviceCodesFromServices = appointmentServices.map(service => {
+    const serviceCodesFromServices = appointmentServicesList.map(service => {
       if (services && typeof services === 'object') {
         // Ищем услугу по ID или названию во всех группах
         for (const groupName in services) {
@@ -3193,6 +3251,7 @@ const RegistrarPanel = () => {
             departmentStats={departmentStats}
             theme={theme}
             language={language}
+            dynamicDepartments={dynamicDepartments}
           />
         </div>
       )}

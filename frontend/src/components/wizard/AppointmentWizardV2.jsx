@@ -2207,7 +2207,7 @@ const CartStepV2 = ({
   const getDisplayedServices = () => {
     if (!Array.isArray(servicesData)) return [];
 
-    let filtered = servicesData;
+    const filtered = servicesData;
 
     // 1. Фильтрация по поиску (Глобальный поиск)
     if (searchQuery.trim()) {
