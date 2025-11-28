@@ -1047,15 +1047,12 @@ const AppointmentWizardV2 = ({
         }
 
         if (foundPatient) {
-          // cartData будет создан позже, пока просто сохраняем patient_id
-          const foundPatientId = foundPatient.id;
-          console.log('✅ Found existing patient:', foundPatientId);
-          
           // Обновляем wizardData с найденным patient_id
           setWizardData(prev => ({
             ...prev,
-            patient: { ...prev.patient, id: foundPatientId }
+            patient: { ...prev.patient, id: foundPatient.id }
           }));
+          console.log('✅ Found existing patient:', foundPatient.id);
 
           // Обновляем данные пациента если нужно
           const needsUpdate =
@@ -1166,7 +1163,11 @@ const AppointmentWizardV2 = ({
               const foundPatient = patients.find(p => (p.phone || '').replace(/\D/g, '') === cleanPhone);
 
               if (foundPatient) {
-                cartData.patient_id = foundPatient.id;
+                // Обновляем wizardData с найденным patient_id
+                setWizardData(prev => ({
+                  ...prev,
+                  patient: { ...prev.patient, id: foundPatient.id }
+                }));
                 console.log('✅ Найден существующий пациент (по телефону):', foundPatient.id);
               } else {
                 // 🚨 НЕ используем fallback - требуем точное совпадение
