@@ -2222,18 +2222,37 @@ const CartStepV2 = ({
     return filtered.filter(service => {
       const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
       const isConsultation = service.name.toLowerCase().includes('консультация');
+      
+      // ✅ Проверка на ЭКГ, ЭхоКГ и рентгенографию по service_code и названию
+      const serviceCode = service.service_code ? String(service.service_code).toUpperCase() : '';
+      const serviceName = service.name ? service.name.toLowerCase() : '';
+      
+      const isECG = serviceCode === 'K10' || 
+                    serviceCode.includes('ECG') || 
+                    serviceName.includes('экг') || 
+                    serviceName.includes('экг');
+      
+      const isEchoCG = serviceCode === 'K11' || 
+                       serviceCode.includes('ECHO') || 
+                       serviceName.includes('эхокг') || 
+                       serviceName.includes('эхо');
+      
+      const isDentalXRay = (serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/)) &&
+                           (serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray'));
 
       switch (activeCategory) {
         case 'specialists':
-          return isConsultation;
+          // ✅ Консультации + ЭКГ + ЭхоКГ + рентгенография зубов
+          return isConsultation || isECG || isEchoCG || isDentalXRay;
         case 'laboratory':
           return normalizedCategory === 'laboratory';
         case 'procedures':
           // Процедуры (нормализованные значения: 'procedures')
-          return normalizedCategory === 'procedures' && !isConsultation;
+          // ✅ Исключаем ЭКГ, ЭхоКГ и рентгенографию из процедур
+          return normalizedCategory === 'procedures' && !isConsultation && !isECG && !isEchoCG && !isDentalXRay;
         case 'other':
-          // Всё остальное (не консультации и не лаборатория и не процедуры)
-          return !isConsultation && normalizedCategory === 'other';
+          // Всё остальное (не консультации и не лаборатория и не процедуры и не ЭКГ/ЭхоКГ/рентген)
+          return !isConsultation && normalizedCategory === 'other' && !isECG && !isEchoCG && !isDentalXRay;
         default:
           return true;
       }

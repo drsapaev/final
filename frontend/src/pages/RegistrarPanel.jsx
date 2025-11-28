@@ -2832,7 +2832,9 @@ const RegistrarPanel = () => {
       'derma': ['D', 'DERM', 'DERM_PROC'],
       'dental': ['S', 'DENT', 'STOM'],
       'lab': ['L'],
-      'procedures': ['P', 'C', 'D_PROC', 'PHYS', 'COSM']
+      // ✅ ИСПРАВЛЕНО: Используем категории, которые возвращает getServiceCategoryByCode
+      // 'P' для физиотерапии (PHYSIO_, PHYS_), 'C' для косметологии (COSM_), 'D_PROC' для дерматологических процедур
+      'procedures': ['P', 'C', 'D_PROC']
     };
 
     const getServiceCategoryByCode = (serviceCode) => {
