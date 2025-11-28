@@ -2229,16 +2229,16 @@ const CartStepV2 = ({
       
       const isECG = serviceCode === 'K10' || 
                     serviceCode.includes('ECG') || 
-                    serviceName.includes('экг') || 
                     serviceName.includes('экг');
       
       const isEchoCG = serviceCode === 'K11' || 
                        serviceCode.includes('ECHO') || 
                        serviceName.includes('эхокг') || 
-                       serviceName.includes('эхо');
+                       serviceName.includes('эхо-кг');
       
+      // ✅ Рентгенография зубов: S-коды (стоматология) + название содержит "рентген"
       const isDentalXRay = (serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/)) &&
-                           (serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray'));
+                           (serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes('рентгенография'));
 
       switch (activeCategory) {
         case 'specialists':
