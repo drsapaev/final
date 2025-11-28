@@ -661,12 +661,23 @@ const AppointmentWizardV2 = ({
 
         // ✅ ИСПРАВЛЕНО: Поиск по service_code (приоритет) и по name
         // Приводим к верхнему регистру для сравнения кодов
-        const searchNameUpper = String(searchName).toUpperCase();
-        const foundService = servicesData.find(s =>
-          (s.service_code && String(s.service_code).toUpperCase() === searchNameUpper) || // Сначала ищем по коду (K01, L01, S01, etc)
-          s.name === searchName || // Потом по названию
-          s.name === searchNameUpper // Или по названию в верхнем регистре
-        );
+        const searchNameUpper = String(searchName).toUpperCase().trim();
+        // Убираем ведущие нули для сравнения (p09 = p9)
+        const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+        
+        const foundService = servicesData.find(s => {
+          if (!s.service_code) return false;
+          const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+          const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+          
+          // Прямое сравнение
+          if (serviceCodeUpper === searchNameUpper) return true;
+          // Сравнение без ведущих нулей (p09 = p9)
+          if (serviceCodeNoZero === searchNameNoZero) return true;
+          // Поиск по названию
+          if (s.name === searchName || s.name === searchNameUpper) return true;
+          return false;
+        });
 
         if (foundService) {
           console.log(`✅ Service resolved: "${searchName}" -> ID ${foundService.id} (${foundService.name})`);
