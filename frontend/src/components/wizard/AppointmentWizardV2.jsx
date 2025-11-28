@@ -948,15 +948,19 @@ const AppointmentWizardV2 = ({
     setIsProcessing(true);
 
     try {
-      // Подготавливаем данные для отправки
-      const cartData = {
-        patient_id: wizardData.patient.id,
-        visits: groupCartItemsByVisit(),
-        discount_mode: wizardData.cart.discount_mode,
-        payment_method: wizardData.payment.method,
-        all_free: wizardData.cart.all_free,
-        notes: wizardData.cart.notes
-      };
+      // ✅ ИСПРАВЛЕНО: Валидация корзины перед подготовкой данных
+      if (!wizardData.cart.items || wizardData.cart.items.length === 0) {
+        toast.error('Корзина пуста. Пожалуйста, добавьте услуги.');
+        return;
+      }
+
+      // Проверяем, что все элементы корзины имеют service_id
+      const itemsWithoutServiceId = wizardData.cart.items.filter(item => !item.service_id);
+      if (itemsWithoutServiceId.length > 0) {
+        console.error('❌ Найдены элементы корзины без service_id:', itemsWithoutServiceId);
+        toast.error('Некоторые услуги не могут быть обработаны. Пожалуйста, удалите их из корзины и добавьте заново.');
+        return;
+      }
 
       // === ШАГ 1: ОПРЕДЕЛЯЕМ ИЛИ НАХОДИМ patient_id ===
 
@@ -1216,7 +1220,21 @@ const AppointmentWizardV2 = ({
   const groupCartItemsByVisit = () => {
     const visits = {};
 
-    wizardData.cart.items.forEach(item => {
+    // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
+    const validItems = wizardData.cart.items.filter(item => {
+      if (!item.service_id) {
+        console.warn(`⚠️ Пропущен элемент корзины без service_id:`, item);
+        return false;
+      }
+      return true;
+    });
+
+    if (validItems.length === 0) {
+      console.warn('⚠️ Нет валидных элементов в корзине');
+      return {};
+    }
+
+    validItems.forEach(item => {
       // Определяем отделение для услуги
       const department = getDepartmentByService(item.service_id);
 
@@ -1251,6 +1269,12 @@ const AppointmentWizardV2 = ({
   };
 
   const getDepartmentByService = (serviceId) => {
+    // ✅ ИСПРАВЛЕНО: Проверка на null/undefined перед поиском
+    if (!serviceId || serviceId === null || serviceId === undefined) {
+      console.warn(`⚠️ getDepartmentByService: serviceId is null/undefined`);
+      return 'general';
+    }
+
     const service = servicesData.find(s => s.id === serviceId);
 
     if (!service) {
