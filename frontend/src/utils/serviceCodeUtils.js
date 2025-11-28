@@ -14,30 +14,32 @@ export const normalizeCategoryCode = (code) => {
     const normalized = code.toLowerCase().trim();
 
     // Map common variations to standard codes
+    // ВАЖНО: Порядок важен - более специфичные коды должны быть раньше
     const codeMap = {
-        // Specialists
-        'k': 'specialists',
-        'cardio': 'specialists',
-        'cardiology': 'specialists',
-        'd': 'specialists',
-        'derma': 'specialists',
-        'dermatology': 'specialists',
-        'c': 'specialists',
-        'cosmetology': 'specialists',
-        'stomatology': 'specialists',
-        'dentistry': 'specialists',
-        'dental': 'specialists',
+        // Procedures (проверяем первыми, так как это более специфично)
+        'd_proc': 'procedures',  // Дерматологические процедуры
+        'p': 'procedures',       // Физиотерапия
+        'c': 'procedures',       // Косметология (процедуры, не консультации)
+        'proc': 'procedures',
+        'procedures': 'procedures',
+        'cosmetology': 'procedures',
 
         // Laboratory
         'l': 'laboratory',
         'lab': 'laboratory',
         'laboratory': 'laboratory',
 
-        // Procedures
-        'p': 'procedures',
-        'proc': 'procedures',
-        'procedures': 'procedures',
-        'cosmetology': 'procedures',
+        // Specialists (консультации)
+        'k': 'specialists',
+        'cardio': 'specialists',
+        'cardiology': 'specialists',
+        'd': 'specialists',      // Консультация дерматолога
+        'derma': 'specialists',
+        'dermatology': 'specialists',
+        's': 'specialists',      // Стоматология (консультации)
+        'stomatology': 'specialists',
+        'dentistry': 'specialists',
+        'dental': 'specialists',
 
         // Other
         'o': 'other',
