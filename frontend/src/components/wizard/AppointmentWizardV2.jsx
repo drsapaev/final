@@ -654,13 +654,21 @@ const AppointmentWizardV2 = ({
   const getServiceName = useCallback((item) => {
     if (!item) return 'Неизвестная услуга';
     
-    // Если есть service_id, ищем в servicesData
+    // Приоритет 1: Если есть service_id, ищем в servicesData
     if (item.service_id) {
       const service = servicesData.find(s => s.id === item.service_id);
       if (service?.name) return service.name;
     }
     
-    // Если service_id нет, пытаемся найти по коду
+    // Приоритет 2: Если service_name уже является полным названием (не код), используем его
+    const serviceName = item.service_name;
+    if (serviceName && serviceName.length > 3 && !/^[A-Z]\d+$/i.test(serviceName)) {
+      // Если это не код (не формат "K01", "p09" и т.д.), а реальное название
+      const foundByName = servicesData.find(s => s.name === serviceName);
+      if (foundByName) return foundByName.name;
+    }
+    
+    // Приоритет 3: Пытаемся найти по коду
     const searchName = item._temp_name || item.service_name;
     if (searchName && servicesData.length > 0) {
       const searchNameUpper = String(searchName).toUpperCase().trim();
@@ -678,10 +686,20 @@ const AppointmentWizardV2 = ({
       });
       
       if (foundService?.name) return foundService.name;
+      
+      // ✅ УЛУЧШЕНО: Поиск по частичному совпадению названия
+      const foundByNamePartial = servicesData.find(s => {
+        if (!s.name) return false;
+        const serviceNameLower = s.name.toLowerCase();
+        const searchNameLower = String(searchName).toLowerCase();
+        return serviceNameLower.includes(searchNameLower) || searchNameLower.includes(serviceNameLower);
+      });
+      
+      if (foundByNamePartial?.name) return foundByNamePartial.name;
     }
     
-    // Fallback: возвращаем service_name или код
-    return item.service_name || searchName || 'Неизвестная услуга';
+    // Fallback: возвращаем service_name (если это название) или код
+    return serviceName || searchName || 'Неизвестная услуга';
   }, [servicesData]);
 
   // Эффект для обогащения данных корзины реальными ID и ценами после загрузки servicesData
@@ -734,12 +752,31 @@ const AppointmentWizardV2 = ({
             ...item,
             service_id: foundService.id,
             service_name: foundService.name, // ✅ SSOT: Сохраняем полное название из servicesData
-            service_price: foundService.price,
+            service_price: foundService.price || 0,
             _temp_name: searchName // Сохраняем исходный код для отладки
           };
         } else {
+          // ✅ УЛУЧШЕНО: Пробуем найти по частичному совпадению названия
+          const foundByName = servicesData.find(s => {
+            if (!s.name) return false;
+            const serviceNameLower = s.name.toLowerCase();
+            const searchNameLower = String(searchName).toLowerCase();
+            return serviceNameLower.includes(searchNameLower) || searchNameLower.includes(serviceNameLower);
+          });
+          
+          if (foundByName) {
+            console.log(`✅ Service found by name match: "${searchName}" -> ID ${foundByName.id} (${foundByName.name})`);
+            return {
+              ...item,
+              service_id: foundByName.id,
+              service_name: foundByName.name,
+              service_price: foundByName.price || 0,
+              _temp_name: searchName
+            };
+          }
+          
           console.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`, 
-            servicesData.slice(0, 10).map(s => s.service_code).filter(Boolean));
+            servicesData.slice(0, 20).map(s => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter(s => s !== 'N/A: N/A'));
         }
 
         return item;
@@ -808,13 +845,16 @@ const AppointmentWizardV2 = ({
   // ===================== КОРЗИНА =====================
 
   const addToCart = (service) => {
+    // ✅ SSOT: Всегда используем данные из servicesData
+    const serviceFromData = servicesData.find(s => s.id === service.id) || service;
+    
     const newItem = {
       id: Date.now(), // Временный ID для React keys
-      service_id: service.id,
-      service_name: service.name,
-      service_price: service.price,
+      service_id: serviceFromData.id,
+      service_name: serviceFromData.name, // ✅ SSOT: Полное название из servicesData
+      service_price: serviceFromData.price,
       quantity: 1,
-      doctor_id: service.requires_doctor ? null : undefined,
+      doctor_id: serviceFromData.requires_doctor ? null : undefined,
       visit_date: (() => {
         // ✅ Используем локальную дату, а не UTC
         const now = new Date();
