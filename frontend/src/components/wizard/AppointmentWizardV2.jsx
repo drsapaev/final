@@ -147,10 +147,15 @@ const AppointmentWizardV2 = ({
             phone: initialData.phone || initialData.patient_phone || initialData.patient?.phone || '',
             address: initialData.address || initialData.patient?.address || '',
             gender: (() => {
-              // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F) в формат формы (male/female)
-              const genderValue = initialData.patient_gender || initialData.gender || initialData.patient?.gender || '';
-              if (genderValue === 'M' || genderValue === 'm') return 'male';
-              if (genderValue === 'F' || genderValue === 'f') return 'female';
+              // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
+              const genderValue = initialData.patient_gender || 
+                                  initialData.gender || 
+                                  initialData.patient?.gender || 
+                                  initialData.patient?.sex || 
+                                  initialData.sex || 
+                                  '';
+              if (genderValue === 'M' || genderValue === 'm' || genderValue === 'male') return 'male';
+              if (genderValue === 'F' || genderValue === 'f' || genderValue === 'female') return 'female';
               return genderValue; // Если уже в формате male/female, оставляем как есть
             })()
           },
@@ -560,7 +565,13 @@ const AppointmentWizardV2 = ({
         birth_date: patient.birth_date || '',
         phone: patient.phone || '',
         address: patient.address || '',
-        gender: patient.gender || '', // ✅ Заполняем пол
+        gender: (() => {
+          // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
+          const genderValue = patient.gender || patient.sex || '';
+          if (genderValue === 'M' || genderValue === 'm' || genderValue === 'male') return 'male';
+          if (genderValue === 'F' || genderValue === 'f' || genderValue === 'female') return 'female';
+          return genderValue;
+        })(), // ✅ Заполняем пол с преобразованием
         // Отдельные поля для обратной совместимости (если нужны)
         lastName: patient.last_name || '',
         firstName: patient.first_name || '',
@@ -637,15 +648,53 @@ const AppointmentWizardV2 = ({
     }
   };
 
-  // ===================== РЕЗОЛВИНГ УСЛУГ (EDIT MODE) =====================
+  // ===================== РЕЗОЛВИНГ УСЛУГ (SSOT) =====================
+
+  // ✅ SSOT: Функция для получения названия услуги из servicesData
+  const getServiceName = useCallback((item) => {
+    if (!item) return 'Неизвестная услуга';
+    
+    // Если есть service_id, ищем в servicesData
+    if (item.service_id) {
+      const service = servicesData.find(s => s.id === item.service_id);
+      if (service?.name) return service.name;
+    }
+    
+    // Если service_id нет, пытаемся найти по коду
+    const searchName = item._temp_name || item.service_name;
+    if (searchName && servicesData.length > 0) {
+      const searchNameUpper = String(searchName).toUpperCase().trim();
+      const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+      
+      const foundService = servicesData.find(s => {
+        if (!s.service_code) return false;
+        const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+        const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+        
+        if (serviceCodeUpper === searchNameUpper) return true;
+        if (serviceCodeNoZero === searchNameNoZero) return true;
+        if (s.name === searchName || s.name === searchNameUpper) return true;
+        return false;
+      });
+      
+      if (foundService?.name) return foundService.name;
+    }
+    
+    // Fallback: возвращаем service_name или код
+    return item.service_name || searchName || 'Неизвестная услуга';
+  }, [servicesData]);
 
   // Эффект для обогащения данных корзины реальными ID и ценами после загрузки servicesData
   useEffect(() => {
-    if (editMode && servicesData.length > 0 && wizardData.cart.items.length > 0) {
-      console.log('🔍 Attempting to resolve services in edit mode...', {
+    // ✅ ИСПРАВЛЕНО: Разрешаем услуги не только в editMode, но и когда servicesData загружены
+    if (servicesData.length > 0 && wizardData.cart.items.length > 0) {
+      const unresolvedCount = wizardData.cart.items.filter(i => !i.service_id).length;
+      if (unresolvedCount === 0) return; // Все услуги уже разрешены
+      
+      console.log('🔍 Attempting to resolve services...', {
         servicesDataCount: servicesData.length,
         cartItemsCount: wizardData.cart.items.length,
-        unresolvedItems: wizardData.cart.items.filter(i => !i.service_id).length
+        unresolvedItems: unresolvedCount
       });
 
       const updatedItems = wizardData.cart.items.map(item => {
@@ -684,11 +733,13 @@ const AppointmentWizardV2 = ({
           return {
             ...item,
             service_id: foundService.id,
-            service_name: foundService.name,
+            service_name: foundService.name, // ✅ SSOT: Сохраняем полное название из servicesData
             service_price: foundService.price,
+            _temp_name: searchName // Сохраняем исходный код для отладки
           };
         } else {
-          console.warn(`⚠️ Service not found in servicesData: "${searchName}"`);
+          console.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`, 
+            servicesData.slice(0, 10).map(s => s.service_code).filter(Boolean));
         }
 
         return item;
@@ -711,7 +762,7 @@ const AppointmentWizardV2 = ({
         }));
       }
     }
-  }, [editMode, servicesData.length, wizardData.cart.items.length]); // Триггерим когда загружаются услуги или меняется количество элементов корзины
+  }, [servicesData, wizardData.cart.items]); // ✅ ИСПРАВЛЕНО: Триггерим при изменении servicesData или корзины
 
   const loadDoctors = async () => {
     try {
@@ -2281,7 +2332,8 @@ const CartStepV2 = ({
   setActiveCategory,
   searchQuery,
   setSearchQuery,
-  isReloading
+  isReloading,
+  getServiceName // ✅ SSOT: Функция для получения названий услуг
 }) => {
   // Local state removed - lifted to AppointmentWizardV2
 
@@ -2501,9 +2553,8 @@ const CartStepV2 = ({
             paddingBottom: '4px'
           }}>
             {cart.items.map(item => {
-              // ✅ ИСПРАВЛЕНО: Получаем полное название услуги из servicesData
-              const service = servicesData?.find(s => s.id === item.service_id);
-              const displayName = service?.name || item.service_name || 'Неизвестная услуга';
+              // ✅ SSOT: Используем единую функцию для получения названия услуги
+              const displayName = getServiceName ? getServiceName(item) : (item.service_name || 'Неизвестная услуга');
               
               return (
               <div key={item.id} style={{
