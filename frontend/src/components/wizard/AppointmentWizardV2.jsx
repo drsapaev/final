@@ -1787,6 +1787,7 @@ const AppointmentWizardV2 = ({
                 servicesData={servicesData}
                 errors={errors}
                 onReloadServices={loadServices}
+                getServiceName={getServiceName} // ✅ SSOT: Передаем функцию для получения названий услуг
                 activeCategory={activeServiceCategory}
                 setActiveCategory={setActiveServiceCategory}
                 searchQuery={serviceSearchQuery}
