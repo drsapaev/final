@@ -163,10 +163,12 @@ def create_visit(
             )
             db.add(visit_service)
     
-    # Логирование (для будущего использования)
+    # Логирование
     if log:
-        # Здесь можно добавить логирование через logging
-        pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("Создан визит ID=%d для пациента %d, врач=%s, дата=%s, услуг=%d",
+                    visit.id, visit.patient_id, visit.doctor_id, visit.visit_date, len(services) if services else 0)
     
     # Уведомления (для будущего использования)
     if notify:

@@ -14,7 +14,6 @@ from app.models.user import User
 from app.models.patient import Patient
 from app.models.clinic import Doctor
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.crud import online_queue as crud_queue
 from app.services.queue_service import queue_service
 
 import logging
@@ -168,7 +167,12 @@ class MorningAssignmentService:
         
         return queue_tags
     
-    def _assign_queues_for_visit(self, visit: Visit, target_date: date) -> List[Dict[str, any]]:
+    def _assign_queues_for_visit(
+        self,
+        visit: Visit,
+        target_date: date,
+        source: str = "morning_assignment",
+    ) -> List[Dict[str, any]]:
         """Присваивает номера в очередях для конкретного визита"""
         
         # Получаем уникальные queue_tag из услуг визита
@@ -182,7 +186,12 @@ class MorningAssignmentService:
         
         for queue_tag in unique_queue_tags:
             try:
-                assignment = self._assign_single_queue(visit, queue_tag, target_date)
+                assignment = self._assign_single_queue(
+                    visit,
+                    queue_tag,
+                    target_date,
+                    source=source,
+                )
                 if assignment:
                     queue_assignments.append(assignment)
             except Exception as e:
@@ -190,7 +199,14 @@ class MorningAssignmentService:
         
         return queue_assignments
     
-    def _assign_single_queue(self, visit: Visit, queue_tag: str, target_date: date) -> Optional[Dict[str, any]]:
+    def _assign_single_queue(
+        self,
+        visit: Visit,
+        queue_tag: str,
+        target_date: date,
+        *,
+        source: str = "morning_assignment",
+    ) -> Optional[Dict[str, any]]:
         """Присваивает номер в конкретной очереди"""
 
         # Определяем врача для очереди
@@ -247,8 +263,23 @@ class MorningAssignmentService:
         user_id = doctor.user_id
         logger.info(f"Конвертация: doctor_id={doctor_id} → user_id={user_id} для queue_tag={queue_tag}")
         
-        # Получаем или создаем дневную очередь с user_id
-        daily_queue = crud_queue.get_or_create_daily_queue(self.db, target_date, user_id, queue_tag)
+        # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для получения/создания очереди
+        # Получаем информацию о враче для defaults
+        doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
+        defaults = {}
+        if doctor:
+            defaults = {
+                "cabinet_number": doctor.cabinet,
+                "max_online_entries": doctor.max_online_per_day if hasattr(doctor, 'max_online_per_day') else None,
+            }
+        
+        daily_queue = queue_service.get_or_create_daily_queue(
+            self.db,
+            day=target_date,
+            specialist_id=user_id,
+            queue_tag=queue_tag,
+            defaults=defaults,
+        )
         
         # Проверяем нет ли уже записи для этого пациента в этой очереди
         existing_entry = self.db.query(OnlineQueueEntry).filter(
@@ -267,14 +298,20 @@ class MorningAssignmentService:
                 "status": "existing"
             }
         
-        next_number = queue_service.get_next_queue_number(
-            self.db,
-            daily_queue=daily_queue,
-            queue_tag=queue_tag,
-        )
+        # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для создания записи
+        # Получаем информацию о пациенте для передачи в create_queue_entry
+        patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
+        patient_name = None
+        phone = None
+        if patient:
+            # Формируем имя пациента
+            if hasattr(patient, 'short_name'):
+                patient_name = patient.short_name()
+            elif hasattr(patient, 'last_name') and hasattr(patient, 'first_name'):
+                patient_name = f"{patient.last_name} {patient.first_name}".strip()
+            phone = patient.phone if hasattr(patient, 'phone') else None
         
-        # Создаем запись в очереди
-        # queue_time - бизнес-время регистрации
+        # Получаем queue_time (бизнес-время регистрации)
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from app.crud.clinic import get_queue_settings
@@ -282,23 +319,27 @@ class MorningAssignmentService:
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
         queue_time = datetime.now(timezone)
         
-        queue_entry = OnlineQueueEntry(
-            queue_id=daily_queue.id,
+        # ✅ ИСПРАВЛЕНО: Используем SSOT метод для создания записи
+        queue_entry = queue_service.create_queue_entry(
+            self.db,
+            daily_queue=daily_queue,
             patient_id=visit.patient_id,
-            number=next_number,
+            patient_name=patient_name,
+            phone=phone,
+            visit_id=visit.id,
+            source=source,  # Источник: зависит от сценария (desk / morning_assignment / confirmation)
             status="waiting",
-            source="morning_assignment",  # Источник: утренняя сборка
-            visit_id=visit.id,  # Связываем с визитом
-            queue_time=queue_time  # Устанавливаем время регистрации
+            queue_time=queue_time,  # Бизнес-время регистрации
+            auto_number=True,  # Автоматически присваиваем номер
+            commit=False,  # Не коммитим сразу, коммит будет в run_morning_assignment
         )
-        self.db.add(queue_entry)
         
-        logger.info(f"Присвоен номер {next_number} в очереди {queue_tag} для пациента {visit.patient_id}")
+        logger.info(f"Присвоен номер {queue_entry.number} в очереди {queue_tag} для пациента {visit.patient_id} (через SSOT)")
         
         return {
             "queue_tag": queue_tag,
             "queue_id": daily_queue.id,
-            "number": next_number,
+            "number": queue_entry.number,
             "status": "assigned"
         }
     
@@ -362,17 +403,10 @@ def test_morning_assignment():
     result = run_morning_assignment()
     stats = get_assignment_stats()
     
-    print("📊 Результат утренней сборки:")
-    print(f"  Успех: {result['success']}")
-    print(f"  Обработано визитов: {result['processed_visits']}")
-    print(f"  Присвоено номеров: {result['assigned_queues']}")
-    print(f"  Ошибки: {len(result['errors'])}")
-    
-    print("\n📈 Статистика:")
-    print(f"  Подтвержденные визиты: {stats['confirmed_visits']}")
-    print(f"  Обработанные визиты: {stats['processed_visits']}")
-    print(f"  Записи в очередях: {stats['queue_entries']}")
-    print(f"  Ожидают обработки: {stats['pending_processing']}")
+    logger.info("Результат утренней сборки: Успех=%s, Обработано визитов=%d, Присвоено номеров=%d, Ошибки=%d",
+                result['success'], result['processed_visits'], result['assigned_queues'], len(result['errors']))
+    logger.info("Статистика: Подтвержденные визиты=%d, Обработанные визиты=%d, Записи в очередях=%d, Ожидают обработки=%d",
+                stats['confirmed_visits'], stats['processed_visits'], stats['queue_entries'], stats['pending_processing'])
     
     return result, stats
 

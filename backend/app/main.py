@@ -43,6 +43,13 @@ app = FastAPI(
 )
 
 # -----------------------------------------------------------------------------
+# Регистрация обработчиков исключений
+# -----------------------------------------------------------------------------
+from app.core.exception_handlers import register_exception_handlers  # noqa: E402
+register_exception_handlers(app)
+log.info("Exception handlers registered")
+
+# -----------------------------------------------------------------------------
 # WebSocket роутер (подключаем рано, чтобы точно были /ws/queue)
 # -----------------------------------------------------------------------------
 from app.ws.queue_ws import router as queue_ws_router, ws_queue  # noqa: E402

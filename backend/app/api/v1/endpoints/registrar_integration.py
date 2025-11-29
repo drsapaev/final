@@ -2,6 +2,8 @@
 API endpoints для интеграции регистратуры с админ панелью
 Основа: detail.md стр. 85-183
 """
+import logging
+import traceback
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,6 +23,8 @@ from app.models.service import Service
 # [OK] Используем прямой SQL вместо импорта модели для избежания конфликта DailyQueue
 # Проблема: DailyQueue определен в двух местах (queue_old.py и online_queue.py)
 # Решение: используем прямой SQL запрос через text() для доступа к queue_entries без импорта модели
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -607,7 +611,7 @@ def start_queue_visit(
                             status="paid",
                             note=f"Автоматическое создание платежа при начале приема (visit {visit.id})"
                         )
-                        print(f"[start_queue_visit] [OK] Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                        logger.info("start_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s", payment.id, visit.id, payment_amount)
                     
                     visit.discount_mode = "paid"
             
@@ -761,7 +765,7 @@ def get_today_queues(
             ecg_services_count = 0
             non_ecg_services_count = 0
             
-            print(f"[get_today_queues] [CHECK] Проверка ЭКГ для Visit {visit.id}, услуг: {len(services)}")
+            logger.debug("get_today_queues: Проверка ЭКГ для Visit %d, услуг: %d", visit.id, len(services))
             for service in services:
                 is_ecg_service = False
                 service_name = service.name or 'N/A'
@@ -776,36 +780,37 @@ def get_today_queues(
                 # Проверяем по queue_tag
                 if service.queue_tag == 'ecg':
                     is_ecg_service = True
-                    print(f"[get_today_queues] [OK] ЭКГ найдено по queue_tag: {service_name} (код: {service_code_val})")
+                    logger.debug("get_today_queues: ЭКГ найдено по queue_tag: %s (код: %s)", service_name, service_code_val)
                 # Проверяем по названию услуги
                 elif service.name:
                     service_name_lower = str(service.name).lower()
                     if 'экг' in service_name_lower or 'ecg' in service_name_lower:
                         is_ecg_service = True
-                        print(f"[get_today_queues] [OK] ЭКГ найдено по названию: {service_name} (код: {service_code_val}, queue_tag: {queue_tag_val})")
+                        logger.debug("get_today_queues: ЭКГ найдено по названию: %s (код: %s, queue_tag: %s)", service_name, service_code_val, queue_tag_val)
                 # Проверяем по коду услуги
                 if not is_ecg_service:
                     if service.service_code:
                         service_code_upper = str(service.service_code).upper()
                         if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
                             is_ecg_service = True
-                            print(f"[get_today_queues] [OK] ЭКГ найдено по service_code: {service_name} (код: {service_code_val})")
+                            logger.debug("get_today_queues: ЭКГ найдено по service_code: %s (код: %s)", service_name, service_code_val)
                     elif service.code:
                         service_code_upper = str(service.code).upper()
                         if 'ECG' in service_code_upper or 'ЭКГ' in service_code_upper:
                             is_ecg_service = True
-                            print(f"[get_today_queues] [OK] ЭКГ найдено по code: {service_name} (код: {service_code_val})")
+                            logger.debug("get_today_queues: ЭКГ найдено по code: %s (код: %s)", service_name, service_code_val)
 
                 if is_ecg_service:
                     has_ecg = True
                     ecg_services_count += 1
                 else:
                     non_ecg_services_count += 1
-                    print(f"[get_today_queues] [SKIP] Не ЭКГ: {service_name} (код: {service_code_val}, queue_tag: {queue_tag_val})")
+                    logger.debug("get_today_queues: Не ЭКГ: %s (код: %s, queue_tag: %s)", service_name, service_code_val, queue_tag_val)
 
             # Только ЭКГ: если есть ЭКГ услуги и нет не-ЭКГ услуг
             has_only_ecg = has_ecg and non_ecg_services_count == 0
-            print(f"[get_today_queues] [STATS] Итог для Visit {visit.id}: has_ecg={has_ecg}, has_only_ecg={has_only_ecg}, ЭКГ услуг={ecg_services_count}, не-ЭКГ услуг={non_ecg_services_count}")
+            logger.debug("get_today_queues: Итог для Visit %d: has_ecg=%s, has_only_ecg=%s, ЭКГ услуг=%d, не-ЭКГ услуг=%d",
+                         visit.id, has_ecg, has_only_ecg, ecg_services_count, non_ecg_services_count)
             
             # [OK] Определяем specialty: если есть ЭКГ, разделяем на отдельные очереди
             visit_date = visit.visit_date or today
@@ -826,10 +831,25 @@ def get_today_queues(
                 patient_specialty_date_key_ecg = f"{patient_id}_{specialty_ecg}_{visit_date}"
                 if patient_specialty_date_key_ecg not in seen_patient_specialty_date:
                     visit_created_at = visit.confirmed_at or visit.created_at if hasattr(visit, 'confirmed_at') else visit.created_at
+                    
+                    # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
+                    visit_queue_time = None
+                    try:
+                        from sqlalchemy import text
+                        queue_entry_row = db.execute(
+                            text("SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
+                            {"visit_id": visit.id}
+                        ).first()
+                        if queue_entry_row and queue_entry_row.queue_time:
+                            visit_queue_time = queue_entry_row.queue_time
+                    except Exception:
+                        pass  # Тихая ошибка - используем created_at как fallback
+                    
                     queues_by_specialty[specialty_ecg]["entries"].append({
                         "type": "visit",
                         "data": visit,
                         "created_at": visit_created_at,
+                        "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                         "filter_services": True,  # Флаг для фильтрации услуг при обработке
                         "ecg_only": True  # Только ЭКГ услуги для этой записи
                     })
@@ -846,23 +866,38 @@ def get_today_queues(
                             "doctor_id": visit.doctor_id
                         }
                     visit_created_at = visit.confirmed_at or visit.created_at if hasattr(visit, 'confirmed_at') else visit.created_at
+                    
+                    # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
+                    visit_queue_time = None
+                    try:
+                        from sqlalchemy import text
+                        queue_entry_row = db.execute(
+                            text("SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
+                            {"visit_id": visit.id}
+                        ).first()
+                        if queue_entry_row and queue_entry_row.queue_time:
+                            visit_queue_time = queue_entry_row.queue_time
+                    except Exception:
+                        pass  # Тихая ошибка - используем created_at как fallback
+                    
                     queues_by_specialty[specialty]["entries"].append({
                         "type": "visit",
                         "data": visit,
                         "created_at": visit_created_at,
+                        "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                         "filter_services": True,  # Флаг для фильтрации услуг при обработке
                         "ecg_only": False  # Исключаем ЭКГ услуги
                     })
                     seen_patient_specialty_date.add(patient_specialty_date_key)
                 else:
-                    print(f"[get_today_queues] Пропущен Visit {visit.id} для cardiology - дубликат по ключу {patient_specialty_date_key}")
+                    logger.debug("get_today_queues: Пропущен Visit %d для cardiology - дубликат по ключу %s", visit.id, patient_specialty_date_key)
                 continue  # Переходим к следующему визиту
             elif has_ecg and has_only_ecg:
                 # Только ЭКГ - идёт в echokg
                 specialty = "echokg"
                 patient_specialty_date_key = f"{patient_id}_{specialty}_{visit_date}"
                 if patient_specialty_date_key in seen_patient_specialty_date:
-                    print(f"[get_today_queues] Пропущен Visit {visit.id} - дубликат по ключу {patient_specialty_date_key}")
+                    logger.debug("get_today_queues: Пропущен Visit %d - дубликат по ключу %s", visit.id, patient_specialty_date_key)
                     continue
                 seen_patient_specialty_date.add(patient_specialty_date_key)
 
@@ -874,10 +909,25 @@ def get_today_queues(
                     }
 
                 visit_created_at = visit.confirmed_at or visit.created_at if hasattr(visit, 'confirmed_at') else visit.created_at
+                
+                # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
+                visit_queue_time = None
+                try:
+                    from sqlalchemy import text
+                    queue_entry_row = db.execute(
+                        text("SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
+                        {"visit_id": visit.id}
+                    ).first()
+                    if queue_entry_row and queue_entry_row.queue_time:
+                        visit_queue_time = queue_entry_row.queue_time
+                except Exception:
+                    pass  # Тихая ошибка - используем created_at как fallback
+                
                 queues_by_specialty[specialty]["entries"].append({
                     "type": "visit",
                     "data": visit,
                     "created_at": visit_created_at,
+                    "queue_time": visit_queue_time,  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
                     "filter_services": True,  # [OK] ИСПРАВЛЕНО: Включаем фильтрацию услуг
                     "ecg_only": True  # [OK] ИСПРАВЛЕНО: Показываем только ЭКГ услуги
                 })
@@ -900,7 +950,7 @@ def get_today_queues(
             # Дедупликация для обычных визитов (без ЭКГ)
             patient_specialty_date_key = f"{patient_id}_{specialty}_{visit_date}"
             if patient_specialty_date_key in seen_patient_specialty_date:
-                print(f"[get_today_queues] Пропущен Visit {visit.id} - дубликат по ключу {patient_specialty_date_key}")
+                logger.debug("get_today_queues: Пропущен Visit %d - дубликат по ключу %s", visit.id, patient_specialty_date_key)
                 continue
             seen_patient_specialty_date.add(patient_specialty_date_key)
             
@@ -915,10 +965,24 @@ def get_today_queues(
             # [OK] УПРОЩЕНО: Используем getattr вместо try/except (Single Source of Truth)
             visit_created_at = getattr(visit, 'confirmed_at', None) or getattr(visit, 'created_at', None)
             
+            # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
+            visit_queue_time = None
+            try:
+                from sqlalchemy import text
+                queue_entry_row = db.execute(
+                    text("SELECT queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
+                    {"visit_id": visit.id}
+                ).first()
+                if queue_entry_row and queue_entry_row.queue_time:
+                    visit_queue_time = queue_entry_row.queue_time
+            except Exception:
+                pass  # Тихая ошибка - используем created_at как fallback
+            
             queues_by_specialty[specialty]["entries"].append({
                 "type": "visit",
                 "data": visit,
-                "created_at": visit_created_at
+                "created_at": visit_created_at,
+                "queue_time": visit_queue_time  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
             })
             
             # [OK] УПРОЩЕНО: Используем getattr вместо try/except (Single Source of Truth)
@@ -974,15 +1038,20 @@ def get_today_queues(
                     "doctor_id": daily_queue.specialist_id
                 }
             
+            # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
+            # Приоритет: queue_time > created_at
+            entry_time = online_entry.queue_time if online_entry.queue_time else (online_entry.created_at if online_entry.created_at else datetime.now())
+            
             # Добавляем запись из онлайн-очереди
             queues_by_specialty[specialty]["entries"].append({
                 "type": "online_queue",
                 "data": online_entry,
-                "created_at": online_entry.created_at if online_entry.created_at else datetime.now()
+                "created_at": online_entry.created_at if online_entry.created_at else datetime.now(),
+                "queue_time": entry_time  # ⭐ ВАЖНО: queue_time для правильной сортировки
             })
 
-            print(f"[get_today_queues] [QR] QR-запись добавлена: ID={online_entry.id}, specialty={specialty}, "
-                  f"queue_tag={daily_queue.queue_tag}, number={online_entry.number}, patient={online_entry.patient_name}")
+            logger.debug("get_today_queues: QR-запись добавлена: ID=%d, specialty=%s, queue_tag=%s, number=%d, patient=%s",
+                         online_entry.id, specialty, daily_queue.queue_tag, online_entry.number, online_entry.patient_name)
         
         # Обрабатываем Appointment (старая система)
         # Подгружаем актуальный статус оплаты из payments при наличии
@@ -1025,7 +1094,7 @@ def get_today_queues(
             # Проверяем, нет ли уже Visit или Appointment для этого пациента в этой специальности на эту дату
             patient_specialty_date_key = f"{patient_id}_{specialty}_{appointment_date}"
             if patient_specialty_date_key in seen_patient_specialty_date:
-                print(f"[get_today_queues] Пропущен Appointment {appointment.id} - дубликат по ключу {patient_specialty_date_key}")
+                logger.debug("get_today_queues: Пропущен Appointment %d - дубликат по ключу %s", appointment.id, patient_specialty_date_key)
                 continue
             
             # [OK] УПРОЩЕНО: Проверяем, нет ли уже Visit для этого Appointment (чтобы избежать дубликатов)
@@ -1052,10 +1121,11 @@ def get_today_queues(
                     existing_visit = db.query(Visit).filter(and_(*visit_filters)).first()
                     if existing_visit:
                         visit_exists = True
-                        print(f"[get_today_queues] Пропущен Appointment {appointment.id} - есть соответствующий Visit {existing_visit.id}")
+                        logger.debug("get_today_queues: Пропущен Appointment %d - есть соответствующий Visit %d", appointment.id, existing_visit.id)
                 except Exception as check_error:
                     # Если проверка не удалась, логируем и продолжаем - лучше показать дубликат, чем упасть с ошибкой
-                    print(f"[get_today_queues] Предупреждение: ошибка при проверке дубликатов для Appointment {getattr(appointment, 'id', 'unknown')}: {check_error}")
+                    logger.warning("get_today_queues: Ошибка при проверке дубликатов для Appointment %s: %s",
+                                   getattr(appointment, 'id', 'unknown'), check_error, exc_info=True)
                     # Не прерываем выполнение - продолжаем обработку Appointment
             
             if visit_exists:
@@ -1071,10 +1141,25 @@ def get_today_queues(
                     "doctor_id": getattr(appointment, 'doctor_id', None)
                 }
             
+            # ✅ ИСПРАВЛЕНО: Получаем queue_time из связанной записи в queue_entries
+            appointment_queue_time = None
+            try:
+                from sqlalchemy import text
+                if patient_id:
+                    queue_entry_row = db.execute(
+                        text("SELECT queue_time FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"),
+                        {"patient_id": patient_id}
+                    ).first()
+                    if queue_entry_row and queue_entry_row.queue_time:
+                        appointment_queue_time = queue_entry_row.queue_time
+            except Exception:
+                pass  # Тихая ошибка - используем created_at как fallback
+            
             queues_by_specialty[specialty]["entries"].append({
                 "type": "appointment",
                 "data": appointment,
-                "created_at": appointment.created_at
+                "created_at": appointment.created_at,
+                "queue_time": appointment_queue_time  # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
             })
             
             # [OK] УПРОЩЕНО: Используем getattr вместо try/except (Single Source of Truth)
@@ -1091,9 +1176,12 @@ def get_today_queues(
             doctor = data["doctor"]
             entries_list = data["entries"]
             
-            # Сортируем записи по времени создания/подтверждения (от раннего к позднему)
-            # Это формирует правильную очередь: кто раньше пришёл, тот раньше в очереди
-            entries_list.sort(key=lambda e: e["created_at"])
+            # ✅ ИСПРАВЛЕНО: Сортируем записи по queue_time (приоритет), иначе по created_at
+            # Это формирует правильную очередь: кто раньше зарегистрировался, тот раньше в очереди
+            # queue_time - это бизнес-время регистрации, которое не меняется при редактировании
+            entries_list.sort(key=lambda e: (
+                e.get("queue_time") or e.get("created_at") or datetime.now()
+            ))
             
             entries = []
             seen_entry_keys = set()  # Для дедупликации записей в одной специальности
@@ -1121,7 +1209,7 @@ def get_today_queues(
                 
                 # Пропускаем дубликаты
                 if entry_key in seen_entry_keys:
-                    print(f"[get_today_queues] Пропущен дубликат: {entry_key} (тип: {entry_type})")
+                    logger.debug("get_today_queues: Пропущен дубликат: %s (тип: %s)", entry_key, entry_type)
                     continue
                 
                 seen_entry_keys.add(entry_key)
@@ -1161,7 +1249,7 @@ def get_today_queues(
                         address = patient.address
                     else:
                         # [OK] ЛОГИРОВАНИЕ: Пациент не найден
-                        print(f"[get_today_queues] [WARN] Пациент не найден для Visit ID={visit.id}, patient_id={visit.patient_id}")
+                        logger.warning("get_today_queues: Пациент не найден для Visit ID=%d, patient_id=%s", visit.id, visit.patient_id)
                         patient_name = f"Пациент ID={visit.patient_id}" if visit.patient_id else "Неизвестный пациент"
                     
                     # Загружаем услуги визита
@@ -1184,7 +1272,7 @@ def get_today_queues(
                                     visit_services.append(vs)
                         # Если нет ЭКГ услуг, не добавляем запись (это не должно произойти, но на всякий случай)
                         if not visit_services:
-                            print(f"[get_today_queues] Предупреждение: флаг ecg_only=True, но ЭКГ услуг не найдено для Visit {visit.id}")
+                            logger.warning("get_today_queues: Флаг ecg_only=True, но ЭКГ услуг не найдено для Visit %d", visit.id)
                             continue  # Пропускаем эту запись, если нет ЭКГ услуг
                     else:
                         # Фильтруем: исключаем ЭКГ услуги (для очереди cardiology)
@@ -1195,7 +1283,7 @@ def get_today_queues(
                                     visit_services.append(vs)
                         # Если не нашли не-ЭКГ услуг, значит это только ЭКГ визит - пропускаем для cardiology
                         if not visit_services:
-                            print(f"[get_today_queues] Пропущен Visit {visit.id} для specialty={specialty}: содержит только ЭКГ услуги")
+                            logger.debug("get_today_queues: Пропущен Visit %d для specialty=%s: содержит только ЭКГ услуги", visit.id, specialty)
                             continue  # Пропускаем эту запись для кардиолога, если нет не-ЭКГ услуг
                     
                     # Если нет отфильтрованных услуг, используем все (fallback)
@@ -1280,7 +1368,7 @@ def get_today_queues(
                         address = patient.address
                     else:
                         # [OK] ЛОГИРОВАНИЕ: Пациент не найден
-                        print(f"[get_today_queues] [WARN] Пациент не найден для Appointment ID={appointment.id}, patient_id={appointment.patient_id}")
+                        logger.warning("get_today_queues: Пациент не найден для Appointment ID=%d, patient_id=%s", appointment.id, appointment.patient_id)
                         patient_name = f"Пациент ID={appointment.patient_id}" if appointment.patient_id else "Неизвестный пациент"
                     
                     # Загружаем услуги из appointment
@@ -1408,11 +1496,12 @@ def get_today_queues(
                         if existing_appointment:
                             appointment_id_value = existing_appointment.id
                 
-                # [OK] УПРОЩЕНО: Получаем РЕАЛЬНЫЙ номер из queue_entries
+                # ✅ ИСПРАВЛЕНО: Получаем РЕАЛЬНЫЙ номер и queue_time из queue_entries
                 # Используем Table reflection вместо ORM модели для избежания конфликта DailyQueue
                 queue_entry_number = idx  # По умолчанию используем idx
+                queue_entry_time = None  # По умолчанию нет queue_time
                 
-                # Пробуем получить номер из таблицы queue_entries через Table reflection
+                # Пробуем получить номер и queue_time из таблицы queue_entries через Table reflection
                 if record_id:
                     try:
                         # Используем прямой SQL запрос через Table reflection (без импорта модели)
@@ -1420,28 +1509,33 @@ def get_today_queues(
                         
                         # Используем прямой SQL для избежания конфликта с моделями
                         if entry_type == "online_queue":
-                            # Для OnlineQueueEntry номер уже есть в объекте
+                            # Для OnlineQueueEntry номер и queue_time уже есть в объекте
                             queue_entry_number = online_entry.number if hasattr(online_entry, 'number') else idx
-                            print(f"[get_today_queues] [STATS] OnlineQueue номер: ID={record_id}, number={queue_entry_number}, patient={patient_name}")
+                            queue_entry_time = online_entry.queue_time if hasattr(online_entry, 'queue_time') and online_entry.queue_time else None
+                            logger.debug("get_today_queues: OnlineQueue номер: ID=%d, number=%d, queue_time=%s, patient=%s", 
+                                       record_id, queue_entry_number, queue_entry_time, patient_name)
                         elif entry_type == "visit":
                             # Ищем запись по visit_id
                             queue_entry_row = db.execute(
-                                text("SELECT number FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
+                                text("SELECT number, queue_time FROM queue_entries WHERE visit_id = :visit_id LIMIT 1"),
                                 {"visit_id": record_id}
                             ).first()
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number
+                                queue_entry_time = queue_entry_row.queue_time
                         elif entry_type == "appointment" and patient_id:
                             # Для Appointment ищем по patient_id
                             queue_entry_row = db.execute(
-                                text("SELECT number FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"),
+                                text("SELECT number, queue_time FROM queue_entries WHERE patient_id = :patient_id AND visit_id IS NULL ORDER BY created_at DESC LIMIT 1"),
                                 {"patient_id": patient_id}
                             ).first()
                             if queue_entry_row:
                                 queue_entry_number = queue_entry_row.number
+                                queue_entry_time = queue_entry_row.queue_time
                     except Exception as e:
                         # Логируем ошибку, но продолжаем работу с дефолтным номером
                         # Это не критично - порядковые номера работают как fallback
+                        logger.debug("get_today_queues: Ошибка получения queue_time: %s", str(e))
                         pass  # Тихая ошибка - порядковые номера достаточно
 
                 # [OK] ДОБАВЛЯЕМ department_key для фронтенда
@@ -1476,6 +1570,25 @@ def get_today_queues(
                                 entry_department_key = svc.department_key
                                 break
 
+                # ✅ ИСПРАВЛЕНО: Определяем queue_time для ответа (приоритет: из queue_entries > из entry_wrapper > created_at)
+                entry_queue_time = queue_entry_time
+                if not entry_queue_time and entry_wrapper.get("queue_time"):
+                    entry_queue_time = entry_wrapper["queue_time"]
+                if not entry_queue_time:
+                    entry_queue_time = entry_wrapper.get("created_at")
+                
+                # ✅ ИСПРАВЛЕНО: Правильная обработка queue_time (может быть datetime или строкой)
+                queue_time_str = None
+                if entry_queue_time:
+                    if isinstance(entry_queue_time, datetime):
+                        queue_time_str = entry_queue_time.isoformat() + "Z"
+                    elif isinstance(entry_queue_time, str):
+                        # Уже строка, используем как есть (может быть уже в ISO формате)
+                        queue_time_str = entry_queue_time if entry_queue_time.endswith("Z") else entry_queue_time + "Z"
+                    elif hasattr(entry_queue_time, 'isoformat'):
+                        # Другой datetime-like объект
+                        queue_time_str = entry_queue_time.isoformat() + "Z"
+                
                 entries.append({
                     "id": record_id,
                     "appointment_id": appointment_id_value,  # Явно добавляем appointment_id
@@ -1492,6 +1605,7 @@ def get_today_queues(
                     "source": source,
                     "status": entry_status,
                     "created_at": entry_wrapper["created_at"].isoformat() + "Z" if entry_wrapper["created_at"] else None,  # [OK] Добавляем 'Z' для UTC
+                    "queue_time": queue_time_str,  # ✅ ИСПРАВЛЕНО: Правильно обработанный queue_time
                     "called_at": None,
                     "visit_time": visit_time,
                     "discount_mode": discount_mode,
@@ -1526,10 +1640,7 @@ def get_today_queues(
         }
         
     except Exception as e:
-        import traceback
-        error_traceback = traceback.format_exc()
-        print(f"[get_today_queues] КРИТИЧЕСКАЯ ОШИБКА: {type(e).__name__}: {e}")
-        print(f"[get_today_queues] Traceback:\n{error_traceback}")
+        logger.error("get_today_queues: КРИТИЧЕСКАЯ ОШИБКА: %s: %s", type(e).__name__, e, exc_info=True)
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1584,9 +1695,12 @@ def get_registrar_calendar(
 # Pydantic schemas для batch endpoint
 class BatchServiceItem(BaseModel):
     """Услуга для массового создания очередей"""
-    specialist_id: int = Field(..., description="ID специалиста")
+    specialist_id: int = Field(..., description="ID специалиста (user_id, не doctor_id)")
     service_id: int = Field(..., description="ID услуги")
     quantity: int = Field(default=1, ge=1, description="Количество")
+    
+    # ⚠️ ВАЖНО: specialist_id должен быть user_id (ForeignKey на users.id), а не doctor_id!
+    # Если передается doctor_id, нужно конвертировать его в user_id на backend
 
 
 class BatchQueueEntriesRequest(BaseModel):
@@ -1664,11 +1778,32 @@ def create_queue_entries_batch(
         current_time = datetime.now(timezone)
 
         # Группируем услуги по specialist_id (один специалист = одна запись в очереди)
+        # ⚠️ ВАЖНО: Конвертируем doctor_id → user_id если нужно
         services_by_specialist: Dict[int, List[BatchServiceItem]] = {}
         for service_item in request.services:
-            if service_item.specialist_id not in services_by_specialist:
-                services_by_specialist[service_item.specialist_id] = []
-            services_by_specialist[service_item.specialist_id].append(service_item)
+            specialist_id = service_item.specialist_id
+            
+            # Проверяем, является ли specialist_id user_id или doctor_id
+            # Если это doctor_id, конвертируем в user_id
+            from app.models.clinic import Doctor
+            doctor = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+            if doctor and doctor.user_id:
+                # Это был doctor_id, конвертируем в user_id
+                specialist_id = doctor.user_id
+                logger.info(f"[create_queue_entries_batch] Конвертация: doctor_id={service_item.specialist_id} → user_id={specialist_id}")
+            else:
+                # Проверяем, что specialist_id существует в users
+                from app.models.user import User
+                user = db.query(User).filter(User.id == specialist_id).first()
+                if not user:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Специалист с ID {specialist_id} не найден (ни в doctors, ни в users)"
+                    )
+            
+            if specialist_id not in services_by_specialist:
+                services_by_specialist[specialist_id] = []
+            services_by_specialist[specialist_id].append(service_item)
 
         logger.debug(f"[create_queue_entries_batch] Группировка услуг: {len(services_by_specialist)} уникальных специалистов")
 

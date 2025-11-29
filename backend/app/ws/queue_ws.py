@@ -34,7 +34,7 @@ class WSManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.rooms = defaultdict(set)
-            print("WSManager: создан новый экземпляр")
+            log.info("WSManager: создан новый экземпляр")
         return cls._instance
 
     def __init__(self) -> None:
@@ -105,7 +105,7 @@ class WSManager:
 
 
 ws_manager = WSManager()
-print(f"WSManager: создан глобальный экземпляр {id(ws_manager)}")
+log.info("WSManager: создан глобальный экземпляр %d", id(ws_manager))
 
 
 def _origin_allowed(origin: Optional[str]) -> bool:

@@ -2941,16 +2941,44 @@ const RegistrarPanel = () => {
 
       // ✅ ИСПРАВЛЕНО: Используем номера из базы данных (queue_numbers), не пересчитываем
       // Это гарантирует, что номера старых услуг не меняются при добавлении новых
+      // ⭐ ВАЖНО: Для каждой вкладки выбираем правильный номер очереди по queue_tag/specialty
       const sortedWithNumbers = sorted.map((appointment) => {
-        // Приоритет 1: Используем номер из queue_numbers (из базы данных)
-        const queueNumberFromDB = appointment.queue_numbers?.[0]?.number || null;
+        // Маппинг активной вкладки на queue_tag/specialty
+        const tabToQueueTagMap = {
+          'cardio': ['cardiology', 'cardio'],
+          'echokg': ['echokg', 'ecg'],
+          'derma': ['dermatology', 'derma'],
+          'dental': ['stomatology', 'dentist', 'dental'],
+          'lab': ['laboratory', 'lab'],
+          'procedures': ['procedures']
+        };
+        
+        // Получаем возможные queue_tag для текущей вкладки
+        const possibleTags = tabToQueueTagMap[activeTab] || [activeTab];
+        
+        // Ищем номер очереди, соответствующий текущей вкладке
+        let queueNumberFromDB = null;
+        if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
+          // Ищем номер очереди с queue_tag или specialty, соответствующим активной вкладке
+          const matchingQueue = appointment.queue_numbers.find(q => {
+            const queueTag = (q.queue_tag || q.specialty || '').toString().toLowerCase().trim();
+            return possibleTags.some(tag => tag.toLowerCase() === queueTag);
+          });
+          
+          if (matchingQueue) {
+            queueNumberFromDB = matchingQueue.number;
+          } else {
+            // Fallback: используем первый номер, если не нашли совпадение
+            queueNumberFromDB = appointment.queue_numbers[0]?.number || null;
+          }
+        }
 
         // Приоритет 2: Используем queue_number из appointment (если есть)
         const queueNumber = queueNumberFromDB || appointment.queue_number || null;
 
         return {
           ...appointment,
-          queue_number: queueNumber,  // ⭐ Используем номер из БД, не пересчитываем
+          queue_number: queueNumber,  // ⭐ Используем номер из БД для текущей вкладки
           queue_numbers: appointment.queue_numbers || []  // ⭐ Сохраняем оригинальные номера из БД
         };
       });

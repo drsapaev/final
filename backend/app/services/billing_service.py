@@ -1,6 +1,7 @@
 """
 Сервис для автоматического выставления счетов
 """
+import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -23,6 +24,8 @@ from app.models.payment import Payment
 from app.models.enums import PaymentStatus, VisitStatus
 from app.services.service_mapping import normalize_service_code
 from app.services.queue_service import queue_service
+
+logger = logging.getLogger(__name__)
 
 
 class BillingService:
@@ -909,7 +912,7 @@ class BillingService:
                 
             except Exception as e:
                 reminder.delivery_status = 'failed'
-                print(f"Ошибка отправки напоминания {reminder.id}: {e}")
+                logger.error("Ошибка отправки напоминания %d: %s", reminder.id, e, exc_info=True)
         
         self.db.commit()
         return sent_count
@@ -986,7 +989,7 @@ class BillingService:
                     self.send_invoice(new_invoice.id)
                 
             except Exception as e:
-                print(f"Ошибка создания периодического счета для {parent_invoice.id}: {e}")
+                logger.error("Ошибка создания периодического счета для %d: %s", parent_invoice.id, e, exc_info=True)
         
         self.db.commit()
         return created_count

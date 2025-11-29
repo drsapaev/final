@@ -2,6 +2,7 @@
 WebSocket endpoints для табло очереди
 Основа: passport.md стр. 2571-3324
 """
+import logging
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -17,6 +18,8 @@ from app.crud import display_config as crud_display
 from app.core.config import settings
 from app.crud import user as crud_user
 from app.db.session import SessionLocal
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -87,7 +90,7 @@ async def websocket_display_board(
             pass
             
     except Exception as e:
-        print(f"Ошибка WebSocket: {e}")
+        logger.error("Ошибка WebSocket: %s", e, exc_info=True)
     finally:
         await manager.disconnect(websocket, board_id)
 

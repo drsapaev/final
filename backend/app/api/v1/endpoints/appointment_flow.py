@@ -4,12 +4,15 @@ API endpoints для жесткого потока: запись → плате�
 
 from datetime import date, datetime
 from typing import Any, Dict, Optional
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.api import deps
+
+logger = logging.getLogger(__name__)
 from app.crud.appointment import appointment as crud_appointment
 from app.crud import emr as crud_emr
 from app.models.enums import AppointmentStatus
@@ -83,17 +86,27 @@ def create_or_update_emr(
     Создать или обновить EMR
     Может работать как с Appointment ID, так и с Visit ID (создает Appointment из Visit если нужно)
     """
-    try:
-        print(f"[create_or_update_emr] Начало обработки appointment_id={appointment_id}, user={current_user.username}, role={getattr(current_user, 'role', 'N/A')}")
-        appointment = crud_appointment.get(db, id=appointment_id)
-        
-        # Если Appointment не найден, проверяем, может это Visit ID
-        if not appointment:
-            print(f"[create_or_update_emr] Appointment {appointment_id} не найден, проверяем Visit...")
-            from app.models.visit import Visit
-            visit = db.query(Visit).filter(Visit.id == appointment_id).first()
-            if visit:
-                print(f"[create_or_update_emr] Найден Visit {appointment_id}, проверяем существующий Appointment...")
+    logger.info(
+        "[create_or_update_emr] Начало обработки appointment_id=%d, user=%s, role=%s",
+        appointment_id,
+        current_user.username,
+        getattr(current_user, 'role', 'N/A'),
+    )
+    appointment = crud_appointment.get(db, id=appointment_id)
+    
+    # Если Appointment не найден, проверяем, может это Visit ID
+    if not appointment:
+        logger.info(
+            "[create_or_update_emr] Appointment %d не найден, проверяем Visit...",
+            appointment_id,
+        )
+        from app.models.visit import Visit
+        visit = db.query(Visit).filter(Visit.id == appointment_id).first()
+        if visit:
+                logger.info(
+                    "[create_or_update_emr] Найден Visit %d, проверяем существующий Appointment...",
+                    appointment_id,
+                )
                 # Проверяем, нет ли уже Appointment для этого Visit (по patient_id, дате, doctor_id)
                 existing_appointment = db.query(AppointmentModel).filter(
                     and_(
@@ -104,12 +117,19 @@ def create_or_update_emr(
                 ).first()
                 
                 if existing_appointment:
-                    print(f"[create_or_update_emr] Найден существующий Appointment {existing_appointment.id} для Visit {visit.id}, используем его")
+                    logger.info(
+                        "[create_or_update_emr] Найден существующий Appointment %d для Visit %d, используем его",
+                        existing_appointment.id,
+                        visit.id,
+                    )
                     appointment = existing_appointment
                     # Обновляем appointment_id в emr_data для корректной привязки
                     emr_data.appointment_id = existing_appointment.id
                 else:
-                    print(f"[create_or_update_emr] Создаем новый Appointment из Visit {visit.id}...")
+                    logger.info(
+                        "[create_or_update_emr] Создаем новый Appointment из Visit %d...",
+                        visit.id,
+                    )
                     # Создаем Appointment из Visit для работы с EMR
                     appointment = AppointmentModel(
                         patient_id=visit.patient_id,
@@ -124,15 +144,24 @@ def create_or_update_emr(
                     db.add(appointment)
                     db.commit()
                     db.refresh(appointment)
-                    print(f"[create_or_update_emr] Создан Appointment {appointment.id} из Visit {visit.id}")
-            else:
-                print(f"[create_or_update_emr] Запись {appointment_id} не найдена ни в Appointment, ни в Visit")
-                raise HTTPException(status_code=404, detail="Запись не найдена")
+                logger.info(
+                    "[create_or_update_emr] Создан Appointment %d из Visit %d",
+                    appointment.id,
+                    visit.id,
+                )
         else:
-            print(f"[create_or_update_emr] Appointment найден: status={appointment.status}")
-    except Exception as e:
-        print(f"[create_or_update_emr] Ошибка при поиске appointment: {e}")
-        raise
+            logger.warning(
+                "[create_or_update_emr] Запись %d не найдена ни в Appointment, ни в Visit",
+                appointment_id,
+            )
+            raise HTTPException(status_code=404, detail="Запись не найдена")
+    else:
+        logger.info(
+            "[create_or_update_emr] Appointment найден: status=%s",
+            appointment.status,
+        )
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
 
     # Проверяем статус записи
     # Разрешаем сохранение EMR если статус: in_visit, in_progress, completed, или called (вызван врачом)
@@ -150,7 +179,11 @@ def create_or_update_emr(
             appointment.status = AppointmentStatus.IN_VISIT
             db.commit()
             db.refresh(appointment)
-            print(f"[create_or_update_emr] Статус appointment {appointment_id} обновлен с '{status_str}' на 'in_visit'")
+            logger.info(
+                "[create_or_update_emr] Статус appointment %d обновлен с '%s' на 'in_visit'",
+                appointment_id,
+                status_str,
+            )
         else:
             raise HTTPException(
                 status_code=400,
@@ -159,11 +192,14 @@ def create_or_update_emr(
 
     try:
         # Проверяем, есть ли уже EMR для этой записи
-        print(f"[create_or_update_emr] Проверка существующего EMR для appointment_id={appointment_id}")
+        logger.info(
+            "[create_or_update_emr] Проверка существующего EMR для appointment_id=%d",
+            appointment_id,
+        )
         existing_emr = crud_emr.emr.get_by_appointment(db, appointment_id=appointment_id)
 
         if existing_emr:
-            print(f"[create_or_update_emr] EMR найден, обновление...")
+            logger.info("[create_or_update_emr] EMR найден, обновление...")
             # Создаем версию перед обновлением
             try:
                 from app.crud.emr_template import emr_version
@@ -184,32 +220,48 @@ def create_or_update_emr(
                     changed_by=current_user.id
                 )
             except Exception as version_error:
-                print(f"[create_or_update_emr] Предупреждение: не удалось создать версию: {version_error}")
-                import traceback
-                traceback.print_exc()
+                logger.warning(
+                    "[create_or_update_emr] Предупреждение: не удалось создать версию: %s",
+                    version_error,
+                    exc_info=True,
+                )
             
             # Обновляем существующий EMR
             emr_update_dict = emr_data.dict(exclude={"appointment_id"})
-            print(f"[create_or_update_emr] Данные для обновления: {list(emr_update_dict.keys())}")
+            logger.info(
+                "[create_or_update_emr] Данные для обновления: %s",
+                list(emr_update_dict.keys()),
+            )
             emr_update = EMRUpdate(**emr_update_dict)
             updated_emr = crud_emr.emr.update(db, db_obj=existing_emr, obj_in=emr_update)
-            print(f"[create_or_update_emr] EMR обновлен успешно")
+            logger.info("[create_or_update_emr] EMR обновлен успешно")
             return updated_emr
         else:
-            print(f"[create_or_update_emr] EMR не найден, создание нового...")
+            logger.info("[create_or_update_emr] EMR не найден, создание нового...")
             # Создаем новый EMR
             # Убеждаемся, что appointment_id установлен из URL параметра
             if emr_data.appointment_id != appointment_id:
-                print(f"[create_or_update_emr] Предупреждение: appointment_id в данных ({emr_data.appointment_id}) != URL ({appointment_id}), используем URL")
+                logger.warning(
+                    "[create_or_update_emr] Предупреждение: appointment_id в данных (%d) != URL (%d), используем URL",
+                    emr_data.appointment_id,
+                    appointment_id,
+                )
             emr_data.appointment_id = appointment_id
-            print(f"[create_or_update_emr] Создание EMR с appointment_id={appointment_id}, is_draft={emr_data.is_draft}")
+            logger.info(
+                "[create_or_update_emr] Создание EMR с appointment_id=%d, is_draft=%s",
+                appointment_id,
+                emr_data.is_draft,
+            )
             try:
                 new_emr = crud_emr.emr.create(db, obj_in=emr_data)
-                print(f"[create_or_update_emr] EMR создан, id={new_emr.id}")
+                logger.info("[create_or_update_emr] EMR создан, id=%d", new_emr.id)
             except Exception as create_error:
-                print(f"[create_or_update_emr] Ошибка при создании EMR: {type(create_error).__name__}: {create_error}")
-                import traceback
-                traceback.print_exc()
+                logger.error(
+                    "[create_or_update_emr] Ошибка при создании EMR: %s: %s",
+                    type(create_error).__name__,
+                    create_error,
+                    exc_info=True,
+                )
                 raise
             
             # Создаем первую версию
@@ -232,22 +284,21 @@ def create_or_update_emr(
                     changed_by=current_user.id
                 )
             except Exception as version_error:
-                print(f"[create_or_update_emr] Предупреждение: не удалось создать версию: {version_error}")
-                import traceback
-                traceback.print_exc()
+                logger.warning(
+                    "[create_or_update_emr] Предупреждение: не удалось создать версию: %s",
+                    version_error,
+                    exc_info=True,
+                )
             
-            print(f"[create_or_update_emr] EMR создан успешно, id={new_emr.id}")
+            logger.info(
+                "[create_or_update_emr] EMR создан успешно, id=%d",
+                new_emr.id,
+            )
             return new_emr
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"[create_or_update_emr] КРИТИЧЕСКАЯ ОШИБКА: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка при сохранении EMR: {str(e)}"
-        )
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
 
 
 @router.post("/{appointment_id}/emr/save", response_model=EMR)

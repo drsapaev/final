@@ -30,9 +30,11 @@ import {
     MacOSPagination,
     MacOSModal,
     MacOSAlert,
+    Switch,
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
+import IconSelector, { iconMap } from './IconSelector';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -58,9 +60,19 @@ const DEFAULT_FORM = {
     key: '',
     description: '',
     color: '#0066cc',
-    icon: '🏥',
+    icon: 'Package', // ✅ ИЗМЕНЕНО: Используем имя иконки из iconMap вместо emoji
     display_order: 999,
     active: true,
+};
+
+// ✅ НОВОЕ: Форма для настройки маппинга услуг
+const DEFAULT_SERVICE_MAPPING = {
+    create_service: false,
+    service_category_code: '',
+    service_code_pattern: '',
+    service_name: '',
+    service_price: '',
+    queue_tag: '',
 };
 
 const DEFAULT_INTEGRATION_OPTIONS = {
@@ -96,6 +108,7 @@ const DepartmentManagement = () => {
 
     const [formData, setFormData] = useState(DEFAULT_FORM);
     const [integrationForm, setIntegrationForm] = useState(DEFAULT_INTEGRATION_OPTIONS);
+    const [serviceMapping, setServiceMapping] = useState(DEFAULT_SERVICE_MAPPING);
     const [showAddForm, setShowAddForm] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingDepartment, setEditingDepartment] = useState(null);
@@ -235,6 +248,29 @@ const DepartmentManagement = () => {
             setShowAddForm(false);
             setFormData(DEFAULT_FORM);
             setIntegrationForm(DEFAULT_INTEGRATION_OPTIONS);
+            setServiceMapping(DEFAULT_SERVICE_MAPPING);
+            
+            // ✅ НОВОЕ: Создание услуги при создании отделения (если включено)
+            if (serviceMapping.create_service && serviceMapping.service_name) {
+                try {
+                    const serviceData = {
+                        name: serviceMapping.service_name,
+                        category_code: serviceMapping.service_category_code || null,
+                        service_code: serviceMapping.service_code_pattern || null,
+                        department_key: formData.key,
+                        queue_tag: serviceMapping.queue_tag || null,
+                        price: serviceMapping.service_price ? parseFloat(serviceMapping.service_price) : null,
+                        currency: 'UZS',
+                        active: true
+                    };
+                    await api.post('/services', serviceData);
+                    toast.success('Услуга создана автоматически');
+                } catch (err) {
+                    console.error('Ошибка создания услуги:', err);
+                    toast.warning('Отделение создано, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
+                }
+            }
+            
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
@@ -271,13 +307,61 @@ const DepartmentManagement = () => {
         try {
             await api.put(`/admin/departments/${editingDepartment.id}`, formData);
             toast.success('Отделение обновлено');
+            
+            // ✅ НОВОЕ: Создание услуги при редактировании (если включено)
+            if (serviceMapping.create_service && serviceMapping.service_name) {
+                try {
+                    const serviceData = {
+                        name: serviceMapping.service_name,
+                        category_code: serviceMapping.service_category_code || null,
+                        service_code: serviceMapping.service_code_pattern || null,
+                        department_key: formData.key,
+                        queue_tag: serviceMapping.queue_tag || null,
+                        price: serviceMapping.service_price ? parseFloat(serviceMapping.service_price) : null,
+                        currency: 'UZS',
+                        active: true
+                    };
+                    await api.post('/services', serviceData);
+                    toast.success('Услуга создана');
+                } catch (err) {
+                    console.error('Ошибка создания услуги:', err);
+                    toast.warning('Отделение обновлено, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
+                }
+            }
+            
             setShowEditModal(false);
             setEditingDepartment(null);
+            setServiceMapping(DEFAULT_SERVICE_MAPPING);
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
             console.error('Ошибка обновления отделения:', err);
             toast.error(err.response?.data?.detail || 'Не удалось обновить отделение');
+        }
+    };
+
+    // ✅ НОВОЕ: Быстрое переключение статуса отделения
+    const handleToggleActive = async (dept, newActive) => {
+        try {
+            await api.put(`/admin/departments/${dept.id}`, { active: newActive });
+            toast.success(`Отделение ${newActive ? 'активировано' : 'деактивировано'}`);
+            await loadDepartments();
+            broadcastDepartmentsUpdate();
+        } catch (err) {
+            console.error('Ошибка обновления статуса:', err);
+            toast.error(err.response?.data?.detail || 'Не удалось обновить статус');
+        }
+    };
+
+    // ✅ НОВОЕ: Быстрое обновление порядка
+    const handleUpdateOrder = async (dept, newOrder) => {
+        try {
+            await api.put(`/admin/departments/${dept.id}`, { display_order: newOrder });
+            await loadDepartments();
+            broadcastDepartmentsUpdate();
+        } catch (err) {
+            console.error('Ошибка обновления порядка:', err);
+            toast.error(err.response?.data?.detail || 'Не удалось обновить порядок');
         }
     };
 
@@ -315,6 +399,7 @@ const DepartmentManagement = () => {
     };
 
     // Фильтрация и сортировка отделений
+    // ✅ ИСПРАВЛЕНО: Сортировка по display_order по умолчанию
     const filteredDepartments = departments
         .filter(dept => {
             const matchesSearch = searchTerm === '' ||
@@ -341,12 +426,10 @@ const DepartmentManagement = () => {
                     bValue = b.key || b.code || '';
                     break;
                 case 'order':
+                default: // ✅ По умолчанию сортируем по display_order
                     aValue = a.display_order || 999;
                     bValue = b.display_order || 999;
                     break;
-                default:
-                    aValue = a.name_ru || a.name || '';
-                    bValue = b.name_ru || b.name || '';
             }
 
             if (sortOrder === 'asc') {
@@ -905,15 +988,11 @@ const DepartmentManagement = () => {
                                         </div>
                                     )}
                                 </div>
-                                <div>
-                                    <MacOSInput
-                                        placeholder="Иконка (emoji)"
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <IconSelector
                                         value={formData.icon}
-                                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                                        style={{
-                                            gridColumn: '1',
-                                            borderColor: validationErrors.icon ? 'var(--mac-error)' : undefined
-                                        }}
+                                        onChange={(iconName) => setFormData({ ...formData, icon: iconName })}
+                                        label="Иконка вкладки"
                                     />
                                     {validationErrors.icon && (
                                         <div style={{
@@ -930,28 +1009,126 @@ const DepartmentManagement = () => {
                                         type="color"
                                         value={formData.color}
                                         onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                        style={{ gridColumn: '2' }}
+                                        style={{ gridColumn: '1' }}
                                     />
-                                    <div style={{ gridColumn: '1 / -1' }}>
-                                        <MacOSTextarea
-                                            placeholder="Описание отделения (опционально)"
-                                            value={formData.description || ''}
-                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                            rows={3}
-                                            style={{ borderColor: validationErrors.description ? 'var(--mac-error)' : undefined }}
-                                        />
-                                        {validationErrors.description && (
-                                            <div style={{
-                                                color: 'var(--mac-error)',
-                                                fontSize: '12px',
-                                                marginTop: '4px'
-                                            }}>
-                                                {validationErrors.description}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <label style={{
+                                        fontSize: '12px',
+                                        color: 'var(--mac-text-secondary)',
+                                        marginTop: '4px',
+                                        display: 'block'
+                                    }}>
+                                        Цвет вкладки
+                                    </label>
+                                </div>
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <MacOSTextarea
+                                        placeholder="Описание отделения (опционально)"
+                                        value={formData.description || ''}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        rows={3}
+                                        style={{ borderColor: validationErrors.description ? 'var(--mac-error)' : undefined }}
+                                    />
+                                    {validationErrors.description && (
+                                        <div style={{
+                                            color: 'var(--mac-error)',
+                                            fontSize: '12px',
+                                            marginTop: '4px'
+                                        }}>
+                                            {validationErrors.description}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* ✅ НОВОЕ: Секция настройки маппинга услуг */}
+                            <div style={{
+                                marginTop: '24px',
+                                padding: '20px',
+                                background: 'var(--mac-bg-secondary)',
+                                borderRadius: 'var(--mac-radius-md)',
+                                border: '1px solid var(--mac-border)'
+                            }}>
+                                <h4 style={{
+                                    fontSize: '16px',
+                                    fontWeight: '600',
+                                    marginBottom: '16px',
+                                    color: 'var(--mac-text-primary)'
+                                }}>
+                                    Настройка услуг для вкладки
+                                </h4>
+                                
+                                <div style={{ marginBottom: '16px' }}>
+                                    <MacOSCheckbox
+                                        checked={serviceMapping.create_service}
+                                        onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
+                                        label="Создать новую услугу при создании отделения"
+                                    />
+                                </div>
+
+                                {serviceMapping.create_service && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                        <div>
+                                            <MacOSInput
+                                                placeholder="Название услуги"
+                                                value={serviceMapping.service_name}
+                                                onChange={(e) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <MacOSSelect
+                                                value={serviceMapping.service_category_code}
+                                                onChange={(e) => setServiceMapping({ ...serviceMapping, service_category_code: e.target.value })}
+                                            >
+                                                {CATEGORY_OPTIONS.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                ))}
+                                            </MacOSSelect>
+                                        </div>
+                                        <div>
+                                            <MacOSInput
+                                                placeholder="Код услуги (например, K01, L01)"
+                                                value={serviceMapping.service_code_pattern}
+                                                onChange={(e) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <MacOSInput
+                                                type="number"
+                                                placeholder="Цена услуги"
+                                                value={serviceMapping.service_price}
+                                                onChange={(e) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })}
+                                            />
+                                        </div>
+                                        <div style={{ gridColumn: '1 / -1' }}>
+                                            <MacOSInput
+                                                placeholder="Queue tag (опционально, например: ecg, cardiology_common)"
+                                                value={serviceMapping.queue_tag}
+                                                onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })}
+                                            />
+                                            <div style={{
+                                                fontSize: '12px',
+                                                color: 'var(--mac-text-secondary)',
+                                                marginTop: '4px'
+                                            }}>
+                                                Услуги с department_key=&quot;{formData.key || '...'}&quot; будут отображаться в этой вкладке мастера регистрации
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!serviceMapping.create_service && (
+                                    <div style={{
+                                        padding: '12px',
+                                        background: 'var(--mac-bg-tertiary)',
+                                        borderRadius: 'var(--mac-radius-sm)',
+                                        fontSize: '13px',
+                                        color: 'var(--mac-text-secondary)'
+                                    }}>
+                                        💡 Для отображения услуг в этой вкладке мастера регистрации, убедитесь, что услуги имеют <code>department_key=&quot;{formData.key || '...'}&quot;</code> или соответствующий <code>category_code</code>.
+                                    </div>
+                                )}
+                            </div>
+
                             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                                 <MacOSButton variant="primary" onClick={handleAddDepartment}>
                                     <Save size={16} style={{ marginRight: '8px' }} />
@@ -959,7 +1136,8 @@ const DepartmentManagement = () => {
                                 </MacOSButton>
                                 <MacOSButton variant="secondary" onClick={() => {
                                     setShowAddForm(false);
-                                    setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
+                                    setFormData(DEFAULT_FORM);
+                                    setServiceMapping(DEFAULT_SERVICE_MAPPING);
                                 }}>
                                     <X size={16} style={{ marginRight: '8px' }} />
                                     Отмена
@@ -1030,115 +1208,210 @@ const DepartmentManagement = () => {
                         </div>
                     )}
 
-                    {/* Заголовок с чекбоксом "Выбрать все" */}
+                    {/* ✅ ТАБЛИЧНЫЙ ВИД ОТДЕЛЕНИЙ */}
                     <div style={{
-                        padding: '12px 16px',
-                        background: 'var(--mac-bg-secondary)',
                         border: '1px solid var(--mac-border)',
                         borderRadius: 'var(--mac-radius-md)',
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: 'var(--mac-text-primary)'
+                        overflow: 'hidden'
                     }}>
-                        <MacOSCheckbox
-                            checked={selectAll}
-                            onChange={(e) => handleSelectAll(e.target.checked)}
-                            label={`Выбрать все (${paginatedDepartments.length})`}
-                        />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {paginatedDepartments.map((dept) => (
-                            <div
-                                key={dept.id}
-                                style={{
-                                    padding: '16px',
+                        <table style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            background: 'var(--mac-bg-primary)'
+                        }}>
+                            <thead>
+                                <tr style={{
                                     background: 'var(--mac-bg-secondary)',
-                                    border: '1px solid var(--mac-border)',
-                                    borderRadius: 'var(--mac-radius-md)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                }}
-                            >
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px',
-                                    flex: 1
+                                    borderBottom: '2px solid var(--mac-border)'
                                 }}>
-                                    <MacOSCheckbox
-                                        checked={selectedDepartments.includes(dept.id)}
-                                        onChange={(e) => handleSelectDepartment(dept.id, e.target.checked)}
-                                    />
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                                        <div
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'left',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)',
+                                        width: '40px'
+                                    }}>
+                                        <MacOSCheckbox
+                                            checked={selectAll}
+                                            onChange={(e) => handleSelectAll(e.target.checked)}
+                                        />
+                                    </th>
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'left',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)',
+                                        width: '60px'
+                                    }}>
+                                        Иконка
+                                    </th>
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'left',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)'
+                                    }}>
+                                        Название
+                                    </th>
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'left',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)',
+                                        width: '120px'
+                                    }}>
+                                        Ключ
+                                    </th>
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'left',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)',
+                                        width: '100px'
+                                    }}>
+                                        Порядок
+                                    </th>
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'center',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)',
+                                        width: '100px'
+                                    }}>
+                                        Статус
+                                    </th>
+                                    <th style={{
+                                        padding: '12px 16px',
+                                        textAlign: 'right',
+                                        fontSize: '13px',
+                                        fontWeight: '600',
+                                        color: 'var(--mac-text-primary)',
+                                        width: '120px'
+                                    }}>
+                                        Действия
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedDepartments.map((dept) => {
+                                    const IconComponent = dept.icon && iconMap[dept.icon] ? iconMap[dept.icon] : null;
+                                    return (
+                                        <tr
+                                            key={dept.id}
                                             style={{
-                                                width: '48px',
-                                                height: '48px',
-                                                borderRadius: 'var(--mac-radius-md)',
-                                                background: dept.color || '#0066cc',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '24px'
+                                                borderBottom: '1px solid var(--mac-border)',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'var(--mac-bg-secondary)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'var(--mac-bg-primary)';
                                             }}
                                         >
-                                            {dept.icon || '🏥'}
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <h4 style={{
-                                                fontSize: '16px',
-                                                fontWeight: '600',
-                                                margin: '0 0 4px 0',
-                                                color: 'var(--mac-text-primary)'
-                                            }}>
-                                                {dept.name_ru || dept.name}
-                                            </h4>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                                <MacOSBadge variant="secondary">{dept.key || dept.code}</MacOSBadge>
-                                                {dept.active === false && <MacOSBadge variant="danger">Неактивно</MacOSBadge>}
-                                                {dept.description && (
-                                                    <span style={{
-                                                        fontSize: '12px',
-                                                        color: 'var(--mac-text-secondary)',
-                                                        maxWidth: '200px',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap'
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <MacOSCheckbox
+                                                    checked={selectedDepartments.includes(dept.id)}
+                                                    onChange={(e) => handleSelectDepartment(dept.id, e.target.checked)}
+                                                />
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <div style={{
+                                                    width: '40px',
+                                                    height: '40px',
+                                                    borderRadius: 'var(--mac-radius-md)',
+                                                    background: dept.color || '#0066cc',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'white'
+                                                }}>
+                                                    {IconComponent ? (
+                                                        <IconComponent size={20} />
+                                                    ) : (
+                                                        <span style={{ fontSize: '20px' }}>{dept.icon || '🏥'}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <div>
+                                                    <div style={{
+                                                        fontSize: '14px',
+                                                        fontWeight: '600',
+                                                        color: 'var(--mac-text-primary)',
+                                                        marginBottom: '4px'
                                                     }}>
-                                                        {dept.description}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <MacOSButton
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => openEditModal(dept)}
-                                        title="Редактировать отделение"
-                                    >
-                                        <Edit2 size={16} />
-                                    </MacOSButton>
-                                    <MacOSButton
-                                        size="sm"
-                                        variant="danger"
-                                        onClick={() => handleDeleteDepartment(dept.id)}
-                                        title="Удалить отделение"
-                                    >
-                                        <Trash2 size={16} />
-                                    </MacOSButton>
-                                </div>
-                            </div>
-                        ))}
+                                                        {dept.name_ru || dept.name}
+                                                    </div>
+                                                    {dept.description && (
+                                                        <div style={{
+                                                            fontSize: '12px',
+                                                            color: 'var(--mac-text-secondary)',
+                                                            maxWidth: '300px',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {dept.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <MacOSBadge variant="secondary">{dept.key || dept.code}</MacOSBadge>
+                                            </td>
+                                            <td style={{ padding: '12px 16px' }}>
+                                                <MacOSInput
+                                                    type="number"
+                                                    value={dept.display_order || 999}
+                                                    onChange={(e) => {
+                                                        const newOrder = parseInt(e.target.value) || 999;
+                                                        handleUpdateOrder(dept, newOrder);
+                                                    }}
+                                                    style={{
+                                                        width: '80px',
+                                                        padding: '6px 8px',
+                                                        fontSize: '13px'
+                                                    }}
+                                                />
+                                            </td>
+                                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                <Switch
+                                                    checked={dept.active !== false}
+                                                    onChange={(checked) => handleToggleActive(dept, checked)}
+                                                />
+                                            </td>
+                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <MacOSButton
+                                                        size="sm"
+                                                        variant="secondary"
+                                                        onClick={() => openEditModal(dept)}
+                                                        title="Редактировать отделение"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </MacOSButton>
+                                                    <MacOSButton
+                                                        size="sm"
+                                                        variant="danger"
+                                                        onClick={() => handleDeleteDepartment(dept.id)}
+                                                        title="Удалить отделение"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </MacOSButton>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
 
                     {departments.length === 0 && (
@@ -1209,7 +1482,8 @@ const DepartmentManagement = () => {
                 onClose={() => {
                     setShowEditModal(false);
                     setEditingDepartment(null);
-                    setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
+                    setFormData(DEFAULT_FORM);
+                    setServiceMapping(DEFAULT_SERVICE_MAPPING);
                     clearValidationErrors();
                 }}
                 title="Редактирование отделения"
@@ -1295,16 +1569,11 @@ const DepartmentManagement = () => {
                             </div>
                         )}
                     </div>
-                    <div>
-                        <MacOSInput
-                            label="Иконка"
-                            placeholder="Иконка (emoji)"
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <IconSelector
                             value={formData.icon}
-                            onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                            style={{
-                                gridColumn: '1',
-                                borderColor: validationErrors.icon ? 'var(--mac-error)' : undefined
-                            }}
+                            onChange={(iconName) => setFormData({ ...formData, icon: iconName })}
+                            label="Иконка вкладки"
                         />
                         {validationErrors.icon && (
                             <div style={{
@@ -1346,6 +1615,108 @@ const DepartmentManagement = () => {
                     </div>
                 </div>
 
+                {/* ✅ НОВОЕ: Секция настройки маппинга услуг в модальном окне */}
+                <div style={{
+                    marginTop: '24px',
+                    padding: '20px',
+                    background: 'var(--mac-bg-secondary)',
+                    borderRadius: 'var(--mac-radius-md)',
+                    border: '1px solid var(--mac-border)'
+                }}>
+                    <h4 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        marginBottom: '16px',
+                        color: 'var(--mac-text-primary)'
+                    }}>
+                        Настройка услуг для вкладки
+                    </h4>
+                    
+                    <div style={{ marginBottom: '16px' }}>
+                        <MacOSCheckbox
+                            checked={serviceMapping.create_service}
+                            onChange={(e) => setServiceMapping({ ...serviceMapping, create_service: e.target.checked })}
+                            label="Создать новую услугу"
+                        />
+                    </div>
+
+                    {serviceMapping.create_service && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                                <MacOSInput
+                                    label="Название услуги"
+                                    placeholder="Название услуги"
+                                    value={serviceMapping.service_name}
+                                    onChange={(e) => setServiceMapping({ ...serviceMapping, service_name: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    color: 'var(--mac-text-primary)',
+                                    marginBottom: '8px'
+                                }}>
+                                    Категория услуги
+                                </label>
+                                <MacOSSelect
+                                    value={serviceMapping.service_category_code}
+                                    onChange={(e) => setServiceMapping({ ...serviceMapping, service_category_code: e.target.value })}
+                                >
+                                    {CATEGORY_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                </MacOSSelect>
+                            </div>
+                            <div>
+                                <MacOSInput
+                                    label="Код услуги"
+                                    placeholder="Код услуги (например, K01, L01)"
+                                    value={serviceMapping.service_code_pattern}
+                                    onChange={(e) => setServiceMapping({ ...serviceMapping, service_code_pattern: e.target.value.toUpperCase() })}
+                                />
+                            </div>
+                            <div>
+                                <MacOSInput
+                                    label="Цена услуги"
+                                    type="number"
+                                    placeholder="Цена услуги"
+                                    value={serviceMapping.service_price}
+                                    onChange={(e) => setServiceMapping({ ...serviceMapping, service_price: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <MacOSInput
+                                    label="Queue tag (опционально)"
+                                    placeholder="Queue tag (например: ecg, cardiology_common)"
+                                    value={serviceMapping.queue_tag}
+                                    onChange={(e) => setServiceMapping({ ...serviceMapping, queue_tag: e.target.value })}
+                                />
+                                <div style={{
+                                    fontSize: '12px',
+                                    color: 'var(--mac-text-secondary)',
+                                    marginTop: '4px'
+                                }}>
+                                    Услуги с department_key=&quot;{formData.key || '...'}&quot; будут отображаться в этой вкладке мастера регистрации
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {!serviceMapping.create_service && (
+                        <div style={{
+                            padding: '12px',
+                            background: 'var(--mac-bg-tertiary)',
+                            borderRadius: 'var(--mac-radius-sm)',
+                            fontSize: '13px',
+                            color: 'var(--mac-text-secondary)'
+                        }}>
+                            💡 Для отображения услуг в этой вкладке мастера регистрации, убедитесь, что услуги имеют <code>department_key=&quot;{formData.key || '...'}&quot;</code> или соответствующий <code>category_code</code>.
+                        </div>
+                    )}
+                </div>
+
                 <div style={{
                     display: 'flex',
                     justifyContent: 'flex-end',
@@ -1359,7 +1730,8 @@ const DepartmentManagement = () => {
                         onClick={() => {
                             setShowEditModal(false);
                             setEditingDepartment(null);
-                            setFormData({ name_ru: '', name_uz: '', key: '', description: '', color: '#0066cc', icon: '🏥', display_order: 999, active: true });
+                            setFormData(DEFAULT_FORM);
+                            setServiceMapping(DEFAULT_SERVICE_MAPPING);
                             clearValidationErrors();
                         }}
                     >

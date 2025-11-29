@@ -272,7 +272,10 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
         # Test dependencies
-        pip install pytest pytest-asyncio httpx
+        pip install pytest pytest-asyncio httpx requests
+        echo "✅ Все зависимости установлены"
+        echo "🔍 Проверяем установленные пакеты:"
+        pip list | grep -E "(fastapi|uvicorn|requests|httpx)" || true
     
     - name: 🗄️ Подготовка тестовой базы
       env:
@@ -301,7 +304,18 @@ jobs:
       run: |
         cd backend
         echo "🔍 Проверяем что приложение может импортироваться..."
-        python -c "from app.main import app; print('✅ App импортирован успешно')" || {
+        python -c "
+        import sys
+        import traceback
+        try:
+            from app.main import app
+            print('✅ App импортирован успешно')
+        except Exception as e:
+            print(f'❌ Ошибка импорта app.main: {e}')
+            print('📋 Полный traceback:')
+            traceback.print_exc()
+            sys.exit(1)
+        " || {
           echo "❌ Не удалось импортировать app.main"
           exit 1
         }
@@ -312,30 +326,52 @@ jobs:
         sleep 15
         echo "📋 Логи сервера после запуска:"
         head -50 server.log || echo "Логи не доступны"
+        echo "🔍 Проверяем статус процесса:"
+        ps aux | grep uvicorn || echo "Процесс не найден"
+        if [ -f server.pid ]; then
+          echo "📝 PID файл существует: $(cat server.pid)"
+        else
+          echo "⚠️ PID файл не найден"
+        fi
     
     - name: 🧪 Интеграционные тесты
       run: |
         cd backend
         # Ждем запуска сервера
+        echo "⏳ Ожидаем запуска сервера..."
+        SERVER_READY=false
         for i in {1..30}; do
           if curl -s -f "http://127.0.0.1:8000/api/v1/health" > /dev/null 2>&1; then
-            echo "✅ Сервер запущен"
+            echo "✅ Сервер запущен и отвечает на запросы"
+            SERVER_READY=true
             break
           fi
+          echo "⏳ Попытка $i/30: сервер еще не готов..."
           if [ $i -eq 30 ]; then
-            echo "❌ Сервер не запустился"
-            cat server.log
+            echo "❌ Сервер не запустился за 60 секунд"
+            echo "📋 Последние 100 строк логов сервера:"
+            tail -100 server.log || echo "Логи не доступны"
+            echo "🔍 Проверяем процессы:"
+            ps aux | grep uvicorn || echo "Процесс uvicorn не найден"
+            if [ -f server.pid ]; then
+              echo "📝 PID файл: $(cat server.pid)"
+            fi
             exit 1
           fi
           sleep 2
         done
         
+        if [ "$SERVER_READY" = false ]; then
+          echo "❌ Сервер не готов к тестированию"
+          exit 1
+        fi
+        
         # Запускаем интеграционные тесты для запущенного сервера
         echo "🧪 Запускаем интеграционные тесты..."
         python tests/integration/test_server_integration.py || {
           echo "⚠️ Некоторые интеграционные тесты не прошли"
-          echo "📊 Логи сервера:"
-          cat server.log || true
+          echo "📊 Логи сервера (последние 100 строк):"
+          tail -100 server.log || true
           exit 1
         }
     

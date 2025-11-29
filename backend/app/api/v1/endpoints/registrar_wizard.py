@@ -2,6 +2,7 @@
 API endpoints для мастера регистрации с поддержкой корзины
 Расширение существующего registrar_integration.py
 """
+import logging
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 from decimal import Decimal
@@ -23,6 +24,8 @@ from app.crud import online_queue as crud_queue
 from app.services.feature_flags import is_feature_enabled
 from app.services.queue_service import queue_service
 from app.services.service_mapping import normalize_service_code
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -139,7 +142,7 @@ def _create_queue_entries(
                     if ecg_resource:
                         doctor_id = ecg_resource.id
                     else:
-                        print(f"Warning: ЭКГ ресурс-врач не найден для queue_tag={queue_tag}")
+                        logger.warning("ЭКГ ресурс-врач не найден для queue_tag=%s", queue_tag)
                         continue
                         
                 elif queue_tag == "lab" and not doctor_id:
@@ -152,7 +155,7 @@ def _create_queue_entries(
                     if lab_resource:
                         doctor_id = lab_resource.id
                     else:
-                        print(f"Warning: Лаборатория ресурс-врач не найден для queue_tag={queue_tag}")
+                        logger.warning("Лаборатория ресурс-врач не найден для queue_tag=%s", queue_tag)
                         continue
                 
                 daily_queue = crud_queue.get_or_create_daily_queue(
@@ -183,9 +186,8 @@ def _create_queue_entries(
             
             # Сохраняем все номера очередей для визита
             queue_numbers[visit.id] = visit_queue_numbers
-            
         except Exception as e:
-            print(f"Warning: Could not create queue entries for visit {visit.id}: {e}")
+            logger.warning("Could not create queue entries for visit %d: %s", visit.id, e, exc_info=True)
     
     return queue_numbers
 
@@ -383,7 +385,7 @@ def check_invoice_status(
                                         provider=invoice.provider,
                                         note=f"Оплата через {invoice.provider} (invoice {invoice.id})"
                                     )
-                                    print(f"[check_invoice_status] [OK] Создан платеж ID={payment.id} для визита {visit.id}")
+                                    logger.info("check_invoice_status: Создан платеж ID=%d для визита %d", payment.id, visit.id)
                                 
                                 visit.status = "confirmed"  # Оплачено и подтверждено
                         
@@ -421,11 +423,8 @@ def create_cart_appointments(
     Создание корзины визитов с единым платежом
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
-    print(f"[CART] REGISTRATION DEBUG: Получен запрос на создание корзины")
-    print(f"   Patient ID: {cart_data.patient_id}")
-    print(f"   Количество визитов: {len(cart_data.visits)}")
-    print(f"   Discount mode: {cart_data.discount_mode}")
-    print(f"   Payment method: {cart_data.payment_method}")
+    logger.info("REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Payment method: %s",
+                cart_data.patient_id, len(cart_data.visits), cart_data.discount_mode, cart_data.payment_method)
 
     try:
         # Валидация пациента
@@ -439,9 +438,9 @@ def create_cart_appointments(
         
         # Создаём визиты
         from time import sleep
-        print(f"[CREATE] REGISTRATION DEBUG: Создаём {len(cart_data.visits)} визитов")
+        logger.info("REGISTRATION: Создаём %d визитов", len(cart_data.visits))
         for idx, visit_req in enumerate(cart_data.visits):
-            print(f"   Визит {idx+1}: department={visit_req.department}, services={len(visit_req.services)}")
+            logger.debug("REGISTRATION: Визит %d: department=%s, services=%d", idx+1, visit_req.department, len(visit_req.services))
             # Проверяем право на повторный визит
             if cart_data.discount_mode == "repeat" and visit_req.doctor_id:
                 service_ids = [s.service_id for s in visit_req.services]
@@ -528,14 +527,14 @@ def create_cart_appointments(
                 notify=False,  # Уведомления отправляются отдельно
                 log=True
             )
-            print(f"[OK] REGISTRATION DEBUG: Визит {visit.id} создан через create_visit()")
+            logger.info("REGISTRATION: Визит %d создан через create_visit()", visit.id)
             
             created_visits.append(visit)
             total_invoice_amount += visit_amount
-            print(f"   [OK] Визит {visit.id} создан успешно для пациента {cart_data.patient_id}")
+            logger.info("REGISTRATION: Визит %d создан успешно для пациента %d", visit.id, cart_data.patient_id)
         
         # Создаём единый invoice
-        print(f"[CREATE] REGISTRATION DEBUG: Создаём инвойс на сумму {total_invoice_amount}")
+        logger.info("REGISTRATION: Создаём инвойс на сумму %s", total_invoice_amount)
         invoice = PaymentInvoice(
             patient_id=cart_data.patient_id,
             total_amount=total_invoice_amount,
@@ -546,7 +545,7 @@ def create_cart_appointments(
         )
         db.add(invoice)
         db.flush()  # Получаем ID invoice
-        print(f"[CREATE] REGISTRATION DEBUG: Инвойс {invoice.id} создан")
+        logger.info("REGISTRATION: Инвойс %d создан", invoice.id)
         
         # Связываем визиты с invoice
         from app.services.billing_service import BillingService
@@ -580,22 +579,37 @@ def create_cart_appointments(
                     from app.models.visit import VisitService
                     service = MorningAssignmentService()
                     service.db = db  # Используем существующую сессию
-                    queue_assignments = service._assign_queues_for_visit(visit, today)
+                    # Для ручной регистрации через мастера источник должен быть 'desk'
+                    queue_assignments = service._assign_queues_for_visit(
+                        visit,
+                        today,
+                        source="desk",
+                    )
                     if queue_assignments:
                         visit.status = "open"  # Готов к приему
                         queue_numbers[visit.id] = queue_assignments
-                        print(f"[OK] REGISTRATION DEBUG: Визит {visit.id} - присвоено {len(queue_assignments)} номеров в очередях")
+                        logger.info(
+                            "REGISTRATION: Визит %d - присвоено %d номеров в очередях (source=desk)",
+                            visit.id,
+                            len(queue_assignments),
+                        )
                     else:
-                        print(f"[WARN] REGISTRATION DEBUG: Визит {visit.id} - не удалось присвоить номера в очередях")
+                        logger.warning(
+                            "REGISTRATION: Визит %d - не удалось присвоить номера в очередях (source=desk)",
+                            visit.id,
+                        )
                 except Exception as e:
-                    print(f"[WARN] REGISTRATION DEBUG: Ошибка присвоения очередей для визита {visit.id}: {str(e)}")
-                    import traceback
-                    print(f"[WARN] TRACEBACK: {traceback.format_exc()}")
+                    logger.warning(
+                        "REGISTRATION: Ошибка присвоения очередей для визита %d (source=desk): %s",
+                        visit.id,
+                        str(e),
+                        exc_info=True,
+                    )
                     # Не прерываем создание визита из-за ошибки очередей
                     continue
         
         db.commit()
-        print(f"[OK] REGISTRATION DEBUG: Транзакция зафиксирована в базе данных!")
+        logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
         
         # Формируем талоны для визитов с присвоенными номерами очередей
         print_tickets = []
@@ -642,7 +656,7 @@ def create_cart_appointments(
                     "confirmation_token": visit.confirmation_token if visit.status == "pending_confirmation" else None
                 })
         except Exception as e:
-            print(f"[WARN] REGISTRATION DEBUG: Ошибка формирования ответа (визиты уже сохранены): {str(e)}")
+            logger.warning("REGISTRATION: Ошибка формирования ответа (визиты уже сохранены): %s", str(e), exc_info=True)
             # Визиты уже сохранены, поэтому не откатываем транзакцию
         
         # Определяем сообщение в зависимости от результата
@@ -651,11 +665,8 @@ def create_cart_appointments(
         else:
             message = "Визиты созданы. Номера в очередях будут присвоены в день визита."
         
-        print(f"[OK] REGISTRATION DEBUG: Корзина создана успешно!")
-        print(f"   Создано визитов: {len(created_visits)}")
-        print(f"   ID визитов: {[v.id for v in created_visits]}")
-        print(f"   Invoice ID: {invoice.id}")
-        print(f"   Total amount: {total_invoice_amount}")
+        logger.info("REGISTRATION: Корзина создана успешно. Создано визитов: %d, ID визитов: %s, Invoice ID: %d, Total amount: %s",
+                    len(created_visits), [v.id for v in created_visits], invoice.id, total_invoice_amount)
 
         return CartResponse(
             success=True,
@@ -671,9 +682,8 @@ def create_cart_appointments(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[ERROR] REGISTRATION DEBUG: Ошибка создания корзины: {str(e)}")
+        logger.error("REGISTRATION: Ошибка создания корзины: %s", str(e), exc_info=True)
         import traceback
-        print(f"[ERROR] Трейсбек: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -910,7 +920,7 @@ def get_all_free_requests(
                             doctor_name = f"Врач #{doctor.id}"
                         doctor_specialty = doctor.specialty
                 except Exception as e:
-                    print(f"[get_all_free_requests] Ошибка получения данных врача для visit {visit.id}: {e}")
+                    logger.warning("get_all_free_requests: Ошибка получения данных врача для visit %d: %s", visit.id, e, exc_info=True)
                     doctor_name = f"Врач #{visit.doctor_id}"
                     doctor_specialty = None
             
@@ -1344,7 +1354,7 @@ def get_visits(
                     created_at=appointment.created_at
                 ))
         except Exception as e:
-            print(f"DEBUG: Error processing appointments: {e}")
+            logger.error("Error processing appointments: %s", e, exc_info=True)
         
         # 2. ПОЛУЧАЕМ ЗАПИСИ ИЗ НОВОЙ ТАБЛИЦЫ VISITS
         visits_query = db.query(Visit)
@@ -1811,7 +1821,7 @@ def mark_visit_as_paid(
         from app.services.billing_service import BillingService
         
         # Логирование для диагностики
-        print(f"[mark_visit_as_paid] User: {current_user.username}, Role: {current_user.role}, Visit ID: {visit_id}")
+        logger.info("mark_visit_as_paid: User: %s, Role: %s, Visit ID: %d", current_user.username, current_user.role, visit_id)
         
         # Находим запись
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
@@ -1871,9 +1881,9 @@ def mark_visit_as_paid(
             # Получаем созданный платеж
             payment = db.query(Payment).filter(Payment.visit_id == visit_id).order_by(Payment.created_at.desc()).first()
             
-            print(f"[mark_visit_as_paid] [OK] Создан платеж ID={payment.id} для визита {visit_id}, сумма={payment_amount}")
+            logger.info("mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s", payment.id, visit_id, payment_amount)
         else:
-            print(f"[mark_visit_as_paid] [WARN] Платеж уже существует для визита {visit_id}, ID={existing_payment.id}")
+            logger.warning("mark_visit_as_paid: Платеж уже существует для визита %d, ID=%d", visit_id, existing_payment.id)
         
         # Обновляем статус и discount_mode
         visit.status = "paid"
@@ -1890,9 +1900,7 @@ def mark_visit_as_paid(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[mark_visit_as_paid] Error: {str(e)}")
-        import traceback
-        print(f"[mark_visit_as_paid] Traceback: {traceback.format_exc()}")
+        logger.error("mark_visit_as_paid: Error: %s", str(e), exc_info=True)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

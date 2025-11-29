@@ -671,3 +671,84 @@ python -m alembic upgrade b9716387212f
 **Версия системы**: 1.0.0  
 **Статус**: ✅ Реализовано и протестировано
 
+---
+
+## Интеграция `AppointmentWizardV2` с онлайн-очередями (чек‑лист)
+
+### Backend (очереди и визиты)
+
+- [x] **SSOT-модели очередей**  
+  Используются только `DailyQueue`, `OnlineQueueEntry`, `QueueToken` (`app/models/online_queue.py`). Поля `queue_time`, `source`, `is_clinic_wide` применяются согласно разделу «База данных».
+
+- [x] **QR-регистрация (Scenario 1/2)**  
+  `POST /api/v1/queue/join/start` и `POST /api/v1/queue/join/complete` (в т.ч. множественная) создают **только** `queue_entries` c `source='online'` и корректным `queue_time`. В этот момент визиты не создаются. Реализация: `QRQueueService.join_queue_with_token()` / `complete_join_session(_multiple)` + `QueueBusinessService.create_queue_entry()`.
+
+- [x] **Ручной сценарий через мастер (desk, Scenario 4/5)**  
+  Endpoint: `POST /api/v1/registrar/cart` (`create_cart_appointments` в `app/api/v1/endpoints/registrar_wizard.py`).  
+  Вход строго соответствует `CartRequest` (`patient_id`, `visits[]`, `discount_mode`, `payment_method`, `all_free`, `notes`).  
+  Визиты создаются через SSOT (`create_visit` + `BillingService.calculate_total`).  
+  Для визитов на сегодня номера в очереди присваиваются через `MorningAssignmentService._assign_queues_for_visit(..., source="desk")`, что даёт `OnlineQueueEntry.source='desk'` и `queue_time = текущее локальное время`.
+
+- [x] **Утренняя сборка (Scenario 6)**  
+  Сервис: `MorningAssignmentService` (`app/services/morning_assignment.py`).  
+  Использует `doctor_id` (через `Doctor.user_id`) для `DailyQueue.specialist_id`.  
+  Для подтверждённых визитов на текущий день создаёт `OnlineQueueEntry` с `source='morning_assignment'` и `queue_time = время запуска сборки`.
+
+- [x] **Добавление услуг по QR (Scenario 3)**  
+  Endpoint: `PUT /api/v1/queue/online-entry/{entry_id}/full-update` (`full_update_online_entry` в `qr_queue.py`).  
+  Личные данные пациента обновляются без изменения `queue_time` и `number` существующих записей.  
+  Новые услуги создают новые `OnlineQueueEntry` с `queue_time = текущее время редактирования`, `source='online'`, по нужному `queue_tag`.
+
+- [x] **Batch API для очередей**  
+  Endpoint: `POST /api/v1/registrar-integration/queue/entries/batch`.  
+  Использует `QueueBusinessService.create_queue_entry()` (SSOT): `queue_time` устанавливается один раз, `source` берётся из запроса (`online`, `desk`, `morning_assignment`).  
+  Покрыт интеграционными тестами: `backend/tests/integration/test_queue_batch_api.py`.
+
+### Frontend (мастер и панели)
+
+- [x] **QR‑регистрация без мастера** (`QueueJoin.jsx`)  
+  Ступени интерфейса: `loading → waiting → info → select-specialists → form → success`.  
+  Работает поверх публичных эндпоинтов очереди. При успешной записи шлёт `CustomEvent('queueUpdated', { detail: { action: 'refreshAll', specialty, departmentKey, entry } })` и сохраняет `lastQueueJoin` в `localStorage` для fallback-обновлений.
+
+- [x] **Панель очередей регистратуры** (`ModernQueueManager.jsx`)  
+  Использует `GET /api/v1/registrar/queues/today` как объединённый источник (`visits + appointments + queue_entries`), генерацию QR и слушает события `queueUpdated` для мгновенного обновления таблиц.
+
+- [x] **Таблица записей** (`EnhancedAppointmentsTable.jsx`)  
+  Отображает:
+  - `queue_numbers[]` (номер и очередь/вкладка),
+  - `source` (`online`, `desk`, `morning_assignment`, `confirmation`) с метками **QR/Manual**,
+  - `discount_mode`, `payment_status`, AllFree и др.  
+  Использует единый маппинг услуг (`service_code`/`category_code`) для кодов (K**, D**, S**, L** и т.п.) и тултипов с полными названиями.
+
+- [x] **`AppointmentWizardV2`** (`frontend/src/components/wizard/AppointmentWizardV2.jsx`)  
+  - Новый визит (desk) → формирует `CartRequest` и вызывает `/registrar/cart`.  
+  - Edit визита → восстанавливает корзину из `initialData`, отслеживает новые услуги, создаёт для них новые визиты/очереди.  
+  - Edit QR‑записи → поднимает данные пациента из очереди/пациента, маппит `queue_numbers` → услуги, при завершении:
+    - создаёт/обновляет `Visit`/`VisitService`,
+    - для новых услуг создаёт отдельные `OnlineQueueEntry` c новым `queue_time`, не изменяя исходные `queue_entries`.
+
+### Мини‑чек‑лист для ручной проверки
+
+- [ ] **Scenario 1/2 (QR только создаёт очередь)**  
+  Выполнить `queue/join/complete` (одиночный и множественный варианты) и убедиться, что создаются только `queue_entries` (`source='online'`), без новых `visits/appointments`.
+
+- [ ] **Scenario 3 (добавление услуг по QR)**  
+  Открыть QR-запись в `AppointmentWizardV2`, добавить услуги, завершить:
+  - старые `queue_entries` не меняют `queue_time` и `number`,
+  - для новых услуг появляются новые строки очереди с `queue_time = время редактирования`, `source='online'`.
+
+- [ ] **Scenario 4/5 (desk)**  
+  Создать визит через мастер на сегодня:
+  - визиты создаются через `/registrar/cart`,
+  - в очередях появляются новые записи с `source='desk'` и корректным `queue_time`.
+
+- [ ] **Scenario 6 (morning_assignment)**  
+  Подготовить подтверждённые визиты на завтра, запустить `MorningAssignmentService`:
+  - создаются `OnlineQueueEntry` с `source='morning_assignment'`,
+  - `DailyQueue.specialist_id` указывает на `users.id` врача.
+
+- [ ] **Регрессия по мастеру**  
+  - Новый визит (desk) по основным отделениям (кардио, дерма, стоматология, лаборатория).  
+  - Edit визита с добавлением/удалением услуг.  
+  - Edit QR‑записи с добавлением услуг в разные отделения (проверить, что новые очереди создаются отдельно, а старые не меняются).
+
