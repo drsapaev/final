@@ -1,7 +1,10 @@
 # app/api/v1/api.py
 from __future__ import annotations
 
+import logging
 from fastapi import APIRouter
+
+logger = logging.getLogger(__name__)
 
 # CRUD departments endpoint registered
 
@@ -160,7 +163,7 @@ api_router.include_router(security_management_router, tags=["security-management
 api_router.include_router(migration_management_router, tags=["migration-management"])
 # Эндпоинты управления фича-флагами
 api_router.include_router(feature_flags.router, tags=["feature-flags"])
-# Эндпоинты QR очередей
+# Эндпоинты QR очередей (основной роутер для queue)
 api_router.include_router(qr_queue.router, prefix="/queue", tags=["qr-queue"])
 # Эндпоинты лимитов очередей
 api_router.include_router(queue_limits.router, prefix="/admin", tags=["queue-limits"])
@@ -201,7 +204,7 @@ try:
     from app.api.v1.endpoints import mcp
     api_router.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 except ImportError:
-    print("MCP module not available - skipping MCP routes")
+        logger.info("MCP module not available - skipping MCP routes")
 api_router.include_router(telegram_bot.router, prefix="/telegram/bot", tags=["telegram-bot"])  # Telegram Bot
 api_router.include_router(telegram_integration.router, prefix="/telegram", tags=["telegram-integration"])
 api_router.include_router(display_websocket.router, prefix="/display", tags=["display-websocket"])
@@ -242,7 +245,8 @@ api_router.include_router(telegram_bot_management.router, prefix="/telegram-bot"
 api_router.include_router(fcm_notifications.router, prefix="/fcm", tags=["fcm-notifications"])
 api_router.include_router(phone_verification.router, prefix="/phone-verification", tags=["phone-verification"])
 api_router.include_router(password_reset.router, prefix="/password-reset", tags=["password-reset"])
-api_router.include_router(queue_reorder.router, prefix="/queue", tags=["queue-reorder"])
+# Эндпоинты переупорядочения очереди (специализированный функционал)
+api_router.include_router(queue_reorder.router, prefix="/queue/reorder", tags=["queue-reorder"])
 api_router.include_router(websocket_auth.router, prefix="/ws-auth", tags=["websocket-auth"])
 api_router.include_router(email_sms_enhanced.router, prefix="/email-sms", tags=["email-sms-enhanced"])
 api_router.include_router(file_system.router, prefix="/files", tags=["file-system"])
@@ -250,8 +254,9 @@ api_router.include_router(file_upload_simple.router, prefix="/files", tags=["fil
 api_router.include_router(file_upload_json.router, prefix="/files", tags=["file-upload-json"])
 api_router.include_router(file_test.router, prefix="/files", tags=["file-test"])
 api_router.include_router(schedule.router, tags=["schedule"])
-# Основной queue router с онлайн-очередью
-api_router.include_router(queue_router, prefix="/queue", tags=["queue"])
+# Legacy queue router (для обратной совместимости)
+# ⚠️ DEPRECATED: Используйте /queue/qr-tokens/* или /queue/join/* из qr_queue.py
+api_router.include_router(queue_router, prefix="/queue/legacy", tags=["queue-legacy"])
 api_router.include_router(cardio.router, tags=["cardio"])
 api_router.include_router(derma.router, tags=["derma"])
 api_router.include_router(dental.router, tags=["dental"])

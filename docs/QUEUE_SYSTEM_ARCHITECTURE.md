@@ -277,14 +277,57 @@ entries = db.query(OnlineQueueEntry).filter(
 
 ---
 
+## 🔌 API Endpoints
+
+### ✅ Активные endpoints (ИСПОЛЬЗУЙТЕ ЭТИ)
+
+**Расположение**: `backend/app/api/v1/endpoints/qr_queue.py`
+
+**Префикс**: `/api/v1/queue/*`
+
+**Основные endpoints**:
+- `POST /queue/admin/qr-tokens/generate` - Генерация QR токена для специалиста
+- `POST /queue/admin/qr-tokens/generate-clinic` - Генерация общего QR токена для клиники
+- `POST /queue/join/start` - Начало сессии присоединения к очереди
+- `POST /queue/join/complete` - Завершение присоединения к очереди
+- `GET /queue/status/{specialist_id}` - Получение статуса очереди
+- `POST /queue/{specialist_id}/call-next` - Вызов следующего пациента
+- `GET /queue/admin/queue-analytics/{specialist_id}` - Аналитика очереди
+- `PUT /queue/online-entry/{entry_id}/update` - Обновление записи в очереди
+- `PUT /queue/online-entry/{entry_id}/full-update` - Полное обновление записи
+
+**Документация**: См. `docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md`
+
+### ⚠️ Legacy endpoints (DEPRECATED)
+
+**Расположение**: `backend/app/api/v1/endpoints/queue.py`
+
+**Префикс**: `/api/v1/queue/legacy/*`
+
+**Статус**: DEPRECATED - будут удалены в будущих версиях
+
+**Миграция**: Используйте endpoints из `qr_queue.py` (см. migration guide)
+
+### 🔄 Специализированные endpoints
+
+**Расположение**: `backend/app/api/v1/endpoints/queue_reorder.py`
+
+**Префикс**: `/api/v1/queue/reorder/*`
+
+**Назначение**: Переупорядочение очереди, управление порядком записей
+
+---
+
 ## 📚 Связанная документация
 
 - [ONLINE_QUEUE_SYSTEM_IMPLEMENTATION.md](./ONLINE_QUEUE_SYSTEM_IMPLEMENTATION.md) - Полная спецификация
+- [QUEUE_ENDPOINTS_MIGRATION_GUIDE.md](./QUEUE_ENDPOINTS_MIGRATION_GUIDE.md) - Migration guide для endpoints
 - [QUEUE_REFACTOR_ANALYSIS.md](../QUEUE_REFACTOR_ANALYSIS.md) - Анализ зависимостей
 - [PHASE_2_1_COMPLETE_REPORT.md](../PHASE_2_1_COMPLETE_REPORT.md) - Отчет по Foreign Key fix
+- [PHASE_3_1_ANALYSIS_REPORT.md](../PHASE_3_1_ANALYSIS_REPORT.md) - Анализ queue endpoints
 
 ---
 
 **Подготовил**: Claude Code Agent
-**Последнее обновление**: 2025-11-24
+**Последнее обновление**: 2025-01-XX
 **Статус**: ✅ Официальная документация SSOT

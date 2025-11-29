@@ -1,13 +1,34 @@
 """
 API эндпоинты для QR очередей
+
+✅ ACTIVE: Этот модуль содержит активные, рекомендуемые endpoints для работы с очередями.
+
+Основные возможности:
+- Генерация QR токенов (специалист/клиника)
+- Session-based присоединение к очереди (двухэтапный процесс)
+- Управление записями в очереди
+- Аналитика и статистика
+- Административные функции
+
+Префикс: /api/v1/queue/*
+
+Для legacy endpoints см.: queue.py (DEPRECATED)
+Для переупорядочения очереди см.: queue_reorder.py
+
+Документация:
+- docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md - Migration guide
+- docs/QUEUE_SYSTEM_ARCHITECTURE.md - Архитектура системы
 """
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_db, require_roles
+
+logger = logging.getLogger(__name__)
 from app.models.user import User
 # NOTE: Doctor импортируется внутри функций для избежания circular dependency
 from app.services.qr_queue_service import QRQueueService
@@ -339,8 +360,12 @@ def get_available_specialists(
         
     except Exception as e:
         import traceback
-        print(f"[get_available_specialists] ОШИБКА: {type(e).__name__}: {str(e)}")
-        print(f"[get_available_specialists] Traceback:\n{traceback.format_exc()}")
+        logger.error(
+            "[get_available_specialists] ОШИБКА: %s: %s",
+            type(e).__name__,
+            str(e),
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения списка специалистов: {str(e)}"
@@ -371,8 +396,12 @@ def get_qr_token_info(
         raise
     except Exception as e:
         import traceback
-        print(f"[get_qr_token_info] ОШИБКА: {type(e).__name__}: {str(e)}")
-        print(f"[get_qr_token_info] Traceback:\n{traceback.format_exc()}")
+        logger.error(
+            "[get_qr_token_info] ОШИБКА: %s: %s",
+            type(e).__name__,
+            str(e),
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения информации о токене: {str(e)}"
@@ -398,29 +427,40 @@ def start_join_session(
         except (QueueValidationError, QueueNotFoundError) as exc:
             raise ValueError(str(exc)) from exc
 
-        print(f"[start_join_session] Запрос на начало сессии с токеном: {request.token[:20]}...")
+        logger.info(
+            "[start_join_session] Запрос на начало сессии с токеном: %s...",
+            request.token[:20],
+        )
         result = service.start_join_session(
             token=request.token,
             ip_address=http_request.client.host if http_request.client else None,
             user_agent=http_request.headers.get("User-Agent")
         )
         
-        print(f"[start_join_session] Сессия успешно создана: {result.get('session_token', '')[:20]}...")
+        logger.info(
+            "[start_join_session] Сессия успешно создана: %s...",
+            result.get('session_token', '')[:20],
+        )
         return JoinSessionStartResponse(**result)
         
     except ValueError as e:
         error_msg = str(e)
-        print(f"[start_join_session] ValueError: {error_msg}")
-        print(f"[start_join_session] Токен: {request.token[:20]}...")
+        logger.warning(
+            "[start_join_session] ValueError: %s, Токен: %s...",
+            error_msg,
+            request.token[:20],
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg
         )
     except Exception as e:
         error_msg = f"Ошибка начала сессии: {str(e)}"
-        print(f"[start_join_session] Неожиданная ошибка: {error_msg}")
-        print(f"[start_join_session] Трассировка:")
-        traceback.print_exc()
+        logger.error(
+            "[start_join_session] Неожиданная ошибка: %s",
+            error_msg,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg
@@ -439,11 +479,13 @@ def complete_join_session(
     service = QRQueueService(db)
 
     try:
-        print(f"[complete_join_session] Начало обработки запроса")
-        print(f"[complete_join_session] session_token: {request.session_token}")
-        print(f"[complete_join_session] patient_name: {request.patient_name}")
-        print(f"[complete_join_session] phone: {request.phone}")
-        print(f"[complete_join_session] specialist_ids: {request.specialist_ids}")
+        logger.info(
+            "[complete_join_session] Начало обработки запроса: session_token=%s, patient_name=%s, phone=%s, specialist_ids=%s",
+            request.session_token,
+            request.patient_name,
+            request.phone,
+            request.specialist_ids,
+        )
 
         # Если передан список specialist_ids - множественное присоединение
         if request.specialist_ids and len(request.specialist_ids) > 0:
@@ -454,7 +496,10 @@ def complete_join_session(
                 phone=request.phone,
                 telegram_id=request.telegram_id,
             )
-            print(f"[complete_join_session] Результат множественного присоединения: {result}")
+            logger.info(
+                "[complete_join_session] Результат множественного присоединения: %s",
+                result,
+            )
             return JoinSessionCompleteMultipleResponse(**result)
         else:
             # Одиночное присоединение (старый способ)
@@ -465,23 +510,23 @@ def complete_join_session(
                 telegram_id=request.telegram_id
             )
 
-            print(f"[complete_join_session] Результат получен: {result}")
+            logger.info(
+                "[complete_join_session] Результат получен: %s",
+                result,
+            )
             return JoinSessionCompleteResponse(**result)
 
     except ValueError as e:
-        print(f"[complete_join_session] ValueError: {str(e)}")
+        logger.warning(
+            "[complete_join_session] ValueError: %s",
+            str(e),
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception as e:
-        import traceback
-        print(f"[complete_join_session] Exception: {type(e).__name__}: {str(e)}")
-        print(f"[complete_join_session] Traceback:\n{traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка присоединения к очереди: {str(e)}"
-        )
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
 
 
 @router.get("/status/{specialist_id}", response_model=QueueStatusResponse)
@@ -776,8 +821,12 @@ def update_online_entry(
         raise
     except Exception as e:
         import traceback
-        print(f"[update_online_entry] Ошибка: {type(e).__name__}: {str(e)}")
-        print(f"[update_online_entry] Traceback:\n{traceback.format_exc()}")
+        logger.error(
+            "[update_online_entry] Ошибка: %s: %s",
+            type(e).__name__,
+            str(e),
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка обновления данных: {str(e)}"
@@ -816,10 +865,13 @@ def full_update_online_entry(
         from datetime import date
         import json
 
-        print(f"[full_update_online_entry] Обновление записи ID={entry_id}")
-        print(f"[full_update_online_entry] Данные пациента: {request.patient_data}")
-        print(f"[full_update_online_entry] Тип визита: {request.visit_type}")
-        print(f"[full_update_online_entry] Услуги: {request.services}")
+        logger.info(
+            "[full_update_online_entry] Обновление записи ID=%d, Данные пациента: %s, Тип визита: %s, Услуги: %s",
+            entry_id,
+            request.patient_data,
+            request.visit_type,
+            request.services,
+        )
 
         # 1. Находим запись
         entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
@@ -830,31 +882,52 @@ def full_update_online_entry(
                 detail="Запись не найдена"
             )
 
-        print(f"[full_update_online_entry] Запись найдена: {entry.patient_name}, phone={entry.phone}")
+        logger.info(
+            "[full_update_online_entry] Запись найдена: %s, phone=%s",
+            entry.patient_name,
+            entry.phone,
+        )
 
         # 2. Обновляем данные пациента в OnlineQueueEntry
         patient_data = request.patient_data
         if patient_data.get('patient_name'):
             entry.patient_name = patient_data['patient_name']
-            print(f"[full_update_online_entry] Обновлено ФИО: {entry.patient_name}")
+            logger.info(
+                "[full_update_online_entry] Обновлено ФИО: %s",
+                entry.patient_name,
+            )
 
         if patient_data.get('phone'):
             entry.phone = patient_data['phone']
-            print(f"[full_update_online_entry] Обновлен телефон: {entry.phone}")
+            logger.info(
+                "[full_update_online_entry] Обновлен телефон: %s",
+                entry.phone,
+            )
 
         if patient_data.get('birth_year') is not None:
             entry.birth_year = patient_data['birth_year']
-            print(f"[full_update_online_entry] Обновлен год рождения: {entry.birth_year}")
+            logger.info(
+                "[full_update_online_entry] Обновлен год рождения: %s",
+                entry.birth_year,
+            )
 
         if patient_data.get('address'):
             entry.address = patient_data['address']
-            print(f"[full_update_online_entry] Обновлен адрес: {entry.address}")
+            logger.info(
+                "[full_update_online_entry] Обновлен адрес: %s",
+                entry.address,
+            )
 
         # 3. Обновляем тип визита и режим скидки
         entry.visit_type = request.visit_type
         # ✅ ИСПРАВЛЕНО: Если all_free = True, устанавливаем discount_mode = "all_free"
         entry.discount_mode = "all_free" if request.all_free else request.discount_mode
-        print(f"[full_update_online_entry] Тип визита: {entry.visit_type}, режим скидки: {entry.discount_mode}, all_free: {request.all_free}")
+        logger.info(
+            "[full_update_online_entry] Тип визита: %s, режим скидки: %s, all_free: %s",
+            entry.visit_type,
+            entry.discount_mode,
+            request.all_free,
+        )
 
         # 4. Обновляем услуги и рассчитываем сумму
         # ✅ НОВЫЙ ФОРМАТ: Полные объекты услуг с метаданными
@@ -870,7 +943,10 @@ def full_update_online_entry(
             try:
                 existing_services = json.loads(entry.services)
                 existing_service_ids = {svc.get('service_id') for svc in existing_services if svc.get('service_id')}
-                print(f"[full_update_online_entry] Существующие услуги: {existing_service_ids}")
+                logger.info(
+                    "[full_update_online_entry] Существующие услуги: %s",
+                    existing_service_ids,
+                )
             except:
                 pass
 
@@ -880,7 +956,10 @@ def full_update_online_entry(
             if service_item['service_id'] not in existing_service_ids:
                 new_service_ids.append(service_item['service_id'])
 
-        print(f"[full_update_online_entry] Новые услуги для добавления: {new_service_ids}")
+        logger.info(
+            "[full_update_online_entry] Новые услуги для добавления: %s",
+            new_service_ids,
+        )
 
         # Определяем: это первичная регистрация или редактирование?
         is_initial_registration = entry.queue_time is None or not entry.services
@@ -888,12 +967,18 @@ def full_update_online_entry(
         if is_initial_registration:
             # Первичная регистрация - обновляем текущую entry со всеми услугами
             queue_time = entry.queue_time or datetime.now(timezone.utc)
-            print(f"[full_update_online_entry] Первичная регистрация, queue_time: {queue_time}")
+            logger.info(
+                "[full_update_online_entry] Первичная регистрация, queue_time: %s",
+                queue_time,
+            )
         else:
             # Редактирование - обновляем текущую entry ТОЛЬКО со старыми услугами
             # Новые услуги будут добавлены как отдельные entries ПОСЛЕ обновления Visit
             queue_time = entry.queue_time
-            print(f"[full_update_online_entry] Редактирование существующей записи, сохраняем оригинальное queue_time: {queue_time}")
+            logger.info(
+                "[full_update_online_entry] Редактирование существующей записи, сохраняем оригинальное queue_time: %s",
+                queue_time,
+            )
 
         # ⭐ Обрабатываем услуги для текущей entry
         # При первичной регистрации - добавляем все услуги
@@ -903,7 +988,10 @@ def full_update_online_entry(
 
             # Если это редактирование и услуга новая - пропускаем (она уже добавлена как отдельная entry)
             if not is_initial_registration and service_id in new_service_ids:
-                print(f"[full_update_online_entry] Пропуск новой услуги {service_id} (уже создана отдельная queue_entry)")
+                logger.info(
+                    "[full_update_online_entry] Пропуск новой услуги %d (уже создана отдельная queue_entry)",
+                    service_id,
+                )
                 continue
 
             service = db.query(Service).filter(Service.id == service_id).first()
@@ -911,15 +999,22 @@ def full_update_online_entry(
                 # Рассчитываем стоимость с учетом скидок
                 item_price = service.price * service_item.get('quantity', 1)
 
-                print(f"[full_update_online_entry] Услуга: {service.name}, базовая цена: {item_price}")
+                logger.info(
+                    "[full_update_online_entry] Услуга: %s, базовая цена: %s",
+                    service.name,
+                    item_price,
+                )
 
                 # Применяем скидки
                 if service.is_consultation and request.discount_mode in ['repeat', 'benefit']:
-                    print(f"[full_update_online_entry] Применена скидка на консультацию ({request.discount_mode})")
+                    logger.info(
+                        "[full_update_online_entry] Применена скидка на консультацию (%s)",
+                        request.discount_mode,
+                    )
                     item_price = 0  # Консультация бесплатна для повторных и льготных
 
                 if request.all_free:
-                    print(f"[full_update_online_entry] Применена скидка all_free")
+                    logger.info("[full_update_online_entry] Применена скидка all_free")
                     item_price = 0  # Всё бесплатно
 
                 total_amount += item_price
@@ -944,8 +1039,11 @@ def full_update_online_entry(
         entry.service_codes = json.dumps(service_codes_list, ensure_ascii=False)  # Обратная совместимость
         entry.total_amount = int(total_amount)  # ✅ СОХРАНЯЕМ СУММУ (конвертируем в int)
 
-        print(f"[full_update_online_entry] Услуги обновлены (новый формат): {len(services_list)} услуг(и)")
-        print(f"[full_update_online_entry] Итоговая сумма: {total_amount}")
+        logger.info(
+            "[full_update_online_entry] Услуги обновлены (новый формат): %d услуг(и), Итоговая сумма: %s",
+            len(services_list),
+            total_amount,
+        )
 
         # ✅ НОВОЕ: Если all_free = True, создаем или обновляем Visit для одобрения
         visit = None  # ✅ Инициализируем переменную visit для использования в проверках после коммита
@@ -954,7 +1052,9 @@ def full_update_online_entry(
             from decimal import Decimal
             from app.models.online_queue import DailyQueue
             
-            print(f"[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения")
+            logger.info(
+                "[full_update_online_entry] all_free=True, создаем/обновляем Visit для одобрения",
+            )
             
             # Получаем данные из связанной очереди
             queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
@@ -1018,7 +1118,9 @@ def full_update_online_entry(
             patient_id_for_visit = entry.patient_id
             if not patient_id_for_visit:
                 # ✅ ИСПРАВЛЕНО: Создаем временного пациента используя единую функцию нормализации
-                print(f"[full_update_online_entry] Создание временного пациента для QR-записи")
+                logger.info(
+                    "[full_update_online_entry] Создание временного пациента для QR-записи",
+                )
                 from app.crud.patient import normalize_patient_name
                 patient_name = patient_data.get('patient_name', 'Неизвестный пациент')
                 name_parts = normalize_patient_name(full_name=patient_name)
@@ -1040,7 +1142,10 @@ def full_update_online_entry(
                 patient_id_for_visit = temp_patient.id
                 # ✅ Связываем OnlineQueueEntry с созданным пациентом
                 entry.patient_id = patient_id_for_visit
-                print(f"[full_update_online_entry] Создан временный пациент ID={patient_id_for_visit} и связан с OnlineQueueEntry")
+                logger.info(
+                    "[full_update_online_entry] Создан временный пациент ID=%d и связан с OnlineQueueEntry",
+                    patient_id_for_visit,
+                )
             
             # ✅ ИСПРАВЛЕНО: Улучшенный поиск существующего Visit для предотвращения дублирования
             visit = None
@@ -1049,7 +1154,10 @@ def full_update_online_entry(
             if entry.visit_id:
                 visit = db.query(Visit).filter(Visit.id == entry.visit_id).first()
                 if visit:
-                    print(f"[full_update_online_entry] Найден Visit по entry.visit_id: {visit.id}")
+                    logger.info(
+                        "[full_update_online_entry] Найден Visit по entry.visit_id: %d",
+                        visit.id,
+                    )
             
             # Приоритет 2: Если не найден, ищем по patient_id + visit_date (без фильтра по discount_mode)
             # Это важно, так как при первом редактировании может быть создан Visit с другим discount_mode
@@ -1059,7 +1167,11 @@ def full_update_online_entry(
                     Visit.visit_date == visit_date
                 ).order_by(Visit.created_at.desc()).first()  # Берем самый последний
                 if visit:
-                    print(f"[full_update_online_entry] Найден Visit по patient_id + visit_date: {visit.id}, discount_mode={visit.discount_mode}")
+                    logger.info(
+                        "[full_update_online_entry] Найден Visit по patient_id + visit_date: %d, discount_mode=%s",
+                        visit.id,
+                        visit.discount_mode,
+                    )
             
             # Приоритет 3: Если все еще не найден, ищем по patient_id + visit_date + discount_mode="all_free"
             if not visit and patient_id_for_visit:
@@ -1069,11 +1181,17 @@ def full_update_online_entry(
                     Visit.discount_mode == "all_free"
                 ).first()
                 if visit:
-                    print(f"[full_update_online_entry] Найден Visit по patient_id + visit_date + all_free: {visit.id}")
+                    logger.info(
+                        "[full_update_online_entry] Найден Visit по patient_id + visit_date + all_free: %d",
+                        visit.id,
+                    )
             
             if visit:
                 # ✅ ИСПРАВЛЕНО: Обновляем существующий Visit (не создаем новый)
-                print(f"[full_update_online_entry] Обновление существующего Visit ID={visit.id}")
+                logger.info(
+                    "[full_update_online_entry] Обновление существующего Visit ID=%d",
+                    visit.id,
+                )
                 visit.approval_status = "pending"  # Сбрасываем статус на pending при обновлении
                 visit.discount_mode = "all_free"  # Убеждаемся, что режим правильный
                 visit.department = department  # Обновляем department
@@ -1092,26 +1210,42 @@ def full_update_online_entry(
                 if has_paid_invoice:
                     # ⚠️ Визит УЖЕ оплачен - НЕ удаляем существующие услуги!
                     # Только добавляем новые услуги к уже существующим
-                    print(f"[full_update_online_entry] ⚠️ Visit {visit.id} имеет оплаченный инвойс - НЕ удаляем услуги, только добавляем новые")
+                    logger.warning(
+                        "[full_update_online_entry] ⚠️ Visit %d имеет оплаченный инвойс - НЕ удаляем услуги, только добавляем новые",
+                        visit.id,
+                    )
                     deleted_count = 0
                 else:
                     # ✅ Визит не оплачен - безопасно удалять и пересоздавать услуги
                     deleted_count = db.query(VisitService).filter(VisitService.visit_id == visit.id).delete()
                     db.flush()  # Коммитим удаление перед добавлением новых
-                    print(f"[full_update_online_entry] Удалено старых услуг: {deleted_count}")
+                    logger.info(
+                        "[full_update_online_entry] Удалено старых услуг: %d",
+                        deleted_count,
+                    )
                 
                 # ✅ Связываем OnlineQueueEntry с Visit (если еще не связан)
                 if not entry.visit_id or entry.visit_id != visit.id:
                     entry.visit_id = visit.id
-                    print(f"[full_update_online_entry] Связан OnlineQueueEntry {entry.id} с Visit {visit.id}")
+                    logger.info(
+                        "[full_update_online_entry] Связан OnlineQueueEntry %d с Visit %d",
+                        entry.id,
+                        visit.id,
+                    )
                 
                 # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
                 if entry.discount_mode != "all_free":
                     entry.discount_mode = "all_free"
-                    print(f"[full_update_online_entry] Синхронизирован discount_mode в OnlineQueueEntry {entry.id} с Visit {visit.id}")
+                    logger.info(
+                        "[full_update_online_entry] Синхронизирован discount_mode в OnlineQueueEntry %d с Visit %d",
+                        entry.id,
+                        visit.id,
+                    )
             else:
                 # ✅ Создаем новый Visit только если действительно не найден существующий
-                print(f"[full_update_online_entry] Создание нового Visit для all_free (существующий не найден)")
+                logger.info(
+                    "[full_update_online_entry] Создание нового Visit для all_free (существующий не найден)",
+                )
                 visit = Visit(
                     patient_id=patient_id_for_visit,
                     doctor_id=doctor_id,
@@ -1131,7 +1265,11 @@ def full_update_online_entry(
                 # ✅ ИСПРАВЛЕНО: Синхронизируем discount_mode в OnlineQueueEntry с Visit
                 entry.discount_mode = "all_free"
                 
-                print(f"[full_update_online_entry] Visit создан с ID={visit.id}, department={department}, discount_mode синхронизирован")
+                logger.info(
+                    "[full_update_online_entry] Visit создан с ID=%d, department=%s, discount_mode синхронизирован",
+                    visit.id,
+                    department,
+                )
             
             # ✅ ИСПРАВЛЕНО: Добавляем услуги к Visit (после удаления старых ИЛИ к существующим)
             added_services = []
@@ -1160,20 +1298,30 @@ def full_update_online_entry(
                         db.add(visit_service)
                         added_services.append(service.name)
                         if has_paid_invoice:
-                            print(f"[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: {service.name}")
+                            logger.info(
+                                "[full_update_online_entry] ✅ Добавлена НОВАЯ услуга к оплаченному визиту: %s",
+                                service.name,
+                            )
                     else:
                         # Обновляем количество если услуга уже есть
                         existing_service.qty = service_item.get('quantity', 1)
                         added_services.append(f"{service.name} (обновлено)")
             
             db.flush()  # Коммитим добавление услуг
-            print(f"[full_update_online_entry] Visit ID={visit.id} обновлен с услугами для all_free: {added_services}")
+            logger.info(
+                "[full_update_online_entry] Visit ID=%d обновлен с услугами для all_free: %s",
+                visit.id,
+                added_services,
+            )
 
         # 5. Если есть patient_id, обновляем также запись Patient
         if entry.patient_id:
             patient = db.query(Patient).filter(Patient.id == entry.patient_id).first()
             if patient:
-                print(f"[full_update_online_entry] Обновление связанного пациента ID={patient.id}")
+                logger.info(
+                    "[full_update_online_entry] Обновление связанного пациента ID=%d",
+                    patient.id,
+                )
 
                 if patient_data.get('patient_name'):
                     # Разбираем ФИО на компоненты
@@ -1194,7 +1342,11 @@ def full_update_online_entry(
                 if patient_data.get('address'):
                     patient.address = patient_data['address']
 
-                print(f"[full_update_online_entry] Пациент обновлен: {patient.last_name} {patient.first_name}")
+                logger.info(
+                    "[full_update_online_entry] Пациент обновлен: %s %s",
+                    patient.last_name,
+                    patient.first_name,
+                )
 
                 # ✅ НОВОЕ: Синхронизируем все остальные queue_entries для этого пациента
                 # Это предотвращает дубликаты в UI (одна запись с данными, другие без)
@@ -1204,7 +1356,11 @@ def full_update_online_entry(
                 ).all()
 
                 if other_entries:
-                    print(f"[full_update_online_entry] Синхронизация данных в {len(other_entries)} других queue_entries для пациента {entry.patient_id}")
+                    logger.info(
+                        "[full_update_online_entry] Синхронизация данных в %d других queue_entries для пациента %d",
+                        len(other_entries),
+                        entry.patient_id,
+                    )
                     for other_entry in other_entries:
                         # ⭐ Queue Integrity Patch: Защита от перезаписи старого времени и номера
                         # Сохраняем оригинальные значения перед обновлением
@@ -1226,7 +1382,12 @@ def full_update_online_entry(
                             other_entry.queue_time = original_queue_time
                         if original_number:
                             other_entry.number = original_number
-                        print(f"[full_update_online_entry] ✅ Защита: сохранены queue_time={original_queue_time}, number={original_number} для entry_id={other_entry.id}")
+                        logger.info(
+                            "[full_update_online_entry] ✅ Защита: сохранены queue_time=%s, number=%s для entry_id=%d",
+                            original_queue_time,
+                            original_number,
+                            other_entry.id,
+                        )
 
                         # ⭐ ИСПРАВЛЕНО: НЕ копируем услуги между queue_entries
                         # Каждая queue_entry должна получать услуги только из своего Visit
@@ -1266,14 +1427,25 @@ def full_update_online_entry(
                                 # Обновляем услуги из Visit (не копируем из других queue_entries!)
                                 other_entry.services = json.dumps(visit_services_list, ensure_ascii=False)
                                 other_entry.total_amount = int(visit_total)
-                                print(f"[full_update_online_entry] ✅ Синхронизировано {len(visit_services_list)} услуг из Visit {other_entry.visit_id} для entry {other_entry.id}")
+                                logger.info(
+                                    "[full_update_online_entry] ✅ Синхронизировано %d услуг из Visit %d для entry %d",
+                                    len(visit_services_list),
+                                    other_entry.visit_id,
+                                    other_entry.id,
+                                )
 
-                    print(f"[full_update_online_entry] ✅ Синхронизировано {len(other_entries)} записей")
+                    logger.info(
+                        "[full_update_online_entry] ✅ Синхронизировано %d записей",
+                        len(other_entries),
+                    )
 
         # ⭐ FIX #4 (ПЕРЕРАБОТАН): СОЗДАНИЕ НОВЫХ QUEUE_ENTRIES ДЛЯ НОВЫХ УСЛУГ
         # Выполняется ПОСЛЕ обновления Visit, чтобы получить актуальные услуги
         if entry.visit_id and len(new_service_ids) > 0:
-            print(f"[full_update_online_entry] ⭐ Создание {len(new_service_ids)} новых queue_entries для новых услуг")
+            logger.info(
+                "[full_update_online_entry] ⭐ Создание %d новых queue_entries для новых услуг",
+                len(new_service_ids),
+            )
 
             from datetime import datetime, timezone
 
@@ -1310,7 +1482,10 @@ def full_update_online_entry(
                         services_by_category[queue_tag] = []
                     services_by_category[queue_tag].append(vs)
 
-            print(f"[full_update_online_entry] Новые услуги распределены по категориям: {list(services_by_category.keys())}")
+            logger.info(
+                "[full_update_online_entry] Новые услуги распределены по категориям: %s",
+                list(services_by_category.keys()),
+            )
 
             # Создаем queue_entry для каждой категории с новыми услугами
             for queue_tag, services in services_by_category.items():
@@ -1342,7 +1517,10 @@ def full_update_online_entry(
                     )
                     db.add(daily_queue)
                     db.flush()
-                    print(f"[full_update_online_entry] Создана новая DailyQueue для {queue_tag}")
+                    logger.info(
+                        "[full_update_online_entry] Создана новая DailyQueue для %s",
+                        queue_tag,
+                    )
 
                 next_number = queue_service.get_next_queue_number(
                     db,
@@ -1396,13 +1574,19 @@ def full_update_online_entry(
                 db.flush()
 
                 service_names = [vs.name for vs in services]
-                print(
-                    f"[full_update_online_entry] ⭐ Создана queue_entry #{next_number} "
-                    f"для {queue_tag}: {service_names}, queue_time={current_time}"
+                logger.info(
+                    "[full_update_online_entry] ⭐ Создана queue_entry #%d для %s: %s, queue_time=%s",
+                    next_number,
+                    queue_tag,
+                    service_names,
+                    current_time,
                 )
 
             db.flush()  # Сохраняем новые entries
-            print(f"[full_update_online_entry] ✅ Создано {len(services_by_category)} новых queue_entries")
+            logger.info(
+                "[full_update_online_entry] ✅ Создано %d новых queue_entries",
+                len(services_by_category),
+            )
 
         # ✅ ИСПРАВЛЕНО: Коммитим все изменения одной транзакцией
         try:
@@ -1413,7 +1597,11 @@ def full_update_online_entry(
             if request.all_free and visit:
                 db.refresh(visit)
                 if entry.visit_id != visit.id:
-                    print(f"[full_update_online_entry] ⚠️ Предупреждение: entry.visit_id ({entry.visit_id}) != visit.id ({visit.id}), исправляем...")
+                    logger.warning(
+                        "[full_update_online_entry] ⚠️ Предупреждение: entry.visit_id (%s) != visit.id (%d), исправляем...",
+                        entry.visit_id,
+                        visit.id,
+                    )
                     entry.visit_id = visit.id
                     db.commit()
                     db.refresh(entry)
@@ -1421,11 +1609,18 @@ def full_update_online_entry(
             # ✅ Проверяем количество VisitService для отладки (если all_free)
             if request.all_free and visit:
                 visit_services_count = db.query(VisitService).filter(VisitService.visit_id == visit.id).count()
-                print(f"[full_update_online_entry] ✅ Финальная проверка: Visit {visit.id} имеет {visit_services_count} услуг (ожидалось {len(request.services)})")
+                logger.info(
+                    "[full_update_online_entry] ✅ Финальная проверка: Visit %d имеет %d услуг (ожидалось %d)",
+                    visit.id,
+                    visit_services_count,
+                    len(request.services),
+                )
                 if visit_services_count != len(request.services):
-                    print(f"[full_update_online_entry] ⚠️ Предупреждение: Количество услуг не совпадает! Возможно дубликаты.")
+                    logger.warning(
+                        "[full_update_online_entry] ⚠️ Предупреждение: Количество услуг не совпадает! Возможно дубликаты.",
+                    )
             
-            print(f"[full_update_online_entry] Запись успешно обновлена")
+            logger.info("[full_update_online_entry] Запись успешно обновлена")
 
             return {
                 "success": True,
@@ -1448,8 +1643,12 @@ def full_update_online_entry(
         except Exception as commit_error:
             db.rollback()
             import traceback
-            print(f"[full_update_online_entry] ❌ Ошибка при коммите: {type(commit_error).__name__}: {str(commit_error)}")
-            print(f"[full_update_online_entry] Traceback:\n{traceback.format_exc()}")
+            logger.error(
+                "[full_update_online_entry] ❌ Ошибка при коммите: %s: %s",
+                type(commit_error).__name__,
+                str(commit_error),
+                exc_info=True,
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Ошибка сохранения изменений: {str(commit_error)}"
@@ -1459,8 +1658,12 @@ def full_update_online_entry(
         raise
     except Exception as e:
         import traceback
-        print(f"[full_update_online_entry] Ошибка: {type(e).__name__}: {str(e)}")
-        print(f"[full_update_online_entry] Traceback:\n{traceback.format_exc()}")
+        logger.error(
+            "[full_update_online_entry] Ошибка: %s: %s",
+            type(e).__name__,
+            str(e),
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при обновлении записи: {str(e)}"
@@ -1489,10 +1692,15 @@ def cancel_service_in_entry(
     import json
     from app.models.online_queue import OnlineQueueEntry, DailyQueue
 
-    print(f"[cancel_service] Отмена услуги service_id={request.service_id} в entry_id={entry_id}")
-    print(f"[cancel_service] Причина: {request.cancel_reason}")
-    print(f"[cancel_service] Была оплачена: {request.was_paid}")
-    print(f"[cancel_service] Отменяет: {current_user.username} (ID: {current_user.id})")
+    logger.info(
+        "[cancel_service] Отмена услуги service_id=%d в entry_id=%d, Причина: %s, Была оплачена: %s, Отменяет: %s (ID: %d)",
+        request.service_id,
+        entry_id,
+        request.cancel_reason,
+        request.was_paid,
+        current_user.username,
+        current_user.id,
+    )
 
     try:
         # Получаем запись
@@ -1527,7 +1735,10 @@ def cancel_service_in_entry(
                 service_obj['was_paid_before_cancel'] = request.was_paid
                 service_found = True
                 cancelled_service_obj = service_obj.copy()
-                print(f"[cancel_service] Услуга '{service_obj.get('name')}' отменена")
+                logger.info(
+                    "[cancel_service] Услуга '%s' отменена",
+                    service_obj.get('name'),
+                )
 
             # Пересчитываем сумму (только не отмененные услуги)
             if not service_obj.get('cancelled', False):
@@ -1543,7 +1754,10 @@ def cancel_service_in_entry(
         entry.services = json.dumps(services_list, ensure_ascii=False)
         entry.total_amount = new_total
 
-        print(f"[cancel_service] Новая сумма: {new_total}")
+        logger.info(
+            "[cancel_service] Новая сумма: %s",
+            new_total,
+        )
 
         # Синхронизируем с другими queue_entries этого пациента
         if entry.patient_id:
@@ -1553,7 +1767,10 @@ def cancel_service_in_entry(
             ).all()
 
             if other_entries:
-                print(f"[cancel_service] Синхронизация отмены с {len(other_entries)} другими записями")
+                logger.info(
+                    "[cancel_service] Синхронизация отмены с %d другими записями",
+                    len(other_entries),
+                )
 
                 for other_entry in other_entries:
                     other_services = json.loads(other_entry.services) if other_entry.services else []
@@ -1579,13 +1796,17 @@ def cancel_service_in_entry(
                         if updated:
                             other_entry.services = json.dumps(other_services, ensure_ascii=False)
                             other_entry.total_amount = other_total
-                            print(f"[cancel_service] Синхронизирована запись {other_entry.id}, новая сумма: {other_total}")
+                            logger.info(
+                                "[cancel_service] Синхронизирована запись %d, новая сумма: %s",
+                                other_entry.id,
+                                other_total,
+                            )
 
         # Коммитим изменения
         db.commit()
         db.refresh(entry)
 
-        print(f"[cancel_service] ✅ Услуга успешно отменена")
+        logger.info("[cancel_service] ✅ Услуга успешно отменена")
 
         return {
             "success": True,
@@ -1599,8 +1820,12 @@ def cancel_service_in_entry(
     except Exception as e:
         db.rollback()
         import traceback
-        print(f"[cancel_service] Ошибка: {type(e).__name__}: {str(e)}")
-        print(f"[cancel_service] Traceback:\n{traceback.format_exc()}")
+        logger.error(
+            "[cancel_service] Ошибка: %s: %s",
+            type(e).__name__,
+            str(e),
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при отмене услуги: {str(e)}"

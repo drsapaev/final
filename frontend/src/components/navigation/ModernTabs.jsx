@@ -68,8 +68,15 @@ const ModernTabs = ({
       // axios response.data contains the backend response body
       const departments = response.data.data || [];
 
+      // ✅ ИСПРАВЛЕНО: Сортировка по display_order ASC
+      const sortedDepartments = [...departments].sort((a, b) => {
+        const aOrder = a.display_order || 999;
+        const bOrder = b.display_order || 999;
+        return aOrder - bOrder;
+      });
+
       // Преобразуем данные из БД в формат для вкладок
-      const departmentsData = departments.map(dept => ({
+      const departmentsData = sortedDepartments.map(dept => ({
         key: dept.key,
         label: language === 'uz' ? (dept.name_uz || dept.name_ru) : dept.name_ru,
         icon: iconMap[dept.icon] || Package, // Fallback на Package если иконка не найдена

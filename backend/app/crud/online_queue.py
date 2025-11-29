@@ -28,6 +28,7 @@ See Also:
 """
 from datetime import datetime, date
 from typing import Optional, Tuple, Dict, Any, List
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from zoneinfo import ZoneInfo
@@ -36,6 +37,8 @@ from app.models.online_queue import DailyQueue, OnlineQueueEntry, QueueToken
 from app.models.clinic import Doctor
 from app.crud.clinic import get_queue_settings
 from app.services.queue_service import queue_service  # ✅ SSOT for business logic
+
+logger = logging.getLogger(__name__)
 
 
 # ===================== ВСТУПЛЕНИЕ В ОЧЕРЕДЬ =====================
@@ -171,7 +174,11 @@ def join_online_queue(
         queue_tag=queue_tag_hint,
     )
 
-    print(f"[join_online_queue] next_number (SSOT) = {next_number}, queue_tag={queue_tag_hint}")
+    logger.info(
+        "[join_online_queue] next_number (SSOT) = %d, queue_tag=%s",
+        next_number,
+        queue_tag_hint,
+    )
     
     # Создаем запись в очереди
     # queue_time - бизнес-время регистрации, не меняется при редактировании
@@ -276,10 +283,17 @@ def join_online_queue_multiple(
     errors = []
     
     # Создаем записи для каждого специалиста
-    print(f"[join_online_queue_multiple] Начинаем создание записей для {len(specialist_ids)} специалистов: {specialist_ids}")
+    logger.info(
+        "[join_online_queue_multiple] Начинаем создание записей для %d специалистов: %s",
+        len(specialist_ids),
+        specialist_ids,
+    )
     for specialist_id in specialist_ids:
         try:
-            print(f"[join_online_queue_multiple] Обрабатываем specialist_id={specialist_id}")
+            logger.info(
+                "[join_online_queue_multiple] Обрабатываем specialist_id=%d",
+                specialist_id,
+            )
             # Получаем или создаем дневную очередь для специалиста
             daily_queue = db.query(DailyQueue).filter(
                 and_(
@@ -290,7 +304,10 @@ def join_online_queue_multiple(
             ).first()
             
             if not daily_queue:
-                print(f"[join_online_queue_multiple] DailyQueue не найдена для specialist_id={specialist_id}, создаем новую")
+                logger.info(
+                    "[join_online_queue_multiple] DailyQueue не найдена для specialist_id=%d, создаем новую",
+                    specialist_id,
+                )
                 # Создаем очередь если не существует
                 daily_queue = DailyQueue(
                     day=queue_token.day,
@@ -300,9 +317,17 @@ def join_online_queue_multiple(
                 db.add(daily_queue)
                 db.commit()
                 db.refresh(daily_queue)
-                print(f"[join_online_queue_multiple] Создана DailyQueue id={daily_queue.id} для specialist_id={specialist_id}")
+                logger.info(
+                    "[join_online_queue_multiple] Создана DailyQueue id=%d для specialist_id=%d",
+                    daily_queue.id,
+                    specialist_id,
+                )
             else:
-                print(f"[join_online_queue_multiple] Найдена DailyQueue id={daily_queue.id} для specialist_id={specialist_id}")
+                logger.info(
+                    "[join_online_queue_multiple] Найдена DailyQueue id=%d для specialist_id=%d",
+                    daily_queue.id,
+                    specialist_id,
+                )
             
             # Проверяем что очередь еще не открыта
             if daily_queue.opened_at:
@@ -356,9 +381,11 @@ def join_online_queue_multiple(
                 queue_tag=queue_tag_hint,
             )
 
-            print(
-                f"[join_online_queue_multiple] specialist_id={specialist_id}, "
-                f"queue_tag={queue_tag_hint}, next_number={next_number}"
+            logger.info(
+                "[join_online_queue_multiple] specialist_id=%d, queue_tag=%s, next_number=%d",
+                specialist_id,
+                queue_tag_hint,
+                next_number,
             )
 
             # ✅ УЛУЧШЕНИЕ: Находим или создаем пациента по телефону
@@ -372,7 +399,11 @@ def join_online_queue_multiple(
 
                 if existing_patient:
                     patient_id = existing_patient.id
-                    print(f"[join_online_queue_multiple] Найден существующий пациент ID={patient_id} для телефона {phone}")
+                    logger.info(
+                        "[join_online_queue_multiple] Найден существующий пациент ID=%d для телефона %s",
+                        patient_id,
+                        phone,
+                    )
                 else:
                     # ✅ ИСПРАВЛЕНО: Передаем full_name в find_or_create_patient для нормализации
                     # find_or_create_patient сам выполнит нормализацию, не нужно делать это дважды
@@ -381,7 +412,11 @@ def join_online_queue_multiple(
                         "full_name": patient_name  # Передаем full_name для нормализации внутри find_or_create_patient
                     })
                     patient_id = new_patient.id
-                    print(f"[join_online_queue_multiple] ✅ Создан новый пациент ID={patient_id} для телефона {phone}")
+                    logger.info(
+                        "[join_online_queue_multiple] ✅ Создан новый пациент ID=%d для телефона %s",
+                        patient_id,
+                        phone,
+                    )
 
             # Создаем запись в очереди с одинаковым queue_time
             queue_entry = OnlineQueueEntry(
@@ -397,7 +432,14 @@ def join_online_queue_multiple(
             )
             db.add(queue_entry)
             db.flush()  # Получаем ID записи
-            print(f"[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id={queue_entry.id} для specialist_id={specialist_id}, queue_id={daily_queue.id}, number={next_number}, patient_id={patient_id}")
+            logger.info(
+                "[join_online_queue_multiple] ✅ Создана OnlineQueueEntry id=%d для specialist_id=%d, queue_id=%d, number=%d, patient_id=%s",
+                queue_entry.id,
+                specialist_id,
+                daily_queue.id,
+                next_number,
+                patient_id,
+            )
             
             # Получаем информацию о специальности для иконки
             specialty_icon_map = {
@@ -423,7 +465,12 @@ def join_online_queue_multiple(
                 "icon": icon,
                 "duplicate": False
             })
-            print(f"[join_online_queue_multiple] ✅ Добавлен результат для specialist_id={specialist_id}: number={next_number}, queue_id={daily_queue.id}")
+            logger.info(
+                "[join_online_queue_multiple] ✅ Добавлен результат для specialist_id=%d: number=%d, queue_id=%d",
+                specialist_id,
+                next_number,
+                daily_queue.id,
+            )
             
         except Exception as e:
             errors.append({

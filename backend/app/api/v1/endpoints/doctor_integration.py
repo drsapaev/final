@@ -270,7 +270,7 @@ def call_patient(
             
         except Exception as ws_error:
             # Не прерываем основной процесс если WebSocket не работает
-            print(f"Предупреждение: не удалось отправить на табло: {ws_error}")
+            logger.warning("Не удалось отправить на табло: %s", ws_error, exc_info=True)
         
         return {
             "success": True,
@@ -395,7 +395,7 @@ def complete_patient_visit(
                             status="paid",
                             note=f"Автоматическое создание платежа при завершении приема (visit {visit.id})"
                         )
-                        print(f"[complete_visit] ✅ Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                        logger.info("complete_visit: Создан платеж ID=%d для визита %d, сумма=%s", payment.id, visit.id, payment_amount)
                     
                     visit.discount_mode = "paid"
             
@@ -508,7 +508,7 @@ def complete_patient_visit(
                             status="paid",
                             note=f"Автоматическое создание платежа при завершении приема из очереди (visit {visit.id})"
                         )
-                        print(f"[complete_queue_visit] ✅ Создан платеж ID={payment.id} для визита {visit.id}, сумма={payment_amount}")
+                        logger.info("complete_queue_visit: Создан платеж ID=%d для визита %d, сумма=%s", payment.id, visit.id, payment_amount)
                     
                     visit.discount_mode = "paid"
                     if hasattr(visit, 'payment_processed_at') and not visit.payment_processed_at:

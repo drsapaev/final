@@ -1,5 +1,12 @@
 """
 API endpoints для системы очередей
+
+⚠️ DEPRECATED: Этот модуль содержит legacy endpoints.
+Для новых интеграций используйте:
+- qr_queue.py - расширенная QR функциональность (/queue/qr-tokens/*, /queue/join/*)
+- queue_reorder.py - переупорядочение очереди (/queue/reorder/*)
+
+Этот модуль сохранен для обратной совместимости и будет удален в будущих версиях.
 """
 from datetime import datetime, date
 from typing import List, Optional
@@ -77,6 +84,11 @@ def generate_qr_token(
     """
     Генерация QR токена для онлайн-очереди
     Доступно только регистраторам и админам
+    
+    ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
+    Используйте вместо него: POST /api/v1/queue/admin/qr-tokens/generate
+    
+    См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
         # Проверка прав доступа
@@ -115,11 +127,8 @@ def generate_qr_token(
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка генерации QR токена: {str(e)}"
-        )
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
 
 
 @router.post("/join", response_model=QueueJoinResponse)
@@ -130,6 +139,13 @@ def join_queue(
     """
     Вступление в онлайн-очередь по токену
     Доступно всем (публичный endpoint)
+    
+    ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
+    Используйте вместо него:
+    - POST /api/v1/queue/join/start (начало сессии)
+    - POST /api/v1/queue/join/complete (завершение присоединения)
+    
+    См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
         queue_service = get_queue_service()
@@ -197,7 +213,7 @@ def join_queue(
             asyncio.create_task(send_queue_update())
 
         except Exception as ws_error:
-            print(f"Предупреждение: не удалось отправить обновление очереди: {ws_error}")
+            logger.warning("Не удалось отправить обновление очереди: %s", ws_error, exc_info=True)
 
         return QueueJoinResponse(
             success=True,
@@ -229,58 +245,55 @@ def get_queue_statistics(
 ):
     """
     Получить статистику очереди для специалиста
+    
+    ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
+    Используйте вместо него: GET /api/v1/queue/admin/queue-analytics/{specialist_id}
+    
+    См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
-    try:
-        # Валидация specialist_id
-        if not isinstance(specialist_id, int) or specialist_id <= 0:
-            raise HTTPException(
-                status_code=422,
-                detail="Некорректный ID специалиста"
-            )
-        
-        # Получаем очередь
-        daily_queue = db.query(DailyQueue).filter(
-            DailyQueue.day == day,
-            DailyQueue.specialist_id == specialist_id
-        ).first()
-        
-        if not daily_queue:
-            return {
-                "success": False,
-                "message": "Очередь не найдена",
-                "statistics": {
-                    "total_entries": 0,
-                    "waiting": 0,
-                    "called": 0,
-                    "completed": 0,
-                    "cancelled": 0,
-                    "max_slots": 0,
-                    "available_slots": 0,
-                    "is_open": False,
-                    "opened_at": None
-                }
-            }
-        
-        # Используем сервис для получения статистики
-        queue_service = get_queue_service()
-        stats = queue_service.get_queue_statistics(db, daily_queue)
-        
+    # Валидация specialist_id
+    if not isinstance(specialist_id, int) or specialist_id <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="Некорректный ID специалиста"
+        )
+    
+    # Получаем очередь
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == day,
+        DailyQueue.specialist_id == specialist_id
+    ).first()
+    
+    if not daily_queue:
         return {
-            "success": True,
-            "statistics": stats,
-            "specialist": {
-                "id": specialist_id,
-                "name": daily_queue.specialist.user.full_name if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{specialist_id}"
-            },
-            "day": day.isoformat()
+            "success": False,
+            "message": "Очередь не найдена",
+            "statistics": {
+                "total_entries": 0,
+                "waiting": 0,
+                "called": 0,
+                "completed": 0,
+                "cancelled": 0,
+                "max_slots": 0,
+                "available_slots": 0,
+                "is_open": False,
+                "opened_at": None
+            }
         }
     
-    except Exception as e:
-        logger.error(f"Ошибка при получении статистики очереди: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка сервера: {str(e)}"
-        )
+    # Используем сервис для получения статистики
+    queue_service = get_queue_service()
+    stats = queue_service.get_queue_statistics(db, daily_queue)
+    
+    return {
+        "success": True,
+        "statistics": stats,
+        "specialist": {
+            "id": specialist_id,
+            "name": daily_queue.specialist.user.full_name if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{specialist_id}"
+        },
+        "day": day.isoformat()
+    }
 
 
 @router.post("/open")
@@ -293,6 +306,11 @@ def open_queue(
     """
     Открытие приема (закрывает онлайн-запись)
     Доступно только регистраторам и админам
+    
+    ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
+    Проверьте документацию для альтернативных endpoints.
+    
+    См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
         # Проверка прав доступа
@@ -330,11 +348,8 @@ def open_queue(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка открытия приема: {str(e)}"
-        )
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
 
 
 @router.get("/today", response_model=QueueStatusResponse)
@@ -345,68 +360,67 @@ def get_today_queue(
 ):
     """
     Получение текущей очереди на сегодня
-    """
-    try:
-        # Валидация specialist_id
-        if not isinstance(specialist_id, int) or specialist_id <= 0:
-            raise HTTPException(
-                status_code=422,
-                detail="Некорректный ID специалиста"
-            )
-        
-        # Проверка существования специалиста
-        specialist = db.query(Doctor).filter(Doctor.id == specialist_id).first()
-        if not specialist:
-            raise HTTPException(
-                status_code=404,
-                detail="Специалист не найден"
-            )
-        
-        today = date.today()
-        
-        # Получение очереди
-        daily_queue = db.query(DailyQueue).filter(
-            DailyQueue.day == today,
-            DailyQueue.specialist_id == specialist_id
-        ).first()
-        
-        if not daily_queue:
-            raise HTTPException(status_code=404, detail="Очередь на сегодня не найдена")
-        
-        # Получение записей
-        entries = db.query(OnlineQueueEntry).filter(
-            OnlineQueueEntry.queue_id == daily_queue.id
-        ).order_by(OnlineQueueEntry.number).all()
-        
-        waiting_count = sum(1 for entry in entries if entry.status == "waiting")
     
-        return QueueStatusResponse(
-            queue_id=daily_queue.id,
-            day=daily_queue.day,
-            specialist_name=(daily_queue.specialist.user.full_name or daily_queue.specialist.user.username) if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{daily_queue.specialist_id}",
-            is_open=daily_queue.opened_at is not None,
-            opened_at=daily_queue.opened_at,
-            total_entries=len(entries),
-            waiting_entries=waiting_count,
-            entries=[
-                QueueEntryResponse(
-                    id=entry.id,
-                    number=entry.number,
-                    patient_name=entry.patient_name,
-                    phone=entry.phone,
-                    status=entry.status,
-                    created_at=entry.created_at,
-                    called_at=entry.called_at
-                ) for entry in entries
-            ]
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
+    ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
+    Используйте вместо него: GET /api/v1/queue/status/{specialist_id}
+    
+    См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
+    """
+    # Валидация specialist_id
+    if not isinstance(specialist_id, int) or specialist_id <= 0:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения очереди: {str(e)}"
+            status_code=422,
+            detail="Некорректный ID специалиста"
         )
+    
+    # Проверка существования специалиста
+    specialist = db.query(Doctor).filter(Doctor.id == specialist_id).first()
+    if not specialist:
+        raise HTTPException(
+            status_code=404,
+            detail="Специалист не найден"
+        )
+    
+    today = date.today()
+    
+    # Получение очереди
+    daily_queue = db.query(DailyQueue).filter(
+        DailyQueue.day == today,
+        DailyQueue.specialist_id == specialist_id
+    ).first()
+    
+    if not daily_queue:
+        raise HTTPException(status_code=404, detail="Очередь на сегодня не найдена")
+    
+    # Получение записей
+    entries = db.query(OnlineQueueEntry).filter(
+        OnlineQueueEntry.queue_id == daily_queue.id
+    ).order_by(OnlineQueueEntry.number).all()
+    
+    waiting_count = sum(1 for entry in entries if entry.status == "waiting")
+
+    return QueueStatusResponse(
+        queue_id=daily_queue.id,
+        day=daily_queue.day,
+        specialist_name=(daily_queue.specialist.user.full_name or daily_queue.specialist.user.username) if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{daily_queue.specialist_id}",
+        is_open=daily_queue.opened_at is not None,
+        opened_at=daily_queue.opened_at,
+        total_entries=len(entries),
+        waiting_entries=waiting_count,
+        entries=[
+            QueueEntryResponse(
+                id=entry.id,
+                number=entry.number,
+                patient_name=entry.patient_name,
+                phone=entry.phone,
+                status=entry.status,
+                created_at=entry.created_at,
+                called_at=entry.called_at
+            ) for entry in entries
+        ]
+    )
+    # Остальные исключения обрабатываются централизованными обработчиками
+    # (exception_handlers.py)
 
 
 @router.post("/call/{entry_id}")
@@ -417,6 +431,11 @@ def call_patient(
 ):
     """
     Вызов пациента (для табло)
+    
+    ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
+    Используйте вместо него: POST /api/v1/queue/{specialist_id}/call-next
+    
+    См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     # Проверка прав доступа
     if current_user.role not in ["Admin", "Registrar", "Doctor"]:
@@ -456,7 +475,7 @@ def call_patient(
         
     except Exception as ws_error:
         # Не прерываем основной процесс если WebSocket не работает
-        print(f"Предупреждение: не удалось отправить на табло: {ws_error}")
+        logger.warning("Не удалось отправить на табло: %s", ws_error, exc_info=True)
     
     return {
         "success": True,

@@ -1,4 +1,5 @@
 # app/api/v1/endpoints/appointments.py
+import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -17,6 +18,8 @@ from app.services.online_queue import _broadcast  # Добавляем _broadcas
 from app.services.online_queue import get_or_create_day, load_stats
 from app.models import appointment as appointment_models
 from app.services.service_mapping import get_service_code
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -534,19 +537,15 @@ def open_day(
     stats = load_stats(db, department=department, date_str=date_str)
     # Отправляем broadcast в WebSocket
     try:
-        print("🔔 Attempting to import _broadcast...")
-        print("🔔 _broadcast imported successfully")
-        print(f"🔔 Calling _broadcast({department}, {date_str}, stats)")
-        print(f"🔔 Stats object: {stats}")
-        print(f"🔔 Stats type: {type(stats)}")
+        logger.debug("Attempting to import _broadcast...")
+        logger.debug("_broadcast imported successfully")
+        logger.debug("Calling _broadcast(department=%s, date_str=%s, stats=%s)", department, date_str, stats)
+        logger.debug("Stats object: %s, type: %s", stats, type(stats))
         _broadcast(department, date_str, stats)
-        print("🔔 _broadcast called successfully")
+        logger.debug("_broadcast called successfully")
     except Exception as e:
         # Не роняем запрос, если broadcast не удался
-        print(f"⚠️ Broadcast error in open_day: {e}")
-        import traceback
-
-        traceback.print_exc()
+        logger.warning("Broadcast error in open_day: %s", e, exc_info=True)
     return {
         "ok": True,
         "department": department,
