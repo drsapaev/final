@@ -96,62 +96,12 @@ jobs:
         python -c "from app.ws.queue_ws import router, ws_queue; print('✅ queue_ws OK')" 2>&1 || echo "⚠️ queue_ws import failed"
         echo "  - Testing app.api.deps..."
         python -c "from app.api.deps import create_access_token; print('✅ deps OK')" 2>&1 || echo "⚠️ deps import failed (will use fallback)"
-        echo "  - Testing app.api.v1.api..."
-        if ! python -c "
-try:
-    from app.api.v1.api import api_router
-    print('✅ api.v1.api OK')
-except Exception as e:
-    print('❌ Failed to import app.api.v1.api:', e)
-    import traceback
-    traceback.print_exc()
-    exit(1)
-" 2>&1; then
-          echo "❌ Failed to import app.api.v1.api - checking which endpoint module fails..."
-          # Проверяем импорты сервисов, которые мы недавно исправили
-          echo "  - Testing recently fixed service imports..."
-          python -c "
-          import sys
-          import traceback
-          services_to_test = [
-              'app.services.ai.deepseek_provider',
-              'app.services.ai.deepseek_provider_new',
-              'app.services.print_service',
-              'app.services.user_management_service',
-              'app.services.mobile_notifications',
-          ]
-          for module in services_to_test:
-              try:
-                  __import__(module)
-                  print(f'✅ {module} OK')
-              except ImportError as e:
-                  print(f'❌ {module} IMPORT ERROR: {e}')
-                  traceback.print_exc()
-              except Exception as e:
-                  print(f'❌ {module} FAILED: {e}')
-                  traceback.print_exc()
-          " 2>&1 || true
-          # Попробуем импортировать основные модули по отдельности
-          python -c "
-          import sys
-          modules_to_test = [
-              'app.api.v1.endpoints.auth',
-              'app.api.v1.endpoints.patients',
-              'app.api.v1.endpoints.visits',
-              'app.api.v1.endpoints.services',
-              'app.api.v1.endpoints.appointments',
-          ]
-          for module in modules_to_test:
-              try:
-                  __import__(module)
-                  print(f'✅ {module} OK')
-              except Exception as e:
-                  print(f'❌ {module} FAILED: {e}')
-                  import traceback
-                  traceback.print_exc()
-          " 2>&1 || true
-          exit 1
-        fi
+        run: |
+          echo "  - Testing app.api.v1.api..."
+          if ! python -c "from app.api.v1.api import api_router; print('✅ api.v1.api OK')" 2>&1; then
+            echo "❌ Failed to import app.api.v1.api"
+            exit 1
+          fi
         echo "  - Testing app.graphql..."
         python -c "from app.graphql import graphql_router; print('✅ graphql OK')" 2>&1 || echo "⚠️ graphql import failed"
         
