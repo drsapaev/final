@@ -29,23 +29,179 @@ jobs:
         cd backend
         pip install -r requirements.txt
 
-    - name: Basic import test
+    - name: Setup test database
       run: |
         cd backend
         export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
         export WS_DEV_ALLOW="1"
-        export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
-        
-        echo "Testing basic imports..."
-        python -c "import app; print('✅ app imported')"
-        python -c "from app.api.v1.api import api_router; print('✅ api imported')"
+
+        python - << 'PY'
+        import sys
+        import time
+        sys.path.insert(0, '.')
+
+        from app.db.base import Base
+        from app.db.session import engine, SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        from sqlalchemy import text
+
+        # Create tables
+        Base.metadata.create_all(bind=engine)
+
+        # Create critical users
+        db = SessionLocal()
+        try:
+            # Admin user
+            admin = User(
+                username="admin",
+                full_name="Administrator",
+                role="Admin",
+                hashed_password=get_password_hash("admin123"),
+                is_active=True
+            )
+            db.add(admin)
+
+            # Registrar user
+            registrar = User(
+                username="registrar",
+                full_name="Registrar",
+                role="Registrar",
+                hashed_password=get_password_hash("registrar123"),
+                is_active=True
+            )
+            db.add(registrar)
+
+            # Doctor user
+            doctor = User(
+                username="doctor",
+                full_name="Doctor",
+                role="Doctor",
+                hashed_password=get_password_hash("doctor123"),
+                is_active=True
+            )
+            db.add(doctor)
+
+            # Cashier user
+            cashier = User(
+                username="cashier",
+                full_name="Cashier",
+                hashed_password=get_password_hash("cashier123"),
+                is_active=True
+            )
+            db.add(cashier)
+
+            # Lab user
+            lab = User(
+                username="lab",
+                full_name="Lab Technician",
+                role="Lab",
+                hashed_password=get_password_hash("lab123"),
+                is_active=True
+            )
+            db.add(lab)
+
+            # Specialized doctors
+            cardio = User(
+                username="cardio",
+                full_name="Cardiologist",
+                role="cardio",
+                hashed_password=get_password_hash("cardio123"),
+                is_active=True
+            )
+            db.add(cardio)
+
+            derma = User(
+                username="derma",
+                full_name="Dermatologist",
+                role="derma",
+                hashed_password=get_password_hash("derma123"),
+                is_active=True
+            )
+            db.add(derma)
+
+            dentist = User(
+                username="dentist",
+                full_name="Dentist",
+                role="dentist",
+                hashed_password=get_password_hash("dentist123"),
+                is_active=True
+            )
+            db.add(dentist)
+
+            db.commit()
+            print("✅ Test database created with critical users")
+        except Exception as e:
+            print(f"❌ Error creating test database: {e}")
+            db.rollback()
+        finally:
+            db.close()
+        PY
+
+    - name: Start backend server
+      run: |
+        cd backend
+        export DATABASE_URL="sqlite:///./clinic.db"
+        export CORS_DISABLE="1"
+        export WS_DEV_ALLOW="1"
+        echo "Запуск backend сервера..."
+
+        # Запускаем сервер в фоне с перенаправлением вывода
+        nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        SERVER_PID=$!
+        echo "Сервер запущен с PID: $SERVER_PID"
+
+        # Ждем больше времени для запуска
+        echo "Ожидание запуска сервера..."
+        sleep 15
+
+        # Проверяем, что процесс еще работает
+        if ! kill -0 $SERVER_PID 2>/dev/null; then
+          echo "❌ Сервер не запустился"
+          echo "Логи сервера:"
+          cat server.log
+          exit 1
+        fi
+
+        echo "Проверка доступности сервера..."
+        # Пробуем несколько раз с задержкой
+        for i in {1..5}; do
+          echo "Попытка $i/5..."
+          if curl -f http://127.0.0.1:8000/api/v1/health; then
+            echo "✅ Сервер успешно запущен и отвечает"
+            break
+          else
+            echo "Попытка $i неудачна, ждем 3 секунды..."
+            sleep 3
+          fi
+        done
+
+        # Финальная проверка
+        if ! curl -f http://127.0.0.1:8000/api/v1/health; then
+          echo "❌ Сервер не отвечает после всех попыток"
+          echo "Логи сервера:"
+          cat server.log
+          exit 1
+        fi
 
     - name: Run role system tests
       run: |
         cd backend
         echo "Running role system tests..."
         python test_role_routing.py
+
+    - name: Stop backend server
+      if: always()
+      run: |
+        echo "Останавливаем сервер..."
+        # Останавливаем по PID если он сохранен
+        if [ -n "$SERVER_PID" ]; then
+          kill $SERVER_PID 2>/dev/null || true
+        fi
+        # Дополнительная очистка процессов uvicorn
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
+        echo "OK: Сервер остановлен"
 
     - name: Check system integrity
       run: |
