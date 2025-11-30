@@ -98,6 +98,29 @@ jobs:
         echo "  - Testing app.api.v1.api..."
         if ! python -c "from app.api.v1.api import api_router; print('✅ api.v1.api OK')" 2>&1; then
           echo "❌ Failed to import app.api.v1.api - checking which endpoint module fails..."
+          # Проверяем импорты сервисов, которые мы недавно исправили
+          echo "  - Testing recently fixed service imports..."
+          python -c "
+          import sys
+          import traceback
+          services_to_test = [
+              'app.services.ai.deepseek_provider',
+              'app.services.ai.deepseek_provider_new',
+              'app.services.print_service',
+              'app.services.user_management_service',
+              'app.services.mobile_notifications',
+          ]
+          for module in services_to_test:
+              try:
+                  __import__(module)
+                  print(f'✅ {module} OK')
+              except ImportError as e:
+                  print(f'❌ {module} IMPORT ERROR: {e}')
+                  traceback.print_exc()
+              except Exception as e:
+                  print(f'❌ {module} FAILED: {e}')
+                  traceback.print_exc()
+          " 2>&1 || true
           # Попробуем импортировать основные модули по отдельности
           python -c "
           import sys

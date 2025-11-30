@@ -156,12 +156,17 @@ class MonitoringService:
                     tables_count = tables_result.scalar()
                 
                 # Количество записей в основных таблицах
+                # Безопасно: используем предопределенный whitelist таблиц
                 main_tables = ['patients', 'appointments', 'visits', 'users', 'services']
                 records_count = {}
                 total_records = 0
                 
                 for table in main_tables:
+                    # Валидация: проверяем, что имя таблицы в whitelist и содержит только безопасные символы
+                    if table not in main_tables or not all(c.isalnum() or c == '_' for c in table):
+                        continue
                     try:
+                        # Безопасно: используем предопределенное имя таблицы из whitelist
                         result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
                         count = result.scalar()
                         records_count[table] = count

@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./clinic.db"
 
     # --- Auth / JWT ---
-    SECRET_KEY: str = Field(default="dev-secret-key-for-clinic-management-system-change-in-production")  # фиксированный ключ для разработки
+    # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите SECRET_KEY через переменную окружения!
+    # Используйте: python -c "import secrets; print(secrets.token_urlsafe(32))" для генерации безопасного ключа
+    SECRET_KEY: str = Field(default="dev-secret-key-for-clinic-management-system-change-in-production")  # ⚠️ DEV ONLY: замените в продакшене!
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 

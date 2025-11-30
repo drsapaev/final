@@ -337,14 +337,30 @@ class PrintService:
     async def _print_pdf_network(self, printer: PrinterConfig, file_path: str) -> Dict[str, Any]:
         """Печать PDF через сеть"""
         try:
+            # Валидация пути к файлу (только безопасные символы)
+            if not all(c.isprintable() and c not in [';', '&', '|', '`', '$', '(', ')', '<', '>'] for c in file_path):
+                raise ValueError("Недопустимый путь к файлу")
+            
+            # Валидация IP адреса (базовая проверка)
+            ip_address = printer.ip_address or "127.0.0.1"
+            if not all(c.isdigit() or c == '.' for c in ip_address.split('.')[0] if ip_address.count('.') == 3 else False):
+                # Если не IP, проверяем как hostname (только буквы, цифры, точки, дефисы)
+                if not all(c.isalnum() or c in ['.', '-'] for c in ip_address):
+                    raise ValueError("Недопустимый IP адрес или hostname")
+            
+            port = printer.port or 631
+            if not isinstance(port, int) or port < 1 or port > 65535:
+                raise ValueError("Недопустимый порт")
+            
             # Используем lp команду для отправки на сетевой принтер
             cmd = [
                 "lp", 
-                "-d", f"ipp://{printer.ip_address}:{printer.port or 631}/printers/default",
-                "-o", f"media={printer.printer_type}",
+                "-d", f"ipp://{ip_address}:{port}/printers/default",
+                "-o", f"media={printer.printer_type or 'A4'}",
                 file_path
             ]
             
+            # Безопасно: используем subprocess_exec с предопределенными командами
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -369,14 +385,25 @@ class PrintService:
         """Печать PDF на локальном принтере"""
         try:
             import platform
+            import shlex
+            
+            # Валидация пути к файлу (только безопасные символы)
+            if not all(c.isprintable() and c not in [';', '&', '|', '`', '$', '(', ')', '<', '>'] for c in file_path):
+                raise ValueError("Недопустимый путь к файлу")
+            
+            device_path = printer.device_path or ('LPT1' if platform.system() == "Windows" else "default")
+            # Валидация пути к устройству (только безопасные символы)
+            if not all(c.isprintable() and c not in [';', '&', '|', '`', '$', '(', ')', '<', '>'] for c in device_path):
+                raise ValueError("Недопустимый путь к устройству")
             
             if platform.system() == "Windows":
                 # Windows: используем команду print
-                cmd = ["print", f"/D:{printer.device_path or 'LPT1'}", file_path]
+                cmd = ["print", f"/D:{device_path}", file_path]
             else:
                 # Linux/Unix: используем lp
-                cmd = ["lp", "-d", printer.device_path or "default", file_path]
+                cmd = ["lp", "-d", device_path, file_path]
             
+            # Безопасно: используем subprocess_exec с предопределенными командами
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,

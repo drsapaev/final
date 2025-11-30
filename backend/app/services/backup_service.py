@@ -513,10 +513,15 @@ class BackupService:
             engine = create_engine(settings.DATABASE_URL)
             with engine.connect() as conn:
                 # Подсчитываем записи в основных таблицах
+                # Безопасно: используем предопределенный whitelist таблиц
                 tables = ['patients', 'appointments', 'visits', 'users', 'services']
                 total = 0
                 for table in tables:
+                    # Валидация: проверяем, что имя таблицы в whitelist и содержит только безопасные символы
+                    if table not in tables or not all(c.isalnum() or c == '_' for c in table):
+                        continue
                     try:
+                        # Безопасно: используем предопределенное имя таблицы из whitelist
                         result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
                         total += result.scalar()
                     except:

@@ -29,8 +29,9 @@ def _hash_or_plain(pw: str) -> str:
 
 
 def ensure_admin() -> dict:
+    # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите ADMIN_PASSWORD через переменную окружения!
     username = os.getenv("ADMIN_USERNAME", "admin").strip()
-    password = os.getenv("ADMIN_PASSWORD", "admin")
+    password = os.getenv("ADMIN_PASSWORD", "admin")  # ⚠️ DEV ONLY: используйте сильный пароль в продакшене!
     email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip()
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
 
