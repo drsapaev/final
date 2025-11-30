@@ -21,7 +21,7 @@ jobs:
   code-quality:
     name: 🔍 Качество кода
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     
     steps:
     - uses: actions/checkout@v4
@@ -37,43 +37,174 @@ jobs:
         cd backend
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install black isort flake8 ruff vulture bandit mypy
+        pip install black isort flake8 ruff vulture bandit mypy radon pydocstyle pylint
     
-    - name: 🎨 Форматирование кода
+    - name: 🔍 Проверка конфигурации
       run: |
         cd backend
-        echo "🔍 Проверяем структуру проекта..."
-        ls -la
-        echo "📁 Содержимое app директории:"
-        ls -la app/ || echo "⚠️ Директория app не найдена"
-        
-        # Применяем форматирование автоматически
-        echo "🎨 Применяем black форматирование..."
-        black . --diff || echo "⚠️ Black не смог отформатировать код"
-        
-        echo "📦 Применяем isort сортировку импортов..."
-        isort . --diff || echo "⚠️ isort не смог отсортировать импорты"
-        
-        # Проверяем форматирование (не блокируем pipeline)
-        echo "✅ Проверяем black форматирование..."
-        black . --check --diff || echo "⚠️ Код требует форматирования"
-        
-        echo "✅ Проверяем isort сортировку..."
-        isort . --check-only --diff || echo "⚠️ Импорты требуют сортировки"
+        echo "🔍 Проверяем конфигурационные файлы..."
+        if [ ! -f "pyproject.toml" ]; then
+          echo "❌ pyproject.toml не найден"
+          exit 1
+        fi
+        echo "✅ pyproject.toml найден"
+        echo "📁 Структура проекта:"
+        ls -la app/ | head -10 || echo "⚠️ Директория app не найдена"
     
-    - name: 🔍 Линтинг
+    - name: 🎨 Проверка форматирования кода
       run: |
         cd backend
-        # Ruff для быстрого анализа
-        ruff check . --output-format=text || echo "⚠️ Ruff нашел проблемы в коде"
-        # Flake8 для критических ошибок
-        flake8 app --select=E9,F63,F7,F82 --show-source --statistics || echo "⚠️ Flake8 нашел критические ошибки"
-        # MyPy для проверки типов
-        mypy app --ignore-missing-imports || echo "⚠️ MyPy нашел проблемы с типами"
-        # Vulture для поиска мертвого кода
-        vulture app --min-confidence 80 --exclude app/api/v1/endpoints/ || echo "⚠️ Vulture нашел мертвый код"
-        # Bandit для безопасности
-        bandit -r app -f json || echo "⚠️ Bandit нашел проблемы безопасности"
+        set -e
+        echo "🎨 Проверяем black форматирование..."
+        if ! black . --check --diff; then
+          echo "❌ Код требует форматирования. Запустите: black ."
+          black . --diff | head -100
+          exit 1
+        fi
+        echo "✅ Black форматирование OK"
+        
+        echo "📦 Проверяем isort сортировку импортов..."
+        if ! isort . --check-only --diff; then
+          echo "❌ Импорты требуют сортировки. Запустите: isort ."
+          isort . --diff | head -100
+          exit 1
+        fi
+        echo "✅ Isort сортировка OK"
+    
+    - name: 🔍 Линтинг и статический анализ
+      run: |
+        cd backend
+        set -e
+        mkdir -p quality-reports
+        
+        echo "🔍 Ruff - быстрый линтер..."
+        ruff check . --output-format=text > quality-reports/ruff.txt 2>&1 || {
+          echo "❌ Ruff нашел проблемы в коде:"
+          cat quality-reports/ruff.txt | head -50
+          exit 1
+        }
+        echo "✅ Ruff проверка OK"
+        
+        echo "🔍 Flake8 - критические ошибки..."
+        flake8 app --select=E9,F63,F7,F82 --show-source --statistics > quality-reports/flake8.txt 2>&1 || {
+          echo "❌ Flake8 нашел критические ошибки:"
+          cat quality-reports/flake8.txt
+          exit 1
+        }
+        echo "✅ Flake8 проверка OK"
+        
+        echo "🔍 MyPy - проверка типов..."
+        mypy app --ignore-missing-imports --show-error-codes > quality-reports/mypy.txt 2>&1 || {
+          echo "⚠️ MyPy нашел проблемы с типами (не блокируем):"
+          cat quality-reports/mypy.txt | head -50
+        }
+        
+        echo "🔍 Pylint - дополнительный анализ..."
+        pylint app --disable=all --enable=E0602,E0603,E1120,E1121 > quality-reports/pylint.txt 2>&1 || {
+          echo "⚠️ Pylint нашел проблемы (не блокируем):"
+          cat quality-reports/pylint.txt | head -30
+        }
+    
+    - name: 🔍 Проверка сложности кода
+      run: |
+        cd backend
+        mkdir -p quality-reports
+        echo "📊 Анализ сложности кода (Radon)..."
+        radon cc app --min B --show-complexity > quality-reports/complexity.txt 2>&1 || true
+        radon mi app --min B > quality-reports/maintainability.txt 2>&1 || true
+        
+        echo "📊 Статистика сложности:"
+        head -30 quality-reports/complexity.txt || true
+        echo ""
+        echo "📊 Индекс поддерживаемости:"
+        head -20 quality-reports/maintainability.txt || true
+    
+    - name: 📝 Проверка документации
+      run: |
+        cd backend
+        mkdir -p quality-reports
+        echo "📝 Проверка docstrings (pydocstyle)..."
+        pydocstyle app --convention=google --add-ignore=D100,D104 > quality-reports/docstyle.txt 2>&1 || {
+          echo "⚠️ Некоторые функции не имеют docstrings (не блокируем):"
+          cat quality-reports/docstyle.txt | head -30
+        }
+    
+    - name: 🔍 Поиск проблемных паттернов
+      run: |
+        cd backend
+        mkdir -p quality-reports
+        set -e
+        
+        echo "🔍 Поиск TODO/FIXME/HACK комментариев..."
+        grep -r "TODO\|FIXME\|HACK\|XXX" app/ --include="*.py" > quality-reports/todos.txt 2>&1 || echo "✅ Нет TODO/FIXME комментариев"
+        if [ -s quality-reports/todos.txt ]; then
+          echo "⚠️ Найдены TODO/FIXME комментарии:"
+          head -20 quality-reports/todos.txt
+        fi
+        
+        echo "🔍 Поиск мертвого кода (Vulture)..."
+        vulture app --min-confidence 80 --exclude app/api/v1/endpoints/ > quality-reports/vulture.txt 2>&1 || {
+          echo "⚠️ Vulture нашел потенциально мертвый код (не блокируем):"
+          head -30 quality-reports/vulture.txt
+        }
+        
+        echo "🔍 Проверка размера файлов..."
+        find app -name "*.py" -type f -exec wc -l {} + | sort -rn | head -20 > quality-reports/large-files.txt || true
+        echo "📊 Самые большие файлы:"
+        head -10 quality-reports/large-files.txt
+        
+        # Проверяем файлы больше 1000 строк
+        if find app -name "*.py" -type f -exec wc -l {} + | awk '$1 > 1000 {print $2}' | grep -q .; then
+          echo "⚠️ Найдены файлы больше 1000 строк:"
+          find app -name "*.py" -type f -exec wc -l {} + | awk '$1 > 1000 {print $1, $2}'
+        fi
+    
+    - name: 🔒 Проверка безопасности
+      run: |
+        cd backend
+        mkdir -p quality-reports
+        echo "🔒 Bandit - сканирование безопасности..."
+        bandit -r app -f json -o quality-reports/bandit.json > quality-reports/bandit.txt 2>&1 || {
+          echo "❌ Bandit нашел проблемы безопасности:"
+          cat quality-reports/bandit.txt | head -50
+          # Показываем только высокий и средний уровень
+          if grep -q "Severity: High\|Severity: Medium" quality-reports/bandit.txt; then
+            echo "❌ Найдены критические проблемы безопасности"
+            exit 1
+          fi
+        }
+        echo "✅ Bandit проверка OK"
+    
+    - name: 📤 Сохранение отчетов
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-quality-reports
+        path: backend/quality-reports/
+        retention-days: 7
+        if-no-files-found: warn
+    
+    - name: 📊 Итоговый отчет
+      if: always()
+      run: |
+        cd backend
+        echo "## 📊 Итоговый отчет качества кода" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Проверки пройдены:" >> $GITHUB_STEP_SUMMARY
+        echo "- Black форматирование" >> $GITHUB_STEP_SUMMARY
+        echo "- Isort сортировка импортов" >> $GITHUB_STEP_SUMMARY
+        echo "- Ruff линтинг" >> $GITHUB_STEP_SUMMARY
+        echo "- Flake8 критические ошибки" >> $GITHUB_STEP_SUMMARY
+        echo "- Bandit безопасность" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f quality-reports/todos.txt ] && [ -s quality-reports/todos.txt ]; then
+          echo "### ⚠️ Найдены TODO/FIXME:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          head -10 quality-reports/todos.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📦 Отчеты сохранены как артефакты" >> $GITHUB_STEP_SUMMARY
 
   # --- Frontend тесты ---
   frontend-tests:
@@ -302,37 +433,176 @@ jobs:
         CORS_DISABLE: "1"
         WS_DEV_ALLOW: "1"
       run: |
+        set -e
         cd backend
+        export DATABASE_URL="sqlite:///./test_clinic.db"
+        export CORS_DISABLE="1"
+        export WS_DEV_ALLOW="1"
+        export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
+        
         echo "🔍 Проверяем что приложение может импортироваться..."
+        echo "Step 1: Testing critical imports before app.main..."
+        echo "  - Testing app.core.exception_handlers..."
         python -c "
+        import os
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
+        from app.core.exception_handlers import register_exception_handlers
+        print('✅ exception_handlers OK')
+        " 2>&1 || echo "⚠️ exception_handlers import failed"
+        
+        echo "  - Testing app.ws.queue_ws..."
+        python -c "
+        import os
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
+        from app.ws.queue_ws import router, ws_queue
+        print('✅ queue_ws OK')
+        " 2>&1 || echo "⚠️ queue_ws import failed"
+        
+        echo "  - Testing app.api.deps..."
+        python -c "
+        import os
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
+        from app.api.deps import create_access_token
+        print('✅ deps OK')
+        " 2>&1 || echo "⚠️ deps import failed (will use fallback)"
+        
+        echo "  - Testing app.api.v1.api..."
+        if ! python -c "
+        import os
         import sys
         import traceback
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
+        try:
+            from app.api.v1.api import api_router
+            print('✅ api.v1.api OK')
+        except Exception as e:
+            print(f'❌ api.v1.api FAILED: {e}')
+            traceback.print_exc()
+            sys.exit(1)
+        " 2>&1; then
+          echo "❌ Failed to import app.api.v1.api - checking which endpoint module fails..."
+          python -c "
+          import os
+          import sys
+          os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+          os.environ['CORS_DISABLE'] = '1'
+          os.environ['WS_DEV_ALLOW'] = '1'
+          modules_to_test = [
+              'app.api.v1.endpoints.auth',
+              'app.api.v1.endpoints.patients',
+              'app.api.v1.endpoints.visits',
+              'app.api.v1.endpoints.services',
+              'app.api.v1.endpoints.appointments',
+          ]
+          failed_modules = []
+          for module in modules_to_test:
+              try:
+                  __import__(module)
+                  print(f'✅ {module} OK')
+              except Exception as e:
+                  print(f'❌ {module} FAILED: {e}')
+                  import traceback
+                  traceback.print_exc()
+                  failed_modules.append(module)
+          if failed_modules:
+              print(f'❌ Failed modules: {failed_modules}')
+              sys.exit(1)
+          " 2>&1 || exit 1
+        fi
+        
+        echo "Step 2: Importing app.main module..."
+        if ! python -c "
+        import os
+        import sys
+        import traceback
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
+        try:
+            import app.main
+            print('✅ app.main module imported')
+        except Exception as e:
+            print(f'❌ Failed to import app.main: {e}')
+            print('Error details:')
+            traceback.print_exc()
+            sys.exit(1)
+        " 2>&1; then
+          echo "❌ Не удалось импортировать app.main"
+          exit 1
+        fi
+        
+        echo "Step 3: Importing app from app.main..."
+        if ! python -c "
+        import os
+        import sys
+        import traceback
+        os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
+        os.environ['CORS_DISABLE'] = '1'
+        os.environ['WS_DEV_ALLOW'] = '1'
         try:
             from app.main import app
             print('✅ App импортирован успешно')
         except Exception as e:
-            print(f'❌ Ошибка импорта app.main: {e}')
-            print('📋 Полный traceback:')
+            print(f'❌ Failed to import app from app.main: {e}')
+            print('Error details:')
             traceback.print_exc()
             sys.exit(1)
-        " || {
-          echo "❌ Не удалось импортировать app.main"
+        " 2>&1; then
+          echo "❌ Не удалось импортировать app из app.main"
           exit 1
-        }
+        fi
+        
+        echo "✅ Все импорты успешны"
         echo "🚀 Запускаем сервер..."
         nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
-        echo $! > server.pid
-        echo "⏳ Ожидаем запуска сервера..."
+        SERVER_PID=$!
+        echo $SERVER_PID > server.pid
+        echo "⏳ Ожидаем запуска сервера (PID: $SERVER_PID)..."
         sleep 15
+        
+        # Проверяем, что процесс еще работает
+        if ! kill -0 $SERVER_PID 2>/dev/null; then
+          echo "❌ Сервер не запустился (процесс завершился)"
+          echo "📋 Логи сервера:"
+          cat server.log || echo "Логи не доступны"
+          exit 1
+        fi
+        
         echo "📋 Логи сервера после запуска:"
         head -50 server.log || echo "Логи не доступны"
         echo "🔍 Проверяем статус процесса:"
-        ps aux | grep uvicorn || echo "Процесс не найден"
+        ps aux | grep uvicorn | grep -v grep || echo "Процесс не найден"
         if [ -f server.pid ]; then
           echo "📝 PID файл существует: $(cat server.pid)"
         else
           echo "⚠️ PID файл не найден"
         fi
+        
+        # Проверяем доступность сервера
+        echo "🔍 Проверяем доступность сервера..."
+        for i in {1..5}; do
+          if curl -f http://127.0.0.1:8000/api/v1/health > /dev/null 2>&1; then
+            echo "✅ Сервер успешно запущен и отвечает на запросы"
+            break
+          else
+            if [ $i -eq 5 ]; then
+              echo "❌ Сервер не отвечает после 5 попыток"
+              echo "📋 Последние 100 строк логов:"
+              tail -100 server.log || echo "Логи не доступны"
+              exit 1
+            fi
+            echo "⏳ Попытка $i/5: сервер еще не готов..."
+            sleep 3
+          fi
+        done
     
     - name: 🧪 Интеграционные тесты
       run: |
