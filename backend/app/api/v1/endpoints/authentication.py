@@ -1,6 +1,7 @@
 """
 API endpoints для системы аутентификации
 """
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
@@ -10,6 +11,8 @@ from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.services.authentication_service import get_authentication_service, AuthenticationService
+
+logger = logging.getLogger(__name__)
 from app.crud.authentication import (
     refresh_token, user_session, password_reset_token, 
     email_verification_token, login_attempt, user_activity, 

@@ -19,7 +19,7 @@ API эндпоинты для QR очередей
 - docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md - Migration guide
 - docs/QUEUE_SYSTEM_ARCHITECTURE.md - Архитектура системы
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request

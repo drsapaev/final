@@ -3,6 +3,7 @@
 Основа: detail.md стр. 3721-3888, passport.md стр. 1925-2063
 """
 import asyncio
+import os
 import socket
 import serial
 from datetime import datetime

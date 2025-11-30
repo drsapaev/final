@@ -347,7 +347,7 @@ async def verify_two_factor_recovery(
             db=db,
             user_id=current_user.id,
             recovery_token=recovery_token,
-            device_fingerprint=request_data.device_fingerprint if 'request_data' in locals() else None,
+            device_fingerprint=None,  # Device fingerprint не требуется для recovery verify
             ip_address=ip_address,
             user_agent=user_agent
         )

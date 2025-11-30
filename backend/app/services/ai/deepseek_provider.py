@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Any
 import httpx
 import json
 import base64
+import io
+from PIL import Image
 from .base_provider import BaseAIProvider, AIRequest, AIResponse
 import logging
 

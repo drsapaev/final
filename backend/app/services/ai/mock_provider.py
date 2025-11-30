@@ -3489,7 +3489,7 @@ class MockProvider(BaseAIProvider):
                     "affected_prescription": "каптоприл",
                     "recommended_action": "контроль креатинина через 2 недели",
                     "urgency": "плановая",
-                    "follow_up_required": true
+                    "follow_up_required": True
                 }
             ],
             "compliance_assessment": {

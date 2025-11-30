@@ -15,6 +15,7 @@ from app.services.telegram_templates import get_telegram_templates_service
 from app.crud import telegram_config as crud_telegram
 from app.crud import appointment as crud_appointment
 from app.crud import patient as crud_patient
+from app.crud import lab_result as crud_lab
 
 router = APIRouter()
 
@@ -155,6 +156,9 @@ async def send_lab_results(
         if not bot_service.active:
             await bot_service.initialize(db)
 
+        # Получаем сервис шаблонов
+        templates_service = get_telegram_templates_service()
+
         # Формируем данные для шаблона
         test_types = [result.test_code for result in lab_results]
         has_abnormalities = any(result.is_abnormal for result in lab_results if hasattr(result, 'is_abnormal'))
@@ -174,7 +178,6 @@ async def send_lab_results(
         }
 
         # Получаем шаблон
-        templates_service = get_telegram_templates_service()
         template = templates_service.get_template(
             "lab_results_ready",
             telegram_user.language_code or "ru",

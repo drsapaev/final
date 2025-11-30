@@ -1,6 +1,7 @@
 """
 API endpoints для управления табло в админ панели
 """
+from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
