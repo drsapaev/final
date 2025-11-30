@@ -12,6 +12,35 @@ exclude = '''
   | node_modules
   | __pycache__
   | .*\.pyi
+  | alembic/versions
+  | migrations
+  | scripts
+  | test_.*\.py
+  | check_.*\.py
+  | create_.*\.py
+  | debug_.*\.py
+  | fix_.*\.py
+  | migrate_.*\.py
+  | update_.*\.py
+  | seed_.*\.py
+  | setup_.*\.py
+  | init_.*\.py
+  | quick_.*\.py
+  | simple_.*\.py
+  | final_.*\.py
+  | verify_.*\.py
+  | find_.*\.py
+  | get_.*\.py
+  | remove_.*\.py
+  | reset_.*\.py
+  | move_.*\.py
+  | load_.*\.py
+  | integration_test\.py
+  | backend_analysis\.py
+  | demo_.*\.py
+  | example_.*\.py
+  | diagnose_.*\.py
+  | add_.*\.py
 )
 '''
 
