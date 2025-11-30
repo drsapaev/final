@@ -13,8 +13,6 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
-
-logger = logging.getLogger(__name__)
 from app.models.appointment import Appointment as AppointmentModel
 from app.models.enums import AppointmentStatus
 from app.models.user import User
@@ -27,6 +25,8 @@ from app.schemas.emr import (
     PrescriptionCreate,
     PrescriptionUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def convert_datetimes_to_iso(obj):
