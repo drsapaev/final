@@ -2337,6 +2337,41 @@ const RegistrarPanel = () => {
       if (!standardDepartments.includes(appointmentDeptKey)) {
         return false;
       }
+      // Если department_key есть, но не совпадает, продолжаем проверку department ниже
+    }
+
+    // ✅ ИСПРАВЛЕНО: Проверка по полю department для всех записей (включая новые из сценария 5)
+    // Проверяем department если department_key отсутствует или не совпадает
+    if (appointment.department && appointment.department !== 'null' && appointment.department !== null) {
+      // Маппинг полных названий отделений на короткие ключи вкладок
+      const departmentMapping = {
+        'cardiology': 'cardio',
+        'laboratory': 'lab',
+        'dermatology': 'derma',
+        'stomatology': 'dental',
+        'dentistry': 'dental',
+        'echokg': 'echokg',
+        'procedures': 'procedures'
+        // 'general' не включаем - это значит "проверить по кодам услуг"
+      };
+
+      const deptLower = appointment.department.toLowerCase();
+      const normalizedDept = departmentMapping[deptLower] || deptLower;
+
+      // Прямое совпадение или совпадение через маппинг
+      if (normalizedDept === departmentKey || appointment.department === departmentKey) {
+        return true;
+      }
+
+      // Если department='general' или не найден в маппинге - это значит проверить по кодам услуг
+      if (deptLower === 'general' || !departmentMapping[deptLower]) {
+        // Продолжаем выполнение - проверка по кодам услуг будет ниже
+      }
+      // Если department записи - динамическое отделение (в маппинге, но не в стандартных отделениях), не показываем
+      else if (!standardDepartments.includes(normalizedDept) && !standardDepartments.includes(appointment.department)) {
+        return false;
+      }
+      // Если не совпадает, продолжаем проверку по кодам услуг
     }
 
     const dept = (appointment.department?.toLowerCase() || '');
@@ -4387,9 +4422,10 @@ const RegistrarPanel = () => {
 
           // Обновляем данные (работает и для создания, и для редактирования)
           try {
-            // ⭐ Увеличена задержка перед обновлением данных
+            // ⭐ Увеличена задержка перед обновлением данных (с 1000ms до 1500ms)
             // чтобы backend успел обновить базу данных и все связанные записи
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Особенно важно для batch операций, которые могут занимать больше времени
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             // Принудительное обновление данных
             await Promise.all([
