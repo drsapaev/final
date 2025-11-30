@@ -82,25 +82,26 @@ jobs:
         
         echo "🔍 Проверка импорта приложения..."
         echo "Step 1: Importing app package..."
-        if ! python -c "
-import sys
-import os
-print('Python version:', sys.version[:5])
-print('Current dir:', os.getcwd())
-print('PYTHONPATH:', os.environ.get('PYTHONPATH', 'NOT SET'))
-print('DATABASE_URL:', os.environ.get('DATABASE_URL', 'NOT SET'))
-try:
-    import app
-    print('✅ app package imported')
-except Exception as e:
-    print('❌ Failed to import app package:', e)
-    import traceback
-    traceback.print_exc()
-    exit(1)
-" 2>&1; then
-          echo "❌ Failed to import app package"
-          exit 1
-        fi
+        |
+          if ! python -c "
+          import sys
+          import os
+          print('Python version:', sys.version[:5])
+          print('Current dir:', os.getcwd())
+          print('PYTHONPATH:', os.environ.get('PYTHONPATH', 'NOT SET'))
+          print('DATABASE_URL:', os.environ.get('DATABASE_URL', 'NOT SET'))
+          try:
+              import app
+              print('✅ app package imported')
+          except Exception as e:
+              print('❌ Failed to import app package:', e)
+              import traceback
+              traceback.print_exc()
+              exit(1)
+          " 2>&1; then
+            echo "❌ Failed to import app package"
+            exit 1
+          fi
         
         echo "Step 2: Testing critical imports before app.main..."
         echo "  - Testing app.core.exception_handlers..."
