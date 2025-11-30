@@ -1,7 +1,7 @@
 """
 GraphQL API для клиники
 """
-from .schema import schema, graphql_router
+
+from .schema import graphql_router, schema
 
 __all__ = ["schema", "graphql_router"]
-

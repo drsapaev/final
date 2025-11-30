@@ -5,12 +5,12 @@ from typing import Any, Dict, Optional
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
-from app.services.queue_service import queue_service
 from app.models.appointment import Appointment
 from app.models.patient import Patient
 from app.models.payment_webhook import PaymentWebhook
 from app.models.service import Service
 from app.models.visit import Visit
+from app.services.queue_service import queue_service
 
 
 class AnalyticsService:
@@ -149,18 +149,18 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """
         Расчёт доходов (SSOT).
-        
+
         Получение статистики доходов за период с расширенными метриками.
         """
         from app.models.payment import Payment
-        
+
         # Базовые фильтры для платежей
         filters = [
             Payment.created_at >= start_date,
             Payment.created_at <= end_date,
-            Payment.status == "paid"
+            Payment.status == "paid",
         ]
-        
+
         # Получаем успешные платежи за период (из PaymentWebhook для онлайн-платежей)
         webhook_payments = (
             db.query(PaymentWebhook)
@@ -179,16 +179,19 @@ class AnalyticsService:
         if department:
             # Если нужна фильтрация по отделению, нужно связать через Visit
             from app.models.visit import Visit
-            payment_query = payment_query.join(Visit).filter(Visit.department == department)
-        
+
+            payment_query = payment_query.join(Visit).filter(
+                Visit.department == department
+            )
+
         payments = payment_query.all()
 
         # Общий доход из PaymentWebhook (онлайн-платежи)
         webhook_revenue = sum(float(p.amount) / 100 for p in webhook_payments)
-        
+
         # Общий доход из Payment (все платежи)
         payment_revenue = sum(float(p.amount) for p in payments)
-        
+
         total_revenue = webhook_revenue + payment_revenue
 
         # Доходы по дням
@@ -200,8 +203,8 @@ class AnalyticsService:
             )
         for payment in payments:
             date_str = payment.created_at.strftime("%Y-%m-%d")
-            daily_revenue[date_str] = (
-                daily_revenue.get(date_str, 0) + float(payment.amount)
+            daily_revenue[date_str] = daily_revenue.get(date_str, 0) + float(
+                payment.amount
             )
 
         # Доходы по провайдерам (из PaymentWebhook)
@@ -211,19 +214,19 @@ class AnalyticsService:
             provider_revenue[provider] = (
                 provider_revenue.get(provider, 0) + float(payment.amount) / 100
             )
-        
+
         # Доходы по методам оплаты (из Payment)
         method_revenue = {}
         for payment in payments:
             method = payment.method or "cash"
-            method_revenue[method] = (
-                method_revenue.get(method, 0) + float(payment.amount)
+            method_revenue[method] = method_revenue.get(method, 0) + float(
+                payment.amount
             )
 
         # Средний чек
         total_transactions = len(webhook_payments) + len(payments)
         avg_check = total_revenue / total_transactions if total_transactions > 0 else 0
-        
+
         # Средний дневной доход
         days_in_period = (end_date - start_date).days + 1
         avg_daily_revenue = total_revenue / days_in_period if days_in_period > 0 else 0
@@ -353,7 +356,7 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """
         Расчёт статистики (SSOT).
-        
+
         Получение комплексного отчёта со всей статистикой.
         """
         return {
@@ -714,7 +717,6 @@ class AnalyticsService:
             "daily_revenue": daily_revenue_list,
         }
 
-
     @staticmethod
     def generate_report(
         db: Session,
@@ -726,7 +728,7 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """
         Генерация отчёта (SSOT).
-        
+
         Args:
             db: Сессия БД
             report_type: Тип отчёта (revenue|visits|patients|services|comprehensive)
@@ -734,7 +736,7 @@ class AnalyticsService:
             end_date: Конечная дата
             department: Отделение (опционально)
             format: Формат отчёта (json|html|csv)
-        
+
         Returns:
             Dict с данными отчёта
         """
@@ -760,16 +762,16 @@ class AnalyticsService:
             )
         else:
             raise ValueError(f"Неизвестный тип отчёта: {report_type}")
-        
+
         # Добавляем метаданные
         report_data["report_meta"] = {
             "report_type": report_type,
             "format": format,
             "generated_at": queue_service.get_local_timestamp(db).isoformat(),
         }
-        
+
         return report_data
-    
+
     @staticmethod
     def export_report(
         db: Session,
@@ -781,7 +783,7 @@ class AnalyticsService:
     ) -> bytes:
         """
         Экспорт отчёта (SSOT).
-        
+
         Args:
             db: Сессия БД
             report_type: Тип отчёта
@@ -789,48 +791,51 @@ class AnalyticsService:
             end_date: Конечная дата
             department: Отделение (опционально)
             export_format: Формат экспорта (json|csv|excel)
-        
+
         Returns:
             bytes - данные отчёта в выбранном формате
         """
-        import json
         import csv
+        import json
         from io import BytesIO, StringIO
-        
+
         # Генерируем отчёт
         report_data = AnalyticsService.generate_report(
             db, report_type, start_date, end_date, department, format="json"
         )
-        
+
         if export_format == "json":
             return json.dumps(report_data, ensure_ascii=False, indent=2).encode('utf-8')
-        
+
         elif export_format == "csv":
             # Преобразуем данные в CSV
             output = StringIO()
             writer = csv.writer(output)
-            
+
             # Заголовки
             writer.writerow(["Период", "Начало", "Конец"])
-            writer.writerow([
-                report_data.get("period", {}).get("start_date", ""),
-                report_data.get("period", {}).get("end_date", "")
-            ])
-            
+            writer.writerow(
+                [
+                    report_data.get("period", {}).get("start_date", ""),
+                    report_data.get("period", {}).get("end_date", ""),
+                ]
+            )
+
             # Основные данные (упрощённая версия)
             if "total_revenue" in report_data:
                 writer.writerow(["Общий доход", report_data["total_revenue"]])
             if "total_visits" in report_data:
                 writer.writerow(["Всего визитов", report_data["total_visits"]])
-            
+
             return output.getvalue().encode('utf-8')
-        
+
         elif export_format == "excel":
             # Для Excel нужен pandas
             try:
-                import pandas as pd
                 from io import BytesIO
-                
+
+                import pandas as pd
+
                 # Преобразуем данные в DataFrame
                 df = pd.DataFrame([report_data])
                 output = BytesIO()
@@ -838,7 +843,7 @@ class AnalyticsService:
                 return output.getvalue()
             except ImportError:
                 raise ValueError("Для экспорта в Excel требуется pandas и openpyxl")
-        
+
         else:
             raise ValueError(f"Неподдерживаемый формат экспорта: {export_format}")
 

@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+import datetime as _dt
+from dataclasses import dataclass
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.models.online import (
+    OnlineDay,  # type: ignore[attr-defined]  # DEPRECATED: use DailyQueue instead
+)
+from app.models.setting import Setting  # type: ignore[attr-defined]
+
 # ============================================================================
 # DEPRECATED SERVICE: Legacy department-based queue system
 # ============================================================================
@@ -16,17 +29,6 @@ from __future__ import annotations
 # This file is kept for backward compatibility with appointments endpoint.
 # Migration to DailyQueue-based system is planned for future.
 # ============================================================================
-
-import datetime as _dt
-from dataclasses import dataclass
-from typing import Optional
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from app.core.config import settings
-from app.models.online import OnlineDay  # type: ignore[attr-defined]  # DEPRECATED: use DailyQueue instead
-from app.models.setting import Setting  # type: ignore[attr-defined]
 
 
 # ЛЕНИВЫЙ импорт менеджера WS, чтобы избежать циклов импорта при старте приложения

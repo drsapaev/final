@@ -2,15 +2,16 @@
 Упрощенный endpoint авторизации без сложных зависимостей
 """
 from datetime import datetime, timedelta
-from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, status, Depends
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from typing import Any, Dict
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.api.deps import create_access_token
+from app.core.security import verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.core.security import verify_password
-from app.api.deps import create_access_token
 
 router = APIRouter()
 

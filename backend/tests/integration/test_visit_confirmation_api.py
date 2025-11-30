@@ -1,11 +1,12 @@
 """
 Интеграционные тесты для API подтверждения визитов
 """
-import pytest
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 
-from app.models.visit import Visit
+import pytest
+
 from app.models.online_queue import OnlineQueueEntry
+from app.models.visit import Visit
 
 
 @pytest.mark.integration

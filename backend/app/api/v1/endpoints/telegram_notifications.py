@@ -2,20 +2,24 @@
 Расширенные API endpoints для Telegram уведомлений
 Поддержка массовых рассылок, планировщика и аналитики
 """
+
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_roles, get_current_user
+from app.api.deps import get_current_user, get_db, require_roles
+from app.crud import (
+    appointment as crud_appointment,
+    lab_result as crud_lab,
+    patient as crud_patient,
+    telegram_config as crud_telegram,
+)
 from app.models.user import User
 from app.services.telegram_bot import get_telegram_bot_service
 from app.services.telegram_templates import get_telegram_templates_service
-from app.crud import telegram_config as crud_telegram
-from app.crud import appointment as crud_appointment
-from app.crud import patient as crud_patient
-from app.crud import lab_result as crud_lab
 
 router = APIRouter()
 
@@ -26,7 +30,7 @@ async def send_appointment_reminder(
     reminder_type: str = Query("24h", description="Тип напоминания: 24h, 2h, 30m"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor"))
+    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor")),
 ):
     """Отправить напоминание о записи на прием"""
     try:
@@ -34,16 +38,14 @@ async def send_appointment_reminder(
         appointment = crud_appointment.get_appointment(db, appointment_id)
         if not appointment:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
 
         # Получаем данные пациента
         patient = crud_patient.get_patient(db, appointment.patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
             )
 
         # Ищем Telegram пользователя
@@ -52,7 +54,7 @@ async def send_appointment_reminder(
             return {
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
-                "patient_phone": patient.phone
+                "patient_phone": patient.phone,
             }
 
         # Получаем сервис бота
@@ -70,22 +72,20 @@ async def send_appointment_reminder(
             "cabinet": appointment.cabinet or "Уточните в регистратуре",
             "clinic_address": "г. Ташкент, ул. Медицинская, 15",
             "clinic_phone": "+998 71 123-45-67",
-            "appointment_id": appointment.id
+            "appointment_id": appointment.id,
         }
 
         # Получаем шаблон
         templates_service = get_telegram_templates_service()
         template = templates_service.get_template(
-            "appointment_reminder",
-            telegram_user.language_code or "ru",
-            template_data
+            "appointment_reminder", telegram_user.language_code or "ru", template_data
         )
 
         # Отправляем сообщение
         success = await bot_service._send_message(
             chat_id=telegram_user.chat_id,
             text=template["text"],
-            reply_markup=template.get("keyboard")
+            reply_markup=template.get("keyboard"),
         )
 
         if success:
@@ -94,12 +94,12 @@ async def send_appointment_reminder(
                 "message": "Напоминание отправлено",
                 "chat_id": telegram_user.chat_id,
                 "patient": patient.full_name,
-                "appointment_id": appointment.id
+                "appointment_id": appointment.id,
             }
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки напоминания"
+                detail="Ошибка отправки напоминания",
             )
 
     except HTTPException:
@@ -107,7 +107,7 @@ async def send_appointment_reminder(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки напоминания: {str(e)}"
+            detail=f"Ошибка отправки напоминания: {str(e)}",
         )
 
 
@@ -117,7 +117,7 @@ async def send_lab_results(
     lab_result_ids: List[int],
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Lab", "Doctor"))
+    current_user: User = Depends(require_roles("Admin", "Lab", "Doctor")),
 ):
     """Отправить результаты анализов пациенту"""
     try:
@@ -125,8 +125,7 @@ async def send_lab_results(
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
             )
 
         # Ищем Telegram пользователя
@@ -135,7 +134,7 @@ async def send_lab_results(
             return {
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
-                "patient_phone": patient.phone
+                "patient_phone": patient.phone,
             }
 
         # Получаем данные анализов
@@ -148,7 +147,7 @@ async def send_lab_results(
         if not lab_results:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Результаты анализов не найдены"
+                detail="Результаты анализов не найдены",
             )
 
         # Получаем сервис бота
@@ -161,8 +160,12 @@ async def send_lab_results(
 
         # Формируем данные для шаблона
         test_types = [result.test_code for result in lab_results]
-        has_abnormalities = any(result.is_abnormal for result in lab_results if hasattr(result, 'is_abnormal'))
-        
+        has_abnormalities = any(
+            result.is_abnormal
+            for result in lab_results
+            if hasattr(result, 'is_abnormal')
+        )
+
         template_data = {
             "patient_name": patient.full_name,
             "test_type": ", ".join(test_types),
@@ -170,25 +173,22 @@ async def send_lab_results(
             "ready_date": datetime.now().strftime("%d.%m.%Y"),
             "has_abnormalities": has_abnormalities,
             "abnormalities_text": templates_service.get_abnormalities_text(
-                has_abnormalities, 
-                telegram_user.language_code or "ru"
+                has_abnormalities, telegram_user.language_code or "ru"
             ),
             "download_link": f"https://clinic.example.com/lab-results/{patient_id}",
-            "doctor_id": lab_results[0].doctor_id
+            "doctor_id": lab_results[0].doctor_id,
         }
 
         # Получаем шаблон
         template = templates_service.get_template(
-            "lab_results_ready",
-            telegram_user.language_code or "ru",
-            template_data
+            "lab_results_ready", telegram_user.language_code or "ru", template_data
         )
 
         # Отправляем сообщение
         success = await bot_service._send_message(
             chat_id=telegram_user.chat_id,
             text=template["text"],
-            reply_markup=template.get("keyboard")
+            reply_markup=template.get("keyboard"),
         )
 
         if success:
@@ -197,12 +197,12 @@ async def send_lab_results(
                 "message": "Результаты анализов отправлены",
                 "chat_id": telegram_user.chat_id,
                 "patient": patient.full_name,
-                "lab_results_count": len(lab_results)
+                "lab_results_count": len(lab_results),
             }
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки результатов"
+                detail="Ошибка отправки результатов",
             )
 
     except HTTPException:
@@ -210,7 +210,7 @@ async def send_lab_results(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки результатов: {str(e)}"
+            detail=f"Ошибка отправки результатов: {str(e)}",
         )
 
 
@@ -220,7 +220,7 @@ async def send_payment_confirmation(
     payment_data: Dict[str, Any],
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Cashier"))
+    current_user: User = Depends(require_roles("Admin", "Cashier")),
 ):
     """Отправить подтверждение платежа"""
     try:
@@ -228,8 +228,7 @@ async def send_payment_confirmation(
         patient = crud_patient.get_patient(db, patient_id)
         if not patient:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Пациент не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Пациент не найден"
             )
 
         # Ищем Telegram пользователя
@@ -238,7 +237,7 @@ async def send_payment_confirmation(
             return {
                 "success": False,
                 "message": "Пациент не зарегистрирован в Telegram боте",
-                "patient_phone": patient.phone
+                "patient_phone": patient.phone,
             }
 
         # Получаем сервис бота
@@ -254,22 +253,20 @@ async def send_payment_confirmation(
             "payment_method": payment_data.get("payment_method", "Карта"),
             "payment_date": datetime.now().strftime("%d.%m.%Y %H:%M"),
             "transaction_id": payment_data.get("transaction_id", "N/A"),
-            "receipt_link": f"https://clinic.example.com/receipt/{payment_data.get('transaction_id')}"
+            "receipt_link": f"https://clinic.example.com/receipt/{payment_data.get('transaction_id')}",
         }
 
         # Получаем шаблон
         templates_service = get_telegram_templates_service()
         template = templates_service.get_template(
-            "payment_confirmation",
-            telegram_user.language_code or "ru",
-            template_data
+            "payment_confirmation", telegram_user.language_code or "ru", template_data
         )
 
         # Отправляем сообщение
         success = await bot_service._send_message(
             chat_id=telegram_user.chat_id,
             text=template["text"],
-            reply_markup=template.get("keyboard")
+            reply_markup=template.get("keyboard"),
         )
 
         if success:
@@ -278,12 +275,12 @@ async def send_payment_confirmation(
                 "message": "Подтверждение платежа отправлено",
                 "chat_id": telegram_user.chat_id,
                 "patient": patient.full_name,
-                "amount": payment_data.get("amount")
+                "amount": payment_data.get("amount"),
             }
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка отправки подтверждения"
+                detail="Ошибка отправки подтверждения",
             )
 
     except HTTPException:
@@ -291,41 +288,49 @@ async def send_payment_confirmation(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки подтверждения: {str(e)}"
+            detail=f"Ошибка отправки подтверждения: {str(e)}",
         )
 
 
 @router.post("/broadcast-message")
 async def send_broadcast_message(
     message: str,
-    target_groups: List[str] = Query(..., description="Группы получателей: patients, doctors, admins"),
+    target_groups: List[str] = Query(
+        ..., description="Группы получателей: patients, doctors, admins"
+    ),
     language: str = Query("ru", description="Язык сообщения"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Отправить широковещательное сообщение"""
     try:
         # Получаем список получателей
         recipients = []
-        
+
         if "patients" in target_groups:
-            patients = crud_telegram.get_telegram_users_by_role(db, "Patient", active_only=True)
+            patients = crud_telegram.get_telegram_users_by_role(
+                db, "Patient", active_only=True
+            )
             recipients.extend(patients)
-        
+
         if "doctors" in target_groups:
-            doctors = crud_telegram.get_telegram_users_by_role(db, "Doctor", active_only=True)
+            doctors = crud_telegram.get_telegram_users_by_role(
+                db, "Doctor", active_only=True
+            )
             recipients.extend(doctors)
-        
+
         if "admins" in target_groups:
-            admins = crud_telegram.get_telegram_users_by_role(db, "Admin", active_only=True)
+            admins = crud_telegram.get_telegram_users_by_role(
+                db, "Admin", active_only=True
+            )
             recipients.extend(admins)
 
         if not recipients:
             return {
                 "success": False,
                 "message": "Нет получателей для отправки",
-                "recipients_count": 0
+                "recipients_count": 0,
             }
 
         # Получаем сервис бота
@@ -340,8 +345,7 @@ async def send_broadcast_message(
         for recipient in recipients:
             try:
                 success = await bot_service._send_message(
-                    chat_id=recipient.chat_id,
-                    text=message
+                    chat_id=recipient.chat_id, text=message
                 )
                 if success:
                     sent_count += 1
@@ -357,13 +361,13 @@ async def send_broadcast_message(
             "total_recipients": len(recipients),
             "sent_count": sent_count,
             "failed_count": failed_count,
-            "target_groups": target_groups
+            "target_groups": target_groups,
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отправки широковещательного сообщения: {str(e)}"
+            detail=f"Ошибка отправки широковещательного сообщения: {str(e)}",
         )
 
 
@@ -371,7 +375,7 @@ async def send_broadcast_message(
 async def get_notification_stats(
     days_back: int = Query(7, description="Количество дней назад"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить статистику уведомлений"""
     try:
@@ -380,7 +384,7 @@ async def get_notification_stats(
         return {
             "period": {
                 "start": (datetime.now() - timedelta(days=days_back)).isoformat(),
-                "end": datetime.now().isoformat()
+                "end": datetime.now().isoformat(),
             },
             "total_sent": 0,
             "total_delivered": 0,
@@ -389,21 +393,17 @@ async def get_notification_stats(
                 "appointment_reminders": 0,
                 "lab_results": 0,
                 "payment_confirmations": 0,
-                "broadcast_messages": 0
+                "broadcast_messages": 0,
             },
-            "by_language": {
-                "ru": 0,
-                "uz": 0,
-                "en": 0
-            },
+            "by_language": {"ru": 0, "uz": 0, "en": 0},
             "delivery_rate": 0.0,
-            "error_rate": 0.0
+            "error_rate": 0.0,
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики: {str(e)}"
+            detail=f"Ошибка получения статистики: {str(e)}",
         )
 
 
@@ -413,7 +413,7 @@ async def schedule_reminder(
     reminder_time: str,  # ISO datetime string
     reminder_type: str = Query("24h", description="Тип напоминания"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """Запланировать напоминание о записи"""
     try:
@@ -424,11 +424,11 @@ async def schedule_reminder(
             "message": "Напоминание запланировано",
             "appointment_id": appointment_id,
             "reminder_time": reminder_time,
-            "reminder_type": reminder_type
+            "reminder_type": reminder_type,
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка планирования напоминания: {str(e)}"
+            detail=f"Ошибка планирования напоминания: {str(e)}",
         )

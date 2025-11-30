@@ -1,33 +1,35 @@
 """
 MCP сервер для работы с МКБ-10
 """
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+
 import logging
-from .base_server import BaseMCPServer, MCPTool, MCPResource
-from ..ai.ai_manager import get_ai_manager, AIProviderType
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from ..ai.ai_manager import AIProviderType, get_ai_manager
+from .base_server import BaseMCPServer, MCPResource, MCPTool
 
 logger = logging.getLogger(__name__)
 
 
 class MedicalICD10MCPServer(BaseMCPServer):
     """MCP сервер для работы с кодами МКБ-10"""
-    
+
     def __init__(self):
         super().__init__(name="medical-icd10-server", version="1.0.0")
         self.ai_manager = None
         self.icd10_cache = {}
         self.common_codes = self._load_common_codes()
-    
+
     async def initialize(self):
         """Инициализация сервера"""
         self.ai_manager = get_ai_manager()
         logger.info("Medical ICD-10 MCP Server initialized")
-    
+
     async def shutdown(self):
         """Завершение работы сервера"""
         logger.info("Medical ICD-10 MCP Server shutting down")
-    
+
     def _load_common_codes(self) -> Dict[str, Dict[str, str]]:
         """Загрузка часто используемых кодов МКБ-10"""
         return {
@@ -47,7 +49,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 "J32.9": "Хронический синусит неуточненный",
                 "J31.0": "Хронический ринит",
                 "U07.1": "COVID-19 вирус идентифицирован",
-                "U09.9": "Состояние после COVID-19 неуточненное (длительный ковид)"
+                "U09.9": "Состояние после COVID-19 неуточненное (длительный ковид)",
             },
             "cardiovascular": {
                 "I10": "Эссенциальная (первичная) гипертензия",
@@ -65,14 +67,14 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 "I64": "Инсульт неуточненный",
                 "I67.9": "Цереброваскулярная болезнь неуточненная",
                 "I73.9": "Болезнь периферических сосудов неуточненная",
-                "I80.3": "Флебит и тромбофлебит нижних конечностей"
+                "I80.3": "Флебит и тромбофлебит нижних конечностей",
             },
             "gastrointestinal": {
                 "K29.7": "Гастрит неуточненный",
                 "K25.9": "Язва желудка неуточненная",
                 "K58.9": "Синдром раздраженного кишечника",
                 "K92.1": "Мелена",
-                "K80.2": "Желчнокаменная болезнь"
+                "K80.2": "Желчнокаменная болезнь",
             },
             "neurological": {
                 "G43.9": "Мигрень неуточненная",
@@ -91,21 +93,21 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 "G56.0": "Синдром запястного канала",
                 "G62.9": "Полиневропатия неуточненная",
                 "R51": "Головная боль",
-                "R55": "Обморок и коллапс"
+                "R55": "Обморок и коллапс",
             },
             "endocrine": {
                 "E11.9": "Сахарный диабет 2 типа без осложнений",
                 "E10.9": "Сахарный диабет 1 типа без осложнений",
                 "E03.9": "Гипотиреоз неуточненный",
                 "E05.9": "Тиреотоксикоз неуточненный",
-                "E66.9": "Ожирение неуточненное"
+                "E66.9": "Ожирение неуточненное",
             },
             "dermatological": {
                 "L20.9": "Атопический дерматит неуточненный",
                 "L40.9": "Псориаз неуточненный",
                 "L50.9": "Крапивница неуточненная",
                 "L70.0": "Угри обыкновенные",
-                "B07": "Вирусные бородавки"
+                "B07": "Вирусные бородавки",
             },
             "dental": {
                 "K02.9": "Кариес зубов неуточненный",
@@ -115,7 +117,7 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 "K05.1": "Хронический гингивит",
                 "K08.1": "Потеря зубов вследствие несчастного случая",
                 "K12.0": "Рецидивирующие афты полости рта",
-                "K12.1": "Другие формы стоматита"
+                "K12.1": "Другие формы стоматита",
             },
             "symptoms": {
                 "R00.0": "Тахикардия неуточненная",
@@ -176,36 +178,38 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 "R68.3": "Симптом в виде «барабанных палочек» (пальцев)",
                 "R68.8": "Другие уточненные общие симптомы и признаки",
                 "R73.0": "Нарушение толерантности к глюкозе",
-                "R73.9": "Гипергликемия неуточненная"
+                "R73.9": "Гипергликемия неуточненная",
             },
             "infections": {
                 "A09.9": "Гастроэнтерит и колит неуточненного происхождения",
                 "B34.9": "Вирусная инфекция неуточненная",
                 "N39.0": "Инфекция мочевыводящих путей",
                 "L03.9": "Флегмона неуточненная",
-                "H66.9": "Средний отит неуточненный"
-            }
+                "H66.9": "Средний отит неуточненный",
+            },
         }
-    
-    @MCPTool(name="suggest_icd10", description="Подсказки кодов МКБ-10 на основе симптомов")
+
+    @MCPTool(
+        name="suggest_icd10", description="Подсказки кодов МКБ-10 на основе симптомов"
+    )
     async def suggest_icd10(
         self,
         symptoms: List[str],
         diagnosis: Optional[str] = None,
         specialty: Optional[str] = None,
         provider: Optional[str] = None,
-        max_suggestions: int = 5
+        max_suggestions: int = 5,
     ) -> Dict[str, Any]:
         """
         Подсказки кодов МКБ-10
-        
+
         Args:
             symptoms: Список симптомов
             diagnosis: Предварительный диагноз
             specialty: Специальность врача
             provider: AI провайдер
             max_suggestions: Максимум подсказок
-        
+
         Returns:
             Список рекомендованных кодов МКБ-10
         """
@@ -217,43 +221,51 @@ class MedicalICD10MCPServer(BaseMCPServer):
                     provider_type = AIProviderType(provider.lower())
                 except ValueError:
                     logger.warning(f"Invalid provider: {provider}, using default")
-            
+
             # Получаем подсказки через AI
             suggestions = await self.ai_manager.suggest_icd10(
-                symptoms=symptoms,
-                diagnosis=diagnosis,
-                provider_type=provider_type
+                symptoms=symptoms, diagnosis=diagnosis, provider_type=provider_type
             )
-            
+
             # Проверяем, получили ли мы детальные клинические рекомендации
-            if suggestions and len(suggestions) > 0 and "clinical_recommendations" in suggestions[0]:
+            if (
+                suggestions
+                and len(suggestions) > 0
+                and "clinical_recommendations" in suggestions[0]
+            ):
                 # Новый формат: детальные клинические рекомендации
                 return {
                     "status": "success",
-                    "clinical_recommendations": suggestions[0]["clinical_recommendations"],
+                    "clinical_recommendations": suggestions[0][
+                        "clinical_recommendations"
+                    ],
                     "metadata": {
                         "symptoms_count": len(symptoms),
                         "has_diagnosis": diagnosis is not None,
                         "specialty": specialty,
                         "provider_used": provider or "default",
                         "timestamp": datetime.utcnow().isoformat(),
-                        "format": "detailed_clinical"
-                    }
+                        "format": "detailed_clinical",
+                    },
                 }
             else:
                 # Старый формат: список кодов
                 # Добавляем релевантные коды из кеша
-                relevant_codes = self._find_relevant_cached_codes(symptoms, diagnosis, specialty)
-                
+                relevant_codes = self._find_relevant_cached_codes(
+                    symptoms, diagnosis, specialty
+                )
+
                 # Объединяем результаты
                 all_suggestions = suggestions[:max_suggestions]
-                
+
                 # Добавляем кешированные коды если есть место
                 for code in relevant_codes:
                     if len(all_suggestions) < max_suggestions:
-                        if not any(s.get("code") == code["code"] for s in all_suggestions):
+                        if not any(
+                            s.get("code") == code["code"] for s in all_suggestions
+                        ):
                             all_suggestions.append(code)
-                
+
                 return {
                     "status": "success",
                     "suggestions": all_suggestions,
@@ -263,147 +275,152 @@ class MedicalICD10MCPServer(BaseMCPServer):
                         "specialty": specialty,
                         "provider_used": provider or "default",
                         "timestamp": datetime.utcnow().isoformat(),
-                        "format": "code_list"
-                    }
+                        "format": "code_list",
+                    },
                 }
-            
+
         except Exception as e:
             logger.error(f"Error suggesting ICD-10 codes: {str(e)}")
             return {
                 "status": "error",
                 "error": f"Failed to suggest ICD-10 codes: {str(e)}",
-                "suggestions": []
+                "suggestions": [],
             }
-    
+
     @MCPTool(name="validate_icd10", description="Валидация кода МКБ-10")
     async def validate_icd10(
         self,
         code: str,
         symptoms: Optional[List[str]] = None,
-        diagnosis: Optional[str] = None
+        diagnosis: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Валидация кода МКБ-10
-        
+
         Args:
             code: Код МКБ-10
             symptoms: Список симптомов для проверки соответствия
             diagnosis: Диагноз для проверки соответствия
-        
+
         Returns:
             Результат валидации
         """
         # Базовая валидация формата
         import re
+
         pattern = r'^[A-Z]\d{2}(\.\d{1,2})?$'
-        
+
         if not re.match(pattern, code.upper()):
             return {
                 "valid": False,
                 "reason": "Неверный формат кода МКБ-10",
-                "format_hint": "Формат: буква + 2 цифры + опционально точка и 1-2 цифры (например, I10 или I10.0)"
+                "format_hint": "Формат: буква + 2 цифры + опционально точка и 1-2 цифры (например, I10 или I10.0)",
             }
-        
+
         # Проверяем в кеше
         code_info = self._find_code_in_cache(code.upper())
-        
+
         relevance_score = 1.0
         warnings = []
-        
+
         # Проверка соответствия симптомам
         if symptoms and code_info:
             # Упрощенная проверка релевантности
             description_lower = code_info.get("description", "").lower()
-            matching_symptoms = sum(1 for s in symptoms if any(word in description_lower for word in s.lower().split()))
+            matching_symptoms = sum(
+                1
+                for s in symptoms
+                if any(word in description_lower for word in s.lower().split())
+            )
             relevance_score = matching_symptoms / len(symptoms) if symptoms else 1.0
-            
+
             if relevance_score < 0.3:
                 warnings.append("Код может не соответствовать указанным симптомам")
-        
+
         return {
             "valid": True,
             "code": code.upper(),
             "description": code_info.get("description") if code_info else None,
             "category": code_info.get("category") if code_info else None,
             "relevance_score": round(relevance_score, 2),
-            "warnings": warnings
+            "warnings": warnings,
         }
-    
+
     @MCPTool(name="search_icd10", description="Поиск кодов МКБ-10 по тексту")
     async def search_icd10(
-        self,
-        query: str,
-        category: Optional[str] = None,
-        limit: int = 10
+        self, query: str, category: Optional[str] = None, limit: int = 10
     ) -> Dict[str, Any]:
         """
         Поиск кодов МКБ-10
-        
+
         Args:
             query: Поисковый запрос
             category: Категория для фильтрации
             limit: Максимум результатов
-        
+
         Returns:
             Найденные коды МКБ-10
         """
         results = []
         query_lower = query.lower()
         query_upper = query.upper()
-        
+
         # Поиск в кешированных кодах
         for cat, codes in self.common_codes.items():
             if category and cat != category:
                 continue
-            
+
             for code, description in codes.items():
                 description_lower = description.lower()
-                
+
                 # Проверяем совпадение по коду (точное или частичное)
                 code_match = False
                 code_score = 0.0
                 if query_upper in code:
                     code_match = True
                     code_score = 1.0 if query_upper == code else 0.95
-                
+
                 # Проверяем совпадение по описанию
                 text_match = query_lower in description_lower
                 text_score = self._calculate_match_score(query_lower, description_lower)
-                
+
                 # Если есть хоть какое-то совпадение - добавляем
                 if code_match or text_match or text_score > 0.3:
                     # Приоритет: совпадение по коду > совпадение по описанию
                     final_score = max(code_score, text_score)
-                    results.append({
-                        "code": code,
-                        "description": description,
-                        "category": cat,
-                        "match_score": final_score,
-                        "match_type": "code" if code_match else "description"
-                    })
-        
+                    results.append(
+                        {
+                            "code": code,
+                            "description": description,
+                            "category": cat,
+                            "match_score": final_score,
+                            "match_type": "code" if code_match else "description",
+                        }
+                    )
+
         # Сортируем по релевантности (код важнее описания)
-        results.sort(key=lambda x: (x["match_score"], x["match_type"] == "code"), reverse=True)
-        
+        results.sort(
+            key=lambda x: (x["match_score"], x["match_type"] == "code"), reverse=True
+        )
+
         return {
             "status": "success",
             "results": results[:limit],
             "total_found": len(results),
             "query": query,
-            "category_filter": category
+            "category_filter": category,
         }
-    
-    @MCPResource(name="common_icd10_codes", description="Часто используемые коды МКБ-10")
-    async def get_common_codes(
-        self,
-        category: Optional[str] = None
-    ) -> Dict[str, Any]:
+
+    @MCPResource(
+        name="common_icd10_codes", description="Часто используемые коды МКБ-10"
+    )
+    async def get_common_codes(self, category: Optional[str] = None) -> Dict[str, Any]:
         """
         Получение часто используемых кодов
-        
+
         Args:
             category: Фильтр по категории
-        
+
         Returns:
             Список часто используемых кодов
         """
@@ -411,28 +428,23 @@ class MedicalICD10MCPServer(BaseMCPServer):
             codes = self.common_codes.get(category, {})
             return {
                 "category": category,
-                "codes": [
-                    {"code": k, "description": v}
-                    for k, v in codes.items()
-                ],
-                "count": len(codes)
+                "codes": [{"code": k, "description": v} for k, v in codes.items()],
+                "count": len(codes),
             }
-        
+
         all_codes = []
         for cat, codes in self.common_codes.items():
             for code, description in codes.items():
-                all_codes.append({
-                    "code": code,
-                    "description": description,
-                    "category": cat
-                })
-        
+                all_codes.append(
+                    {"code": code, "description": description, "category": cat}
+                )
+
         return {
             "codes": all_codes,
             "total_count": len(all_codes),
-            "categories": list(self.common_codes.keys())
+            "categories": list(self.common_codes.keys()),
         }
-    
+
     @MCPResource(name="icd10_categories", description="Категории МКБ-10")
     async def get_categories(self) -> Dict[str, Any]:
         """Получение списка категорий МКБ-10"""
@@ -457,26 +469,22 @@ class MedicalICD10MCPServer(BaseMCPServer):
             "R00-R99": "Симптомы и признаки",
             "S00-T98": "Травмы и отравления",
             "V01-Y98": "Внешние причины",
-            "Z00-Z99": "Факторы, влияющие на здоровье"
+            "Z00-Z99": "Факторы, влияющие на здоровье",
         }
-        
+
         return {
             "categories": [
-                {"range": k, "description": v}
-                for k, v in categories.items()
+                {"range": k, "description": v} for k, v in categories.items()
             ],
-            "total_count": len(categories)
+            "total_count": len(categories),
         }
-    
+
     def _find_relevant_cached_codes(
-        self,
-        symptoms: List[str],
-        diagnosis: Optional[str],
-        specialty: Optional[str]
+        self, symptoms: List[str], diagnosis: Optional[str], specialty: Optional[str]
     ) -> List[Dict[str, str]]:
         """Поиск релевантных кодов в кеше"""
         relevant = []
-        
+
         # Определяем категорию по специальности
         specialty_mapping = {
             "cardiology": "cardiovascular",
@@ -485,51 +493,46 @@ class MedicalICD10MCPServer(BaseMCPServer):
             "neurology": "neurological",
             "endocrinology": "endocrine",
             "dermatology": "dermatological",
-            "dentistry": "dental"
+            "dentistry": "dental",
         }
-        
+
         category = specialty_mapping.get(specialty) if specialty else None
-        
+
         # Ищем в соответствующей категории или во всех
         search_categories = [category] if category else list(self.common_codes.keys())
-        
+
         for cat in search_categories:
             codes = self.common_codes.get(cat, {})
             for code, description in codes.items():
                 score = self._calculate_relevance(description, symptoms, diagnosis)
                 if score > 0.3:
-                    relevant.append({
-                        "code": code,
-                        "description": description,
-                        "category": cat,
-                        "relevance_score": score
-                    })
-        
+                    relevant.append(
+                        {
+                            "code": code,
+                            "description": description,
+                            "category": cat,
+                            "relevance_score": score,
+                        }
+                    )
+
         # Сортируем по релевантности
         relevant.sort(key=lambda x: x["relevance_score"], reverse=True)
         return relevant[:3]
-    
+
     def _find_code_in_cache(self, code: str) -> Optional[Dict[str, str]]:
         """Поиск кода в кеше"""
         for category, codes in self.common_codes.items():
             if code in codes:
-                return {
-                    "code": code,
-                    "description": codes[code],
-                    "category": category
-                }
+                return {"code": code, "description": codes[code], "category": category}
         return None
-    
+
     def _calculate_relevance(
-        self,
-        description: str,
-        symptoms: List[str],
-        diagnosis: Optional[str]
+        self, description: str, symptoms: List[str], diagnosis: Optional[str]
     ) -> float:
         """Расчет релевантности кода"""
         score = 0.0
         description_lower = description.lower()
-        
+
         # Проверка симптомов
         if symptoms:
             for symptom in symptoms:
@@ -537,46 +540,48 @@ class MedicalICD10MCPServer(BaseMCPServer):
                 matching = sum(1 for word in words if word in description_lower)
                 score += matching / len(words) if words else 0
             score = score / len(symptoms) if symptoms else 0
-        
+
         # Проверка диагноза
         if diagnosis:
             diagnosis_words = diagnosis.lower().split()
             matching = sum(1 for word in diagnosis_words if word in description_lower)
             diagnosis_score = matching / len(diagnosis_words) if diagnosis_words else 0
             score = (score + diagnosis_score * 2) / 3  # Диагноз важнее
-        
+
         return min(score, 1.0)
-    
+
     def _calculate_match_score(self, query: str, text: str) -> float:
         """Расчет точности совпадения с поддержкой нечеткого поиска"""
         if query == text:
             return 1.0
-        
+
         # Если весь запрос содержится в тексте - высокий балл
         if query in text:
             return 0.9
-        
+
         # Если текст содержится в запросе - средний балл
         if text in query:
             return 0.7
-        
+
         words = query.split()
         if not words:
             return 0.0
-        
+
         # Подсчет полных совпадений слов
         full_matches = sum(1 for word in words if word in text)
-        
+
         # Подсчет частичных совпадений (начало слова)
         partial_matches = 0
         text_words = text.split()
         for query_word in words:
             if len(query_word) >= 3:  # Минимум 3 символа для частичного поиска
                 for text_word in text_words:
-                    if text_word.startswith(query_word) or query_word.startswith(text_word):
+                    if text_word.startswith(query_word) or query_word.startswith(
+                        text_word
+                    ):
                         partial_matches += 0.5
                         break
-        
+
         # Финальный балл: полные совпадения важнее частичных
         total_score = (full_matches + partial_matches) / len(words)
         return min(total_score, 1.0)

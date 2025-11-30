@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Date, JSON
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -24,7 +24,7 @@ class Visit(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-    
+
     # ✅ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
     discount_mode: Mapped[str] = mapped_column(
         String(16), nullable=False, default="none", index=True
@@ -38,18 +38,32 @@ class Visit(Base):
     )
     visit_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
-    department: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # Department name/key
+    department: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )  # Department name/key
     department_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("departments.id", ondelete="SET NULL"),
-        nullable=True, index=True
+        Integer,
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
-    
+
     # ✅ ПОЛЯ ДЛЯ ПОДТВЕРЖДЕНИЯ ВИЗИТОВ
-    confirmation_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
-    confirmation_channel: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # phone|telegram|pwa
-    confirmation_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    confirmed_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # user_id, telegram_id, или phone
+    confirmation_token: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, index=True
+    )
+    confirmation_channel: Mapped[Optional[str]] = mapped_column(
+        String(16), nullable=True
+    )  # phone|telegram|pwa
+    confirmation_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    confirmed_by: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )  # user_id, telegram_id, или phone
 
     services: Mapped[list["VisitService"]] = relationship(
         back_populates="visit", cascade="all, delete-orphan"

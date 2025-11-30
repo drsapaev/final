@@ -1,13 +1,16 @@
 """
 Расширенные схемы для мобильного API
 """
-from datetime import datetime, date
-from typing import List, Optional, Dict, Any
+
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class DoctorSearchResponse(BaseModel):
     """Ответ поиска врачей"""
+
     id: int
     name: str
     specialty: str
@@ -23,6 +26,7 @@ class DoctorSearchResponse(BaseModel):
 
 class ServiceSearchResponse(BaseModel):
     """Ответ поиска услуг"""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -36,6 +40,7 @@ class ServiceSearchResponse(BaseModel):
 
 class ServiceCategoryResponse(BaseModel):
     """Категория услуг"""
+
     name: str
     display_name: str
     description: Optional[str] = None
@@ -46,6 +51,7 @@ class ServiceCategoryResponse(BaseModel):
 
 class QueuePositionResponse(BaseModel):
     """Позиция в очереди"""
+
     queue_id: int
     doctor_name: str
     specialty: str
@@ -58,6 +64,7 @@ class QueuePositionResponse(BaseModel):
 
 class FeedbackResponse(BaseModel):
     """Ответ на обратную связь"""
+
     success: bool
     message: str
     feedback_id: int
@@ -65,6 +72,7 @@ class FeedbackResponse(BaseModel):
 
 class EmergencyContactResponse(BaseModel):
     """Ответ экстренного обращения"""
+
     success: bool
     message: str
     emergency_id: int
@@ -73,6 +81,7 @@ class EmergencyContactResponse(BaseModel):
 
 class ProfileResponse(BaseModel):
     """Ответ обновления профиля"""
+
     success: bool
     message: str
     patient: Dict[str, Any]
@@ -80,6 +89,7 @@ class ProfileResponse(BaseModel):
 
 class NotificationSettingsResponse(BaseModel):
     """Настройки уведомлений"""
+
     push_enabled: bool = True
     sms_enabled: bool = True
     email_enabled: bool = True
@@ -90,6 +100,7 @@ class NotificationSettingsResponse(BaseModel):
 
 class ClinicInfoResponse(BaseModel):
     """Информация о клинике"""
+
     name: str
     address: str
     phone: str
@@ -103,6 +114,7 @@ class ClinicInfoResponse(BaseModel):
 
 class APIVersionResponse(BaseModel):
     """Версия API"""
+
     version: str
     build: str
     features: List[str]
@@ -111,6 +123,7 @@ class APIVersionResponse(BaseModel):
 
 class AppointmentActionResponse(BaseModel):
     """Ответ действия с записью"""
+
     success: bool
     message: str
     new_date: Optional[str] = None
@@ -118,6 +131,7 @@ class AppointmentActionResponse(BaseModel):
 
 class DoctorScheduleSlot(BaseModel):
     """Слот в расписании врача"""
+
     date: date
     time: str
     available: bool
@@ -127,12 +141,14 @@ class DoctorScheduleSlot(BaseModel):
 
 class DoctorScheduleResponse(BaseModel):
     """Расписание врача"""
+
     doctor_id: int
     schedule: List[DoctorScheduleSlot]
 
 
 class MobileStatsExtended(BaseModel):
     """Расширенная статистика для мобильного"""
+
     total_appointments: int = 0
     upcoming_appointments: int = 0
     completed_appointments: int = 0
@@ -147,6 +163,7 @@ class MobileStatsExtended(BaseModel):
 
 class MobileNotificationExtended(BaseModel):
     """Расширенное уведомление"""
+
     id: int
     title: str
     message: str
@@ -160,6 +177,7 @@ class MobileNotificationExtended(BaseModel):
 
 class PatientMedicalHistory(BaseModel):
     """Медицинская история пациента"""
+
     allergies: Optional[str] = None
     chronic_conditions: Optional[str] = None
     medications: List[str] = []
@@ -171,6 +189,7 @@ class PatientMedicalHistory(BaseModel):
 
 class AppointmentReminderSettings(BaseModel):
     """Настройки напоминаний о записях"""
+
     enabled: bool = True
     remind_24h: bool = True
     remind_2h: bool = True
@@ -180,6 +199,7 @@ class AppointmentReminderSettings(BaseModel):
 
 class MobileSecuritySettings(BaseModel):
     """Настройки безопасности мобильного приложения"""
+
     biometric_enabled: bool = False
     pin_enabled: bool = False
     auto_logout_minutes: int = 30
@@ -189,6 +209,7 @@ class MobileSecuritySettings(BaseModel):
 
 class PaymentMethodMobile(BaseModel):
     """Способ оплаты для мобильного"""
+
     id: int
     type: str  # card, cash, click, payme, kaspi
     name: str
@@ -199,6 +220,7 @@ class PaymentMethodMobile(BaseModel):
 
 class MobilePaymentRequest(BaseModel):
     """Запрос оплаты через мобильное"""
+
     appointment_id: int
     payment_method_id: int
     amount: float
@@ -207,6 +229,7 @@ class MobilePaymentRequest(BaseModel):
 
 class MobilePaymentResponse(BaseModel):
     """Ответ оплаты через мобильное"""
+
     success: bool
     payment_id: Optional[int] = None
     payment_url: Optional[str] = None  # Для онлайн оплаты
@@ -216,6 +239,7 @@ class MobilePaymentResponse(BaseModel):
 
 class LabResultExtended(BaseModel):
     """Расширенный результат анализа"""
+
     id: int
     test_name: str
     result_value: str
@@ -232,6 +256,7 @@ class LabResultExtended(BaseModel):
 
 class MobileSearchFilters(BaseModel):
     """Фильтры поиска для мобильного"""
+
     specialty: Optional[str] = None
     rating_min: Optional[float] = None
     price_min: Optional[float] = None
@@ -239,5 +264,3 @@ class MobileSearchFilters(BaseModel):
     available_today: Optional[bool] = None
     location: Optional[str] = None
     insurance_accepted: Optional[bool] = None
-
-

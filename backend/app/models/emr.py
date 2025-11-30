@@ -38,23 +38,43 @@ class EMR(Base):
 
     # Прикрепленные файлы (JSON массив)
     attachments: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    
+
     # Расширенные поля для специализаций
-    vital_signs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Жизненные показатели
-    lab_results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Результаты анализов
-    imaging_results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Результаты исследований
-    medications: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Назначенные препараты
+    vital_signs: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Жизненные показатели
+    lab_results: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Результаты анализов
+    imaging_results: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Результаты исследований
+    medications: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Назначенные препараты
     allergies: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Аллергии
-    family_history: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Семейный анамнез
-    social_history: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Социальный анамнез
-    
+    family_history: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Семейный анамнез
+    social_history: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Социальный анамнез
+
     # AI данные
-    ai_suggestions: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # AI предложения
-    ai_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)  # Уверенность AI
-    
+    ai_suggestions: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # AI предложения
+    ai_confidence: Mapped[Optional[float]] = mapped_column(
+        nullable=True
+    )  # Уверенность AI
+
     # Метаданные
-    template_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # ID используемого шаблона
-    specialty: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Специализация
+    template_id: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )  # ID используемого шаблона
+    specialty: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True
+    )  # Специализация
 
     # Статус и метаданные
     is_draft: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -1,24 +1,26 @@
 """
 Конфигурация pytest для тестов системы клиники
 """
-import pytest
-import tempfile
+
 import os
-from datetime import datetime, date
+import tempfile
+from datetime import date, datetime
+
+import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
 
-from app.main import app
-from app.db.base_class import Base
 from app.api.deps import get_db
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.service import Service
-from app.models.clinic import Doctor
 from app.core.security import get_password_hash
+from app.db.base_class import Base
+from app.main import app
+from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.patient import Patient
+from app.models.service import Service
+from app.models.user import User
+from app.models.visit import Visit
 
 
 @pytest.fixture(scope="session")
@@ -26,12 +28,12 @@ def test_db():
     """Создает тестовую базу данных"""
     # Используем in-memory БД для тестов
     engine = create_engine("sqlite:///:memory:", echo=False)
-    
+
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
-    
+
     yield engine
-    
+
     # Для in-memory БД очистка не нужна
 
 
@@ -40,26 +42,27 @@ def db_session(test_db):
     """Создает сессию БД для каждого теста"""
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db)
     session = TestingSessionLocal()
-    
+
     yield session
-    
+
     session.close()
 
 
 @pytest.fixture(scope="function")
 def client(db_session):
     """Создает тестовый клиент FastAPI"""
+
     def override_get_db():
         try:
             yield db_session
         finally:
             pass
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     with TestClient(app) as test_client:
         yield test_client
-    
+
     app.dependency_overrides.clear()
 
 
@@ -73,7 +76,7 @@ def admin_user(db_session):
         hashed_password=get_password_hash("admin123"),
         role="Admin",
         is_active=True,
-        is_superuser=True
+        is_superuser=True,
     )
     db_session.add(user)
     db_session.commit()
@@ -91,7 +94,7 @@ def cardio_user(db_session):
         hashed_password=get_password_hash("cardio123"),
         role="cardio",
         is_active=True,
-        is_superuser=False
+        is_superuser=False,
     )
     db_session.add(user)
     db_session.commit()
@@ -109,7 +112,7 @@ def registrar_user(db_session):
         hashed_password=get_password_hash("registrar123"),
         role="Registrar",
         is_active=True,
-        is_superuser=False
+        is_superuser=False,
     )
     db_session.add(user)
     db_session.commit()
@@ -126,7 +129,7 @@ def test_patient(db_session):
         middle_name="Иванович",
         phone="+998901234567",
         birth_date=date(1990, 1, 1),
-        address="Тестовый адрес"
+        address="Тестовый адрес",
     )
     db_session.add(patient)
     db_session.commit()
@@ -143,7 +146,7 @@ def test_doctor(db_session, cardio_user):
         license_number="TEST123",
         experience_years=10,
         bio="Тестовый кардиолог",
-        is_active=True
+        is_active=True,
     )
     db_session.add(doctor)
     db_session.commit()
@@ -164,7 +167,7 @@ def test_service(db_session):
         requires_doctor=True,
         queue_tag="cardiology_common",
         is_consultation=True,
-        allow_doctor_price_override=False
+        allow_doctor_price_override=False,
     )
     db_session.add(service)
     db_session.commit()
@@ -185,7 +188,7 @@ def test_visit(db_session, test_patient, test_doctor):
         department="cardiology",
         confirmation_token="test-token-123",
         confirmation_channel="telegram",
-        confirmation_expires_at=datetime.utcnow().replace(hour=23, minute=59)
+        confirmation_expires_at=datetime.utcnow().replace(hour=23, minute=59),
     )
     db_session.add(visit)
     db_session.commit()
@@ -200,7 +203,7 @@ def test_daily_queue(db_session, cardio_user):
         day=date.today(),
         specialist_id=cardio_user.id,
         queue_tag="cardiology_common",
-        active=True
+        active=True,
     )
     db_session.add(queue)
     db_session.commit()
@@ -220,7 +223,7 @@ def test_queue_entry(db_session, test_daily_queue, test_patient, test_visit):
         telegram_id=123456789,  # Фиксированное значение для тестов
         visit_id=test_visit.id,
         source="confirmation",
-        status="waiting"
+        status="waiting",
     )
     db_session.add(entry)
     db_session.commit()
@@ -231,10 +234,10 @@ def test_queue_entry(db_session, test_daily_queue, test_patient, test_visit):
 @pytest.fixture(scope="function")
 def auth_headers(client, admin_user):
     """Создает заголовки авторизации для администратора"""
-    response = client.post("/api/v1/authentication/login", json={
-        "username": admin_user.username,
-        "password": "admin123"
-    })
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": admin_user.username, "password": "admin123"},
+    )
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -243,10 +246,10 @@ def auth_headers(client, admin_user):
 @pytest.fixture(scope="function")
 def cardio_auth_headers(client, cardio_user):
     """Создает заголовки авторизации для кардиолога"""
-    response = client.post("/api/v1/authentication/login", json={
-        "username": cardio_user.username,
-        "password": "cardio123"
-    })
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": cardio_user.username, "password": "cardio123"},
+    )
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -255,10 +258,10 @@ def cardio_auth_headers(client, cardio_user):
 @pytest.fixture(scope="function")
 def registrar_auth_headers(client, registrar_user):
     """Создает заголовки авторизации для регистратора"""
-    response = client.post("/api/v1/authentication/login", json={
-        "username": registrar_user.username,
-        "password": "registrar123"
-    })
+    response = client.post(
+        "/api/v1/authentication/login",
+        json={"username": registrar_user.username, "password": "registrar123"},
+    )
     assert response.status_code == 200
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

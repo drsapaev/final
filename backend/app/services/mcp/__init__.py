@@ -3,12 +3,12 @@ MCP (Model Context Protocol) интеграция для медицинской 
 """
 
 from .base_server import BaseMCPServer
-from .mcp_client import MedicalMCPClient, get_mcp_client
 from .complaint_server import MedicalComplaintMCPServer
 from .icd10_server import MedicalICD10MCPServer
-from .lab_server import MedicalLabMCPServer
 from .imaging_server import MedicalImagingMCPServer
-from .mcp_manager import MCPManager, get_mcp_manager
+from .lab_server import MedicalLabMCPServer
+from .mcp_client import get_mcp_client, MedicalMCPClient
+from .mcp_manager import get_mcp_manager, MCPManager
 
 __all__ = [
     'BaseMCPServer',
@@ -19,5 +19,5 @@ __all__ = [
     'MedicalLabMCPServer',
     'MedicalImagingMCPServer',
     'MCPManager',
-    'get_mcp_manager'
+    'get_mcp_manager',
 ]

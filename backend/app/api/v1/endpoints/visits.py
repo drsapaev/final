@@ -101,17 +101,17 @@ def list_visits(
 def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
     """
     Создать визит.
-    
-    Использует feature flag USE_CRUD_VISITS для переключения между старой (Table API) 
+
+    Использует feature flag USE_CRUD_VISITS для переключения между старой (Table API)
     и новой (CRUD) реализацией. По умолчанию используется старая реализация для безопасности.
     """
     # Feature flag для безопасной миграции на CRUD
     use_crud = os.getenv("USE_CRUD_VISITS", "false").lower() == "true"
-    
+
     if use_crud:
         # Новая реализация через CRUD (Single Source of Truth)
         from app.crud.visit import create_visit as crud_create_visit
-        
+
         visit = crud_create_visit(
             db=db,
             patient_id=payload.patient_id,
@@ -121,9 +121,9 @@ def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
             status="open",
             auto_status=False,  # Статус уже установлен
             notify=False,
-            log=True
+            log=True,
         )
-        
+
         return VisitOut(
             id=visit.id,
             patient_id=visit.patient_id,
@@ -133,7 +133,7 @@ def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
             started_at=None,
             finished_at=None,
             notes=visit.notes,
-            planned_date=visit.visit_date
+            planned_date=visit.visit_date,
         )
     else:
         # Старая реализация через Table API (для обратной совместимости)

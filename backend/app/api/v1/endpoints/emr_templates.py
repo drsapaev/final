@@ -1,20 +1,22 @@
 """
 API endpoints для шаблонов EMR
 """
+
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.api.deps import get_current_user
+from app.crud.emr_template import emr_template, emr_version
+from app.db.session import get_db
 from app.schemas.emr_template import (
     EMRTemplateCreate,
-    EMRTemplateUpdate,
     EMRTemplateOut,
+    EMRTemplateStructure,
+    EMRTemplateUpdate,
     EMRVersionOut,
-    EMRTemplateStructure
 )
-from app.crud.emr_template import emr_template, emr_version
 from app.services.emr_templates import EMRTemplateService
 
 router = APIRouter()
@@ -25,7 +27,7 @@ async def get_emr_templates(
     specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
     is_public: Optional[bool] = Query(None, description="Только публичные шаблоны"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Получить список шаблонов EMR"""
     try:
@@ -35,12 +37,11 @@ async def get_emr_templates(
             templates = emr_template.get_by_specialty(db, specialty=specialty)
         else:
             templates = emr_template.get_multi(db)
-        
+
         return templates
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения шаблонов: {str(e)}"
+            status_code=500, detail=f"Ошибка получения шаблонов: {str(e)}"
         )
 
 
@@ -48,7 +49,7 @@ async def get_emr_templates(
 async def get_user_templates(
     specialty: Optional[str] = Query(None, description="Фильтр по специализации"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Получить шаблоны пользователя"""
     try:
@@ -59,7 +60,7 @@ async def get_user_templates(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения пользовательских шаблонов: {str(e)}"
+            detail=f"Ошибка получения пользовательских шаблонов: {str(e)}",
         )
 
 
@@ -67,7 +68,7 @@ async def get_user_templates(
 async def create_emr_template(
     template_data: EMRTemplateCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Создать новый шаблон EMR"""
     try:
@@ -76,8 +77,7 @@ async def create_emr_template(
         return template
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка создания шаблона: {str(e)}"
+            status_code=500, detail=f"Ошибка создания шаблона: {str(e)}"
         )
 
 
@@ -85,7 +85,7 @@ async def create_emr_template(
 async def create_template_from_structure(
     structure: EMRTemplateStructure,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Создать шаблон из структуры"""
     try:
@@ -95,8 +95,7 @@ async def create_template_from_structure(
         return template
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка создания шаблона из структуры: {str(e)}"
+            status_code=500, detail=f"Ошибка создания шаблона из структуры: {str(e)}"
         )
 
 
@@ -104,7 +103,7 @@ async def create_template_from_structure(
 async def get_emr_template(
     template_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Получить шаблон EMR по ID"""
     try:
@@ -116,8 +115,7 @@ async def get_emr_template(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения шаблона: {str(e)}"
+            status_code=500, detail=f"Ошибка получения шаблона: {str(e)}"
         )
 
 
@@ -126,26 +124,27 @@ async def update_emr_template(
     template_id: int,
     template_update: EMRTemplateUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Обновить шаблон EMR"""
     try:
         template = emr_template.get(db, id=template_id)
         if not template:
             raise HTTPException(status_code=404, detail="Шаблон не найден")
-        
+
         # Проверяем права доступа
         if template.created_by != current_user.id and not current_user.role == "Admin":
             raise HTTPException(status_code=403, detail="Нет прав для редактирования")
-        
-        updated_template = emr_template.update(db, db_obj=template, obj_in=template_update)
+
+        updated_template = emr_template.update(
+            db, db_obj=template, obj_in=template_update
+        )
         return updated_template
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка обновления шаблона: {str(e)}"
+            status_code=500, detail=f"Ошибка обновления шаблона: {str(e)}"
         )
 
 
@@ -154,7 +153,7 @@ async def clone_emr_template(
     template_id: int,
     new_name: str,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Клонировать шаблон EMR"""
     try:
@@ -166,8 +165,7 @@ async def clone_emr_template(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка клонирования шаблона: {str(e)}"
+            status_code=500, detail=f"Ошибка клонирования шаблона: {str(e)}"
         )
 
 
@@ -175,58 +173,61 @@ async def clone_emr_template(
 async def delete_emr_template(
     template_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Удалить шаблон EMR"""
     try:
         template = emr_template.get(db, id=template_id)
         if not template:
             raise HTTPException(status_code=404, detail="Шаблон не найден")
-        
+
         # Проверяем права доступа
         if template.created_by != current_user.id and not current_user.role == "Admin":
             raise HTTPException(status_code=403, detail="Нет прав для удаления")
-        
+
         emr_template.remove(db, id=template_id)
         return {"message": "Шаблон успешно удален"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка удаления шаблона: {str(e)}"
+            status_code=500, detail=f"Ошибка удаления шаблона: {str(e)}"
         )
 
 
 @router.get("/templates/default/load")
 async def load_default_templates(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
     """Загрузить предустановленные шаблоны"""
     try:
         if current_user.role != "Admin":
-            raise HTTPException(status_code=403, detail="Только администраторы могут загружать шаблоны")
-        
+            raise HTTPException(
+                status_code=403, detail="Только администраторы могут загружать шаблоны"
+            )
+
         default_templates = EMRTemplateService.get_default_templates()
         created_templates = []
-        
+
         for template_structure in default_templates:
-            template_data = EMRTemplateService.create_template_from_structure(template_structure)
+            template_data = EMRTemplateService.create_template_from_structure(
+                template_structure
+            )
             template_data["created_by"] = current_user.id
-            template = emr_template.create(db, obj_in=EMRTemplateCreate(**template_data))
+            template = emr_template.create(
+                db, obj_in=EMRTemplateCreate(**template_data)
+            )
             created_templates.append(template)
-        
+
         return {
             "message": f"Загружено {len(created_templates)} шаблонов",
-            "templates": created_templates
+            "templates": created_templates,
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка загрузки шаблонов: {str(e)}"
+            status_code=500, detail=f"Ошибка загрузки шаблонов: {str(e)}"
         )
 
 
@@ -235,7 +236,7 @@ async def get_emr_versions(
     emr_id: int,
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Получить версии EMR"""
     try:
@@ -243,8 +244,7 @@ async def get_emr_versions(
         return versions
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения версий: {str(e)}"
+            status_code=500, detail=f"Ошибка получения версий: {str(e)}"
         )
 
 
@@ -253,7 +253,7 @@ async def restore_emr_version(
     emr_id: int,
     version_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Восстановить версию EMR"""
     try:
@@ -262,15 +262,11 @@ async def restore_emr_version(
         )
         if not restored_version:
             raise HTTPException(status_code=404, detail="Версия не найдена")
-        
-        return {
-            "message": "Версия успешно восстановлена",
-            "version": restored_version
-        }
+
+        return {"message": "Версия успешно восстановлена", "version": restored_version}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка восстановления версии: {str(e)}"
+            status_code=500, detail=f"Ошибка восстановления версии: {str(e)}"
         )

@@ -1,35 +1,67 @@
 """
 API endpoints для системы аутентификации
 """
+
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.api.deps import get_current_user
+from app.db.session import get_db
 from app.models.user import User
-from app.services.authentication_service import get_authentication_service, AuthenticationService
+from app.services.authentication_service import (
+    AuthenticationService,
+    get_authentication_service,
+)
 
 logger = logging.getLogger(__name__)
 from app.crud.authentication import (
-    refresh_token, user_session, password_reset_token, 
-    email_verification_token, login_attempt, user_activity, 
-    security_event, user
+    email_verification_token,
+    login_attempt,
+    password_reset_token,
+    refresh_token,
+    security_event,
+    user,
+    user_activity,
+    user_session,
 )
 from app.schemas.authentication import (
-    LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse,
-    LogoutRequest, LogoutResponse, PasswordResetRequest, PasswordResetConfirmRequest,
-    PasswordChangeRequest, EmailVerificationRequest, EmailVerificationConfirmRequest,
-    UserProfileUpdateRequest, UserProfileResponse, UserSessionResponse,
-    LoginAttemptResponse, UserActivityResponse, SecurityEventResponse,
-    TokenValidationResponse, AuthStatusResponse, PasswordStrengthResponse,
-    DeviceInfoResponse, AuthErrorResponse, AuthSuccessResponse,
-    UserListResponse, UserCreateRequest, UserUpdateRequest, UserDeleteRequest,
-    SessionListResponse, SessionRevokeRequest, SecurityEventListResponse,
-    SecurityEventResolveRequest, AuthStatsResponse
+    AuthErrorResponse,
+    AuthStatsResponse,
+    AuthStatusResponse,
+    AuthSuccessResponse,
+    DeviceInfoResponse,
+    EmailVerificationConfirmRequest,
+    EmailVerificationRequest,
+    LoginAttemptResponse,
+    LoginRequest,
+    LoginResponse,
+    LogoutRequest,
+    LogoutResponse,
+    PasswordChangeRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    PasswordStrengthResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
+    SecurityEventListResponse,
+    SecurityEventResolveRequest,
+    SecurityEventResponse,
+    SessionListResponse,
+    SessionRevokeRequest,
+    TokenValidationResponse,
+    UserActivityResponse,
+    UserCreateRequest,
+    UserDeleteRequest,
+    UserListResponse,
+    UserProfileResponse,
+    UserProfileUpdateRequest,
+    UserSessionResponse,
+    UserUpdateRequest,
 )
 
 router = APIRouter()
@@ -44,20 +76,18 @@ def get_client_info(request: Request) -> tuple[str, str]:
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
-    request_data: LoginRequest,
-    request: Request,
-    db: Session = Depends(get_db)
+    request_data: LoginRequest, request: Request, db: Session = Depends(get_db)
 ):
     """Вход в систему"""
     try:
         print(f"DEBUG: Login endpoint called with username={request_data.username}")
-        
+
         ip_address, user_agent = get_client_info(request)
         print(f"DEBUG: IP={ip_address}, UserAgent={user_agent}")
-        
+
         service = get_authentication_service()
         print(f"DEBUG: Service obtained: {service}")
-        
+
         result = service.login_user(
             db=db,
             username=request_data.username,
@@ -65,19 +95,18 @@ async def login(
             ip_address=ip_address,
             user_agent=user_agent,
             device_fingerprint=request_data.device_fingerprint,
-            remember_me=request_data.remember_me
+            remember_me=request_data.remember_me,
         )
-        
+
         print(f"DEBUG: login_user result: {result}")
-        
+
         if not result["success"]:
             print(f"DEBUG: Authentication failed, raising HTTPException")
             print(f"DEBUG: Result details: {result}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=result["message"]
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=result["message"]
             )
-        
+
         return LoginResponse(
             access_token=(result.get("tokens") or {}).get("access_token"),
             refresh_token=(result.get("tokens") or {}).get("refresh_token"),
@@ -86,50 +115,49 @@ async def login(
             user=result["user"],
             requires_2fa=result["requires_2fa"],
             two_factor_method=result["two_factor_method"],
-            pending_2fa_token=result.get("pending_2fa_token")
+            pending_2fa_token=result.get("pending_2fa_token"),
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"DEBUG: Exception in login endpoint: {e}")
         import traceback
+
         print(f"DEBUG: Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(e)}"
+            detail=f"Ошибка входа: {str(e)}",
         )
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
 async def refresh_access_token(
-    request_data: RefreshTokenRequest,
-    db: Session = Depends(get_db)
+    request_data: RefreshTokenRequest, db: Session = Depends(get_db)
 ):
     """Обновление access токена"""
     try:
         service = get_authentication_service()
         result = service.refresh_access_token(db, request_data.refresh_token)
-        
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=result["message"]
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=result["message"]
             )
-        
+
         return RefreshTokenResponse(
             access_token=result["access_token"],
             refresh_token=request_data.refresh_token,  # Возвращаем тот же refresh токен
             token_type=result["token_type"],
-            expires_in=result["expires_in"]
+            expires_in=result["expires_in"],
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления токена: {str(e)}"
+            detail=f"Ошибка обновления токена: {str(e)}",
         )
 
 
@@ -138,7 +166,7 @@ async def logout(
     request_data: LogoutRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Выход из системы"""
     try:
@@ -147,99 +175,85 @@ async def logout(
             db=db,
             refresh_token=request_data.refresh_token,
             user_id=current_user.id,
-            logout_all=request_data.logout_all_devices
+            logout_all=request_data.logout_all_devices,
         )
-        
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
             )
-        
-        return LogoutResponse(
-            success=True,
-            message=result["message"]
-        )
-        
+
+        return LogoutResponse(success=True, message=result["message"])
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка выхода: {str(e)}"
+            detail=f"Ошибка выхода: {str(e)}",
         )
 
 
 @router.post("/password-reset", response_model=AuthSuccessResponse)
 async def request_password_reset(
-    request_data: PasswordResetRequest,
-    request: Request,
-    db: Session = Depends(get_db)
+    request_data: PasswordResetRequest, request: Request, db: Session = Depends(get_db)
 ):
     """Запрос сброса пароля"""
     try:
         ip_address, user_agent = get_client_info(request)
-        
+
         service = get_authentication_service()
         result = service.create_password_reset_token(
             db=db,
             email=request_data.email,
             ip_address=ip_address,
-            user_agent=user_agent
+            user_agent=user_agent,
         )
-        
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
             )
-        
+
         return AuthSuccessResponse(
             success=True,
             message="Инструкции по сбросу пароля отправлены на email",
-            data={"expires_at": result["expires_at"].isoformat()}
+            data={"expires_at": result["expires_at"].isoformat()},
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запроса сброса пароля: {str(e)}"
+            detail=f"Ошибка запроса сброса пароля: {str(e)}",
         )
 
 
 @router.post("/password-reset/confirm", response_model=AuthSuccessResponse)
 async def confirm_password_reset(
-    request_data: PasswordResetConfirmRequest,
-    db: Session = Depends(get_db)
+    request_data: PasswordResetConfirmRequest, db: Session = Depends(get_db)
 ):
     """Подтверждение сброса пароля"""
     try:
         service = get_authentication_service()
         result = service.reset_password(
-            db=db,
-            token=request_data.token,
-            new_password=request_data.new_password
+            db=db, token=request_data.token, new_password=request_data.new_password
         )
-        
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
             )
-        
-        return AuthSuccessResponse(
-            success=True,
-            message=result["message"]
-        )
-        
+
+        return AuthSuccessResponse(success=True, message=result["message"])
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка сброса пароля: {str(e)}"
+            detail=f"Ошибка сброса пароля: {str(e)}",
         )
 
 
@@ -247,7 +261,7 @@ async def confirm_password_reset(
 async def change_password(
     request_data: PasswordChangeRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Смена пароля"""
     try:
@@ -256,26 +270,22 @@ async def change_password(
             db=db,
             user_id=current_user.id,
             current_password=request_data.current_password,
-            new_password=request_data.new_password
+            new_password=request_data.new_password,
         )
-        
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
             )
-        
-        return AuthSuccessResponse(
-            success=True,
-            message=result["message"]
-        )
-        
+
+        return AuthSuccessResponse(success=True, message=result["message"])
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка смены пароля: {str(e)}"
+            detail=f"Ошибка смены пароля: {str(e)}",
         )
 
 
@@ -283,98 +293,85 @@ async def change_password(
 async def request_email_verification(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Запрос верификации email"""
     try:
         ip_address, user_agent = get_client_info(request)
-        
+
         service = get_authentication_service()
         result = service.create_email_verification_token(
-            db=db,
-            user_id=current_user.id,
-            ip_address=ip_address,
-            user_agent=user_agent
+            db=db, user_id=current_user.id, ip_address=ip_address, user_agent=user_agent
         )
-        
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
             )
-        
+
         return AuthSuccessResponse(
             success=True,
             message="Ссылка для верификации email отправлена",
-            data={"expires_at": result["expires_at"].isoformat()}
+            data={"expires_at": result["expires_at"].isoformat()},
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запроса верификации email: {str(e)}"
+            detail=f"Ошибка запроса верификации email: {str(e)}",
         )
 
 
 @router.post("/email-verification/confirm", response_model=AuthSuccessResponse)
 async def confirm_email_verification(
-    request_data: EmailVerificationConfirmRequest,
-    db: Session = Depends(get_db)
+    request_data: EmailVerificationConfirmRequest, db: Session = Depends(get_db)
 ):
     """Подтверждение верификации email"""
     try:
         service = get_authentication_service()
-        result = service.verify_email(
-            db=db,
-            token=request_data.token
-        )
-        
+        result = service.verify_email(db=db, token=request_data.token)
+
         if not result["success"]:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result["message"]
+                status_code=status.HTTP_400_BAD_REQUEST, detail=result["message"]
             )
-        
-        return AuthSuccessResponse(
-            success=True,
-            message=result["message"]
-        )
-        
+
+        return AuthSuccessResponse(success=True, message=result["message"])
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка верификации email: {str(e)}"
+            detail=f"Ошибка верификации email: {str(e)}",
         )
 
 
 @router.get("/profile", response_model=UserProfileResponse)
 async def get_user_profile(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Получить профиль пользователя"""
     try:
         service = get_authentication_service()
         profile = service.get_user_profile(db, current_user.id)
-        
+
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Профиль пользователя не найден"
+                detail="Профиль пользователя не найден",
             )
-        
+
         return UserProfileResponse(**profile)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения профиля: {str(e)}"
+            detail=f"Ошибка получения профиля: {str(e)}",
         )
 
 
@@ -382,7 +379,7 @@ async def get_user_profile(
 async def update_user_profile(
     request_data: UserProfileUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Обновить профиль пользователя"""
     try:
@@ -391,21 +388,21 @@ async def update_user_profile(
         for field, value in update_data.items():
             if hasattr(current_user, field):
                 setattr(current_user, field, value)
-        
+
         db.commit()
         db.refresh(current_user)
-        
+
         # Получаем обновленный профиль
         service = get_authentication_service()
         profile = service.get_user_profile(db, current_user.id)
-        
+
         return UserProfileResponse(**profile)
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления профиля: {str(e)}"
+            detail=f"Ошибка обновления профиля: {str(e)}",
         )
 
 
@@ -414,45 +411,47 @@ async def get_user_sessions(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Получить сессии пользователя"""
     try:
         skip = (page - 1) * per_page
         sessions = user_session.get_by_user_id(db, current_user.id)
-        
+
         # Пагинация
         total = len(sessions)
-        sessions = sessions[skip:skip + per_page]
-        
+        sessions = sessions[skip : skip + per_page]
+
         # Конвертируем в ответы
         session_responses = []
         for session in sessions:
-            session_responses.append(UserSessionResponse(
-                id=session.id,
-                session_id=session.session_id,
-                created_at=session.created_at,
-                last_activity=session.last_activity,
-                expires_at=session.expires_at,
-                is_active=session.is_active,
-                ip_address=session.ip_address,
-                user_agent=session.user_agent,
-                device_name=session.device_name,
-                current_session=False  # TODO: определить текущую сессию
-            ))
-        
+            session_responses.append(
+                UserSessionResponse(
+                    id=session.id,
+                    session_id=session.session_id,
+                    created_at=session.created_at,
+                    last_activity=session.last_activity,
+                    expires_at=session.expires_at,
+                    is_active=session.is_active,
+                    ip_address=session.ip_address,
+                    user_agent=session.user_agent,
+                    device_name=session.device_name,
+                    current_session=False,  # TODO: определить текущую сессию
+                )
+            )
+
         return SessionListResponse(
             sessions=session_responses,
             total=total,
             page=page,
             per_page=per_page,
-            total_pages=(total + per_page - 1) // per_page
+            total_pages=(total + per_page - 1) // per_page,
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения сессий: {str(e)}"
+            detail=f"Ошибка получения сессий: {str(e)}",
         )
 
 
@@ -461,7 +460,7 @@ async def revoke_session(
     session_id: int,
     request_data: SessionRevokeRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Отозвать сессию"""
     try:
@@ -469,28 +468,23 @@ async def revoke_session(
         session = user_session.get_by_session_id(db, str(session_id))
         if not session or session.user_id != current_user.id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Сессия не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
             )
-        
+
         success = user_session.deactivate_session(db, str(session_id))
         if not success:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ошибка отзыва сессии"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Ошибка отзыва сессии"
             )
-        
-        return AuthSuccessResponse(
-            success=True,
-            message="Сессия успешно отозвана"
-        )
-        
+
+        return AuthSuccessResponse(success=True, message="Сессия успешно отозвана")
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка отзыва сессии: {str(e)}"
+            detail=f"Ошибка отзыва сессии: {str(e)}",
         )
 
 
@@ -498,78 +492,85 @@ async def revoke_session(
 async def get_user_activity(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Получить активность пользователя"""
     try:
         activities = user_activity.get_by_user_id(db, current_user.id, limit)
-        
+
         activity_responses = []
         for activity in activities:
-            activity_responses.append(UserActivityResponse(
-                id=activity.id,
-                activity_type=activity.activity_type,
-                description=activity.description,
-                created_at=activity.created_at,
-                ip_address=activity.ip_address,
-                metadata=json.loads(activity.metadata) if activity.metadata else None
-            ))
-        
+            activity_responses.append(
+                UserActivityResponse(
+                    id=activity.id,
+                    activity_type=activity.activity_type,
+                    description=activity.description,
+                    created_at=activity.created_at,
+                    ip_address=activity.ip_address,
+                    metadata=(
+                        json.loads(activity.metadata) if activity.metadata else None
+                    ),
+                )
+            )
+
         return activity_responses
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения активности: {str(e)}"
+            detail=f"Ошибка получения активности: {str(e)}",
         )
 
 
 @router.get("/status", response_model=AuthStatusResponse)
 async def get_auth_status(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """Получить статус аутентификации"""
     try:
         service = get_authentication_service()
         profile = service.get_user_profile(db, current_user.id)
-        
+
         if not profile:
             return AuthStatusResponse(
                 authenticated=False,
                 user=None,
                 session=None,
                 two_factor_required=False,
-                two_factor_verified=False
+                two_factor_verified=False,
             )
-        
+
         # Получаем текущую сессию (упрощенно)
         sessions = user_session.get_active_sessions(db, current_user.id)
         current_session = sessions[0] if sessions else None
-        
+
         return AuthStatusResponse(
             authenticated=True,
             user=UserProfileResponse(**profile),
-            session=UserSessionResponse(
-                id=current_session.id,
-                session_id=current_session.session_id,
-                created_at=current_session.created_at,
-                last_activity=current_session.last_activity,
-                expires_at=current_session.expires_at,
-                is_active=current_session.is_active,
-                ip_address=current_session.ip_address,
-                user_agent=current_session.user_agent,
-                device_name=current_session.device_name,
-                current_session=True
-            ) if current_session else None,
+            session=(
+                UserSessionResponse(
+                    id=current_session.id,
+                    session_id=current_session.session_id,
+                    created_at=current_session.created_at,
+                    last_activity=current_session.last_activity,
+                    expires_at=current_session.expires_at,
+                    is_active=current_session.is_active,
+                    ip_address=current_session.ip_address,
+                    user_agent=current_session.user_agent,
+                    device_name=current_session.device_name,
+                    current_session=True,
+                )
+                if current_session
+                else None
+            ),
             two_factor_required=profile.get("two_factor_enabled", False),
-            two_factor_verified=profile.get("two_factor_enabled", False)
+            two_factor_verified=profile.get("two_factor_enabled", False),
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статуса: {str(e)}"
+            detail=f"Ошибка получения статуса: {str(e)}",
         )
 
 
@@ -587,54 +588,55 @@ async def auth_health_check():
             "user_sessions",
             "login_attempts",
             "user_activity",
-            "security_events"
+            "security_events",
         ],
         "token_types": ["access", "refresh"],
         "access_token_expire_minutes": 30,
         "refresh_token_expire_days": 30,
         "password_reset_expire_hours": 1,
-        "email_verification_expire_hours": 24
+        "email_verification_expire_hours": 24,
     }
 
 
 # ===================== УПРАВЛЕНИЕ СЕССИЯМИ =====================
 
+
 @router.get("/sessions/current")
 async def get_current_session(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Получить текущую сессию пользователя"""
     try:
         auth_service = get_authentication_service()
         ip_address, user_agent = get_client_info(request)
-        
+
         session = auth_service.get_current_session(
             db, current_user.id, ip_address, user_agent
         )
-        
+
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Активная сессия не найдена"
+                detail="Активная сессия не найдена",
             )
-        
+
         session_info = auth_service.get_session_info(db, session.id)
-        
+
         return {
             "success": True,
             "message": "Текущая сессия получена",
-            "session": session_info
+            "session": session_info,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting current session: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения текущей сессии"
+            detail="Ошибка получения текущей сессии",
         )
 
 
@@ -642,31 +644,31 @@ async def get_current_session(
 async def get_user_sessions(
     active_only: bool = Query(True, description="Только активные сессии"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Получить все сессии пользователя"""
     try:
         auth_service = get_authentication_service()
         sessions = auth_service.get_user_sessions(db, current_user.id, active_only)
-        
+
         sessions_info = []
         for session in sessions:
             session_info = auth_service.get_session_info(db, session.id)
             if session_info:
                 sessions_info.append(session_info)
-        
+
         return {
             "success": True,
             "message": f"Найдено {len(sessions_info)} сессий",
             "sessions": sessions_info,
-            "total": len(sessions_info)
+            "total": len(sessions_info),
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting user sessions: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения сессий пользователя"
+            detail="Ошибка получения сессий пользователя",
         )
 
 
@@ -675,48 +677,48 @@ async def revoke_session(
     session_id: int,
     reason: str = Query("manual", description="Причина отзыва сессии"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Отозвать сессию"""
     try:
         auth_service = get_authentication_service()
-        
+
         # Проверяем, что сессия принадлежит текущему пользователю
         from app.models.authentication import UserSession
+
         session = db.query(UserSession).filter(UserSession.id == session_id).first()
         if not session:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Сессия не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
             )
-        
+
         if session.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этой сессии"
+                detail="Нет доступа к этой сессии",
             )
-        
+
         success = auth_service.revoke_session(db, session_id, reason)
-        
+
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Не удалось отозвать сессию"
+                detail="Не удалось отозвать сессию",
             )
-        
+
         return {
             "success": True,
             "message": f"Сессия {session_id} отозвана",
-            "reason": reason
+            "reason": reason,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error revoking session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка отзыва сессии"
+            detail="Ошибка отзыва сессии",
         )
 
 
@@ -726,12 +728,12 @@ async def revoke_all_sessions(
     except_current: bool = Query(True, description="Исключить текущую сессию"),
     reason: str = Query("logout_all", description="Причина отзыва сессий"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Отозвать все сессии пользователя"""
     try:
         auth_service = get_authentication_service()
-        
+
         current_session_id = None
         if except_current:
             ip_address, user_agent = get_client_info(request)
@@ -740,30 +742,29 @@ async def revoke_all_sessions(
             )
             if current_session:
                 current_session_id = current_session.id
-        
+
         revoked_count = auth_service.revoke_all_user_sessions(
             db, current_user.id, current_session_id, reason
         )
-        
+
         return {
             "success": True,
             "message": f"Отозвано {revoked_count} сессий",
             "revoked_count": revoked_count,
-            "reason": reason
+            "reason": reason,
         }
-        
+
     except Exception as e:
         logger.error(f"Error revoking all sessions: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка отзыва всех сессий"
+            detail="Ошибка отзыва всех сессий",
         )
 
 
 @router.post("/sessions/cleanup")
 async def cleanup_expired_sessions(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     """Очистить истекшие сессии (только для администраторов)"""
     try:
@@ -771,25 +772,25 @@ async def cleanup_expired_sessions(
         if current_user.role not in ["Admin", "SuperAdmin"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Недостаточно прав для выполнения операции"
+                detail="Недостаточно прав для выполнения операции",
             )
-        
+
         auth_service = get_authentication_service()
         cleaned_count = auth_service.cleanup_expired_sessions(db)
-        
+
         return {
             "success": True,
             "message": f"Очищено {cleaned_count} истекших сессий",
-            "cleaned_count": cleaned_count
+            "cleaned_count": cleaned_count,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error cleaning up expired sessions: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка очистки истекших сессий"
+            detail="Ошибка очистки истекших сессий",
         )
 
 
@@ -797,46 +798,49 @@ async def cleanup_expired_sessions(
 async def get_session_info(
     session_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Получить информацию о сессии"""
     try:
         auth_service = get_authentication_service()
-        
+
         # Проверяем, что сессия принадлежит текущему пользователю или пользователь - администратор
         from app.models.authentication import UserSession
+
         session = db.query(UserSession).filter(UserSession.id == session_id).first()
         if not session:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Сессия не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Сессия не найдена"
             )
-        
-        if session.user_id != current_user.id and current_user.role not in ["Admin", "SuperAdmin"]:
+
+        if session.user_id != current_user.id and current_user.role not in [
+            "Admin",
+            "SuperAdmin",
+        ]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Нет доступа к этой сессии"
+                detail="Нет доступа к этой сессии",
             )
-        
+
         session_info = auth_service.get_session_info(db, session_id)
-        
+
         if not session_info:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Информация о сессии не найдена"
+                detail="Информация о сессии не найдена",
             )
-        
+
         return {
             "success": True,
             "message": "Информация о сессии получена",
-            "session": session_info
+            "session": session_info,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting session info {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка получения информации о сессии"
+            detail="Ошибка получения информации о сессии",
         )

@@ -1,15 +1,18 @@
 """
 Pydantic схемы для управления пользователями
 """
+
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator, EmailStr
-from pydantic.config import ConfigDict
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic.config import ConfigDict
 
 
 class UserStatus(str, Enum):
     """Статусы пользователя"""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
@@ -19,6 +22,7 @@ class UserStatus(str, Enum):
 
 class Gender(str, Enum):
     """Пол пользователя"""
+
     MALE = "male"
     FEMALE = "female"
     OTHER = "other"
@@ -26,6 +30,7 @@ class Gender(str, Enum):
 
 class Theme(str, Enum):
     """Темы интерфейса"""
+
     LIGHT = "light"
     DARK = "dark"
     AUTO = "auto"
@@ -33,16 +38,19 @@ class Theme(str, Enum):
 
 class TimeFormat(str, Enum):
     """Форматы времени"""
+
     HOUR_12 = "12"
     HOUR_24 = "24"
 
 
 # Схемы для профиля пользователя
 
+
 class UserProfileBase(BaseModel):
     """Базовая схема профиля пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(None, min_length=1, max_length=50)
@@ -59,16 +67,19 @@ class UserProfileBase(BaseModel):
 
 class UserProfileCreate(UserProfileBase):
     """Схема создания профиля пользователя"""
+
     user_id: int
 
 
 class UserProfileUpdate(UserProfileBase):
     """Схема обновления профиля пользователя"""
+
     pass
 
 
 class UserProfileResponse(UserProfileBase):
     """Схема ответа профиля пользователя"""
+
     model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     id: int
     user_id: int
@@ -99,10 +110,12 @@ class UserProfileResponse(UserProfileBase):
 
 # Схемы для настроек пользователя
 
+
 class UserPreferencesBase(BaseModel):
     """Базовая схема настроек пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     theme: Optional[Theme] = Theme.LIGHT
     language: Optional[str] = Field(None, max_length=10)
     timezone: Optional[str] = Field(None, max_length=50)
@@ -116,14 +129,20 @@ class UserPreferencesBase(BaseModel):
 
 class UserPreferencesCreate(UserPreferencesBase):
     """Схема создания настроек пользователя"""
+
     user_id: int
     profile_id: int
 
 
 class UserPreferencesUpdate(UserPreferencesBase):
     """Схема обновления настроек пользователя"""
-    working_hours_start: Optional[str] = Field(None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
-    working_hours_end: Optional[str] = Field(None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
+
+    working_hours_start: Optional[str] = Field(
+        None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+    )
+    working_hours_end: Optional[str] = Field(
+        None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+    )
     working_days: Optional[List[int]] = Field(None, min_items=1, max_items=7)
     break_duration: Optional[int] = Field(None, ge=0, le=480)  # 0-8 часов
     dashboard_layout: Optional[Dict[str, Any]] = None
@@ -137,6 +156,7 @@ class UserPreferencesUpdate(UserPreferencesBase):
 
 class UserPreferencesResponse(UserPreferencesBase):
     """Схема ответа настроек пользователя"""
+
     model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     id: int
     user_id: int
@@ -158,10 +178,12 @@ class UserPreferencesResponse(UserPreferencesBase):
 
 # Схемы для настроек уведомлений
 
+
 class UserNotificationSettingsBase(BaseModel):
     """Базовая схема настроек уведомлений"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     email_appointment_reminder: Optional[bool] = True
     email_appointment_cancellation: Optional[bool] = True
     email_appointment_confirmation: Optional[bool] = True
@@ -185,20 +207,29 @@ class UserNotificationSettingsBase(BaseModel):
 
 class UserNotificationSettingsCreate(UserNotificationSettingsBase):
     """Схема создания настроек уведомлений"""
+
     user_id: int
     profile_id: int
 
 
 class UserNotificationSettingsUpdate(UserNotificationSettingsBase):
     """Схема обновления настроек уведомлений"""
-    reminder_time_before: Optional[int] = Field(None, ge=5, le=10080)  # 5 минут - 7 дней
-    quiet_hours_start: Optional[str] = Field(None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
-    quiet_hours_end: Optional[str] = Field(None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")
+
+    reminder_time_before: Optional[int] = Field(
+        None, ge=5, le=10080
+    )  # 5 минут - 7 дней
+    quiet_hours_start: Optional[str] = Field(
+        None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+    )
+    quiet_hours_end: Optional[str] = Field(
+        None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+    )
     weekend_notifications: Optional[bool] = False
 
 
 class UserNotificationSettingsResponse(UserNotificationSettingsBase):
     """Схема ответа настроек уведомлений"""
+
     model_config = ConfigDict(protected_namespaces=(), extra='ignore')
     id: int
     user_id: int
@@ -213,10 +244,12 @@ class UserNotificationSettingsResponse(UserNotificationSettingsBase):
 
 # Схемы для ролей и разрешений
 
+
 class UserRoleBase(BaseModel):
     """Базовая схема роли пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     name: str = Field(..., min_length=1, max_length=50)
     display_name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
@@ -225,14 +258,16 @@ class UserRoleBase(BaseModel):
 
 class UserRoleCreate(UserRoleBase):
     """Схема создания роли пользователя"""
+
     is_system: Optional[bool] = False
     is_active: Optional[bool] = True
 
 
 class UserRoleUpdate(BaseModel):
     """Схема обновления роли пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     display_name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     permissions: Optional[List[str]] = None
@@ -241,6 +276,7 @@ class UserRoleUpdate(BaseModel):
 
 class UserRoleResponse(UserRoleBase):
     """Схема ответа роли пользователя"""
+
     id: int
     is_system: bool
     is_active: bool
@@ -250,8 +286,9 @@ class UserRoleResponse(UserRoleBase):
 
 class UserPermissionBase(BaseModel):
     """Базовая схема разрешения пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=500)
@@ -260,12 +297,14 @@ class UserPermissionBase(BaseModel):
 
 class UserPermissionCreate(UserPermissionBase):
     """Схема создания разрешения пользователя"""
+
     is_system: Optional[bool] = False
     is_active: Optional[bool] = True
 
 
 class UserPermissionResponse(UserPermissionBase):
     """Схема ответа разрешения пользователя"""
+
     id: int
     is_system: bool
     is_active: bool
@@ -274,10 +313,12 @@ class UserPermissionResponse(UserPermissionBase):
 
 # Схемы для групп пользователей
 
+
 class UserGroupBase(BaseModel):
     """Базовая схема группы пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=500)
@@ -285,14 +326,16 @@ class UserGroupBase(BaseModel):
 
 class UserGroupCreate(UserGroupBase):
     """Схема создания группы пользователей"""
+
     is_active: Optional[bool] = True
     is_system: Optional[bool] = False
 
 
 class UserGroupUpdate(BaseModel):
     """Схема обновления группы пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     display_name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=500)
     is_active: Optional[bool] = None
@@ -300,6 +343,7 @@ class UserGroupUpdate(BaseModel):
 
 class UserGroupResponse(UserGroupBase):
     """Схема ответа группы пользователей"""
+
     id: int
     is_active: bool
     is_system: bool
@@ -309,8 +353,9 @@ class UserGroupResponse(UserGroupBase):
 
 class UserGroupMemberBase(BaseModel):
     """Базовая схема участника группы"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     user_id: int
     group_id: int
     role: str = Field(..., pattern="^(member|admin|moderator)$")
@@ -318,21 +363,25 @@ class UserGroupMemberBase(BaseModel):
 
 class UserGroupMemberCreate(UserGroupMemberBase):
     """Схема создания участника группы"""
+
     pass
 
 
 class UserGroupMemberResponse(UserGroupMemberBase):
     """Схема ответа участника группы"""
+
     id: int
     joined_at: datetime
 
 
 # Схемы для аудита
 
+
 class UserAuditLogBase(BaseModel):
     """Базовая схема аудита пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     action: str = Field(..., min_length=1, max_length=50)
     resource_type: Optional[str] = Field(None, max_length=50)
     resource_id: Optional[int] = None
@@ -343,6 +392,7 @@ class UserAuditLogBase(BaseModel):
 
 class UserAuditLogCreate(UserAuditLogBase):
     """Схема создания аудита пользователя"""
+
     user_id: int
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
@@ -351,6 +401,7 @@ class UserAuditLogCreate(UserAuditLogBase):
 
 class UserAuditLogResponse(UserAuditLogBase):
     """Схема ответа аудита пользователя"""
+
     id: int
     user_id: int
     ip_address: Optional[str] = None
@@ -361,23 +412,25 @@ class UserAuditLogResponse(UserAuditLogBase):
 
 # Схемы для управления пользователями
 
+
 class UserCreateRequest(BaseModel):
     """Схема создания пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
     role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
-    
+
     # Профиль
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
     last_name: Optional[str] = Field(None, min_length=1, max_length=50)
     phone: Optional[str] = Field(None, min_length=10, max_length=20)
-    
+
     @validator('password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -393,14 +446,17 @@ class UserCreateRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     """Схема обновления пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
-    role: Optional[str] = Field(None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    role: Optional[str] = Field(
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+    )
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
-    
+
     # Профиль
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     first_name: Optional[str] = Field(None, min_length=1, max_length=50)
@@ -410,8 +466,9 @@ class UserUpdateRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """Схема ответа пользователя"""
+
     model_config = ConfigDict(protected_namespaces=(), extra='ignore')
-    
+
     id: int
     username: str
     email: Optional[str] = None
@@ -420,7 +477,7 @@ class UserResponse(BaseModel):
     is_superuser: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    
+
     # Профиль
     profile: Optional[UserProfileResponse] = None
     preferences: Optional[UserPreferencesResponse] = None
@@ -429,8 +486,9 @@ class UserResponse(BaseModel):
 
 class UserListResponse(BaseModel):
     """Схема ответа списка пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     users: List[UserResponse]
     total: int
     page: int
@@ -440,8 +498,9 @@ class UserListResponse(BaseModel):
 
 class UserStatsResponse(BaseModel):
     """Схема ответа статистики пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     total_users: int
     active_users: int
     inactive_users: int
@@ -456,10 +515,13 @@ class UserStatsResponse(BaseModel):
 
 class UserSearchRequest(BaseModel):
     """Схема поиска пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     query: Optional[str] = Field(None, min_length=1, max_length=100)
-    role: Optional[str] = Field(None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    role: Optional[str] = Field(
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+    )
     status: Optional[UserStatus] = None
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
@@ -473,18 +535,24 @@ class UserSearchRequest(BaseModel):
 
 class UserBulkActionRequest(BaseModel):
     """Схема массовых действий с пользователями"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     user_ids: List[int] = Field(..., min_items=1, max_items=100)
-    action: str = Field(..., pattern="^(activate|deactivate|suspend|unsuspend|delete|change_role)$")
-    role: Optional[str] = Field(None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    action: str = Field(
+        ..., pattern="^(activate|deactivate|suspend|unsuspend|delete|change_role)$"
+    )
+    role: Optional[str] = Field(
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+    )
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class UserBulkActionResponse(BaseModel):
     """Схема ответа массовых действий"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     success: bool
     message: str
     processed_count: int
@@ -494,8 +562,9 @@ class UserBulkActionResponse(BaseModel):
 
 class UserExportRequest(BaseModel):
     """Схема экспорта пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     format: str = Field(..., pattern="^(csv|excel|json|pdf)$")
     fields: Optional[List[str]] = None
     filters: Optional[UserSearchRequest] = None
@@ -506,8 +575,9 @@ class UserExportRequest(BaseModel):
 
 class UserExportResponse(BaseModel):
     """Схема ответа экспорта пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     success: bool
     message: str
     file_url: Optional[str] = None

@@ -19,9 +19,7 @@ def list_services(
     stmt = select(Service)
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(
-            (Service.name.ilike(like)) | (Service.code.ilike(like))
-        )
+        stmt = stmt.where((Service.name.ilike(like)) | (Service.code.ilike(like)))
     if active is not None:
         stmt = stmt.where(Service.active == active)
     stmt = stmt.order_by(Service.name.asc()).limit(limit).offset(offset)

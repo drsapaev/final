@@ -3,16 +3,17 @@
 Поддерживает различные провайдеры облачной печати
 """
 
-import logging
-import json
-import base64
-import requests
 import asyncio
-from typing import Dict, List, Optional, Any, Union
-from datetime import datetime, timedelta
+import base64
+import json
+import logging
 from abc import ABC, abstractmethod
-from enum import Enum
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+
+import requests
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class PrinterStatus(str, Enum):
     """Статусы принтера"""
+
     ONLINE = "online"
     OFFLINE = "offline"
     ERROR = "error"
@@ -32,6 +34,7 @@ class PrinterStatus(str, Enum):
 
 class PrintJobStatus(str, Enum):
     """Статусы задания печати"""
+
     PENDING = "pending"
     PRINTING = "printing"
     COMPLETED = "completed"
@@ -41,6 +44,7 @@ class PrintJobStatus(str, Enum):
 
 class DocumentFormat(str, Enum):
     """Форматы документов"""
+
     PDF = "pdf"
     HTML = "html"
     TEXT = "text"
@@ -50,6 +54,7 @@ class DocumentFormat(str, Enum):
 @dataclass
 class PrintJob:
     """Задание печати"""
+
     id: str
     title: str
     content: Union[str, bytes]
@@ -71,6 +76,7 @@ class PrintJob:
 @dataclass
 class Printer:
     """Информация о принтере"""
+
     id: str
     name: str
     description: str
@@ -132,7 +138,11 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
 
     async def _get_access_token(self) -> str:
         """Получить токен доступа"""
-        if self.access_token and self.token_expires_at and datetime.now() < self.token_expires_at:
+        if (
+            self.access_token
+            and self.token_expires_at
+            and datetime.now() < self.token_expires_at
+        ):
             return self.access_token
 
         url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
@@ -140,18 +150,18 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             "grant_type": "client_credentials",
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "scope": "https://graph.microsoft.com/.default"
+            "scope": "https://graph.microsoft.com/.default",
         }
 
         try:
             response = requests.post(url, data=data)
             response.raise_for_status()
             token_data = response.json()
-            
+
             self.access_token = token_data["access_token"]
             expires_in = token_data.get("expires_in", 3600)
             self.token_expires_at = datetime.now() + timedelta(seconds=expires_in - 60)
-            
+
             return self.access_token
         except Exception as e:
             logger.error(f"Ошибка получения токена Microsoft Universal Print: {e}")
@@ -162,25 +172,27 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
         try:
             token = await self._get_access_token()
             headers = {"Authorization": f"Bearer {token}"}
-            
+
             url = "https://graph.microsoft.com/v1.0/print/printers"
             response = requests.get(url, headers=headers)
             response.raise_for_status()
-            
+
             data = response.json()
             printers = []
-            
+
             for printer_data in data.get("value", []):
                 printer = Printer(
                     id=printer_data["id"],
                     name=printer_data["displayName"],
                     description=printer_data.get("description", ""),
-                    status=self._map_printer_status(printer_data.get("status", {}).get("state")),
+                    status=self._map_printer_status(
+                        printer_data.get("status", {}).get("state")
+                    ),
                     location=printer_data.get("location", {}).get("displayName", ""),
-                    capabilities=printer_data.get("capabilities", {})
+                    capabilities=printer_data.get("capabilities", {}),
                 )
                 printers.append(printer)
-            
+
             return printers
         except Exception as e:
             logger.error(f"Ошибка получения принтеров Microsoft Universal Print: {e}")
@@ -191,11 +203,11 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
         try:
             token = await self._get_access_token()
             headers = {"Authorization": f"Bearer {token}"}
-            
+
             url = f"https://graph.microsoft.com/v1.0/print/printers/{printer_id}"
             response = requests.get(url, headers=headers)
             response.raise_for_status()
-            
+
             data = response.json()
             status_data = data.get("status", {})
             return self._map_printer_status(status_data.get("state"))
@@ -209,9 +221,9 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             token = await self._get_access_token()
             headers = {
                 "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
-            
+
             # Подготовка документа
             if job.format == DocumentFormat.PDF:
                 content_type = "application/pdf"
@@ -221,35 +233,39 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
                 content_type = "text/plain"
             else:
                 content_type = "application/octet-stream"
-            
+
             # Кодирование содержимого
             if isinstance(job.content, str):
                 content_bytes = job.content.encode('utf-8')
             else:
                 content_bytes = job.content
-            
+
             content_base64 = base64.b64encode(content_bytes).decode('utf-8')
-            
+
             # Создание задания печати
             job_data = {
                 "displayName": job.title,
                 "configuration": {
                     "copies": job.copies,
                     "colorMode": "color" if job.color else "monochrome",
-                    "duplex": "twoSidedLongEdge" if job.duplex else "oneSided"
+                    "duplex": "twoSidedLongEdge" if job.duplex else "oneSided",
                 },
-                "documents": [{
-                    "displayName": job.title,
-                    "contentType": content_type,
-                    "size": len(content_bytes),
-                    "content": content_base64
-                }]
+                "documents": [
+                    {
+                        "displayName": job.title,
+                        "contentType": content_type,
+                        "size": len(content_bytes),
+                        "content": content_base64,
+                    }
+                ],
             }
-            
-            url = f"https://graph.microsoft.com/v1.0/print/printers/{job.printer_id}/jobs"
+
+            url = (
+                f"https://graph.microsoft.com/v1.0/print/printers/{job.printer_id}/jobs"
+            )
             response = requests.post(url, headers=headers, json=job_data)
             response.raise_for_status()
-            
+
             result = response.json()
             return result["id"]
         except Exception as e:
@@ -261,11 +277,11 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
         try:
             token = await self._get_access_token()
             headers = {"Authorization": f"Bearer {token}"}
-            
+
             url = f"https://graph.microsoft.com/v1.0/print/jobs/{job_id}"
             response = requests.get(url, headers=headers)
             response.raise_for_status()
-            
+
             data = response.json()
             status = data.get("status", {}).get("state")
             return self._map_job_status(status)
@@ -278,11 +294,11 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
         try:
             token = await self._get_access_token()
             headers = {"Authorization": f"Bearer {token}"}
-            
+
             url = f"https://graph.microsoft.com/v1.0/print/jobs/{job_id}/cancel"
             response = requests.post(url, headers=headers)
             response.raise_for_status()
-            
+
             return True
         except Exception as e:
             logger.error(f"Ошибка отмены задания {job_id}: {e}")
@@ -294,7 +310,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             "idle": PrinterStatus.ONLINE,
             "processing": PrinterStatus.BUSY,
             "stopped": PrinterStatus.ERROR,
-            "offline": PrinterStatus.OFFLINE
+            "offline": PrinterStatus.OFFLINE,
         }
         return mapping.get(status, PrinterStatus.ERROR)
 
@@ -305,7 +321,7 @@ class MicrosoftUniversalPrintProvider(BasePrintProvider):
             "processing": PrintJobStatus.PRINTING,
             "completed": PrintJobStatus.COMPLETED,
             "aborted": PrintJobStatus.CANCELLED,
-            "failed": PrintJobStatus.FAILED
+            "failed": PrintJobStatus.FAILED,
         }
         return mapping.get(status, PrintJobStatus.FAILED)
 
@@ -315,7 +331,9 @@ class GoogleCloudPrintProvider(BasePrintProvider):
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        logger.warning("Google Cloud Print был закрыт в 2021 году. Используйте альтернативные провайдеры.")
+        logger.warning(
+            "Google Cloud Print был закрыт в 2021 году. Используйте альтернативные провайдеры."
+        )
 
     async def get_printers(self) -> List[Printer]:
         return []
@@ -344,15 +362,15 @@ class MockPrintProvider(BasePrintProvider):
                 name="Тестовый принтер 1",
                 description="Виртуальный принтер для тестирования",
                 status=PrinterStatus.ONLINE,
-                location="Тестовая локация"
+                location="Тестовая локация",
             ),
             Printer(
                 id="mock-printer-2",
                 name="Тестовый принтер 2",
                 description="Второй виртуальный принтер",
                 status=PrinterStatus.BUSY,
-                location="Другая локация"
-            )
+                location="Другая локация",
+            ),
         ]
         self.jobs = {}
 
@@ -369,15 +387,15 @@ class MockPrintProvider(BasePrintProvider):
         job_id = f"mock-job-{len(self.jobs) + 1}"
         self.jobs[job_id] = job
         job.status = PrintJobStatus.PENDING
-        
+
         # Симуляция обработки задания
         await asyncio.sleep(0.1)
         job.status = PrintJobStatus.PRINTING
-        
+
         await asyncio.sleep(0.1)
         job.status = PrintJobStatus.COMPLETED
         job.completed_at = datetime.now()
-        
+
         return job_id
 
     async def get_job_status(self, job_id: str) -> PrintJobStatus:
@@ -406,20 +424,24 @@ class CloudPrintingService:
             microsoft_config = {
                 "tenant_id": getattr(settings, 'MICROSOFT_PRINT_TENANT_ID', ''),
                 "client_id": getattr(settings, 'MICROSOFT_PRINT_CLIENT_ID', ''),
-                "client_secret": getattr(settings, 'MICROSOFT_PRINT_CLIENT_SECRET', '')
+                "client_secret": getattr(settings, 'MICROSOFT_PRINT_CLIENT_SECRET', ''),
             }
             if all(microsoft_config.values()):
-                self.providers["microsoft"] = MicrosoftUniversalPrintProvider(microsoft_config)
+                self.providers["microsoft"] = MicrosoftUniversalPrintProvider(
+                    microsoft_config
+                )
 
         # Mock провайдер для тестирования
         self.providers["mock"] = MockPrintProvider({})
 
-        logger.info(f"Инициализированы провайдеры печати: {list(self.providers.keys())}")
+        logger.info(
+            f"Инициализированы провайдеры печати: {list(self.providers.keys())}"
+        )
 
     async def get_all_printers(self) -> Dict[str, List[Printer]]:
         """Получить принтеры от всех провайдеров"""
         all_printers = {}
-        
+
         for provider_name, provider in self.providers.items():
             try:
                 printers = await provider.get_printers()
@@ -428,14 +450,16 @@ class CloudPrintingService:
             except Exception as e:
                 logger.error(f"Ошибка получения принтеров от {provider_name}: {e}")
                 all_printers[provider_name] = []
-        
+
         return all_printers
 
-    async def get_printer_by_id(self, provider_name: str, printer_id: str) -> Optional[Printer]:
+    async def get_printer_by_id(
+        self, provider_name: str, printer_id: str
+    ) -> Optional[Printer]:
         """Получить принтер по ID"""
         if provider_name not in self.providers:
             return None
-        
+
         try:
             printers = await self.providers[provider_name].get_printers()
             for printer in printers:
@@ -443,7 +467,7 @@ class CloudPrintingService:
                     return printer
         except Exception as e:
             logger.error(f"Ошибка получения принтера {printer_id}: {e}")
-        
+
         return None
 
     async def print_document(
@@ -455,7 +479,7 @@ class CloudPrintingService:
         format: DocumentFormat,
         copies: int = 1,
         color: bool = False,
-        duplex: bool = False
+        duplex: bool = False,
     ) -> Optional[str]:
         """Печать документа"""
         if provider_name not in self.providers:
@@ -471,19 +495,21 @@ class CloudPrintingService:
                 printer_id=printer_id,
                 copies=copies,
                 color=color,
-                duplex=duplex
+                duplex=duplex,
             )
-            
+
             provider = self.providers[provider_name]
             job_id = await provider.submit_print_job(job)
-            
+
             logger.info(f"Задание печати {job_id} отправлено на принтер {printer_id}")
             return job_id
         except Exception as e:
             logger.error(f"Ошибка печати документа: {e}")
             return None
 
-    async def get_job_status(self, provider_name: str, job_id: str) -> Optional[PrintJobStatus]:
+    async def get_job_status(
+        self, provider_name: str, job_id: str
+    ) -> Optional[PrintJobStatus]:
         """Получить статус задания печати"""
         if provider_name not in self.providers:
             return None
@@ -513,7 +539,7 @@ class CloudPrintingService:
         printer_id: str,
         document_type: str,
         patient_data: Dict[str, Any],
-        template_data: Dict[str, Any] = None
+        template_data: Dict[str, Any] = None,
     ) -> Optional[str]:
         """Печать медицинского документа"""
         try:
@@ -531,20 +557,22 @@ class CloudPrintingService:
                 return None
 
             title = f"{document_type}_{patient_data.get('patient_name', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
+
             return await self.print_document(
                 provider_name=provider_name,
                 printer_id=printer_id,
                 title=title,
                 content=content,
                 format=DocumentFormat.HTML,
-                copies=1
+                copies=1,
             )
         except Exception as e:
             logger.error(f"Ошибка печати медицинского документа: {e}")
             return None
 
-    def _generate_prescription(self, patient_data: Dict[str, Any], template_data: Dict[str, Any]) -> str:
+    def _generate_prescription(
+        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+    ) -> str:
         """Генерация рецепта"""
         return f"""
         <html>
@@ -580,11 +608,13 @@ class CloudPrintingService:
         </html>
         """
 
-    def _generate_receipt(self, patient_data: Dict[str, Any], template_data: Dict[str, Any]) -> str:
+    def _generate_receipt(
+        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+    ) -> str:
         """Генерация чека"""
         services = template_data.get('services', [])
         total = sum(service.get('price', 0) for service in services)
-        
+
         services_html = ""
         for service in services:
             services_html += f"""
@@ -593,7 +623,7 @@ class CloudPrintingService:
                 <td>{service.get('price', 0)} сум</td>
             </tr>
             """
-        
+
         return f"""
         <html>
         <head>
@@ -628,7 +658,9 @@ class CloudPrintingService:
         </html>
         """
 
-    def _generate_ticket(self, patient_data: Dict[str, Any], template_data: Dict[str, Any]) -> str:
+    def _generate_ticket(
+        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+    ) -> str:
         """Генерация талона"""
         return f"""
         <html>
@@ -654,7 +686,9 @@ class CloudPrintingService:
         </html>
         """
 
-    def _generate_report(self, patient_data: Dict[str, Any], template_data: Dict[str, Any]) -> str:
+    def _generate_report(
+        self, patient_data: Dict[str, Any], template_data: Dict[str, Any]
+    ) -> str:
         """Генерация отчета"""
         return f"""
         <html>
@@ -702,4 +736,3 @@ class CloudPrintingService:
 def get_cloud_printing_service(db: Session) -> CloudPrintingService:
     """Получить экземпляр сервиса облачной печати"""
     return CloudPrintingService(db)
-

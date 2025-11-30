@@ -20,35 +20,39 @@ async def get_quick_stats(
     try:
         # Простые подсчеты без сложных запросов
         today = datetime.now().date()
-        
+
         # Импортируем модели здесь
-        from app.models.patient import Patient
         from app.models.appointment import Appointment
+        from app.models.patient import Patient
         from app.models.payment_webhook import PaymentWebhook
-        
+
         # Подсчитываем пациентов
         total_patients = db.query(Patient).count()
-        
+
         # Подсчитываем записи на сегодня
-        today_appointments = db.query(Appointment).filter(
-            func.date(Appointment.appointment_date) == today
-        ).count()
-        
+        today_appointments = (
+            db.query(Appointment)
+            .filter(func.date(Appointment.appointment_date) == today)
+            .count()
+        )
+
         # Подсчитываем общие записи
         total_appointments = db.query(Appointment).count()
-        
+
         # Подсчитываем платежи
         total_payments = db.query(PaymentWebhook).count()
-        
+
         return {
             "total_patients": total_patients,
             "today_appointments": today_appointments,
             "total_appointments": total_appointments,
             "total_payments": total_payments,
-            "date": today.isoformat()
+            "date": today.isoformat(),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+        )
 
 
 @router.get("/dashboard")
@@ -59,45 +63,48 @@ async def get_dashboard_data(
     """Получение данных для дашборда"""
     try:
         today = datetime.now().date()
-        
+
         # Импортируем модели
-        from app.models.patient import Patient
         from app.models.appointment import Appointment
+        from app.models.patient import Patient
         from app.models.payment_webhook import PaymentWebhook
-        
+
         # Базовые метрики
         total_patients = db.query(Patient).count()
         total_appointments = db.query(Appointment).count()
         total_payments = db.query(PaymentWebhook).count()
-        
+
         # Записи на сегодня
-        today_appointments = db.query(Appointment).filter(
-            func.date(Appointment.appointment_date) == today
-        ).count()
-        
+        today_appointments = (
+            db.query(Appointment)
+            .filter(func.date(Appointment.appointment_date) == today)
+            .count()
+        )
+
         # Записи на завтра
         tomorrow = today + timedelta(days=1)
-        tomorrow_appointments = db.query(Appointment).filter(
-            func.date(Appointment.appointment_date) == tomorrow
-        ).count()
-        
+        tomorrow_appointments = (
+            db.query(Appointment)
+            .filter(func.date(Appointment.appointment_date) == tomorrow)
+            .count()
+        )
+
         return {
             "overview": {
                 "total_patients": total_patients,
                 "total_appointments": total_appointments,
-                "total_payments": total_payments
+                "total_payments": total_payments,
             },
-            "today": {
-                "appointments": today_appointments,
-                "date": today.isoformat()
-            },
+            "today": {"appointments": today_appointments, "date": today.isoformat()},
             "tomorrow": {
                 "appointments": tomorrow_appointments,
-                "date": tomorrow.isoformat()
-            }
+                "date": tomorrow.isoformat(),
+            },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения данных дашборда: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения данных дашборда: {str(e)}"
+        )
 
 
 @router.get("/trends")
@@ -110,8 +117,10 @@ async def get_trends_analytics(
     try:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
-        
+
         # Используем SSOT для получения трендов
         return AnalyticsService.get_trends(db, days)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения трендов: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения трендов: {str(e)}"
+        )

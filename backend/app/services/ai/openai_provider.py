@@ -1,27 +1,30 @@
 """
 OpenAI провайдер для AI функций
 """
-from typing import Dict, List, Optional, Any
+
+import base64
+import json
+import logging
+from typing import Any, Dict, List, Optional
+
 import openai
 from openai import AsyncOpenAI
-import json
-import base64
-from .base_provider import BaseAIProvider, AIRequest, AIResponse
-import logging
+
+from .base_provider import AIRequest, AIResponse, BaseAIProvider
 
 logger = logging.getLogger(__name__)
 
 
 class OpenAIProvider(BaseAIProvider):
     """Провайдер OpenAI (GPT-4, GPT-3.5)"""
-    
+
     def __init__(self, api_key: str, model: Optional[str] = None):
         super().__init__(api_key, model)
         self.client = AsyncOpenAI(api_key=api_key)
-    
+
     def get_default_model(self) -> str:
         return "gpt-4-turbo-preview"
-    
+
     async def generate(self, request: AIRequest) -> AIResponse:
         """Генерация ответа через OpenAI API"""
         try:
@@ -29,42 +32,42 @@ class OpenAIProvider(BaseAIProvider):
             if request.system_prompt:
                 messages.append({"role": "system", "content": request.system_prompt})
             messages.append({"role": "user", "content": request.prompt})
-            
+
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_tokens=request.max_tokens,
-                temperature=request.temperature
+                temperature=request.temperature,
             )
-            
+
             return AIResponse(
                 content=response.choices[0].message.content,
                 usage={
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
+                    "total_tokens": response.usage.total_tokens,
                 },
                 model=response.model,
-                provider=self.provider_name
+                provider=self.provider_name,
             )
         except Exception as e:
             return AIResponse(
-                content="",
-                provider=self.provider_name,
-                error=self._format_error(e)
+                content="", provider=self.provider_name, error=self._format_error(e)
             )
-    
-    async def analyze_complaint(self, complaint: str, patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def analyze_complaint(
+        self, complaint: str, patient_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Анализ жалоб и создание плана обследования"""
         system_prompt = self._build_system_prompt("doctor")
-        
+
         prompt = f"""Проанализируйте жалобы пациента и составьте план обследования.
 
 Жалобы: {complaint}
 """
         if patient_info:
             prompt += f"\nИнформация о пациенте: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}"
-        
+
         prompt += """
 
 Ответьте в формате JSON:
@@ -82,34 +85,35 @@ class OpenAIProvider(BaseAIProvider):
     "urgency": "срочность (экстренно/планово/неотложно)",
     "red_flags": ["тревожные симптомы, если есть"]
 }"""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=1500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=1500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def differential_diagnosis(self, symptoms: List[str], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def differential_diagnosis(
+        self, symptoms: List[str], patient_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Дифференциальная диагностика на основе симптомов"""
         age = patient_info.get("age", "не указан") if patient_info else "не указан"
-        gender = patient_info.get("gender", "не указан") if patient_info else "не указан"
-        
+        gender = (
+            patient_info.get("gender", "не указан") if patient_info else "не указан"
+        )
+
         symptoms_text = ", ".join(symptoms)
-        
+
         prompt = f"""
         Проведите дифференциальную диагностику для пациента со следующими симптомами:
         
@@ -139,45 +143,46 @@ class OpenAIProvider(BaseAIProvider):
             "urgency_level": "низкий/средний/высокий/критический"
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-диагност с 25-летним стажем. 
         Специализируетесь на дифференциальной диагностике. 
         Всегда учитываете возраст и пол пациента при постановке диагноза.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=1500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=1500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def symptom_analysis(self, symptoms: List[str], severity: Optional[List[int]] = None) -> Dict[str, Any]:
+
+    async def symptom_analysis(
+        self, symptoms: List[str], severity: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
         """Расширенный анализ симптомов с оценкой тяжести"""
         symptoms_with_severity = []
-        
+
         for i, symptom in enumerate(symptoms):
             severity_score = severity[i] if severity and i < len(severity) else None
             if severity_score:
-                symptoms_with_severity.append(f"{symptom} (тяжесть: {severity_score}/10)")
+                symptoms_with_severity.append(
+                    f"{symptom} (тяжесть: {severity_score}/10)"
+                )
             else:
                 symptoms_with_severity.append(symptom)
-        
+
         symptoms_text = "\n".join([f"- {s}" for s in symptoms_with_severity])
-        
+
         prompt = f"""
         Проанализируйте следующие симптомы:
         
@@ -212,32 +217,31 @@ class OpenAIProvider(BaseAIProvider):
             "examination_priority": ["первоочередное", "второстепенное"]
         }}
         """
-        
+
         system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии. 
         Анализируете симптомы системно, учитывая их взаимосвязи и клиническое значение.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=1200
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=1200
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def clinical_decision_support(self, case_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def clinical_decision_support(
+        self, case_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Поддержка клинических решений"""
         prompt = f"""
         Проанализируйте клинический случай и предоставьте рекомендации:
@@ -281,42 +285,41 @@ class OpenAIProvider(BaseAIProvider):
             "referral_criteria": ["критерий 1", "критерий 2"]
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине. 
         Предоставляете комплексные рекомендации по ведению пациентов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=2000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=2000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def suggest_icd10(self, symptoms: List[str], diagnosis: Optional[str] = None) -> List[Dict[str, str]]:
+
+    async def suggest_icd10(
+        self, symptoms: List[str], diagnosis: Optional[str] = None
+    ) -> List[Dict[str, str]]:
         """Подсказки кодов МКБ-10"""
         system_prompt = self._build_system_prompt("icd")
-        
+
         prompt = f"""Подберите коды МКБ-10 для следующих симптомов и диагноза.
 
 Симптомы: {', '.join(symptoms)}
 """
         if diagnosis:
             prompt += f"\nДиагноз: {diagnosis}"
-        
+
         prompt += """
 
 Верните список наиболее подходящих кодов МКБ-10 в формате JSON:
@@ -329,33 +332,34 @@ class OpenAIProvider(BaseAIProvider):
 ]
 
 Верните не более 5 наиболее релевантных кодов."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=800
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=800
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return []
-        
+
         try:
             return json.loads(response.content)
         except:
             return []
-    
-    async def interpret_lab_results(self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def interpret_lab_results(
+        self, results: List[Dict[str, Any]], patient_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Интерпретация результатов анализов"""
         system_prompt = self._build_system_prompt("lab")
-        
-        results_text = "\n".join([
-            f"{r['name']}: {r['value']} {r.get('unit', '')} (норма: {r.get('reference', 'не указана')})"
-            for r in results
-        ])
-        
+
+        results_text = "\n".join(
+            [
+                f"{r['name']}: {r['value']} {r.get('unit', '')} (норма: {r.get('reference', 'не указана')})"
+                for r in results
+            ]
+        )
+
         prompt = f"""Проинтерпретируйте результаты лабораторных анализов.
 
 Результаты:
@@ -363,7 +367,7 @@ class OpenAIProvider(BaseAIProvider):
 """
         if patient_info:
             prompt += f"\nПациент: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}"
-        
+
         prompt += """
 
 Ответьте в формате JSON:
@@ -381,34 +385,35 @@ class OpenAIProvider(BaseAIProvider):
     "recommendations": ["рекомендации по дообследованию"],
     "urgency": "требуется ли срочная консультация (да/нет)"
 }"""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=1500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=1500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def differential_diagnosis(self, symptoms: List[str], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def differential_diagnosis(
+        self, symptoms: List[str], patient_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Дифференциальная диагностика на основе симптомов"""
         age = patient_info.get("age", "не указан") if patient_info else "не указан"
-        gender = patient_info.get("gender", "не указан") if patient_info else "не указан"
-        
+        gender = (
+            patient_info.get("gender", "не указан") if patient_info else "не указан"
+        )
+
         symptoms_text = ", ".join(symptoms)
-        
+
         prompt = f"""
         Проведите дифференциальную диагностику для пациента со следующими симптомами:
         
@@ -438,45 +443,46 @@ class OpenAIProvider(BaseAIProvider):
             "urgency_level": "низкий/средний/высокий/критический"
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-диагност с 25-летним стажем. 
         Специализируетесь на дифференциальной диагностике. 
         Всегда учитываете возраст и пол пациента при постановке диагноза.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=1500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=1500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def symptom_analysis(self, symptoms: List[str], severity: Optional[List[int]] = None) -> Dict[str, Any]:
+
+    async def symptom_analysis(
+        self, symptoms: List[str], severity: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
         """Расширенный анализ симптомов с оценкой тяжести"""
         symptoms_with_severity = []
-        
+
         for i, symptom in enumerate(symptoms):
             severity_score = severity[i] if severity and i < len(severity) else None
             if severity_score:
-                symptoms_with_severity.append(f"{symptom} (тяжесть: {severity_score}/10)")
+                symptoms_with_severity.append(
+                    f"{symptom} (тяжесть: {severity_score}/10)"
+                )
             else:
                 symptoms_with_severity.append(symptom)
-        
+
         symptoms_text = "\n".join([f"- {s}" for s in symptoms_with_severity])
-        
+
         prompt = f"""
         Проанализируйте следующие симптомы:
         
@@ -511,32 +517,31 @@ class OpenAIProvider(BaseAIProvider):
             "examination_priority": ["первоочередное", "второстепенное"]
         }}
         """
-        
+
         system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии. 
         Анализируете симптомы системно, учитывая их взаимосвязи и клиническое значение.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=1200
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=1200
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def clinical_decision_support(self, case_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def clinical_decision_support(
+        self, case_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Поддержка клинических решений"""
         prompt = f"""
         Проанализируйте клинический случай и предоставьте рекомендации:
@@ -580,71 +585,71 @@ class OpenAIProvider(BaseAIProvider):
             "referral_criteria": ["критерий 1", "критерий 2"]
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине. 
         Предоставляете комплексные рекомендации по ведению пациентов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=2000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=2000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def analyze_skin(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def analyze_skin(
+        self, image_data: bytes, metadata: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Анализ кожи по фото через GPT-4 Vision"""
         try:
             # Кодируем изображение в base64
             base64_image = base64.b64encode(image_data).decode('utf-8')
-            
+
             system_prompt = self._build_system_prompt("dermatologist")
-            
+
             user_content = [
                 {
                     "type": "text",
-                    "text": "Проанализируйте состояние кожи на фото. Определите тип кожи, возможные проблемы и дайте рекомендации."
+                    "text": "Проанализируйте состояние кожи на фото. Определите тип кожи, возможные проблемы и дайте рекомендации.",
                 },
                 {
                     "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
-                    }
-                }
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                },
             ]
-            
+
             if metadata:
-                user_content[0]["text"] += f"\n\nДополнительная информация: {json.dumps(metadata, ensure_ascii=False)}"
-            
+                user_content[0][
+                    "text"
+                ] += f"\n\nДополнительная информация: {json.dumps(metadata, ensure_ascii=False)}"
+
             response = await self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content}
+                    {"role": "user", "content": user_content},
                 ],
                 max_tokens=1000,
-                temperature=0.3
+                temperature=0.3,
             )
-            
+
             content = response.choices[0].message.content
-            
+
             # Пытаемся извлечь JSON из ответа
             try:
                 # Ищем JSON в ответе
                 import re
+
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
                     return json.loads(json_match.group())
@@ -654,23 +659,22 @@ class OpenAIProvider(BaseAIProvider):
                         "skin_type": "не определен",
                         "problems": ["требуется ручной анализ"],
                         "recommendations": [content],
-                        "ai_confidence": "low"
+                        "ai_confidence": "low",
                     }
             except:
-                return {
-                    "analysis": content,
-                    "structured": False
-                }
-                
+                return {"analysis": content, "structured": False}
+
         except Exception as e:
             return {"error": self._format_error(e)}
-    
-    async def interpret_ecg(self, ecg_data: Dict[str, Any], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def interpret_ecg(
+        self, ecg_data: Dict[str, Any], patient_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Интерпретация ЭКГ"""
         system_prompt = self._build_system_prompt("cardiologist")
-        
+
         ecg_params = ecg_data.get('parameters', {})
-        
+
         prompt = f"""Проинтерпретируйте данные ЭКГ.
 
 Параметры ЭКГ:
@@ -681,13 +685,15 @@ class OpenAIProvider(BaseAIProvider):
 - QTc: {ecg_params.get('qtc', 'не указано')} мс
 - Ось сердца: {ecg_params.get('axis', 'не указано')}°
 """
-        
+
         if patient_info:
             prompt += f"\nПациент: возраст {patient_info.get('age', 'не указан')}, пол {patient_info.get('gender', 'не указан')}"
-        
+
         if ecg_data.get('auto_interpretation'):
-            prompt += f"\nАвтоматическая интерпретация: {ecg_data['auto_interpretation']}"
-        
+            prompt += (
+                f"\nАвтоматическая интерпретация: {ecg_data['auto_interpretation']}"
+            )
+
         prompt += """
 
 Ответьте в формате JSON:
@@ -701,34 +707,35 @@ class OpenAIProvider(BaseAIProvider):
     "recommendations": ["рекомендации"],
     "urgency": "срочность консультации кардиолога (экстренно/планово/не требуется)"
 }"""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=1200
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=1200
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def differential_diagnosis(self, symptoms: List[str], patient_info: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def differential_diagnosis(
+        self, symptoms: List[str], patient_info: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Дифференциальная диагностика на основе симптомов"""
         age = patient_info.get("age", "не указан") if patient_info else "не указан"
-        gender = patient_info.get("gender", "не указан") if patient_info else "не указан"
-        
+        gender = (
+            patient_info.get("gender", "не указан") if patient_info else "не указан"
+        )
+
         symptoms_text = ", ".join(symptoms)
-        
+
         prompt = f"""
         Проведите дифференциальную диагностику для пациента со следующими симптомами:
         
@@ -758,45 +765,46 @@ class OpenAIProvider(BaseAIProvider):
             "urgency_level": "низкий/средний/высокий/критический"
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-диагност с 25-летним стажем. 
         Специализируетесь на дифференциальной диагностике. 
         Всегда учитываете возраст и пол пациента при постановке диагноза.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=1500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=1500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def symptom_analysis(self, symptoms: List[str], severity: Optional[List[int]] = None) -> Dict[str, Any]:
+
+    async def symptom_analysis(
+        self, symptoms: List[str], severity: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
         """Расширенный анализ симптомов с оценкой тяжести"""
         symptoms_with_severity = []
-        
+
         for i, symptom in enumerate(symptoms):
             severity_score = severity[i] if severity and i < len(severity) else None
             if severity_score:
-                symptoms_with_severity.append(f"{symptom} (тяжесть: {severity_score}/10)")
+                symptoms_with_severity.append(
+                    f"{symptom} (тяжесть: {severity_score}/10)"
+                )
             else:
                 symptoms_with_severity.append(symptom)
-        
+
         symptoms_text = "\n".join([f"- {s}" for s in symptoms_with_severity])
-        
+
         prompt = f"""
         Проанализируйте следующие симптомы:
         
@@ -831,32 +839,31 @@ class OpenAIProvider(BaseAIProvider):
             "examination_priority": ["первоочередное", "второстепенное"]
         }}
         """
-        
+
         system_prompt = """Вы врач-терапевт с экспертизой в симптоматологии. 
         Анализируете симптомы системно, учитывая их взаимосвязи и клиническое значение.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=1200
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=1200
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def clinical_decision_support(self, case_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def clinical_decision_support(
+        self, case_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Поддержка клинических решений"""
         prompt = f"""
         Проанализируйте клинический случай и предоставьте рекомендации:
@@ -900,41 +907,43 @@ class OpenAIProvider(BaseAIProvider):
             "referral_criteria": ["критерий 1", "критерий 2"]
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-консультант с экспертизой в клинической медицине. 
         Предоставляете комплексные рекомендации по ведению пациентов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=2000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.3, max_tokens=2000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-
     # Новые методы для анализа медицинских изображений
-    async def analyze_xray_image(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+    async def analyze_xray_image(
+        self, image_data: bytes, metadata: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Анализ рентгеновского снимка"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
-        body_part = metadata.get("body_part", "не указано") if metadata else "не указано"
-        patient_age = metadata.get("patient_age", "не указан") if metadata else "не указан"
+
+        body_part = (
+            metadata.get("body_part", "не указано") if metadata else "не указано"
+        )
+        patient_age = (
+            metadata.get("patient_age", "не указан") if metadata else "не указан"
+        )
         clinical_info = metadata.get("clinical_info", "") if metadata else ""
-        
+
         prompt = f"""Проанализируйте рентгеновский снимок как опытный врач-рентгенолог.
         
         Область исследования: {body_part}
@@ -942,148 +951,199 @@ class OpenAIProvider(BaseAIProvider):
         Клиническая информация: {clinical_info}
         
         Предоставьте анализ в формате JSON с техническим качеством, анатомическими структурами, патологическими находками и рекомендациями."""
-        
+
         try:
             response = await self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=[
-                    {"role": "system", "content": "Вы опытный врач-рентгенолог. Анализируете снимки с высокой точностью. Ответы только в формате JSON."},
+                    {
+                        "role": "system",
+                        "content": "Вы опытный врач-рентгенолог. Анализируете снимки с высокой точностью. Ответы только в формате JSON.",
+                    },
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                        ]
-                    }
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                },
+                            },
+                        ],
+                    },
                 ],
                 max_tokens=2000,
-                temperature=0.1
+                temperature=0.1,
             )
-            
+
             return json.loads(response.choices[0].message.content)
         except Exception as e:
             return {"error": self._format_error(e)}
-    
-    async def analyze_ultrasound_image(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def analyze_ultrasound_image(
+        self, image_data: bytes, metadata: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Анализ УЗИ изображения"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
+
         organ = metadata.get("organ", "не указан") if metadata else "не указан"
-        patient_age = metadata.get("patient_age", "не указан") if metadata else "не указан"
-        
+        patient_age = (
+            metadata.get("patient_age", "не указан") if metadata else "не указан"
+        )
+
         prompt = f"""Проанализируйте ультразвуковое изображение как врач УЗИ-диагностики.
         
         Исследуемый орган: {organ}
         Возраст пациента: {patient_age}
         
         Предоставьте анализ в формате JSON с качеством изображения, анатомической оценкой, патологическими изменениями и рекомендациями."""
-        
+
         try:
             response = await self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=[
-                    {"role": "system", "content": "Вы опытный врач УЗИ-диагностики. Анализируете изображения с учетом технических параметров. Ответы только в формате JSON."},
+                    {
+                        "role": "system",
+                        "content": "Вы опытный врач УЗИ-диагностики. Анализируете изображения с учетом технических параметров. Ответы только в формате JSON.",
+                    },
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                        ]
-                    }
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                },
+                            },
+                        ],
+                    },
                 ],
                 max_tokens=2000,
-                temperature=0.1
+                temperature=0.1,
             )
-            
+
             return json.loads(response.choices[0].message.content)
         except Exception as e:
             return {"error": self._format_error(e)}
-    
-    async def analyze_dermatoscopy_image(self, image_data: bytes, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def analyze_dermatoscopy_image(
+        self, image_data: bytes, metadata: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Анализ дерматоскопического изображения"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
-        lesion_location = metadata.get("lesion_location", "не указана") if metadata else "не указана"
-        patient_age = metadata.get("patient_age", "не указан") if metadata else "не указан"
-        
+
+        lesion_location = (
+            metadata.get("lesion_location", "не указана") if metadata else "не указана"
+        )
+        patient_age = (
+            metadata.get("patient_age", "не указан") if metadata else "не указан"
+        )
+
         prompt = f"""Проанализируйте дерматоскопическое изображение как дерматолог-онколог.
         
         Локализация образования: {lesion_location}
         Возраст пациента: {patient_age}
         
         Проведите анализ по системе ABCDE и предоставьте результат в формате JSON с дерматоскопическими признаками, оценкой риска, дифференциальной диагностикой и рекомендациями."""
-        
+
         try:
             response = await self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=[
-                    {"role": "system", "content": "Вы опытный дерматолог-онколог с экспертизой в дерматоскопии. Анализируете по стандартам ABCDE. Ответы только в формате JSON."},
+                    {
+                        "role": "system",
+                        "content": "Вы опытный дерматолог-онколог с экспертизой в дерматоскопии. Анализируете по стандартам ABCDE. Ответы только в формате JSON.",
+                    },
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                        ]
-                    }
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                },
+                            },
+                        ],
+                    },
                 ],
                 max_tokens=2500,
-                temperature=0.1
+                temperature=0.1,
             )
-            
+
             return json.loads(response.choices[0].message.content)
         except Exception as e:
             return {"error": self._format_error(e)}
-    
-    async def analyze_medical_image_generic(self, image_data: bytes, image_type: str, metadata: Optional[Dict] = None) -> Dict[str, Any]:
+
+    async def analyze_medical_image_generic(
+        self, image_data: bytes, image_type: str, metadata: Optional[Dict] = None
+    ) -> Dict[str, Any]:
         """Универсальный анализ медицинского изображения"""
         image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
+
         patient_info = ""
         if metadata:
             patient_info = f"Возраст: {metadata.get('patient_age', 'не указан')}, Пол: {metadata.get('patient_gender', 'не указан')}"
-        
+
         prompt = f"""Проанализируйте медицинское изображение типа {image_type} как врач-специалист.
         
         {patient_info}
         
         Предоставьте профессиональный анализ в формате JSON с качеством изображения, патологическими находками, нормальными структурами, дифференциальной диагностикой и рекомендациями."""
-        
+
         try:
             response = await self.client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=[
-                    {"role": "system", "content": f"Вы опытный врач-специалист по анализу медицинских изображений типа {image_type}. Ответы только в формате JSON."},
+                    {
+                        "role": "system",
+                        "content": f"Вы опытный врач-специалист по анализу медицинских изображений типа {image_type}. Ответы только в формате JSON.",
+                    },
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-                        ]
-                    }
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                },
+                            },
+                        ],
+                    },
                 ],
                 max_tokens=2000,
-                temperature=0.1
+                temperature=0.1,
             )
-            
+
             return json.loads(response.choices[0].message.content)
         except Exception as e:
             return {"error": self._format_error(e)}
 
-    async def generate_treatment_plan(self, patient_data: Dict[str, Any], diagnosis: str, medical_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
+    async def generate_treatment_plan(
+        self,
+        patient_data: Dict[str, Any],
+        diagnosis: str,
+        medical_history: Optional[List[Dict]] = None,
+    ) -> Dict[str, Any]:
         """Генерация персонализированного плана лечения"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
         weight = patient_data.get("weight", "не указан")
         allergies = patient_data.get("allergies", [])
         comorbidities = patient_data.get("comorbidities", [])
-        
+
         history_text = ""
         if medical_history:
-            history_text = "\n".join([
-                f"- {h.get('date', 'дата не указана')}: {h.get('diagnosis', 'диагноз не указан')} - {h.get('treatment', 'лечение не указано')}"
-                for h in medical_history
-            ])
-        
+            history_text = "\n".join(
+                [
+                    f"- {h.get('date', 'дата не указана')}: {h.get('diagnosis', 'диагноз не указан')} - {h.get('treatment', 'лечение не указано')}"
+                    for h in medical_history
+                ]
+            )
+
         prompt = f"""
         Создайте персонализированный план лечения для пациента:
         
@@ -1101,33 +1161,35 @@ class OpenAIProvider(BaseAIProvider):
         
         Предоставьте комплексный план лечения в формате JSON с целями лечения, медикаментозной терапией, немедикаментозными вмешательствами, рекомендациями по образу жизни и графиком наблюдения.
         """
-        
+
         system_prompt = """Вы опытный врач-клиницист с экспертизой в персонализированной медицине.
         Создаете индивидуальные планы лечения с учетом всех особенностей пациента.
         Всегда учитываете возраст, пол, сопутствующие заболевания, аллергии и историю болезни.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=2500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=2500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def optimize_medication_regimen(self, current_medications: List[Dict], patient_profile: Dict[str, Any], condition: str) -> Dict[str, Any]:
+
+    async def optimize_medication_regimen(
+        self,
+        current_medications: List[Dict],
+        patient_profile: Dict[str, Any],
+        condition: str,
+    ) -> Dict[str, Any]:
         """Оптимизация медикаментозной терапии"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1135,12 +1197,14 @@ class OpenAIProvider(BaseAIProvider):
         kidney_function = patient_profile.get("kidney_function", "не указана")
         liver_function = patient_profile.get("liver_function", "не указана")
         allergies = patient_profile.get("allergies", [])
-        
-        medications_text = "\n".join([
-            f"- {med.get('name', 'не указано')}: {med.get('dosage', 'не указано')} {med.get('frequency', 'не указано')}"
-            for med in current_medications
-        ])
-        
+
+        medications_text = "\n".join(
+            [
+                f"- {med.get('name', 'не указано')}: {med.get('dosage', 'не указано')} {med.get('frequency', 'не указано')}"
+                for med in current_medications
+            ]
+        )
+
         prompt = f"""
         Оптимизируйте медикаментозную терапию для пациента:
         
@@ -1159,44 +1223,45 @@ class OpenAIProvider(BaseAIProvider):
         
         Предоставьте оптимизированный план в формате JSON с изменениями препаратов, анализом взаимодействий и рекомендациями по мониторингу.
         """
-        
+
         system_prompt = """Вы клинический фармаколог с экспертизой в оптимизации лекарственной терапии.
         Анализируете взаимодействия препаратов, корректируете дозировки с учетом функции органов.
         Всегда учитываете безопасность, эффективность и приверженность лечению.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=2000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=2000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def assess_treatment_effectiveness(self, treatment_history: List[Dict], patient_response: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def assess_treatment_effectiveness(
+        self, treatment_history: List[Dict], patient_response: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Оценка эффективности лечения"""
-        history_text = "\n".join([
-            f"- {h.get('date', 'дата не указана')}: {h.get('treatment', 'лечение не указано')} - {h.get('outcome', 'результат не указан')}"
-            for h in treatment_history
-        ])
-        
+        history_text = "\n".join(
+            [
+                f"- {h.get('date', 'дата не указана')}: {h.get('treatment', 'лечение не указано')} - {h.get('outcome', 'результат не указан')}"
+                for h in treatment_history
+            ]
+        )
+
         current_symptoms = patient_response.get("symptoms", [])
         side_effects = patient_response.get("side_effects", [])
         quality_of_life = patient_response.get("quality_of_life_score", "не указан")
         adherence = patient_response.get("adherence_rate", "не указан")
-        
+
         prompt = f"""
         Оцените эффективность проводимого лечения:
         
@@ -1211,33 +1276,32 @@ class OpenAIProvider(BaseAIProvider):
         
         Предоставьте анализ эффективности в формате JSON с оценкой ответа на лечение, анализом побочных эффектов и рекомендациями по корректировке.
         """
-        
+
         system_prompt = """Вы опытный врач-клиницист с экспертизой в оценке эффективности лечения.
         Анализируете динамику состояния пациента, приверженность терапии и качество жизни.
         Даете объективную оценку и конкретные рекомендации по корректировке лечения.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=2000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=2000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def suggest_lifestyle_modifications(self, patient_profile: Dict[str, Any], conditions: List[str]) -> Dict[str, Any]:
+
+    async def suggest_lifestyle_modifications(
+        self, patient_profile: Dict[str, Any], conditions: List[str]
+    ) -> Dict[str, Any]:
         """Рекомендации по изменению образа жизни"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1246,9 +1310,9 @@ class OpenAIProvider(BaseAIProvider):
         smoking_status = patient_profile.get("smoking_status", "не указан")
         alcohol_consumption = patient_profile.get("alcohol_consumption", "не указано")
         occupation = patient_profile.get("occupation", "не указана")
-        
+
         conditions_text = ", ".join(conditions) if conditions else "не указаны"
-        
+
         prompt = f"""
         Разработайте персонализированные рекомендации по изменению образа жизни:
         
@@ -1265,39 +1329,42 @@ class OpenAIProvider(BaseAIProvider):
         
         Предоставьте рекомендации в формате JSON с диетическими рекомендациями, физической активностью, управлением стрессом и модификацией привычек.
         """
-        
+
         system_prompt = """Вы специалист по профилактической медицине и здоровому образу жизни.
         Создаете персонализированные, реалистичные и научно обоснованные рекомендации.
         Учитываете индивидуальные особенности пациента и его заболевания.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=2500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=2500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-    async def check_drug_interactions(self, medications: List[Dict[str, Any]], patient_profile: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def check_drug_interactions(
+        self,
+        medications: List[Dict[str, Any]],
+        patient_profile: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Проверка лекарственных взаимодействий"""
-        medications_text = "\n".join([
-            f"- {med.get('name', 'не указано')}: {med.get('dosage', 'не указано')} {med.get('frequency', 'не указано')}"
-            for med in medications
-        ])
-        
+        medications_text = "\n".join(
+            [
+                f"- {med.get('name', 'не указано')}: {med.get('dosage', 'не указано')} {med.get('frequency', 'не указано')}"
+                for med in medications
+            ]
+        )
+
         patient_info = ""
         if patient_profile:
             age = patient_profile.get("age", "не указан")
@@ -1306,7 +1373,7 @@ class OpenAIProvider(BaseAIProvider):
             kidney_function = patient_profile.get("kidney_function", "не указана")
             liver_function = patient_profile.get("liver_function", "не указана")
             allergies = patient_profile.get("allergies", [])
-            
+
             patient_info = f"""
             ПРОФИЛЬ ПАЦИЕНТА:
             - Возраст: {age}
@@ -1316,7 +1383,7 @@ class OpenAIProvider(BaseAIProvider):
             - Функция печени: {liver_function}
             - Аллергии: {', '.join(allergies) if allergies else 'не указаны'}
             """
-        
+
         prompt = f"""
         Проанализируйте лекарственные взаимодействия между препаратами:
         
@@ -1394,39 +1461,41 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы клинический фармаколог с экспертизой в лекарственных взаимодействиях.
         Анализируете взаимодействия препаратов на основе современных клинических данных.
         Учитываете фармакокинетику, фармакодинамику и индивидуальные особенности пациента.
         Предоставляете практические рекомендации по безопасному применению препаратов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def analyze_drug_safety(self, medication: Dict[str, Any], patient_profile: Dict[str, Any], conditions: List[str]) -> Dict[str, Any]:
+
+    async def analyze_drug_safety(
+        self,
+        medication: Dict[str, Any],
+        patient_profile: Dict[str, Any],
+        conditions: List[str],
+    ) -> Dict[str, Any]:
         """Анализ безопасности препарата для конкретного пациента"""
         med_name = medication.get("name", "не указано")
         med_dosage = medication.get("dosage", "не указано")
         med_frequency = medication.get("frequency", "не указано")
-        
+
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
         weight = patient_profile.get("weight", "не указан")
@@ -1435,9 +1504,9 @@ class OpenAIProvider(BaseAIProvider):
         kidney_function = patient_profile.get("kidney_function", "не указана")
         liver_function = patient_profile.get("liver_function", "не указана")
         allergies = patient_profile.get("allergies", [])
-        
+
         conditions_text = ", ".join(conditions) if conditions else "не указаны"
-        
+
         prompt = f"""
         Проанализируйте безопасность препарата для конкретного пациента:
         
@@ -1523,34 +1592,33 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы клинический фармаколог с экспертизой в безопасности лекарственных средств.
         Оцениваете безопасность препаратов с учетом индивидуальных особенностей пациента.
         Учитываете возраст, пол, функцию органов, сопутствующие заболевания и аллергии.
         Предоставляете практические рекомендации по безопасному применению.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=2500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=2500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def suggest_drug_alternatives(self, medication: str, reason: str, patient_profile: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def suggest_drug_alternatives(
+        self, medication: str, reason: str, patient_profile: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Предложение альтернативных препаратов"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1559,7 +1627,7 @@ class OpenAIProvider(BaseAIProvider):
         liver_function = patient_profile.get("liver_function", "не указана")
         allergies = patient_profile.get("allergies", [])
         conditions = patient_profile.get("conditions", [])
-        
+
         prompt = f"""
         Предложите альтернативные препараты для замены:
         
@@ -1637,34 +1705,33 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы клинический фармаколог с экспертизой в подборе альтернативных препаратов.
         Предлагаете безопасные и эффективные альтернативы с учетом индивидуальных особенностей пациента.
         Учитываете эффективность, безопасность, стоимость и доступность препаратов.
         Предоставляете практические рекомендации по переходу на альтернативную терапию.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def calculate_drug_dosage(self, medication: str, patient_profile: Dict[str, Any], indication: str) -> Dict[str, Any]:
+
+    async def calculate_drug_dosage(
+        self, medication: str, patient_profile: Dict[str, Any], indication: str
+    ) -> Dict[str, Any]:
         """Расчет дозировки препарата"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1674,7 +1741,7 @@ class OpenAIProvider(BaseAIProvider):
         creatinine = patient_profile.get("creatinine", "не указан")
         creatinine_clearance = patient_profile.get("creatinine_clearance", "не указан")
         liver_function = patient_profile.get("liver_function", "не указана")
-        
+
         prompt = f"""
         Рассчитайте оптимальную дозировку препарата для пациента:
         
@@ -1767,34 +1834,33 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы клинический фармаколог с экспертизой в расчете дозировок лекарственных средств.
         Рассчитываете индивидуальные дозировки с учетом возраста, веса, функции органов и показаний.
         Учитываете фармакокинетику, фармакодинамику и индивидуальную вариабельность.
         Предоставляете практические рекомендации по дозированию и мониторингу.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-    async def assess_patient_risk(self, patient_data: Dict[str, Any], risk_factors: List[str], condition: str) -> Dict[str, Any]:
+    async def assess_patient_risk(
+        self, patient_data: Dict[str, Any], risk_factors: List[str], condition: str
+    ) -> Dict[str, Any]:
         """Комплексная оценка рисков пациента"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -1806,12 +1872,18 @@ class OpenAIProvider(BaseAIProvider):
         comorbidities = patient_data.get("comorbidities", [])
         medications = patient_data.get("medications", [])
         family_history = patient_data.get("family_history", [])
-        
+
         risk_factors_text = ", ".join(risk_factors) if risk_factors else "не указаны"
         comorbidities_text = ", ".join(comorbidities) if comorbidities else "не указаны"
-        medications_text = ", ".join([med.get("name", "не указано") for med in medications]) if medications else "не указаны"
-        family_history_text = ", ".join(family_history) if family_history else "не указан"
-        
+        medications_text = (
+            ", ".join([med.get("name", "не указано") for med in medications])
+            if medications
+            else "не указаны"
+        )
+        family_history_text = (
+            ", ".join(family_history) if family_history else "не указан"
+        )
+
         prompt = f"""
         Проведите комплексную оценку рисков для пациента:
         
@@ -1913,34 +1985,36 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы врач-эпидемиолог и специалист по оценке рисков с экспертизой в профилактической медицине.
         Проводите комплексную оценку рисков на основе современных клинических рекомендаций и доказательной медицины.
         Учитываете все факторы риска, их взаимодействие и кумулятивный эффект.
         Предоставляете практические рекомендации по снижению рисков и мониторингу.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def predict_complications(self, patient_profile: Dict[str, Any], procedure_or_condition: str, timeline: str) -> Dict[str, Any]:
+
+    async def predict_complications(
+        self,
+        patient_profile: Dict[str, Any],
+        procedure_or_condition: str,
+        timeline: str,
+    ) -> Dict[str, Any]:
         """Прогнозирование возможных осложнений"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -1948,12 +2022,20 @@ class OpenAIProvider(BaseAIProvider):
         medications = patient_profile.get("medications", [])
         allergies = patient_profile.get("allergies", [])
         previous_complications = patient_profile.get("previous_complications", [])
-        
+
         comorbidities_text = ", ".join(comorbidities) if comorbidities else "не указаны"
-        medications_text = ", ".join([med.get("name", "не указано") for med in medications]) if medications else "не указаны"
+        medications_text = (
+            ", ".join([med.get("name", "не указано") for med in medications])
+            if medications
+            else "не указаны"
+        )
         allergies_text = ", ".join(allergies) if allergies else "не указаны"
-        complications_text = ", ".join(previous_complications) if previous_complications else "не указаны"
-        
+        complications_text = (
+            ", ".join(previous_complications)
+            if previous_complications
+            else "не указаны"
+        )
+
         prompt = f"""
         Спрогнозируйте возможные осложнения для пациента:
         
@@ -2038,34 +2120,36 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-клиницист с экспертизой в прогнозировании и профилактике осложнений.
         Анализируете риски на основе современных клинических данных и доказательной медицины.
         Учитываете индивидуальные особенности пациента и специфику процедуры/состояния.
         Предоставляете практические рекомендации по профилактике и раннему выявлению осложнений.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def calculate_mortality_risk(self, patient_data: Dict[str, Any], condition: str, scoring_system: Optional[str] = None) -> Dict[str, Any]:
+
+    async def calculate_mortality_risk(
+        self,
+        patient_data: Dict[str, Any],
+        condition: str,
+        scoring_system: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Расчет риска смертности"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -2073,14 +2157,30 @@ class OpenAIProvider(BaseAIProvider):
         laboratory_values = patient_data.get("laboratory_values", {})
         comorbidities = patient_data.get("comorbidities", [])
         severity_indicators = patient_data.get("severity_indicators", {})
-        
-        vital_signs_text = ", ".join([f"{k}: {v}" for k, v in vital_signs.items()]) if vital_signs else "не указаны"
-        lab_values_text = ", ".join([f"{k}: {v}" for k, v in laboratory_values.items()]) if laboratory_values else "не указаны"
+
+        vital_signs_text = (
+            ", ".join([f"{k}: {v}" for k, v in vital_signs.items()])
+            if vital_signs
+            else "не указаны"
+        )
+        lab_values_text = (
+            ", ".join([f"{k}: {v}" for k, v in laboratory_values.items()])
+            if laboratory_values
+            else "не указаны"
+        )
         comorbidities_text = ", ".join(comorbidities) if comorbidities else "не указаны"
-        severity_text = ", ".join([f"{k}: {v}" for k, v in severity_indicators.items()]) if severity_indicators else "не указаны"
-        
-        scoring_system_info = f"Используйте шкалу: {scoring_system}" if scoring_system else "Используйте наиболее подходящую валидированную шкалу"
-        
+        severity_text = (
+            ", ".join([f"{k}: {v}" for k, v in severity_indicators.items()])
+            if severity_indicators
+            else "не указаны"
+        )
+
+        scoring_system_info = (
+            f"Используйте шкалу: {scoring_system}"
+            if scoring_system
+            else "Используйте наиболее подходящую валидированную шкалу"
+        )
+
         prompt = f"""
         Рассчитайте риск смертности для пациента:
         
@@ -2166,34 +2266,33 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы врач-реаниматолог и специалист по интенсивной терапии с экспертизой в оценке тяжести состояния.
         Используете валидированные шкалы оценки риска смертности (APACHE, SOFA, SAPS, CHA2DS2-VASc и др.).
         Интерпретируете результаты в клиническом контексте и предоставляете практические рекомендации.
         Учитываете ограничения шкал и индивидуальные особенности пациента.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def assess_surgical_risk(self, patient_profile: Dict[str, Any], surgery_type: str, anesthesia_type: str) -> Dict[str, Any]:
+
+    async def assess_surgical_risk(
+        self, patient_profile: Dict[str, Any], surgery_type: str, anesthesia_type: str
+    ) -> Dict[str, Any]:
         """Оценка хирургических рисков"""
         age = patient_profile.get("age", "не указан")
         gender = patient_profile.get("gender", "не указан")
@@ -2205,12 +2304,18 @@ class OpenAIProvider(BaseAIProvider):
         previous_surgeries = patient_profile.get("previous_surgeries", [])
         allergies = patient_profile.get("allergies", [])
         functional_status = patient_profile.get("functional_status", "не указан")
-        
+
         comorbidities_text = ", ".join(comorbidities) if comorbidities else "не указаны"
-        medications_text = ", ".join([med.get("name", "не указано") for med in medications]) if medications else "не указаны"
-        surgeries_text = ", ".join(previous_surgeries) if previous_surgeries else "не указаны"
+        medications_text = (
+            ", ".join([med.get("name", "не указано") for med in medications])
+            if medications
+            else "не указаны"
+        )
+        surgeries_text = (
+            ", ".join(previous_surgeries) if previous_surgeries else "не указаны"
+        )
         allergies_text = ", ".join(allergies) if allergies else "не указаны"
-        
+
         prompt = f"""
         Оцените хирургические риски для пациента:
         
@@ -2320,34 +2425,36 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы анестезиолог-реаниматолог с экспертизой в периоперационной медицине.
         Оцениваете хирургические риски на основе современных клинических рекомендаций и валидированных шкал.
         Учитываете все аспекты периоперационного периода и индивидуальные особенности пациента.
         Предоставляете практические рекомендации по оптимизации и минимизации рисков.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def predict_readmission_risk(self, patient_data: Dict[str, Any], discharge_condition: str, social_factors: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def predict_readmission_risk(
+        self,
+        patient_data: Dict[str, Any],
+        discharge_condition: str,
+        social_factors: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """Прогнозирование риска повторной госпитализации"""
         age = patient_data.get("age", "не указан")
         gender = patient_data.get("gender", "не указан")
@@ -2356,17 +2463,23 @@ class OpenAIProvider(BaseAIProvider):
         medications = patient_data.get("medications", [])
         length_of_stay = patient_data.get("length_of_stay", "не указана")
         previous_admissions = patient_data.get("previous_admissions", "не указаны")
-        
+
         social_support = social_factors.get("social_support", "не указана")
         insurance_status = social_factors.get("insurance_status", "не указан")
         transportation = social_factors.get("transportation", "не указан")
         housing_situation = social_factors.get("housing_situation", "не указана")
-        caregiver_availability = social_factors.get("caregiver_availability", "не указана")
+        caregiver_availability = social_factors.get(
+            "caregiver_availability", "не указана"
+        )
         health_literacy = social_factors.get("health_literacy", "не указана")
-        
+
         comorbidities_text = ", ".join(comorbidities) if comorbidities else "не указаны"
-        medications_text = ", ".join([med.get("name", "не указано") for med in medications]) if medications else "не указаны"
-        
+        medications_text = (
+            ", ".join([med.get("name", "не указано") for med in medications])
+            if medications
+            else "не указаны"
+        )
+
         prompt = f"""
         Спрогнозируйте риск повторной госпитализации для пациента:
         
@@ -2499,44 +2612,43 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по управлению переходами в медицинской помощи с экспертизой в предотвращении повторных госпитализаций.
         Анализируете медицинские, социальные и системные факторы риска повторной госпитализации.
         Используете валидированные инструменты оценки риска и доказательные вмешательства.
         Предоставляете комплексные рекомендации по планированию выписки и координации помощи.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-    async def transcribe_audio(self, audio_data: bytes, language: str = "ru", medical_context: bool = True) -> Dict[str, Any]:
+    async def transcribe_audio(
+        self, audio_data: bytes, language: str = "ru", medical_context: bool = True
+    ) -> Dict[str, Any]:
         """Транскрипция аудио в текст с медицинской терминологией"""
         try:
             # Создаем временный файл для аудио
-            import tempfile
             import os
-            
+            import tempfile
+
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
                 temp_file.write(audio_data)
                 temp_file_path = temp_file.name
-            
+
             try:
                 # Используем Whisper API для транскрипции
                 with open(temp_file_path, 'rb') as audio_file:
@@ -2544,62 +2656,99 @@ class OpenAIProvider(BaseAIProvider):
                         model="whisper-1",
                         file=audio_file,
                         language=language,
-                        prompt="Медицинская консультация. Включает медицинскую терминологию, симптомы, диагнозы, лечение." if medical_context else None,
+                        prompt=(
+                            "Медицинская консультация. Включает медицинскую терминологию, симптомы, диагнозы, лечение."
+                            if medical_context
+                            else None
+                        ),
                         response_format="verbose_json",
-                        temperature=0.1
+                        temperature=0.1,
                     )
-                
+
                 return {
                     "text": transcript.text,
                     "language": transcript.language,
                     "duration": transcript.duration,
-                    "segments": [
-                        {
-                            "start": segment.start,
-                            "end": segment.end,
-                            "text": segment.text,
-                            "confidence": getattr(segment, 'avg_logprob', 0.0)
-                        }
-                        for segment in transcript.segments
-                    ] if hasattr(transcript, 'segments') else [],
+                    "segments": (
+                        [
+                            {
+                                "start": segment.start,
+                                "end": segment.end,
+                                "text": segment.text,
+                                "confidence": getattr(segment, 'avg_logprob', 0.0),
+                            }
+                            for segment in transcript.segments
+                        ]
+                        if hasattr(transcript, 'segments')
+                        else []
+                    ),
                     "confidence": getattr(transcript, 'avg_logprob', 0.0),
-                    "medical_context": medical_context
+                    "medical_context": medical_context,
                 }
             finally:
                 # Удаляем временный файл
                 os.unlink(temp_file_path)
-                
+
         except Exception as e:
             return {
                 "error": f"Ошибка транскрипции: {str(e)}",
                 "text": "",
-                "confidence": 0.0
+                "confidence": 0.0,
             }
-    
-    async def structure_medical_text(self, text: str, document_type: str) -> Dict[str, Any]:
+
+    async def structure_medical_text(
+        self, text: str, document_type: str
+    ) -> Dict[str, Any]:
         """Структурирование медицинского текста в формализованные поля"""
         document_templates = {
             "consultation": {
-                "fields": ["жалобы", "анамнез", "объективный_осмотр", "диагноз", "лечение", "рекомендации"],
-                "description": "консультация врача"
+                "fields": [
+                    "жалобы",
+                    "анамнез",
+                    "объективный_осмотр",
+                    "диагноз",
+                    "лечение",
+                    "рекомендации",
+                ],
+                "description": "консультация врача",
             },
             "prescription": {
-                "fields": ["препараты", "дозировка", "способ_применения", "длительность", "противопоказания"],
-                "description": "рецепт"
+                "fields": [
+                    "препараты",
+                    "дозировка",
+                    "способ_применения",
+                    "длительность",
+                    "противопоказания",
+                ],
+                "description": "рецепт",
             },
             "discharge": {
-                "fields": ["диагноз_при_выписке", "проведенное_лечение", "состояние_при_выписке", "рекомендации", "контрольные_осмотры"],
-                "description": "выписной эпикриз"
+                "fields": [
+                    "диагноз_при_выписке",
+                    "проведенное_лечение",
+                    "состояние_при_выписке",
+                    "рекомендации",
+                    "контрольные_осмотры",
+                ],
+                "description": "выписной эпикриз",
             },
             "examination": {
-                "fields": ["вид_исследования", "показания", "результаты", "заключение", "рекомендации"],
-                "description": "результат обследования"
-            }
+                "fields": [
+                    "вид_исследования",
+                    "показания",
+                    "результаты",
+                    "заключение",
+                    "рекомендации",
+                ],
+                "description": "результат обследования",
+            },
         }
-        
-        template = document_templates.get(document_type, document_templates["consultation"])
+
+        template = document_templates.get(
+            document_type, document_templates["consultation"]
+        )
         fields_list = ", ".join(template["fields"])
-        
+
         prompt = f"""
         Структурируйте медицинский текст ({template["description"]}) в формализованные поля.
         
@@ -2640,33 +2789,30 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы медицинский документовед с экспертизой в структурировании медицинских записей.
         Извлекаете и организуете информацию из неструктурированного медицинского текста.
         Используете стандартную медицинскую терминологию и форматы документации.
         Обеспечиваете высокое качество структурирования и полноту извлечения данных.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=2500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=2500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
+
     async def extract_medical_entities(self, text: str) -> Dict[str, Any]:
         """Извлечение медицинских сущностей из текста"""
         prompt = f"""
@@ -2788,37 +2934,38 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по обработке естественного языка в медицине с экспертизой в извлечении медицинских сущностей.
         Точно идентифицируете и классифицируете медицинские термины, препараты, диагнозы и процедуры.
         Используете медицинские стандарты и классификации (МКБ-10, АТХ и др.).
         Оцениваете достоверность извлечения и предоставляете структурированные результаты.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def generate_medical_summary(self, consultation_text: str, patient_history: Optional[str] = None) -> Dict[str, Any]:
+
+    async def generate_medical_summary(
+        self, consultation_text: str, patient_history: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Генерация медицинского резюме из текста консультации"""
-        history_context = f"\n\nИСТОРИЯ ПАЦИЕНТА:\n{patient_history}" if patient_history else ""
-        
+        history_context = (
+            f"\n\nИСТОРИЯ ПАЦИЕНТА:\n{patient_history}" if patient_history else ""
+        )
+
         prompt = f"""
         Создайте медицинское резюме на основе текста консультации:
         
@@ -2908,37 +3055,36 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы опытный врач-клиницист с экспертизой в создании медицинских резюме и клинической документации.
         Анализируете консультации и создаете структурированные, клинически значимые резюме.
         Обеспечиваете полноту, точность и клиническую релевантность информации.
         Следуете стандартам медицинской документации и клинического мышления.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def validate_medical_record(self, record_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def validate_medical_record(
+        self, record_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Валидация и проверка медицинской записи на полноту и корректность"""
         record_json = json.dumps(record_data, ensure_ascii=False, indent=2)
-        
+
         prompt = f"""
         Проведите валидацию медицинской записи на полноту, корректность и соответствие стандартам:
         
@@ -3023,59 +3169,62 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по качеству медицинской документации с экспертизой в валидации медицинских записей.
         Проверяете медицинские записи на полноту, точность, клиническую согласованность и соответствие стандартам.
         Используете медицинские стандарты, классификации и требования к документации.
         Выявляете проблемы качества данных и предоставляете конструктивные рекомендации по улучшению.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-    async def optimize_doctor_schedule(self, schedule_data: Dict[str, Any], constraints: Dict[str, Any]) -> Dict[str, Any]:
+    async def optimize_doctor_schedule(
+        self, schedule_data: Dict[str, Any], constraints: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Оптимизация расписания врача с учетом ограничений и предпочтений"""
         doctor_info = schedule_data.get("doctor", {})
         current_schedule = schedule_data.get("current_schedule", [])
         appointments = schedule_data.get("appointments", [])
-        
+
         doctor_name = doctor_info.get("name", "не указан")
         specialty = doctor_info.get("specialty", "не указана")
         experience = doctor_info.get("experience_years", "не указан")
         preferences = doctor_info.get("preferences", {})
-        
+
         working_hours = constraints.get("working_hours", {})
         break_requirements = constraints.get("break_requirements", {})
         max_patients_per_day = constraints.get("max_patients_per_day", "не указано")
         appointment_types = constraints.get("appointment_types", [])
-        
-        current_schedule_text = "\n".join([
-            f"- {slot.get('time', 'не указано')}: {slot.get('type', 'свободно')} ({slot.get('duration', 0)} мин)"
-            for slot in current_schedule
-        ])
-        
-        appointments_text = "\n".join([
-            f"- {apt.get('time', 'не указано')}: {apt.get('patient_type', 'обычный')} пациент, {apt.get('complaint', 'не указано')} ({apt.get('estimated_duration', 30)} мин)"
-            for apt in appointments
-        ])
-        
+
+        current_schedule_text = "\n".join(
+            [
+                f"- {slot.get('time', 'не указано')}: {slot.get('type', 'свободно')} ({slot.get('duration', 0)} мин)"
+                for slot in current_schedule
+            ]
+        )
+
+        appointments_text = "\n".join(
+            [
+                f"- {apt.get('time', 'не указано')}: {apt.get('patient_type', 'обычный')} пациент, {apt.get('complaint', 'не указано')} ({apt.get('estimated_duration', 30)} мин)"
+                for apt in appointments
+            ]
+        )
+
         prompt = f"""
         Оптимизируйте расписание врача с учетом всех ограничений и предпочтений:
         
@@ -3180,56 +3329,70 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы специалист по оптимизации медицинских расписаний с экспертизой в управлении временем и ресурсами.
         Создаете эффективные расписания, учитывающие потребности врачей, пациентов и медицинского учреждения.
         Используете принципы lean-менеджмента и данные о производительности для оптимизации.
         Обеспечиваете баланс между эффективностью работы и качеством медицинской помощи.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def predict_appointment_duration(self, appointment_data: Dict[str, Any], historical_data: List[Dict]) -> Dict[str, Any]:
+
+    async def predict_appointment_duration(
+        self, appointment_data: Dict[str, Any], historical_data: List[Dict]
+    ) -> Dict[str, Any]:
         """Прогнозирование длительности приема на основе исторических данных"""
         patient_info = appointment_data.get("patient", {})
         appointment_type = appointment_data.get("type", "не указан")
         complaint = appointment_data.get("complaint", "не указана")
         doctor_specialty = appointment_data.get("doctor_specialty", "не указана")
         is_first_visit = appointment_data.get("is_first_visit", False)
-        
+
         # Обработка исторических данных
         historical_summary = {
             "total_appointments": len(historical_data),
-            "average_duration": sum(apt.get("actual_duration", 30) for apt in historical_data) / len(historical_data) if historical_data else 30,
+            "average_duration": (
+                sum(apt.get("actual_duration", 30) for apt in historical_data)
+                / len(historical_data)
+                if historical_data
+                else 30
+            ),
             "duration_range": {
-                "min": min(apt.get("actual_duration", 30) for apt in historical_data) if historical_data else 15,
-                "max": max(apt.get("actual_duration", 30) for apt in historical_data) if historical_data else 60
-            }
+                "min": (
+                    min(apt.get("actual_duration", 30) for apt in historical_data)
+                    if historical_data
+                    else 15
+                ),
+                "max": (
+                    max(apt.get("actual_duration", 30) for apt in historical_data)
+                    if historical_data
+                    else 60
+                ),
+            },
         }
-        
+
         similar_cases = [
-            apt for apt in historical_data 
-            if apt.get("type") == appointment_type or apt.get("complaint", "").lower() in complaint.lower()
+            apt
+            for apt in historical_data
+            if apt.get("type") == appointment_type
+            or apt.get("complaint", "").lower() in complaint.lower()
         ]
-        
+
         prompt = f"""
         Спрогнозируйте длительность медицинского приема на основе данных:
         
@@ -3302,50 +3465,54 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по анализу медицинских данных с экспертизой в прогнозировании временных затрат на медицинские процедуры.
         Анализируете исторические данные и клинические факторы для точного прогнозирования длительности приемов.
         Учитываете сложность случаев, особенности пациентов и специфику медицинских специальностей.
         Предоставляете практические рекомендации по планированию времени и оптимизации расписания.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def suggest_optimal_slots(self, doctor_profile: Dict[str, Any], patient_requirements: Dict[str, Any], available_slots: List[Dict]) -> Dict[str, Any]:
+
+    async def suggest_optimal_slots(
+        self,
+        doctor_profile: Dict[str, Any],
+        patient_requirements: Dict[str, Any],
+        available_slots: List[Dict],
+    ) -> Dict[str, Any]:
         """Предложение оптимальных временных слотов для записи"""
         doctor_name = doctor_profile.get("name", "не указан")
         specialty = doctor_profile.get("specialty", "не указана")
         working_patterns = doctor_profile.get("working_patterns", {})
         performance_metrics = doctor_profile.get("performance_metrics", {})
-        
+
         patient_preferences = patient_requirements.get("preferences", {})
         urgency_level = patient_requirements.get("urgency", "обычная")
         appointment_type = patient_requirements.get("type", "консультация")
         estimated_duration = patient_requirements.get("estimated_duration", 30)
-        
-        slots_text = "\n".join([
-            f"- {slot.get('date', 'не указано')} {slot.get('time', 'не указано')}: {slot.get('duration', 30)} мин (загрузка: {slot.get('current_load', 0)}%)"
-            for slot in available_slots
-        ])
-        
+
+        slots_text = "\n".join(
+            [
+                f"- {slot.get('date', 'не указано')} {slot.get('time', 'не указано')}: {slot.get('duration', 30)} мин (загрузка: {slot.get('current_load', 0)}%)"
+                for slot in available_slots
+            ]
+        )
+
         prompt = f"""
         Предложите оптимальные временные слоты для записи пациента:
         
@@ -3430,34 +3597,33 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по оптимизации медицинского планирования с экспертизой в анализе временных слотов и предпочтений.
         Анализируете множественные факторы для предложения оптимальных временных слотов для медицинских приемов.
         Учитываете производительность врачей, удобство пациентов и эффективность клиники.
         Предоставляете обоснованные рекомендации с учетом всех заинтересованных сторон.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def analyze_workload_distribution(self, doctors_data: List[Dict], time_period: str) -> Dict[str, Any]:
+
+    async def analyze_workload_distribution(
+        self, doctors_data: List[Dict], time_period: str
+    ) -> Dict[str, Any]:
         """Анализ распределения рабочей нагрузки между врачами"""
         doctors_summary = []
         for doctor in doctors_data:
@@ -3466,15 +3632,17 @@ class OpenAIProvider(BaseAIProvider):
                 "specialty": doctor.get("specialty", "не указана"),
                 "total_appointments": len(doctor.get("appointments", [])),
                 "total_hours": doctor.get("total_working_hours", 0),
-                "patient_load": doctor.get("patient_load", 0)
+                "patient_load": doctor.get("patient_load", 0),
             }
             doctors_summary.append(summary)
-        
-        doctors_text = "\n".join([
-            f"- {doc['name']} ({doc['specialty']}): {doc['total_appointments']} приемов, {doc['total_hours']} часов, нагрузка {doc['patient_load']}%"
-            for doc in doctors_summary
-        ])
-        
+
+        doctors_text = "\n".join(
+            [
+                f"- {doc['name']} ({doc['specialty']}): {doc['total_appointments']} приемов, {doc['total_hours']} часов, нагрузка {doc['patient_load']}%"
+                for doc in doctors_summary
+            ]
+        )
+
         prompt = f"""
         Проанализируйте распределение рабочей нагрузки между врачами:
         
@@ -3571,55 +3739,58 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по анализу рабочей нагрузки в медицинских учреждениях с экспертизой в оптимизации ресурсов.
         Анализируете распределение нагрузки между врачами и предлагаете стратегии оптимизации.
         Учитываете производительность, качество медицинской помощи и удовлетворенность персонала.
         Предоставляете практические рекомендации по перераспределению нагрузки и улучшению эффективности.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def generate_shift_recommendations(self, department_data: Dict[str, Any], staffing_requirements: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def generate_shift_recommendations(
+        self, department_data: Dict[str, Any], staffing_requirements: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Генерация рекомендаций по составлению смен и графиков работы"""
         department_name = department_data.get("name", "не указано")
         staff_list = department_data.get("staff", [])
         current_shifts = department_data.get("current_shifts", [])
         patient_flow_patterns = department_data.get("patient_flow_patterns", {})
-        
+
         min_staff_per_shift = staffing_requirements.get("min_staff_per_shift", 1)
         coverage_hours = staffing_requirements.get("coverage_hours", "24/7")
         skill_requirements = staffing_requirements.get("skill_requirements", [])
         compliance_rules = staffing_requirements.get("compliance_rules", {})
-        
-        staff_text = "\n".join([
-            f"- {staff.get('name', 'не указан')} ({staff.get('role', 'не указана')}, опыт: {staff.get('experience', 0)} лет, предпочтения: {staff.get('preferences', {})})"
-            for staff in staff_list
-        ])
-        
-        shifts_text = "\n".join([
-            f"- {shift.get('time', 'не указано')}: {len(shift.get('staff', []))} сотрудников, загрузка {shift.get('workload', 0)}%"
-            for shift in current_shifts
-        ])
-        
+
+        staff_text = "\n".join(
+            [
+                f"- {staff.get('name', 'не указан')} ({staff.get('role', 'не указана')}, опыт: {staff.get('experience', 0)} лет, предпочтения: {staff.get('preferences', {})})"
+                for staff in staff_list
+            ]
+        )
+
+        shifts_text = "\n".join(
+            [
+                f"- {shift.get('time', 'не указано')}: {len(shift.get('staff', []))} сотрудников, загрузка {shift.get('workload', 0)}%"
+                for shift in current_shifts
+            ]
+        )
+
         prompt = f"""
         Создайте оптимальные рекомендации по составлению смен и графиков работы:
         
@@ -3745,54 +3916,61 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по управлению медицинским персоналом с экспертизой в составлении оптимальных графиков работы.
         Создаете эффективные системы смен, учитывающие потребности пациентов, возможности персонала и требования регулирования.
         Используете принципы управления человеческими ресурсами и данные о производительности для оптимизации.
         Обеспечиваете соблюдение трудового законодательства и медицинских стандартов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-    async def analyze_documentation_quality(self, medical_records: List[Dict], quality_standards: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze_documentation_quality(
+        self, medical_records: List[Dict], quality_standards: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Анализ качества медицинской документации"""
         records_summary = []
         for record in medical_records[:10]:  # Ограничиваем для анализа
             summary = {
                 "record_id": record.get("id", "не указан"),
                 "record_type": record.get("type", "не указан"),
-                "completeness": len([k for k, v in record.items() if v]) / len(record) * 100 if record else 0,
+                "completeness": (
+                    len([k for k, v in record.items() if v]) / len(record) * 100
+                    if record
+                    else 0
+                ),
                 "fields_count": len(record),
                 "has_diagnosis": bool(record.get("diagnosis")),
                 "has_treatment": bool(record.get("treatment")),
-                "has_symptoms": bool(record.get("symptoms"))
+                "has_symptoms": bool(record.get("symptoms")),
             }
             records_summary.append(summary)
-        
-        standards_text = "\n".join([f"- {k}: {v}" for k, v in quality_standards.items()])
-        records_text = "\n".join([
-            f"Запись {r['record_id']}: {r['record_type']}, полнота {r['completeness']:.1f}%, диагноз: {'есть' if r['has_diagnosis'] else 'нет'}"
-            for r in records_summary
-        ])
-        
+
+        standards_text = "\n".join(
+            [f"- {k}: {v}" for k, v in quality_standards.items()]
+        )
+        records_text = "\n".join(
+            [
+                f"Запись {r['record_id']}: {r['record_type']}, полнота {r['completeness']:.1f}%, диагноз: {'есть' if r['has_diagnosis'] else 'нет'}"
+                for r in records_summary
+            ]
+        )
+
         prompt = f"""
         Проанализируйте качество медицинской документации на соответствие стандартам:
         
@@ -3881,51 +4059,62 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по качеству медицинской документации с экспертизой в аудите и улучшении медицинских записей.
         Анализируете документацию на соответствие медицинским стандартам, нормативным требованиям и лучшим практикам.
         Выявляете проблемы качества и предоставляете практические рекомендации по улучшению.
         Обеспечиваете соблюдение требований безопасности пациентов и правовых норм.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def detect_documentation_gaps(self, patient_record: Dict[str, Any], required_fields: List[str]) -> Dict[str, Any]:
+
+    async def detect_documentation_gaps(
+        self, patient_record: Dict[str, Any], required_fields: List[str]
+    ) -> Dict[str, Any]:
         """Выявление пробелов в медицинской документации"""
         record_fields = list(patient_record.keys())
-        missing_fields = [field for field in required_fields if field not in patient_record or not patient_record.get(field)]
-        present_fields = [field for field in required_fields if field in patient_record and patient_record.get(field)]
-        
+        missing_fields = [
+            field
+            for field in required_fields
+            if field not in patient_record or not patient_record.get(field)
+        ]
+        present_fields = [
+            field
+            for field in required_fields
+            if field in patient_record and patient_record.get(field)
+        ]
+
         record_summary = {
             "total_fields": len(patient_record),
             "required_fields": len(required_fields),
             "present_fields": len(present_fields),
             "missing_fields": len(missing_fields),
-            "completeness_percentage": (len(present_fields) / len(required_fields)) * 100 if required_fields else 100
+            "completeness_percentage": (
+                (len(present_fields) / len(required_fields)) * 100
+                if required_fields
+                else 100
+            ),
         }
-        
+
         record_text = json.dumps(patient_record, ensure_ascii=False, indent=2)
         required_text = ", ".join(required_fields)
         missing_text = ", ".join(missing_fields) if missing_fields else "нет"
-        
+
         prompt = f"""
         Выявите пробелы в медицинской документации пациента:
         
@@ -4013,38 +4202,37 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы специалист по анализу медицинской документации с экспертизой в выявлении пробелов и недостатков.
         Систематически анализируете медицинские записи на полноту, точность и соответствие требованиям.
         Выявляете критические пробелы, влияющие на безопасность пациентов и качество помощи.
         Предоставляете практические рекомендации по устранению недостатков документации.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def suggest_documentation_improvements(self, record_analysis: Dict[str, Any], best_practices: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def suggest_documentation_improvements(
+        self, record_analysis: Dict[str, Any], best_practices: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Предложение улучшений для медицинской документации"""
         analysis_text = json.dumps(record_analysis, ensure_ascii=False, indent=2)
         practices_text = json.dumps(best_practices, ensure_ascii=False, indent=2)
-        
+
         prompt = f"""
         На основе анализа медицинской документации предложите улучшения:
         
@@ -4184,38 +4372,39 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы консультант по улучшению качества медицинской документации с экспертизой в оптимизации процессов и внедрении лучших практик.
         Разрабатываете комплексные стратегии улучшения документации, учитывающие клинические, технологические и регулятивные аспекты.
         Предоставляете практические, реализуемые рекомендации с четкими планами внедрения и показателями успеха.
         Обеспечиваете соответствие международным стандартам качества и безопасности пациентов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def validate_clinical_consistency(self, diagnosis: str, symptoms: List[str], treatment: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def validate_clinical_consistency(
+        self, diagnosis: str, symptoms: List[str], treatment: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Валидация клинической согласованности диагноза, симптомов и лечения"""
         symptoms_text = ", ".join(symptoms) if symptoms else "не указаны"
-        treatment_text = json.dumps(treatment, ensure_ascii=False) if treatment else "не указано"
-        
+        treatment_text = (
+            json.dumps(treatment, ensure_ascii=False) if treatment else "не указано"
+        )
+
         prompt = f"""
         Проверьте клиническую согласованность диагноза, симптомов и лечения:
         
@@ -4308,42 +4497,43 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы клинический эксперт с глубокими знаниями в области диагностики и лечения заболеваний.
         Анализируете клиническую согласованность диагнозов, симптомов и назначенного лечения.
         Используете принципы доказательной медицины и современные клинические рекомендации.
         Выявляете потенциальные проблемы безопасности и качества медицинской помощи.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=3500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=3500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def audit_prescription_safety(self, prescriptions: List[Dict], patient_profile: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def audit_prescription_safety(
+        self, prescriptions: List[Dict], patient_profile: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Аудит безопасности назначений и рецептов"""
-        prescriptions_text = "\n".join([
-            f"- {p.get('medication', 'не указано')}: {p.get('dosage', 'не указано')}, {p.get('frequency', 'не указано')}, {p.get('duration', 'не указано')}"
-            for p in prescriptions[:10]  # Ограничиваем для анализа
-        ])
-        
+        prescriptions_text = "\n".join(
+            [
+                f"- {p.get('medication', 'не указано')}: {p.get('dosage', 'не указано')}, {p.get('frequency', 'не указано')}, {p.get('duration', 'не указано')}"
+                for p in prescriptions[:10]  # Ограничиваем для анализа
+            ]
+        )
+
         patient_text = json.dumps(patient_profile, ensure_ascii=False, indent=2)
-        
+
         prompt = f"""
         Проведите аудит безопасности назначений и рецептов:
         
@@ -4476,56 +4666,67 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы клинический фармаколог с экспертизой в области безопасности лекарственных средств и рационального назначения.
         Проводите комплексный аудит назначений на предмет безопасности, эффективности и соответствия стандартам.
         Анализируете лекарственные взаимодействия, противопоказания и индивидуальные факторы риска пациента.
         Предоставляете практические рекомендации по оптимизации фармакотерапии и обеспечению безопасности пациентов.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
 
-    async def analyze_medical_trends(self, medical_data: List[Dict], time_period: str, analysis_type: str) -> Dict[str, Any]:
+    async def analyze_medical_trends(
+        self, medical_data: List[Dict], time_period: str, analysis_type: str
+    ) -> Dict[str, Any]:
         """Анализ медицинских трендов и паттернов в данных"""
         # Ограничиваем данные для анализа
         data_sample = medical_data[:100] if len(medical_data) > 100 else medical_data
-        
+
         # Подготавливаем сводку данных
         data_summary = {
             "total_records": len(medical_data),
             "sample_size": len(data_sample),
             "time_period": time_period,
             "analysis_type": analysis_type,
-            "data_types": list(set([record.get("type", "unknown") for record in data_sample])),
+            "data_types": list(
+                set([record.get("type", "unknown") for record in data_sample])
+            ),
             "date_range": {
-                "start": min([record.get("date", "2024-01-01") for record in data_sample]) if data_sample else "N/A",
-                "end": max([record.get("date", "2024-01-01") for record in data_sample]) if data_sample else "N/A"
-            }
+                "start": (
+                    min([record.get("date", "2024-01-01") for record in data_sample])
+                    if data_sample
+                    else "N/A"
+                ),
+                "end": (
+                    max([record.get("date", "2024-01-01") for record in data_sample])
+                    if data_sample
+                    else "N/A"
+                ),
+            },
         }
-        
-        sample_data_text = "\n".join([
-            f"- {record.get('type', 'unknown')}: {record.get('diagnosis', 'N/A')} ({record.get('date', 'N/A')})"
-            for record in data_sample[:20]  # Показываем только первые 20 записей
-        ])
-        
+
+        sample_data_text = "\n".join(
+            [
+                f"- {record.get('type', 'unknown')}: {record.get('diagnosis', 'N/A')} ({record.get('date', 'N/A')})"
+                for record in data_sample[:20]  # Показываем только первые 20 записей
+            ]
+        )
+
         prompt = f"""
         Проанализируйте медицинские тренды и паттерны в предоставленных данных:
         
@@ -4673,52 +4874,59 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы эксперт по медицинской аналитике и анализу данных с глубокими знаниями в области эпидемиологии, биостатистики и здравоохранения.
         Анализируете медицинские тренды, выявляете паттерны и предоставляете практические инсайты для улучшения качества медицинской помощи.
         Используете современные методы анализа данных и машинного обучения для выявления скрытых закономерностей.
         Предоставляете статистически обоснованные выводы с учетом клинической значимости.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def detect_anomalies(self, dataset: List[Dict], baseline_data: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def detect_anomalies(
+        self, dataset: List[Dict], baseline_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Выявление аномалий в медицинских данных"""
         # Ограничиваем данные для анализа
         data_sample = dataset[:50] if len(dataset) > 50 else dataset
-        
+
         dataset_summary = {
             "total_records": len(dataset),
             "sample_size": len(data_sample),
-            "data_fields": list(set().union(*[record.keys() for record in data_sample])) if data_sample else [],
-            "record_types": list(set([record.get("type", "unknown") for record in data_sample]))
+            "data_fields": (
+                list(set().union(*[record.keys() for record in data_sample]))
+                if data_sample
+                else []
+            ),
+            "record_types": list(
+                set([record.get("type", "unknown") for record in data_sample])
+            ),
         }
-        
-        sample_text = "\n".join([
-            f"- Record {i+1}: {json.dumps(record, ensure_ascii=False)}"
-            for i, record in enumerate(data_sample[:10])
-        ])
-        
+
+        sample_text = "\n".join(
+            [
+                f"- Record {i+1}: {json.dumps(record, ensure_ascii=False)}"
+                for i, record in enumerate(data_sample[:10])
+            ]
+        )
+
         baseline_text = json.dumps(baseline_data, ensure_ascii=False, indent=2)
-        
+
         prompt = f"""
         Выявите аномалии в медицинских данных по сравнению с базовыми показателями:
         
@@ -4868,51 +5076,64 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы специалист по выявлению аномалий в медицинских данных с экспертизой в области статистического анализа и машинного обучения.
         Анализируете медицинские данные для выявления отклонений от нормы, статистических выбросов и необычных паттернов.
         Оцениваете клиническую значимость аномалий и их влияние на безопасность пациентов и качество медицинской помощи.
         Предоставляете практические рекомендации по корректирующим действиям и предотвращению аномалий.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.1,
-            max_tokens=4000
+            prompt=prompt, system_prompt=system_prompt, temperature=0.1, max_tokens=4000
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def predict_outcomes(self, patient_data: Dict[str, Any], historical_outcomes: List[Dict]) -> Dict[str, Any]:
+
+    async def predict_outcomes(
+        self, patient_data: Dict[str, Any], historical_outcomes: List[Dict]
+    ) -> Dict[str, Any]:
         """Прогнозирование медицинских исходов на основе данных"""
         patient_text = json.dumps(patient_data, ensure_ascii=False, indent=2)
-        
+
         # Ограничиваем исторические данные
-        outcomes_sample = historical_outcomes[:30] if len(historical_outcomes) > 30 else historical_outcomes
+        outcomes_sample = (
+            historical_outcomes[:30]
+            if len(historical_outcomes) > 30
+            else historical_outcomes
+        )
         outcomes_summary = {
             "total_cases": len(historical_outcomes),
             "sample_size": len(outcomes_sample),
-            "outcome_types": list(set([outcome.get("result", "unknown") for outcome in outcomes_sample])),
-            "success_rate": len([o for o in outcomes_sample if o.get("result") == "success"]) / len(outcomes_sample) * 100 if outcomes_sample else 0
+            "outcome_types": list(
+                set([outcome.get("result", "unknown") for outcome in outcomes_sample])
+            ),
+            "success_rate": (
+                len([o for o in outcomes_sample if o.get("result") == "success"])
+                / len(outcomes_sample)
+                * 100
+                if outcomes_sample
+                else 0
+            ),
         }
-        
-        outcomes_text = "\n".join([
-            f"- Case {i+1}: {outcome.get('condition', 'N/A')} → {outcome.get('result', 'N/A')} (duration: {outcome.get('duration', 'N/A')})"
-            for i, outcome in enumerate(outcomes_sample[:15])
-        ])
-        
+
+        outcomes_text = "\n".join(
+            [
+                f"- Case {i+1}: {outcome.get('condition', 'N/A')} → {outcome.get('result', 'N/A')} (duration: {outcome.get('duration', 'N/A')})"
+                for i, outcome in enumerate(outcomes_sample[:15])
+            ]
+        )
+
         prompt = f"""
         Спрогнозируйте медицинские исходы для пациента на основе исторических данных:
         
@@ -5098,37 +5319,36 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы эксперт по прогнозированию медицинских исходов с глубокими знаниями в области клинической медицины, биостатистики и прогностического моделирования.
         Анализируете данные пациентов и исторические исходы для создания точных и клинически значимых прогнозов.
         Учитываете множественные факторы риска, коморбидности и индивидуальные особенности пациентов.
         Предоставляете вероятностные оценки с указанием уровня уверенности и клинических рекомендаций.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def generate_insights_report(self, analytics_data: Dict[str, Any], report_type: str) -> Dict[str, Any]:
+
+    async def generate_insights_report(
+        self, analytics_data: Dict[str, Any], report_type: str
+    ) -> Dict[str, Any]:
         """Генерация отчета с аналитическими инсайтами"""
         analytics_text = json.dumps(analytics_data, ensure_ascii=False, indent=2)
-        
+
         prompt = f"""
         Сгенерируйте комплексный отчет с аналитическими инсайтами на основе предоставленных данных:
         
@@ -5358,56 +5578,61 @@ class OpenAIProvider(BaseAIProvider):
             }}
         }}
         """
-        
+
         system_prompt = """Вы эксперт по созданию аналитических отчетов в здравоохранении с глубокими знаниями в области медицинской аналитики, управления качеством и стратегического планирования.
         Создаете комплексные, структурированные отчеты с практическими инсайтами и рекомендациями для руководства медицинских учреждений.
         Анализируете данные с точки зрения клинической эффективности, операционной эффективности и финансовой устойчивости.
         Предоставляете четкие, обоснованные выводы с указанием уровня уверенности и практических шагов для внедрения.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }
-    
-    async def identify_risk_patterns(self, population_data: List[Dict], risk_factors: List[str]) -> Dict[str, Any]:
+
+    async def identify_risk_patterns(
+        self, population_data: List[Dict], risk_factors: List[str]
+    ) -> Dict[str, Any]:
         """Выявление паттернов рисков в популяционных данных"""
         # Ограничиваем данные для анализа
-        data_sample = population_data[:100] if len(population_data) > 100 else population_data
-        
+        data_sample = (
+            population_data[:100] if len(population_data) > 100 else population_data
+        )
+
         population_summary = {
             "total_population": len(population_data),
             "sample_size": len(data_sample),
-            "age_groups": list(set([p.get("age_group", "unknown") for p in data_sample])),
+            "age_groups": list(
+                set([p.get("age_group", "unknown") for p in data_sample])
+            ),
             "gender_distribution": {
                 "male": len([p for p in data_sample if p.get("gender") == "male"]),
-                "female": len([p for p in data_sample if p.get("gender") == "female"])
+                "female": len([p for p in data_sample if p.get("gender") == "female"]),
             },
-            "risk_factors_analyzed": risk_factors
+            "risk_factors_analyzed": risk_factors,
         }
-        
-        sample_text = "\n".join([
-            f"- Patient {i+1}: Age {p.get('age', 'N/A')}, Gender {p.get('gender', 'N/A')}, Conditions: {p.get('conditions', [])}"
-            for i, p in enumerate(data_sample[:15])
-        ])
-        
+
+        sample_text = "\n".join(
+            [
+                f"- Patient {i+1}: Age {p.get('age', 'N/A')}, Gender {p.get('gender', 'N/A')}, Conditions: {p.get('conditions', [])}"
+                for i, p in enumerate(data_sample[:15])
+            ]
+        )
+
         risk_factors_text = ", ".join(risk_factors)
-        
+
         prompt = f"""
         Выявите паттерны рисков в популяционных медицинских данных:
         
@@ -5605,29 +5830,26 @@ class OpenAIProvider(BaseAIProvider):
             ]
         }}
         """
-        
+
         system_prompt = """Вы эксперт по эпидемиологии и анализу рисков в здравоохранении с глубокими знаниями в области популяционной медицины, биостатистики и общественного здравоохранения.
         Анализируете популяционные данные для выявления паттернов рисков, факторов риска и разработки стратегий профилактики.
         Используете современные методы анализа данных и машинного обучения для выявления скрытых закономерностей в здоровье популяций.
         Предоставляете практические рекомендации по вмешательствам на популяционном уровне и политике здравоохранения.
         Ответы даете только в формате JSON."""
-        
+
         request = AIRequest(
-            prompt=prompt,
-            system_prompt=system_prompt,
-            temperature=0.2,
-            max_tokens=4500
+            prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4500
         )
-        
+
         response = await self.generate(request)
-        
+
         if response.error:
             return {"error": response.error}
-        
+
         try:
             return json.loads(response.content)
         except:
             return {
                 "error": "Не удалось разобрать ответ AI",
-                "raw_response": response.content
+                "raw_response": response.content,
             }

@@ -2,18 +2,20 @@
 Расширенный сервис для Email и SMS уведомлений
 Поддержка HTML шаблонов, массовых рассылок и аналитики
 """
+
 import asyncio
+import json
 import logging
 import smtplib
 import ssl
 from datetime import datetime, timedelta
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 from typing import Any, Dict, List, Optional, Tuple
-from jinja2 import Template, Environment, FileSystemLoader
+
 import requests
-import json
+from jinja2 import Environment, FileSystemLoader, Template
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -21,6 +23,7 @@ from app.crud import notification as crud_notification
 from app.models.notification import NotificationHistory
 
 logger = logging.getLogger(__name__)
+
 
 class EmailSMSEnhancedService:
     """Расширенный сервис для Email и SMS уведомлений"""
@@ -32,25 +35,24 @@ class EmailSMSEnhancedService:
         self.smtp_username = getattr(settings, "SMTP_USERNAME", None)
         self.smtp_password = getattr(settings, "SMTP_PASSWORD", None)
         self.smtp_use_tls = getattr(settings, "SMTP_USE_TLS", True)
-        
+
         # SMS настройки
         self.sms_api_key = getattr(settings, "SMS_API_KEY", None)
         self.sms_api_url = getattr(settings, "SMS_API_URL", None)
         self.sms_sender = getattr(settings, "SMS_SENDER", "Clinic")
-        
+
         # Шаблоны
         self.template_env = Environment(
-            loader=FileSystemLoader('templates/email'),
-            autoescape=True
+            loader=FileSystemLoader('templates/email'), autoescape=True
         )
-        
+
         # Статистика
         self.stats = {
             'emails_sent': 0,
             'emails_failed': 0,
             'sms_sent': 0,
             'sms_failed': 0,
-            'last_reset': datetime.now()
+            'last_reset': datetime.now(),
         }
 
     async def send_email_enhanced(
@@ -62,7 +64,7 @@ class EmailSMSEnhancedService:
         html_content: str = None,
         text_content: str = None,
         attachments: List[Dict[str, Any]] = None,
-        priority: str = "normal"
+        priority: str = "normal",
     ) -> Tuple[bool, str]:
         """Расширенная отправка email с поддержкой шаблонов"""
         try:
@@ -124,7 +126,7 @@ class EmailSMSEnhancedService:
         template_name: str = None,
         template_data: Dict[str, Any] = None,
         sender: str = None,
-        priority: str = "normal"
+        priority: str = "normal",
     ) -> Tuple[bool, str]:
         """Расширенная отправка SMS с поддержкой шаблонов"""
         try:
@@ -144,7 +146,7 @@ class EmailSMSEnhancedService:
                 "phone": self._format_phone(phone),
                 "message": message,
                 "sender": sender or self.sms_sender,
-                "priority": priority
+                "priority": priority,
             }
 
             # Отправляем SMS
@@ -152,7 +154,7 @@ class EmailSMSEnhancedService:
                 self.sms_api_url,
                 json=data,
                 timeout=30,
-                headers={'Content-Type': 'application/json'}
+                headers={'Content-Type': 'application/json'},
             )
             response.raise_for_status()
 
@@ -181,20 +183,15 @@ class EmailSMSEnhancedService:
         html_content: str = None,
         text_content: str = None,
         batch_size: int = 50,
-        delay_between_batches: float = 1.0
+        delay_between_batches: float = 1.0,
     ) -> Dict[str, Any]:
         """Массовая отправка email"""
-        results = {
-            'total': len(recipients),
-            'sent': 0,
-            'failed': 0,
-            'errors': []
-        }
+        results = {'total': len(recipients), 'sent': 0, 'failed': 0, 'errors': []}
 
         # Разбиваем на батчи
         for i in range(0, len(recipients), batch_size):
-            batch = recipients[i:i + batch_size]
-            
+            batch = recipients[i : i + batch_size]
+
             # Отправляем батч
             tasks = []
             for recipient in batch:
@@ -202,25 +199,31 @@ class EmailSMSEnhancedService:
                     to_email=recipient['email'],
                     subject=subject,
                     template_name=template_name,
-                    template_data={**template_data, **recipient} if template_data else recipient,
+                    template_data=(
+                        {**template_data, **recipient} if template_data else recipient
+                    ),
                     html_content=html_content,
-                    text_content=text_content
+                    text_content=text_content,
                 )
                 tasks.append(task)
 
             # Ждем завершения батча
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Обрабатываем результаты
             for j, result in enumerate(batch_results):
                 if isinstance(result, Exception):
                     results['failed'] += 1
-                    results['errors'].append(f"Ошибка для {batch[j]['email']}: {str(result)}")
+                    results['errors'].append(
+                        f"Ошибка для {batch[j]['email']}: {str(result)}"
+                    )
                 elif result[0]:  # success
                     results['sent'] += 1
                 else:
                     results['failed'] += 1
-                    results['errors'].append(f"Ошибка для {batch[j]['email']}: {result[1]}")
+                    results['errors'].append(
+                        f"Ошибка для {batch[j]['email']}: {result[1]}"
+                    )
 
             # Задержка между батчами
             if i + batch_size < len(recipients):
@@ -235,20 +238,15 @@ class EmailSMSEnhancedService:
         template_name: str = None,
         template_data: Dict[str, Any] = None,
         batch_size: int = 100,
-        delay_between_batches: float = 0.5
+        delay_between_batches: float = 0.5,
     ) -> Dict[str, Any]:
         """Массовая отправка SMS"""
-        results = {
-            'total': len(recipients),
-            'sent': 0,
-            'failed': 0,
-            'errors': []
-        }
+        results = {'total': len(recipients), 'sent': 0, 'failed': 0, 'errors': []}
 
         # Разбиваем на батчи
         for i in range(0, len(recipients), batch_size):
-            batch = recipients[i:i + batch_size]
-            
+            batch = recipients[i : i + batch_size]
+
             # Отправляем батч
             tasks = []
             for recipient in batch:
@@ -256,23 +254,29 @@ class EmailSMSEnhancedService:
                     phone=recipient['phone'],
                     message=message,
                     template_name=template_name,
-                    template_data={**template_data, **recipient} if template_data else recipient
+                    template_data=(
+                        {**template_data, **recipient} if template_data else recipient
+                    ),
                 )
                 tasks.append(task)
 
             # Ждем завершения батча
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             # Обрабатываем результаты
             for j, result in enumerate(batch_results):
                 if isinstance(result, Exception):
                     results['failed'] += 1
-                    results['errors'].append(f"Ошибка для {batch[j]['phone']}: {str(result)}")
+                    results['errors'].append(
+                        f"Ошибка для {batch[j]['phone']}: {str(result)}"
+                    )
                 elif result[0]:  # success
                     results['sent'] += 1
                 else:
                     results['failed'] += 1
-                    results['errors'].append(f"Ошибка для {batch[j]['phone']}: {result[1]}")
+                    results['errors'].append(
+                        f"Ошибка для {batch[j]['phone']}: {result[1]}"
+                    )
 
             # Задержка между батчами
             if i + batch_size < len(recipients):
@@ -285,7 +289,7 @@ class EmailSMSEnhancedService:
         patient_data: Dict[str, Any],
         appointment_data: Dict[str, Any],
         channels: List[str] = None,
-        template_data: Dict[str, Any] = None
+        template_data: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """Расширенное напоминание о записи"""
         if channels is None:
@@ -295,24 +299,26 @@ class EmailSMSEnhancedService:
             'patient_id': patient_data.get('id'),
             'appointment_id': appointment_data.get('id'),
             'channels': {},
-            'success': True
+            'success': True,
         }
 
         # Подготавливаем данные для шаблона
         template_data = template_data or {}
-        template_data.update({
-            'patient_name': patient_data.get('full_name', 'Пациент'),
-            'patient_phone': patient_data.get('phone', ''),
-            'patient_email': patient_data.get('email', ''),
-            'doctor_name': appointment_data.get('doctor_name', 'Врач'),
-            'specialty': appointment_data.get('specialty', 'Специалист'),
-            'appointment_date': appointment_data.get('date', ''),
-            'appointment_time': appointment_data.get('time', ''),
-            'cabinet': appointment_data.get('cabinet', 'Уточните в регистратуре'),
-            'clinic_name': 'Programma Clinic',
-            'clinic_address': 'г. Ташкент, ул. Медицинская, 15',
-            'clinic_phone': '+998 71 123-45-67'
-        })
+        template_data.update(
+            {
+                'patient_name': patient_data.get('full_name', 'Пациент'),
+                'patient_phone': patient_data.get('phone', ''),
+                'patient_email': patient_data.get('email', ''),
+                'doctor_name': appointment_data.get('doctor_name', 'Врач'),
+                'specialty': appointment_data.get('specialty', 'Специалист'),
+                'appointment_date': appointment_data.get('date', ''),
+                'appointment_time': appointment_data.get('time', ''),
+                'cabinet': appointment_data.get('cabinet', 'Уточните в регистратуре'),
+                'clinic_name': 'Programma Clinic',
+                'clinic_address': 'г. Ташкент, ул. Медицинская, 15',
+                'clinic_phone': '+998 71 123-45-67',
+            }
+        )
 
         # Отправляем по каналам
         for channel in channels:
@@ -321,22 +327,21 @@ class EmailSMSEnhancedService:
                     to_email=patient_data['email'],
                     subject=f"Напоминание о записи - {template_data['appointment_date']}",
                     template_name='appointment_reminder',
-                    template_data=template_data
+                    template_data=template_data,
                 )
                 results['channels']['email'] = {'success': success, 'message': message}
-            
+
             elif channel == 'sms' and patient_data.get('phone'):
                 success, message = await self.send_sms_enhanced(
                     phone=patient_data['phone'],
                     template_name='appointment_reminder_sms',
-                    template_data=template_data
+                    template_data=template_data,
                 )
                 results['channels']['sms'] = {'success': success, 'message': message}
 
         # Определяем общий успех
         results['success'] = all(
-            result.get('success', False) 
-            for result in results['channels'].values()
+            result.get('success', False) for result in results['channels'].values()
         )
 
         return results
@@ -346,7 +351,7 @@ class EmailSMSEnhancedService:
         patient_data: Dict[str, Any],
         lab_data: Dict[str, Any],
         channels: List[str] = None,
-        template_data: Dict[str, Any] = None
+        template_data: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """Расширенная отправка результатов анализов"""
         if channels is None:
@@ -356,23 +361,25 @@ class EmailSMSEnhancedService:
             'patient_id': patient_data.get('id'),
             'lab_results_id': lab_data.get('id'),
             'channels': {},
-            'success': True
+            'success': True,
         }
 
         # Подготавливаем данные для шаблона
         template_data = template_data or {}
-        template_data.update({
-            'patient_name': patient_data.get('full_name', 'Пациент'),
-            'patient_phone': patient_data.get('phone', ''),
-            'patient_email': patient_data.get('email', ''),
-            'test_type': lab_data.get('test_type', 'Лабораторное исследование'),
-            'collection_date': lab_data.get('collection_date', ''),
-            'ready_date': datetime.now().strftime('%d.%m.%Y'),
-            'has_abnormalities': lab_data.get('has_abnormalities', False),
-            'download_link': f"https://clinic.example.com/lab-results/{patient_data.get('id')}",
-            'clinic_name': 'Programma Clinic',
-            'clinic_phone': '+998 71 123-45-67'
-        })
+        template_data.update(
+            {
+                'patient_name': patient_data.get('full_name', 'Пациент'),
+                'patient_phone': patient_data.get('phone', ''),
+                'patient_email': patient_data.get('email', ''),
+                'test_type': lab_data.get('test_type', 'Лабораторное исследование'),
+                'collection_date': lab_data.get('collection_date', ''),
+                'ready_date': datetime.now().strftime('%d.%m.%Y'),
+                'has_abnormalities': lab_data.get('has_abnormalities', False),
+                'download_link': f"https://clinic.example.com/lab-results/{patient_data.get('id')}",
+                'clinic_name': 'Programma Clinic',
+                'clinic_phone': '+998 71 123-45-67',
+            }
+        )
 
         # Отправляем по каналам
         for channel in channels:
@@ -381,22 +388,21 @@ class EmailSMSEnhancedService:
                     to_email=patient_data['email'],
                     subject=f"Результаты анализов готовы - {template_data['ready_date']}",
                     template_name='lab_results_ready',
-                    template_data=template_data
+                    template_data=template_data,
                 )
                 results['channels']['email'] = {'success': success, 'message': message}
-            
+
             elif channel == 'sms' and patient_data.get('phone'):
                 success, message = await self.send_sms_enhanced(
                     phone=patient_data['phone'],
                     template_name='lab_results_ready_sms',
-                    template_data=template_data
+                    template_data=template_data,
                 )
                 results['channels']['sms'] = {'success': success, 'message': message}
 
         # Определяем общий успех
         results['success'] = all(
-            result.get('success', False) 
-            for result in results['channels'].values()
+            result.get('success', False) for result in results['channels'].values()
         )
 
         return results
@@ -406,7 +412,7 @@ class EmailSMSEnhancedService:
         patient_data: Dict[str, Any],
         payment_data: Dict[str, Any],
         channels: List[str] = None,
-        template_data: Dict[str, Any] = None
+        template_data: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """Расширенное подтверждение платежа"""
         if channels is None:
@@ -416,25 +422,27 @@ class EmailSMSEnhancedService:
             'patient_id': patient_data.get('id'),
             'payment_id': payment_data.get('id'),
             'channels': {},
-            'success': True
+            'success': True,
         }
 
         # Подготавливаем данные для шаблона
         template_data = template_data or {}
-        template_data.update({
-            'patient_name': patient_data.get('full_name', 'Пациент'),
-            'patient_phone': patient_data.get('phone', ''),
-            'patient_email': patient_data.get('email', ''),
-            'amount': payment_data.get('amount', 0),
-            'currency': payment_data.get('currency', 'UZS'),
-            'formatted_amount': f"{payment_data.get('amount', 0):,.0f} {payment_data.get('currency', 'UZS')}",
-            'payment_method': payment_data.get('payment_method', 'Карта'),
-            'payment_date': datetime.now().strftime('%d.%m.%Y %H:%M'),
-            'transaction_id': payment_data.get('transaction_id', ''),
-            'receipt_link': f"https://clinic.example.com/receipt/{payment_data.get('transaction_id')}",
-            'clinic_name': 'Programma Clinic',
-            'clinic_phone': '+998 71 123-45-67'
-        })
+        template_data.update(
+            {
+                'patient_name': patient_data.get('full_name', 'Пациент'),
+                'patient_phone': patient_data.get('phone', ''),
+                'patient_email': patient_data.get('email', ''),
+                'amount': payment_data.get('amount', 0),
+                'currency': payment_data.get('currency', 'UZS'),
+                'formatted_amount': f"{payment_data.get('amount', 0):,.0f} {payment_data.get('currency', 'UZS')}",
+                'payment_method': payment_data.get('payment_method', 'Карта'),
+                'payment_date': datetime.now().strftime('%d.%m.%Y %H:%M'),
+                'transaction_id': payment_data.get('transaction_id', ''),
+                'receipt_link': f"https://clinic.example.com/receipt/{payment_data.get('transaction_id')}",
+                'clinic_name': 'Programma Clinic',
+                'clinic_phone': '+998 71 123-45-67',
+            }
+        )
 
         # Отправляем по каналам
         for channel in channels:
@@ -443,41 +451,38 @@ class EmailSMSEnhancedService:
                     to_email=patient_data['email'],
                     subject=f"Подтверждение платежа - {template_data['formatted_amount']}",
                     template_name='payment_confirmation',
-                    template_data=template_data
+                    template_data=template_data,
                 )
                 results['channels']['email'] = {'success': success, 'message': message}
-            
+
             elif channel == 'sms' and patient_data.get('phone'):
                 success, message = await self.send_sms_enhanced(
                     phone=patient_data['phone'],
                     template_name='payment_confirmation_sms',
-                    template_data=template_data
+                    template_data=template_data,
                 )
                 results['channels']['sms'] = {'success': success, 'message': message}
 
         # Определяем общий успех
         results['success'] = all(
-            result.get('success', False) 
-            for result in results['channels'].values()
+            result.get('success', False) for result in results['channels'].values()
         )
 
         return results
 
     async def _render_email_template(
-        self, 
-        template_name: str, 
-        template_data: Dict[str, Any]
+        self, template_name: str, template_data: Dict[str, Any]
     ) -> Tuple[str, str]:
         """Рендеринг HTML и текстового шаблона email"""
         try:
             # HTML шаблон
             html_template = self.template_env.get_template(f"{template_name}.html")
             html_content = html_template.render(**template_data)
-            
+
             # Текстовый шаблон
             text_template = self.template_env.get_template(f"{template_name}.txt")
             text_content = text_template.render(**template_data)
-            
+
             return html_content, text_content
         except Exception as e:
             logger.error(f"Ошибка рендеринга email шаблона {template_name}: {e}")
@@ -485,9 +490,7 @@ class EmailSMSEnhancedService:
             return self._get_basic_email_template(template_data)
 
     async def _render_sms_template(
-        self, 
-        template_name: str, 
-        template_data: Dict[str, Any]
+        self, template_name: str, template_data: Dict[str, Any]
     ) -> str:
         """Рендеринг SMS шаблона"""
         try:
@@ -502,7 +505,7 @@ class EmailSMSEnhancedService:
         """Форматирование номера телефона"""
         # Убираем все нецифровые символы
         phone = ''.join(filter(str.isdigit, phone))
-        
+
         # Добавляем код страны если нужно
         if phone.startswith('998'):
             return f"+{phone}"
@@ -510,7 +513,7 @@ class EmailSMSEnhancedService:
             return f"+998{phone}"
         elif not phone.startswith('+'):
             return f"+{phone}"
-        
+
         return phone
 
     async def _add_attachment(self, msg: MIMEMultipart, attachment: Dict[str, Any]):
@@ -520,8 +523,10 @@ class EmailSMSEnhancedService:
                 with open(attachment['path'], 'rb') as f:
                     img_data = f.read()
                 image = MIMEImage(img_data)
-                image.add_header('Content-Disposition', 
-                               f'attachment; filename={attachment["filename"]}')
+                image.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename={attachment["filename"]}',
+                )
                 msg.attach(image)
         except Exception as e:
             logger.error(f"Ошибка добавления вложения: {e}")
@@ -550,7 +555,7 @@ class EmailSMSEnhancedService:
         </body>
         </html>
         """
-        
+
         text = f"""
         Programma Clinic
         
@@ -563,7 +568,7 @@ class EmailSMSEnhancedService:
         г. Ташкент, ул. Медицинская, 15
         Телефон: +998 71 123-45-67
         """
-        
+
         return html, text
 
     def _get_basic_sms_template(self, data: Dict[str, Any]) -> str:
@@ -575,15 +580,19 @@ class EmailSMSEnhancedService:
         return {
             **self.stats,
             'email_success_rate': (
-                self.stats['emails_sent'] / 
-                (self.stats['emails_sent'] + self.stats['emails_failed']) * 100
-                if (self.stats['emails_sent'] + self.stats['emails_failed']) > 0 else 0
+                self.stats['emails_sent']
+                / (self.stats['emails_sent'] + self.stats['emails_failed'])
+                * 100
+                if (self.stats['emails_sent'] + self.stats['emails_failed']) > 0
+                else 0
             ),
             'sms_success_rate': (
-                self.stats['sms_sent'] / 
-                (self.stats['sms_sent'] + self.stats['sms_failed']) * 100
-                if (self.stats['sms_sent'] + self.stats['sms_failed']) > 0 else 0
-            )
+                self.stats['sms_sent']
+                / (self.stats['sms_sent'] + self.stats['sms_failed'])
+                * 100
+                if (self.stats['sms_sent'] + self.stats['sms_failed']) > 0
+                else 0
+            ),
         }
 
     def reset_statistics(self):
@@ -593,11 +602,13 @@ class EmailSMSEnhancedService:
             'emails_failed': 0,
             'sms_sent': 0,
             'sms_failed': 0,
-            'last_reset': datetime.now()
+            'last_reset': datetime.now(),
         }
+
 
 # Глобальный экземпляр сервиса
 email_sms_enhanced_service = EmailSMSEnhancedService()
+
 
 def get_email_sms_enhanced_service() -> EmailSMSEnhancedService:
     """Получить экземпляр расширенного Email/SMS сервиса"""

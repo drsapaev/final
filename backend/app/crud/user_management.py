@@ -1,25 +1,44 @@
 """
 CRUD операции для управления пользователями
 """
-from typing import Optional, List, Dict, Any, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, func, text
-from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
+from sqlalchemy import and_, desc, func, or_, text
+from sqlalchemy.orm import Session
+
+from app.crud.base import CRUDBase
+from app.models.role_permission import (
+    Permission,
+    Role,
+    UserGroup,
+    UserPermissionOverride,
+)
 from app.models.user import User
 from app.models.user_profile import (
-    UserProfile, UserPreferences, UserNotificationSettings, UserAuditLog, UserStatus
+    UserAuditLog,
+    UserNotificationSettings,
+    UserPreferences,
+    UserProfile,
+    UserStatus,
 )
-from app.models.role_permission import (
-    Role, Permission, UserGroup, UserPermissionOverride
-)
-from app.crud.base import CRUDBase
 from app.schemas.user_management import (
-    UserCreateRequest, UserUpdateRequest, UserProfileCreate, UserProfileUpdate,
-    UserPreferencesCreate, UserPreferencesUpdate, UserNotificationSettingsCreate,
-    UserNotificationSettingsUpdate, UserRoleCreate, UserRoleUpdate,
-    UserGroupCreate, UserGroupUpdate, UserGroupMemberCreate,
-    UserSearchRequest, UserBulkActionRequest
+    UserBulkActionRequest,
+    UserCreateRequest,
+    UserGroupCreate,
+    UserGroupMemberCreate,
+    UserGroupUpdate,
+    UserNotificationSettingsCreate,
+    UserNotificationSettingsUpdate,
+    UserPreferencesCreate,
+    UserPreferencesUpdate,
+    UserProfileCreate,
+    UserProfileUpdate,
+    UserRoleCreate,
+    UserRoleUpdate,
+    UserSearchRequest,
+    UserUpdateRequest,
 )
 
 
@@ -34,18 +53,21 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
         """Получить профиль по телефону"""
         return db.query(UserProfile).filter(UserProfile.phone == phone).first()
 
-    def get_by_status(self, db: Session, status: UserStatus, limit: int = 100) -> List[UserProfile]:
+    def get_by_status(
+        self, db: Session, status: UserStatus, limit: int = 100
+    ) -> List[UserProfile]:
         """Получить профили по статусу"""
-        return db.query(UserProfile).filter(
-            UserProfile.status == status
-        ).limit(limit).all()
+        return (
+            db.query(UserProfile)
+            .filter(UserProfile.status == status)
+            .limit(limit)
+            .all()
+        )
 
     def get_recent_activity(self, db: Session, hours: int = 24) -> List[UserProfile]:
         """Получить профили с недавней активностью"""
         since = datetime.utcnow() - timedelta(hours=hours)
-        return db.query(UserProfile).filter(
-            UserProfile.last_activity >= since
-        ).all()
+        return db.query(UserProfile).filter(UserProfile.last_activity >= since).all()
 
     def update_status(self, db: Session, user_id: int, status: UserStatus) -> bool:
         """Обновить статус профиля"""
@@ -122,12 +144,16 @@ class CRUDUserProfile(CRUDBase[UserProfile, UserProfileCreate, UserProfileUpdate
         return False
 
 
-class CRUDUserPreferences(CRUDBase[UserPreferences, UserPreferencesCreate, UserPreferencesUpdate]):
+class CRUDUserPreferences(
+    CRUDBase[UserPreferences, UserPreferencesCreate, UserPreferencesUpdate]
+):
     """CRUD операции для настроек пользователей"""
 
     def get_by_user_id(self, db: Session, user_id: int) -> Optional[UserPreferences]:
         """Получить настройки по ID пользователя"""
-        return db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
+        return (
+            db.query(UserPreferences).filter(UserPreferences.user_id == user_id).first()
+        )
 
     def get_by_theme(self, db: Session, theme: str) -> List[UserPreferences]:
         """Получить настройки по теме"""
@@ -135,11 +161,15 @@ class CRUDUserPreferences(CRUDBase[UserPreferences, UserPreferencesCreate, UserP
 
     def get_by_language(self, db: Session, language: str) -> List[UserPreferences]:
         """Получить настройки по языку"""
-        return db.query(UserPreferences).filter(UserPreferences.language == language).all()
+        return (
+            db.query(UserPreferences).filter(UserPreferences.language == language).all()
+        )
 
     def get_by_timezone(self, db: Session, timezone: str) -> List[UserPreferences]:
         """Получить настройки по часовому поясу"""
-        return db.query(UserPreferences).filter(UserPreferences.timezone == timezone).all()
+        return (
+            db.query(UserPreferences).filter(UserPreferences.timezone == timezone).all()
+        )
 
     def update_theme(self, db: Session, user_id: int, theme: str) -> bool:
         """Обновить тему пользователя"""
@@ -169,32 +199,64 @@ class CRUDUserPreferences(CRUDBase[UserPreferences, UserPreferencesCreate, UserP
         return False
 
 
-class CRUDUserNotificationSettings(CRUDBase[UserNotificationSettings, UserNotificationSettingsCreate, UserNotificationSettingsUpdate]):
+class CRUDUserNotificationSettings(
+    CRUDBase[
+        UserNotificationSettings,
+        UserNotificationSettingsCreate,
+        UserNotificationSettingsUpdate,
+    ]
+):
     """CRUD операции для настроек уведомлений пользователей"""
 
-    def get_by_user_id(self, db: Session, user_id: int) -> Optional[UserNotificationSettings]:
+    def get_by_user_id(
+        self, db: Session, user_id: int
+    ) -> Optional[UserNotificationSettings]:
         """Получить настройки уведомлений по ID пользователя"""
-        return db.query(UserNotificationSettings).filter(UserNotificationSettings.user_id == user_id).first()
+        return (
+            db.query(UserNotificationSettings)
+            .filter(UserNotificationSettings.user_id == user_id)
+            .first()
+        )
 
-    def get_users_with_email_notifications(self, db: Session, notification_type: str) -> List[UserNotificationSettings]:
+    def get_users_with_email_notifications(
+        self, db: Session, notification_type: str
+    ) -> List[UserNotificationSettings]:
         """Получить пользователей с включенными email уведомлениями"""
-        return db.query(UserNotificationSettings).filter(
-            getattr(UserNotificationSettings, f"email_{notification_type}") == True
-        ).all()
+        return (
+            db.query(UserNotificationSettings)
+            .filter(
+                getattr(UserNotificationSettings, f"email_{notification_type}") == True
+            )
+            .all()
+        )
 
-    def get_users_with_sms_notifications(self, db: Session, notification_type: str) -> List[UserNotificationSettings]:
+    def get_users_with_sms_notifications(
+        self, db: Session, notification_type: str
+    ) -> List[UserNotificationSettings]:
         """Получить пользователей с включенными SMS уведомлениями"""
-        return db.query(UserNotificationSettings).filter(
-            getattr(UserNotificationSettings, f"sms_{notification_type}") == True
-        ).all()
+        return (
+            db.query(UserNotificationSettings)
+            .filter(
+                getattr(UserNotificationSettings, f"sms_{notification_type}") == True
+            )
+            .all()
+        )
 
-    def get_users_with_push_notifications(self, db: Session, notification_type: str) -> List[UserNotificationSettings]:
+    def get_users_with_push_notifications(
+        self, db: Session, notification_type: str
+    ) -> List[UserNotificationSettings]:
         """Получить пользователей с включенными push уведомлениями"""
-        return db.query(UserNotificationSettings).filter(
-            getattr(UserNotificationSettings, f"push_{notification_type}") == True
-        ).all()
+        return (
+            db.query(UserNotificationSettings)
+            .filter(
+                getattr(UserNotificationSettings, f"push_{notification_type}") == True
+            )
+            .all()
+        )
 
-    def update_notification_setting(self, db: Session, user_id: int, setting_name: str, value: bool) -> bool:
+    def update_notification_setting(
+        self, db: Session, user_id: int, setting_name: str, value: bool
+    ) -> bool:
         """Обновить конкретную настройку уведомлений"""
         settings = self.get_by_user_id(db, user_id)
         if settings and hasattr(settings, setting_name):
@@ -279,7 +341,9 @@ class CRUDUserGroup(CRUDBase[UserGroup, UserGroupCreate, UserGroupUpdate]):
         # Временно отключено - нет таблицы user_group_members в role_permission.py
         return []
 
-    def add_member(self, db: Session, group_id: int, user_id: int, role: str = "member") -> bool:
+    def add_member(
+        self, db: Session, group_id: int, user_id: int, role: str = "member"
+    ) -> bool:
         """Добавить участника в группу"""
         # Временно отключено - нет таблицы user_group_members в role_permission.py
         return True
@@ -289,7 +353,9 @@ class CRUDUserGroup(CRUDBase[UserGroup, UserGroupCreate, UserGroupUpdate]):
         # Временно отключено - нет таблицы user_group_members в role_permission.py
         return True
 
-    def update_member_role(self, db: Session, group_id: int, user_id: int, role: str) -> bool:
+    def update_member_role(
+        self, db: Session, group_id: int, user_id: int, role: str
+    ) -> bool:
         """Обновить роль участника в группе"""
         # Временно отключено - нет таблицы user_group_members в role_permission.py
         return True
@@ -304,54 +370,82 @@ class CRUDUserGroup(CRUDBase[UserGroup, UserGroupCreate, UserGroupUpdate]):
 class CRUDUserAuditLog(CRUDBase[UserAuditLog, None, None]):
     """CRUD операции для аудита пользователей"""
 
-    def get_by_user_id(self, db: Session, user_id: int, limit: int = 100) -> List[UserAuditLog]:
+    def get_by_user_id(
+        self, db: Session, user_id: int, limit: int = 100
+    ) -> List[UserAuditLog]:
         """Получить аудит пользователя"""
-        return db.query(UserAuditLog).filter(
-            UserAuditLog.user_id == user_id
-        ).order_by(desc(UserAuditLog.created_at)).limit(limit).all()
+        return (
+            db.query(UserAuditLog)
+            .filter(UserAuditLog.user_id == user_id)
+            .order_by(desc(UserAuditLog.created_at))
+            .limit(limit)
+            .all()
+        )
 
-    def get_by_action(self, db: Session, action: str, limit: int = 100) -> List[UserAuditLog]:
+    def get_by_action(
+        self, db: Session, action: str, limit: int = 100
+    ) -> List[UserAuditLog]:
         """Получить аудит по действию"""
-        return db.query(UserAuditLog).filter(
-            UserAuditLog.action == action
-        ).order_by(desc(UserAuditLog.created_at)).limit(limit).all()
+        return (
+            db.query(UserAuditLog)
+            .filter(UserAuditLog.action == action)
+            .order_by(desc(UserAuditLog.created_at))
+            .limit(limit)
+            .all()
+        )
 
-    def get_by_resource(self, db: Session, resource_type: str, resource_id: int, limit: int = 100) -> List[UserAuditLog]:
+    def get_by_resource(
+        self, db: Session, resource_type: str, resource_id: int, limit: int = 100
+    ) -> List[UserAuditLog]:
         """Получить аудит по ресурсу"""
-        return db.query(UserAuditLog).filter(
-            and_(UserAuditLog.resource_type == resource_type, UserAuditLog.resource_id == resource_id)
-        ).order_by(desc(UserAuditLog.created_at)).limit(limit).all()
+        return (
+            db.query(UserAuditLog)
+            .filter(
+                and_(
+                    UserAuditLog.resource_type == resource_type,
+                    UserAuditLog.resource_id == resource_id,
+                )
+            )
+            .order_by(desc(UserAuditLog.created_at))
+            .limit(limit)
+            .all()
+        )
 
-    def get_recent_activity(self, db: Session, hours: int = 24, limit: int = 100) -> List[UserAuditLog]:
+    def get_recent_activity(
+        self, db: Session, hours: int = 24, limit: int = 100
+    ) -> List[UserAuditLog]:
         """Получить недавнюю активность"""
         since = datetime.utcnow() - timedelta(hours=hours)
-        return db.query(UserAuditLog).filter(
-            UserAuditLog.created_at >= since
-        ).order_by(desc(UserAuditLog.created_at)).limit(limit).all()
+        return (
+            db.query(UserAuditLog)
+            .filter(UserAuditLog.created_at >= since)
+            .order_by(desc(UserAuditLog.created_at))
+            .limit(limit)
+            .all()
+        )
 
-    def get_user_activity_summary(self, db: Session, user_id: int, days: int = 30) -> Dict[str, int]:
+    def get_user_activity_summary(
+        self, db: Session, user_id: int, days: int = 30
+    ) -> Dict[str, int]:
         """Получить сводку активности пользователя"""
         since = datetime.utcnow() - timedelta(days=days)
-        
+
         # Подсчитываем действия по типам
-        actions = db.query(
-            UserAuditLog.action,
-            func.count(UserAuditLog.id).label('count')
-        ).filter(
-            and_(
-                UserAuditLog.user_id == user_id,
-                UserAuditLog.created_at >= since
+        actions = (
+            db.query(UserAuditLog.action, func.count(UserAuditLog.id).label('count'))
+            .filter(
+                and_(UserAuditLog.user_id == user_id, UserAuditLog.created_at >= since)
             )
-        ).group_by(UserAuditLog.action).all()
-        
+            .group_by(UserAuditLog.action)
+            .all()
+        )
+
         return {action: count for action, count in actions}
 
     def cleanup_old_logs(self, db: Session, days: int = 365) -> int:
         """Очистить старые записи аудита"""
         since = datetime.utcnow() - timedelta(days=days)
-        count = db.query(UserAuditLog).filter(
-            UserAuditLog.created_at < since
-        ).delete()
+        count = db.query(UserAuditLog).filter(UserAuditLog.created_at < since).delete()
         db.commit()
         return count
 
@@ -364,45 +458,60 @@ class CRUDUserExtended(CRUDBase[User, UserCreateRequest, UserUpdateRequest]):
         """Получить пользователя с профилем"""
         return db.query(User).filter(User.id == user_id).first()
 
-    def get_users_by_role(self, db: Session, role: str, skip: int = 0, limit: int = 100) -> List[User]:
+    def get_users_by_role(
+        self, db: Session, role: str, skip: int = 0, limit: int = 100
+    ) -> List[User]:
         """Получить пользователей по роли"""
         return db.query(User).filter(User.role == role).offset(skip).limit(limit).all()
 
-    def get_active_users(self, db: Session, skip: int = 0, limit: int = 100) -> List[User]:
+    def get_active_users(
+        self, db: Session, skip: int = 0, limit: int = 100
+    ) -> List[User]:
         """Получить активных пользователей"""
-        return db.query(User).filter(User.is_active == True).offset(skip).limit(limit).all()
+        return (
+            db.query(User)
+            .filter(User.is_active == True)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     def get_superusers(self, db: Session) -> List[User]:
         """Получить суперпользователей"""
         return db.query(User).filter(User.is_superuser == True).all()
 
-    def search_users(self, db: Session, query: str, skip: int = 0, limit: int = 100) -> List[User]:
+    def search_users(
+        self, db: Session, query: str, skip: int = 0, limit: int = 100
+    ) -> List[User]:
         """Поиск пользователей"""
-        return db.query(User).filter(
-            or_(
-                User.username.ilike(f"%{query}%"),
-                User.email.ilike(f"%{query}%")
+        return (
+            db.query(User)
+            .filter(
+                or_(User.username.ilike(f"%{query}%"), User.email.ilike(f"%{query}%"))
             )
-        ).offset(skip).limit(limit).all()
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     def get_user_statistics(self, db: Session) -> Dict[str, int]:
         """Получить статистику пользователей"""
         total = db.query(User).count()
         active = db.query(User).filter(User.is_active == True).count()
         superusers = db.query(User).filter(User.is_superuser == True).count()
-        
+
         # Статистика по ролям
         roles_stats = {}
         for role in ["Admin", "Doctor", "Nurse", "Receptionist", "Patient"]:
             count = db.query(User).filter(User.role == role).count()
             roles_stats[role] = count
-        
+
         return {
             "total": total,
             "active": active,
             "inactive": total - active,
             "superusers": superusers,
-            "by_role": roles_stats
+            "by_role": roles_stats,
         }
 
     def deactivate_user(self, db: Session, user_id: int) -> bool:
@@ -438,4 +547,3 @@ user_group = CRUDUserGroup(UserGroup)
 # user_group_member временно отключен
 user_audit_log = CRUDUserAuditLog(UserAuditLog)
 user_extended = CRUDUserExtended(User)
-

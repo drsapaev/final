@@ -1,7 +1,8 @@
 """
 Service code normalization utilities
 """
-from typing import Dict, Any
+
+from typing import Any, Dict
 
 
 def normalize_service_code(code: str) -> str:
@@ -44,7 +45,7 @@ def normalize_service_code(code: str) -> str:
 def get_service_code(service_data: Dict[str, Any]) -> str:
     """
     Извлекает код услуги из различных полей
-    
+
     ВАЖНО: Для формата 'K01', 'D01', 'L01' (SSOT формат из БД) сохраняет регистр.
     Для других форматов нормализует к нижнему регистру.
 
@@ -70,22 +71,23 @@ def get_service_code(service_data: Dict[str, Any]) -> str:
     service_code = service_data.get("service_code")
     code = service_data.get("code")
     category_code = service_data.get("category_code")
-    
+
     # Если есть service_code в формате SSOT (K01, D01, L01 и т.д.), возвращаем как есть
     if service_code:
         # ✅ ИСПРАВЛЕНО Bug 2: Проверяем формат SSOT независимо от регистра (K01, k01, D01, d01 и т.д.)
         # Формат SSOT: одна буква (любой регистр) + одна или две цифры
         import re
+
         # Нормализуем к верхнему регистру для проверки, но сохраняем оригинальный регистр
         if re.match(r'^[A-Za-z]\d{1,2}$', service_code):
             # Это SSOT формат - нормализуем к верхнему регистру для консистентности
             # (K01, k01 -> K01; D01, d01 -> D01)
             return service_code.upper()
-    
+
     # Для остальных случаев используем нормализацию
     code_to_normalize = service_code or code or category_code or ""
-    
+
     if code_to_normalize:
         return normalize_service_code(code_to_normalize)
-    
+
     return ""

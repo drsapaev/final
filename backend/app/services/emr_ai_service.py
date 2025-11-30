@@ -1,10 +1,11 @@
 """
 AI сервис для EMR - подсказки и автозаполнение
 """
+
 import json
 import logging
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +17,17 @@ class EMRService:
         self.ai_providers = {
             "openai": "gpt-3.5-turbo",
             "anthropic": "claude-3-sonnet",
-            "local": "llama-3"
+            "local": "llama-3",
         }
 
     async def get_diagnosis_suggestions(
-        self, 
-        symptoms: List[str], 
-        specialty: str = "general"
+        self, symptoms: List[str], specialty: str = "general"
     ) -> List[Dict[str, Any]]:
         """Получить предложения диагнозов на основе симптомов"""
         try:
             # Формируем промпт для AI
             prompt = self._build_diagnosis_prompt(symptoms, specialty)
-            
+
             # Здесь будет вызов AI API
             # Пока возвращаем заглушку
             suggestions = [
@@ -36,57 +35,52 @@ class EMRService:
                     "diagnosis": "Острый респираторный вирус",
                     "icd10": "J06.9",
                     "confidence": 0.85,
-                    "description": "Острое респираторное заболевание вирусной этиологии"
+                    "description": "Острое респираторное заболевание вирусной этиологии",
                 },
                 {
                     "diagnosis": "Острый бронхит",
                     "icd10": "J20.9",
                     "confidence": 0.72,
-                    "description": "Острое воспаление бронхов"
-                }
+                    "description": "Острое воспаление бронхов",
+                },
             ]
-            
+
             return suggestions
-            
+
         except Exception as e:
             logger.error(f"Ошибка получения предложений диагнозов: {e}")
             return []
 
     async def get_treatment_suggestions(
-        self,
-        diagnosis: str,
-        specialty: str = "general"
+        self, diagnosis: str, specialty: str = "general"
     ) -> List[Dict[str, Any]]:
         """Получить предложения лечения на основе диагноза"""
         try:
             prompt = self._build_treatment_prompt(diagnosis, specialty)
-            
+
             # Заглушка для предложений лечения
             suggestions = [
                 {
                     "medication": "Парацетамол 500мг",
                     "dosage": "1 таблетка 3 раза в день",
                     "duration": "5-7 дней",
-                    "instructions": "Принимать после еды"
+                    "instructions": "Принимать после еды",
                 },
                 {
                     "medication": "Ибупрофен 400мг",
                     "dosage": "1 таблетка 2 раза в день",
                     "duration": "3-5 дней",
-                    "instructions": "Принимать с едой"
-                }
+                    "instructions": "Принимать с едой",
+                },
             ]
-            
+
             return suggestions
-            
+
         except Exception as e:
             logger.error(f"Ошибка получения предложений лечения: {e}")
             return []
 
-    async def get_icd10_suggestions(
-        self,
-        diagnosis_text: str
-    ) -> List[Dict[str, Any]]:
+    async def get_icd10_suggestions(self, diagnosis_text: str) -> List[Dict[str, Any]]:
         """Получить предложения кодов МКБ-10"""
         try:
             # Заглушка для кодов МКБ-10
@@ -94,17 +88,17 @@ class EMRService:
                 {
                     "code": "J06.9",
                     "description": "Острая инфекция верхних дыхательных путей неуточненная",
-                    "category": "Болезни органов дыхания"
+                    "category": "Болезни органов дыхания",
                 },
                 {
                     "code": "J20.9",
                     "description": "Острый бронхит неуточненный",
-                    "category": "Болезни органов дыхания"
-                }
+                    "category": "Болезни органов дыхания",
+                },
             ]
-            
+
             return suggestions
-            
+
         except Exception as e:
             logger.error(f"Ошибка получения кодов МКБ-10: {e}")
             return []
@@ -113,21 +107,21 @@ class EMRService:
         self,
         template_structure: Dict[str, Any],
         patient_data: Dict[str, Any],
-        specialty: str = "general"
+        specialty: str = "general",
     ) -> Dict[str, Any]:
         """Автозаполнение полей EMR на основе данных пациента"""
         try:
             filled_data = {}
-            
+
             # Анализируем структуру шаблона
             for section in template_structure.get("sections", []):
                 section_name = section["section_name"]
                 filled_data[section_name] = {}
-                
+
                 for field in section.get("fields", []):
                     field_name = field["field_name"]
                     field_type = field["field_type"]
-                    
+
                     # Автозаполнение на основе типа поля
                     if field_type == "checkbox":
                         filled_data[section_name][field_name] = False
@@ -136,20 +130,22 @@ class EMRService:
                     elif field_type == "textarea":
                         filled_data[section_name][field_name] = ""
                     elif field_type == "select":
-                        filled_data[section_name][field_name] = field.get("options", [""])[0]
+                        filled_data[section_name][field_name] = field.get(
+                            "options", [""]
+                        )[0]
                     elif field_type == "date":
-                        filled_data[section_name][field_name] = datetime.now().strftime("%Y-%m-%d")
-            
+                        filled_data[section_name][field_name] = datetime.now().strftime(
+                            "%Y-%m-%d"
+                        )
+
             return filled_data
-            
+
         except Exception as e:
             logger.error(f"Ошибка автозаполнения EMR: {e}")
             return {}
 
     async def validate_emr_data(
-        self,
-        emr_data: Dict[str, Any],
-        template_structure: Dict[str, Any]
+        self, emr_data: Dict[str, Any], template_structure: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Валидация данных EMR"""
         try:
@@ -157,9 +153,9 @@ class EMRService:
                 "is_valid": True,
                 "errors": [],
                 "warnings": [],
-                "suggestions": []
+                "suggestions": [],
             }
-            
+
             # Проверяем обязательные поля
             for section in template_structure.get("sections", []):
                 if section.get("required", False):
@@ -178,7 +174,7 @@ class EMRService:
                                         f"Отсутствует обязательное поле: {field['label']}"
                                     )
                                     validation_result["is_valid"] = False
-            
+
             # Проверяем коды МКБ-10
             if "diagnosis" in emr_data:
                 diagnosis_section = emr_data.get("diagnosis", {})
@@ -188,22 +184,22 @@ class EMRService:
                         validation_result["warnings"].append(
                             "Код МКБ-10 может быть некорректным"
                         )
-            
+
             return validation_result
-            
+
         except Exception as e:
             logger.error(f"Ошибка валидации EMR: {e}")
             return {
                 "is_valid": False,
                 "errors": [f"Ошибка валидации: {str(e)}"],
                 "warnings": [],
-                "suggestions": []
+                "suggestions": [],
             }
 
     def _build_diagnosis_prompt(self, symptoms: List[str], specialty: str) -> str:
         """Построить промпт для получения диагнозов"""
         symptoms_text = ", ".join(symptoms)
-        
+
         prompt = f"""
         На основе следующих симптомов предложите возможные диагнозы:
         
@@ -218,7 +214,7 @@ class EMRService:
         
         Ответ в формате JSON.
         """
-        
+
         return prompt
 
     def _build_treatment_prompt(self, diagnosis: str, specialty: str) -> str:
@@ -237,7 +233,7 @@ class EMRService:
         
         Ответ в формате JSON.
         """
-        
+
         return prompt
 
     def _validate_icd10_code(self, code: str) -> bool:
@@ -245,16 +241,15 @@ class EMRService:
         # Простая валидация формата МКБ-10
         if not code:
             return False
-        
+
         # МКБ-10 коды обычно имеют формат: буква + 2-3 цифры + точка + 1-2 цифры
         import re
+
         pattern = r'^[A-Z]\d{2,3}(\.\d{1,2})?$'
         return bool(re.match(pattern, code))
 
     async def get_ai_suggestions(
-        self,
-        emr_data: Dict[str, Any],
-        specialty: str = "general"
+        self, emr_data: Dict[str, Any], specialty: str = "general"
     ) -> Dict[str, Any]:
         """Получить общие AI предложения для EMR"""
         try:
@@ -263,38 +258,42 @@ class EMRService:
                 "treatment": [],
                 "icd10": [],
                 "warnings": [],
-                "improvements": []
+                "improvements": [],
             }
-            
+
             # Анализируем жалобы для предложения диагнозов
             if "complaints" in emr_data:
                 complaints_section = emr_data["complaints"]
                 symptoms = []
-                
+
                 for field_name, value in complaints_section.items():
                     if isinstance(value, bool) and value:
                         symptoms.append(field_name)
                     elif isinstance(value, str) and value.strip():
                         symptoms.append(value.strip())
-                
+
                 if symptoms:
-                    diagnosis_suggestions = await self.get_diagnosis_suggestions(symptoms, specialty)
+                    diagnosis_suggestions = await self.get_diagnosis_suggestions(
+                        symptoms, specialty
+                    )
                     suggestions["diagnosis"] = diagnosis_suggestions
-            
+
             # Анализируем диагноз для предложения лечения
             if "diagnosis" in emr_data:
                 diagnosis_section = emr_data["diagnosis"]
                 main_diagnosis = diagnosis_section.get("main_diagnosis", "")
-                
+
                 if main_diagnosis:
-                    treatment_suggestions = await self.get_treatment_suggestions(main_diagnosis, specialty)
+                    treatment_suggestions = await self.get_treatment_suggestions(
+                        main_diagnosis, specialty
+                    )
                     suggestions["treatment"] = treatment_suggestions
-                    
+
                     icd10_suggestions = await self.get_icd10_suggestions(main_diagnosis)
                     suggestions["icd10"] = icd10_suggestions
-            
+
             return suggestions
-            
+
         except Exception as e:
             logger.error(f"Ошибка получения AI предложений: {e}")
             return {
@@ -302,12 +301,13 @@ class EMRService:
                 "treatment": [],
                 "icd10": [],
                 "warnings": [],
-                "improvements": []
+                "improvements": [],
             }
 
 
 # Глобальный экземпляр сервиса
 emr_ai_service = EMRService()
+
 
 async def get_emr_ai_service() -> EMRService:
     """Получить экземпляр AI сервиса для EMR"""

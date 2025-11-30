@@ -2,11 +2,12 @@
 E2E тесты для полного сценария работы с миграциями:
 Создание данных → Резервное копирование → Миграция → Восстановление → Проверка целостности
 """
-import pytest
 import json
-import tempfile
 import os
+import tempfile
 from datetime import date, datetime, timedelta
+
+import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.services.migration_service import MigrationService

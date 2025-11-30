@@ -1,17 +1,17 @@
-from typing import Any, Dict, List, Optional
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.api import deps
-from app.models.user import User
-from app.models.doctor_price_override import DoctorPriceOverride
-from app.models.visit import Visit
-from app.models.service import Service
 from app.models.clinic import Doctor
+from app.models.doctor_price_override import DoctorPriceOverride
+from app.models.service import Service
+from app.models.user import User
+from app.models.visit import Visit
 
 router = APIRouter(prefix="/derma", tags=["derma"])
 
@@ -110,7 +110,11 @@ async def create_cosmetic_procedure(
         )
 
 
-@router.post("/price-override", summary="Изменить цену процедуры", response_model=PriceOverrideResponse)
+@router.post(
+    "/price-override",
+    summary="Изменить цену процедуры",
+    response_model=PriceOverrideResponse,
+)
 async def create_price_override(
     override_data: PriceOverrideRequest,
     db: Session = Depends(deps.get_db),
@@ -124,31 +128,33 @@ async def create_price_override(
         visit = db.query(Visit).filter(Visit.id == override_data.visit_id).first()
         if not visit:
             raise HTTPException(status_code=404, detail="Визит не найден")
-        
+
         # Проверяем существование услуги
-        service = db.query(Service).filter(Service.id == override_data.service_id).first()
+        service = (
+            db.query(Service).filter(Service.id == override_data.service_id).first()
+        )
         if not service:
             raise HTTPException(status_code=404, detail="Услуга не найдена")
-        
+
         # Проверяем, что услуга разрешает изменение цены врачом
         if not service.allow_doctor_price_override:
             raise HTTPException(
-                status_code=400, 
-                detail="Данная услуга не разрешает изменение цены врачом"
+                status_code=400,
+                detail="Данная услуга не разрешает изменение цены врачом",
             )
-        
+
         # Получаем врача по пользователю
         doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
         if not doctor:
             raise HTTPException(status_code=404, detail="Врач не найден")
-        
+
         # Проверяем, что врач - дерматолог
         if doctor.specialty not in ["dermatology", "cosmetology"]:
             raise HTTPException(
-                status_code=403, 
-                detail="Только дерматолог-косметолог может изменять цены процедур"
+                status_code=403,
+                detail="Только дерматолог-косметолог может изменять цены процедур",
             )
-        
+
         # Создаём запись об изменении цены
         price_override = DoctorPriceOverride(
             visit_id=override_data.visit_id,
@@ -158,13 +164,13 @@ async def create_price_override(
             new_price=override_data.new_price,
             reason=override_data.reason,
             details=override_data.details,
-            status="pending"
+            status="pending",
         )
-        
+
         db.add(price_override)
         db.commit()
         db.refresh(price_override)
-        
+
         return PriceOverrideResponse(
             id=price_override.id,
             visit_id=price_override.visit_id,
@@ -174,9 +180,9 @@ async def create_price_override(
             reason=price_override.reason,
             details=price_override.details,
             status=price_override.status,
-            created_at=price_override.created_at
+            created_at=price_override.created_at,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -191,7 +197,9 @@ async def get_price_overrides(
     db: Session = Depends(deps.get_db),
     user: User = Depends(deps.require_roles("Admin", "Doctor", "derma")),
     visit_id: Optional[int] = Query(None, description="ID визита"),
-    status: Optional[str] = Query(None, description="Статус (pending, approved, rejected)"),
+    status: Optional[str] = Query(
+        None, description="Статус (pending, approved, rejected)"
+    ),
     limit: int = Query(50, ge=1, le=100),
 ) -> List[PriceOverrideResponse]:
     """
@@ -202,19 +210,21 @@ async def get_price_overrides(
         doctor = db.query(Doctor).filter(Doctor.user_id == user.id).first()
         if not doctor:
             raise HTTPException(status_code=404, detail="Врач не найден")
-        
+
         query = db.query(DoctorPriceOverride).filter(
             DoctorPriceOverride.doctor_id == doctor.id
         )
-        
+
         if visit_id:
             query = query.filter(DoctorPriceOverride.visit_id == visit_id)
-        
+
         if status:
             query = query.filter(DoctorPriceOverride.status == status)
-        
-        overrides = query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
-        
+
+        overrides = (
+            query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
+        )
+
         return [
             PriceOverrideResponse(
                 id=override.id,
@@ -225,11 +235,11 @@ async def get_price_overrides(
                 reason=override.reason,
                 details=override.details,
                 status=override.status,
-                created_at=override.created_at
+                created_at=override.created_at,
             )
             for override in overrides
         ]
-        
+
     except HTTPException:
         raise
     except Exception as e:

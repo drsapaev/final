@@ -1,6 +1,8 @@
+import time
+
 import pytest
 import requests
-import time
+
 
 class TestAPIIntegration:
     """Базовые интеграционные тесты API"""

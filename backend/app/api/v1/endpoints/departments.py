@@ -2,13 +2,15 @@
 Departments API endpoint
 Provides department/tab management for registrar panel
 """
+
 from typing import List
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_active_user
-from app.models.user import User
+from app.api.deps import get_current_active_user, get_db
 from app.models.department import Department
+from app.models.user import User
 
 router = APIRouter()
 
@@ -18,7 +20,7 @@ router = APIRouter()
 async def get_departments(
     active_only: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get list of departments/tabs
@@ -44,23 +46,19 @@ async def get_departments(
             "display_order": dept.display_order,
             "icon": dept.icon,
             "color": dept.color,
-            "gradient": dept.gradient
+            "gradient": dept.gradient,
         }
         for dept in departments
     ]
 
-    return {
-        "success": True,
-        "data": departments_data,
-        "count": len(departments_data)
-    }
+    return {"success": True, "data": departments_data, "count": len(departments_data)}
 
 
 @router.get("/{department_id}")
 async def get_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get single department by ID"""
     from fastapi import HTTPException
@@ -82,6 +80,6 @@ async def get_department(
             "display_order": department.display_order,
             "icon": department.icon,
             "color": department.color,
-            "gradient": department.gradient
-        }
+            "gradient": department.gradient,
+        },
     }

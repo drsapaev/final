@@ -2,13 +2,14 @@
 E2E тесты для полного сценария работы с визитами:
 Врач назначил → Пациент подтвердил → Номер в очереди выдан
 """
-import pytest
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
-from app.models.visit import Visit, VisitService
+import pytest
+
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
+from app.models.visit import Visit, VisitService
 from app.services.morning_assignment import MorningAssignmentService
 
 

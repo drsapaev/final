@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.core.security import require_roles
-from app.models.user import User
 from app.crud import user as crud_user
+from app.models.user import User
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -24,9 +24,10 @@ def list_users(
     # Используем CRUD функцию вместо прямого запроса
     # Если нет get_users(), используем select напрямую через CRUD
     from sqlalchemy import select
+
     stmt = select(User).order_by(User.id.asc())
     users = db.execute(stmt).scalars().all()
-    
+
     return [
         {
             "id": u.id,

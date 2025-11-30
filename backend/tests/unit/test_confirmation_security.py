@@ -1,13 +1,17 @@
 """
 Юнит тесты для системы безопасности подтверждения визитов
 """
-import pytest
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
-from app.services.confirmation_security import ConfirmationSecurityService, SecurityCheckResult
-from app.models.visit import Visit
+import pytest
+
 from app.models.patient import Patient
+from app.models.visit import Visit
+from app.services.confirmation_security import (
+    ConfirmationSecurityService,
+    SecurityCheckResult,
+)
 
 
 @pytest.mark.unit

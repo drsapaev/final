@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from typing import List, Optional, Any
 from decimal import Decimal
+from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.crud import service as crud
+from app.models.clinic import Doctor, ServiceCategory
 from app.models.service import Service
-from app.models.clinic import ServiceCategory, Doctor
 from app.services.service_mapping import normalize_service_code
 
 router = APIRouter(tags=["services"])
@@ -61,7 +61,7 @@ class ServiceOut(BaseModel):
     doctor_id: Optional[int] = None
     # ✅ НОВЫЕ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
     category_code: Optional[str] = None  # K, D, C, L, S, O
-    service_code: Optional[str] = None   # K01, D02, C03, etc.
+    service_code: Optional[str] = None  # K01, D02, C03, etc.
     requires_doctor: Optional[bool] = None
     queue_tag: Optional[str] = None
     is_consultation: Optional[bool] = None
@@ -90,7 +90,9 @@ class ServiceCreate(BaseModel):
     queue_tag: Optional[str] = Field(None, max_length=32)
     is_consultation: bool = False
     allow_doctor_price_override: bool = False
-    department_key: Optional[str] = Field(None, max_length=50)  # ✅ ДОБАВЛЕНО: связь с отделением
+    department_key: Optional[str] = Field(
+        None, max_length=50
+    )  # ✅ ДОБАВЛЕНО: связь с отделением
 
 
 class ServiceUpdate(BaseModel):
@@ -111,7 +113,9 @@ class ServiceUpdate(BaseModel):
     queue_tag: Optional[str] = Field(None, max_length=32)
     is_consultation: Optional[bool] = None
     allow_doctor_price_override: Optional[bool] = None
-    department_key: Optional[str] = Field(None, max_length=50)  # ✅ ДОБАВЛЕНО: связь с отделением
+    department_key: Optional[str] = Field(
+        None, max_length=50
+    )  # ✅ ДОБАВЛЕНО: связь с отделением
 
 
 def _row_to_out(r) -> ServiceOut:
@@ -145,7 +149,12 @@ def _row_to_out(r) -> ServiceOut:
 
 # ==================== КАТЕГОРИИ УСЛУГ ====================
 
-@router.get("/categories", response_model=List[ServiceCategoryOut], summary="Список категорий услуг")
+
+@router.get(
+    "/categories",
+    response_model=List[ServiceCategoryOut],
+    summary="Список категорий услуг",
+)
 async def list_service_categories(
     db: Session = Depends(get_db),
     # user=Depends(require_roles("Admin", "Registrar", "Doctor")),
@@ -159,7 +168,9 @@ async def list_service_categories(
     return categories
 
 
-@router.post("/categories", response_model=ServiceCategoryOut, summary="Создать категорию услуг")
+@router.post(
+    "/categories", response_model=ServiceCategoryOut, summary="Создать категорию услуг"
+)
 async def create_service_category(
     category_data: ServiceCategoryCreate,
     db: Session = Depends(get_db),
@@ -167,10 +178,17 @@ async def create_service_category(
 ):
     """Создать новую категорию услуг"""
     # Проверяем уникальность кода
-    existing = db.query(ServiceCategory).filter(ServiceCategory.code == category_data.code).first()
+    existing = (
+        db.query(ServiceCategory)
+        .filter(ServiceCategory.code == category_data.code)
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail=f"Категория с кодом '{category_data.code}' уже существует")
-    
+        raise HTTPException(
+            status_code=400,
+            detail=f"Категория с кодом '{category_data.code}' уже существует",
+        )
+
     category = ServiceCategory(**category_data.dict())
     db.add(category)
     db.commit()
@@ -178,7 +196,11 @@ async def create_service_category(
     return category
 
 
-@router.put("/categories/{category_id}", response_model=ServiceCategoryOut, summary="Обновить категорию услуг")
+@router.put(
+    "/categories/{category_id}",
+    response_model=ServiceCategoryOut,
+    summary="Обновить категорию услуг",
+)
 async def update_service_category(
     category_id: int,
     category_data: ServiceCategoryUpdate,
@@ -186,19 +208,28 @@ async def update_service_category(
     # user=Depends(require_roles("Admin")),
 ):
     """Обновить существующую категорию услуг"""
-    category = db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
+    category = (
+        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
+    )
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
-    
+
     # Проверяем уникальность кода при обновлении
     if category_data.code and category_data.code != category.code:
-        existing = db.query(ServiceCategory).filter(ServiceCategory.code == category_data.code).first()
+        existing = (
+            db.query(ServiceCategory)
+            .filter(ServiceCategory.code == category_data.code)
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=400, detail=f"Категория с кодом '{category_data.code}' уже существует")
-    
+            raise HTTPException(
+                status_code=400,
+                detail=f"Категория с кодом '{category_data.code}' уже существует",
+            )
+
     for field, value in category_data.dict(exclude_unset=True).items():
         setattr(category, field, value)
-    
+
     db.commit()
     db.refresh(category)
     return category
@@ -211,24 +242,29 @@ async def delete_service_category(
     # user=Depends(require_roles("Admin")),
 ):
     """Удалить категорию услуг"""
-    category = db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
+    category = (
+        db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
+    )
     if not category:
         raise HTTPException(status_code=404, detail="Категория не найдена")
-    
+
     # Проверяем, есть ли связанные услуги
-    services_count = db.query(Service).filter(Service.category_id == category_id).count()
+    services_count = (
+        db.query(Service).filter(Service.category_id == category_id).count()
+    )
     if services_count > 0:
         raise HTTPException(
-            status_code=400, 
-            detail=f"Нельзя удалить категорию: к ней привязано {services_count} услуг"
+            status_code=400,
+            detail=f"Нельзя удалить категорию: к ней привязано {services_count} услуг",
         )
-    
+
     db.delete(category)
     db.commit()
     return {"message": "Категория успешно удалена"}
 
 
 # ==================== УСЛУГИ ====================
+
 
 @router.get("", response_model=List[ServiceOut], summary="Каталог услуг")
 async def list_services(
@@ -246,16 +282,17 @@ async def list_services(
     """Получить список услуг с фильтрацией"""
     try:
         rows = crud.list_services(db, q=q, active=active, limit=limit, offset=offset)
-        
+
         # Дополнительная фильтрация
         if category_id is not None:
             rows = [r for r in rows if getattr(r, 'category_id', None) == category_id]
         if department:
             rows = [r for r in rows if getattr(r, 'department', None) == department]
-        
+
         return [_row_to_out(r) for r in rows]
     except Exception as e:
         import traceback
+
         print(f"Error in list_services: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Ошибка получения услуг: {str(e)}")
@@ -285,22 +322,35 @@ async def create_service(
     if service_data.code:
         existing = db.query(Service).filter(Service.code == service_data.code).first()
         if existing:
-            raise HTTPException(status_code=400, detail=f"Услуга с кодом '{service_data.code}' уже существует")
-    
+            raise HTTPException(
+                status_code=400,
+                detail=f"Услуга с кодом '{service_data.code}' уже существует",
+            )
+
     # Проверяем существование категории
     if service_data.category_id:
-        category = db.query(ServiceCategory).filter(ServiceCategory.id == service_data.category_id).first()
+        category = (
+            db.query(ServiceCategory)
+            .filter(ServiceCategory.id == service_data.category_id)
+            .first()
+        )
         if not category:
-            raise HTTPException(status_code=400, detail="Указанная категория не найдена")
+            raise HTTPException(
+                status_code=400, detail="Указанная категория не найдена"
+            )
 
     # Normalize service codes before creating the service
     service_dict = service_data.dict()
     if service_dict.get('code'):
         service_dict['code'] = normalize_service_code(service_dict['code'])
     if service_dict.get('service_code'):
-        service_dict['service_code'] = normalize_service_code(service_dict['service_code'])
+        service_dict['service_code'] = normalize_service_code(
+            service_dict['service_code']
+        )
     if service_dict.get('category_code'):
-        service_dict['category_code'] = normalize_service_code(service_dict['category_code'])
+        service_dict['category_code'] = normalize_service_code(
+            service_dict['category_code']
+        )
 
     service = Service(**service_dict)
     db.add(service)
@@ -320,27 +370,40 @@ async def update_service(
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Услуга не найдена")
-    
+
     # Проверяем уникальность кода при обновлении
     if service_data.code and service_data.code != service.code:
         existing = db.query(Service).filter(Service.code == service_data.code).first()
         if existing:
-            raise HTTPException(status_code=400, detail=f"Услуга с кодом '{service_data.code}' уже существует")
-    
+            raise HTTPException(
+                status_code=400,
+                detail=f"Услуга с кодом '{service_data.code}' уже существует",
+            )
+
     # Проверяем существование категории
     if service_data.category_id:
-        category = db.query(ServiceCategory).filter(ServiceCategory.id == service_data.category_id).first()
+        category = (
+            db.query(ServiceCategory)
+            .filter(ServiceCategory.id == service_data.category_id)
+            .first()
+        )
         if not category:
-            raise HTTPException(status_code=400, detail="Указанная категория не найдена")
+            raise HTTPException(
+                status_code=400, detail="Указанная категория не найдена"
+            )
 
     # Normalize service codes before updating
     update_dict = service_data.dict(exclude_unset=True)
     if 'code' in update_dict and update_dict['code'] is not None:
         update_dict['code'] = normalize_service_code(update_dict['code'])
     if 'service_code' in update_dict and update_dict['service_code'] is not None:
-        update_dict['service_code'] = normalize_service_code(update_dict['service_code'])
+        update_dict['service_code'] = normalize_service_code(
+            update_dict['service_code']
+        )
     if 'category_code' in update_dict and update_dict['category_code'] is not None:
-        update_dict['category_code'] = normalize_service_code(update_dict['category_code'])
+        update_dict['category_code'] = normalize_service_code(
+            update_dict['category_code']
+        )
 
     for field, value in update_dict.items():
         setattr(service, field, value)
@@ -360,13 +423,14 @@ async def delete_service(
     service = db.query(Service).filter(Service.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Услуга не найдена")
-    
+
     db.delete(service)
     db.commit()
     return {"message": "Услуга успешно удалена"}
 
 
 # ==================== ВРЕМЕННЫЙ ENDPOINT ДЛЯ ВРАЧЕЙ ====================
+
 
 class DoctorOut(BaseModel):
     id: int
@@ -378,7 +442,11 @@ class DoctorOut(BaseModel):
         from_attributes = True
 
 
-@router.get("/admin/doctors", response_model=List[DoctorOut], summary="Список врачей (временный)")
+@router.get(
+    "/admin/doctors",
+    response_model=List[DoctorOut],
+    summary="Список врачей (временный)",
+)
 async def list_doctors_temp(
     db: Session = Depends(get_db),
 ):
@@ -389,8 +457,10 @@ async def list_doctors_temp(
 
 # ==================== РАЗРЕШЕНИЕ УСЛУГ (SSOT) ====================
 
+
 class ServiceResolveResponse(BaseModel):
     """Response schema для resolve_service endpoint"""
+
     service_id: Optional[int] = None
     service_code: Optional[str] = None
     normalized_code: Optional[str] = None
@@ -403,7 +473,9 @@ class ServiceResolveResponse(BaseModel):
         from_attributes = True
 
 
-@router.get("/resolve", response_model=ServiceResolveResponse, summary="Разрешить услугу (SSOT)")
+@router.get(
+    "/resolve", response_model=ServiceResolveResponse, summary="Разрешить услугу (SSOT)"
+)
 async def resolve_service_endpoint(
     service_id: Optional[int] = Query(None, description="ID услуги"),
     code: Optional[str] = Query(None, description="Код услуги"),
@@ -412,22 +484,22 @@ async def resolve_service_endpoint(
 ):
     """
     Универсальный endpoint для разрешения услуги.
-    
+
     Возвращает полную информацию об услуге: нормализованный код, категорию,
     подкатегорию, отделения и UI-тип для фронтенда.
-    
+
     Можно указать либо service_id, либо code (или оба).
     """
     from app.services.service_mapping import resolve_service
-    
+
     # Валидация: должен быть указан хотя бы один параметр
     if not service_id and not code:
         raise HTTPException(
             status_code=400,
-            detail="Необходимо указать либо service_id, либо code (или оба)"
+            detail="Необходимо указать либо service_id, либо code (или оба)",
         )
-    
+
     # Вызов SSOT функции
     result = resolve_service(service_id=service_id, code=code, db=db)
-    
+
     return ServiceResolveResponse(**result)

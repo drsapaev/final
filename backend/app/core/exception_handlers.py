@@ -3,20 +3,21 @@
 
 Обеспечивает единообразную обработку ошибок во всем приложении.
 """
+
 import logging
 from typing import Union
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError, OperationalError
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 
 from app.services.queue_service import (
-    QueueError,
-    QueueValidationError,
     QueueConflictError,
+    QueueError,
     QueueNotFoundError,
+    QueueValidationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     """
     Регистрирует все обработчики исключений в FastAPI приложении
     """
-    
+
     @app.exception_handler(QueueValidationError)
     async def queue_validation_error_handler(
         request: Request, exc: QueueValidationError
@@ -44,10 +45,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "queue_validation_error",
                 "message": str(exc),
-                "detail": "Ошибка валидации данных очереди"
-            }
+                "detail": "Ошибка валидации данных очереди",
+            },
         )
-    
+
     @app.exception_handler(QueueConflictError)
     async def queue_conflict_error_handler(
         request: Request, exc: QueueConflictError
@@ -65,10 +66,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "queue_conflict_error",
                 "message": str(exc),
-                "detail": "Конфликт в очереди (дубликат, лимит или блокировка)"
-            }
+                "detail": "Конфликт в очереди (дубликат, лимит или блокировка)",
+            },
         )
-    
+
     @app.exception_handler(QueueNotFoundError)
     async def queue_not_found_error_handler(
         request: Request, exc: QueueNotFoundError
@@ -86,14 +87,12 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "queue_not_found_error",
                 "message": str(exc),
-                "detail": "Очередь или запись не найдена"
-            }
+                "detail": "Очередь или запись не найдена",
+            },
         )
-    
+
     @app.exception_handler(QueueError)
-    async def queue_error_handler(
-        request: Request, exc: QueueError
-    ) -> JSONResponse:
+    async def queue_error_handler(request: Request, exc: QueueError) -> JSONResponse:
         """
         Обработка общих ошибок очереди
         """
@@ -108,10 +107,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "queue_error",
                 "message": str(exc),
-                "detail": "Ошибка при работе с очередью"
-            }
+                "detail": "Ошибка при работе с очередью",
+            },
         )
-    
+
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(
         request: Request, exc: IntegrityError
@@ -125,7 +124,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             request.url.path,
             exc_info=True,
         )
-        
+
         # Пытаемся извлечь понятное сообщение из ошибки
         error_msg = str(exc.orig) if hasattr(exc, 'orig') else str(exc)
         if "UNIQUE constraint" in error_msg:
@@ -134,16 +133,16 @@ def register_exception_handlers(app: FastAPI) -> None:
             detail = "Нарушение ссылочной целостности"
         else:
             detail = "Ошибка целостности данных"
-        
+
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={
                 "error": "integrity_error",
                 "message": detail,
-                "detail": error_msg
-            }
+                "detail": error_msg,
+            },
         )
-    
+
     @app.exception_handler(OperationalError)
     async def operational_error_handler(
         request: Request, exc: OperationalError
@@ -162,10 +161,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "database_operational_error",
                 "message": "Ошибка подключения к базе данных",
-                "detail": "Попробуйте позже"
-            }
+                "detail": "Попробуйте позже",
+            },
         )
-    
+
     @app.exception_handler(SQLAlchemyError)
     async def sqlalchemy_error_handler(
         request: Request, exc: SQLAlchemyError
@@ -184,14 +183,12 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "database_error",
                 "message": "Ошибка базы данных",
-                "detail": str(exc)
-            }
+                "detail": str(exc),
+            },
         )
-    
+
     @app.exception_handler(ValueError)
-    async def value_error_handler(
-        request: Request, exc: ValueError
-    ) -> JSONResponse:
+    async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
         """
         Обработка ошибок валидации значений
         """
@@ -205,10 +202,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "validation_error",
                 "message": str(exc),
-                "detail": "Некорректное значение параметра"
-            }
+                "detail": "Некорректное значение параметра",
+            },
         )
-    
+
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
@@ -226,10 +223,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "validation_error",
                 "message": "Ошибка валидации запроса",
-                "detail": exc.errors()
-            }
+                "detail": exc.errors(),
+            },
         )
-    
+
     @app.exception_handler(Exception)
     async def general_exception_handler(
         request: Request, exc: Exception
@@ -249,7 +246,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={
                 "error": "internal_server_error",
                 "message": "Внутренняя ошибка сервера",
-                "detail": str(exc) if logger.level <= logging.DEBUG else "Обратитесь к администратору"
-            }
+                "detail": (
+                    str(exc)
+                    if logger.level <= logging.DEBUG
+                    else "Обратитесь к администратору"
+                ),
+            },
         )
-

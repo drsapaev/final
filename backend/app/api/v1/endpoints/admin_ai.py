@@ -1,44 +1,55 @@
 """
 API endpoints для управления AI в админ панели
 """
+
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.models.user import User
 from app.crud import ai_config as crud_ai
+from app.models.user import User
 from app.schemas.ai_config import (
-    AIProviderOut, AIProviderCreate, AIProviderUpdate, AIProviderTestRequest,
-    AIPromptTemplateOut, AIPromptTemplateCreate, AIPromptTemplateUpdate,
-    AIUsageLogOut, AISystemSettings, AITestResult, AIStatsResponse
+    AIPromptTemplateCreate,
+    AIPromptTemplateOut,
+    AIPromptTemplateUpdate,
+    AIProviderCreate,
+    AIProviderOut,
+    AIProviderTestRequest,
+    AIProviderUpdate,
+    AIStatsResponse,
+    AISystemSettings,
+    AITestResult,
+    AIUsageLogOut,
 )
 
 router = APIRouter()
 
 # ===================== AI ПРОВАЙДЕРЫ =====================
 
+
 @router.get("/ai/providers", response_model=List[AIProviderOut])
 def get_ai_providers(
     active_only: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список AI провайдеров"""
     try:
         providers = crud_ai.get_ai_providers(db, active_only=active_only)
-        
+
         # Скрываем API ключи в ответе
         for provider in providers:
             if provider.api_key:
                 provider.api_key = "***скрыт***"
-        
+
         return providers
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения AI провайдеров: {str(e)}"
+            detail=f"Ошибка получения AI провайдеров: {str(e)}",
         )
 
 
@@ -46,20 +57,20 @@ def get_ai_providers(
 def get_ai_provider(
     provider_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить AI провайдера по ID"""
     provider = crud_ai.get_ai_provider_by_id(db, provider_id)
     if not provider:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"AI провайдер с ID {provider_id} не найден"
+            detail=f"AI провайдер с ID {provider_id} не найден",
         )
-    
+
     # Скрываем API ключ
     if provider.api_key:
         provider.api_key = "***скрыт***"
-    
+
     return provider
 
 
@@ -67,7 +78,7 @@ def get_ai_provider(
 def create_ai_provider(
     provider: AIProviderCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать AI провайдера"""
     try:
@@ -76,22 +87,22 @@ def create_ai_provider(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Провайдер с именем '{provider.name}' уже существует"
+                detail=f"Провайдер с именем '{provider.name}' уже существует",
             )
-        
+
         new_provider = crud_ai.create_ai_provider(db, provider)
-        
+
         # Скрываем API ключ в ответе
         if new_provider.api_key:
             new_provider.api_key = "***скрыт***"
-        
+
         return new_provider
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания AI провайдера: {str(e)}"
+            detail=f"Ошибка создания AI провайдера: {str(e)}",
         )
 
 
@@ -100,7 +111,7 @@ def update_ai_provider(
     provider_id: int,
     provider: AIProviderUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить AI провайдера"""
     try:
@@ -108,20 +119,20 @@ def update_ai_provider(
         if not updated_provider:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"AI провайдер с ID {provider_id} не найден"
+                detail=f"AI провайдер с ID {provider_id} не найден",
             )
-        
+
         # Скрываем API ключ в ответе
         if updated_provider.api_key:
             updated_provider.api_key = "***скрыт***"
-        
+
         return updated_provider
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления AI провайдера: {str(e)}"
+            detail=f"Ошибка обновления AI провайдера: {str(e)}",
         )
 
 
@@ -129,7 +140,7 @@ def update_ai_provider(
 def delete_ai_provider(
     provider_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Удалить AI провайдера"""
     try:
@@ -137,16 +148,16 @@ def delete_ai_provider(
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"AI провайдер с ID {provider_id} не найден"
+                detail=f"AI провайдер с ID {provider_id} не найден",
             )
-        
+
         return {"success": True, "message": "AI провайдер деактивирован"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка удаления AI провайдера: {str(e)}"
+            detail=f"Ошибка удаления AI провайдера: {str(e)}",
         )
 
 
@@ -155,7 +166,7 @@ def test_ai_provider(
     provider_id: int,
     test_request: AIProviderTestRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Тестировать AI провайдера"""
     try:
@@ -163,30 +174,31 @@ def test_ai_provider(
         if not provider:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"AI провайдер с ID {provider_id} не найден"
+                detail=f"AI провайдер с ID {provider_id} не найден",
             )
-        
+
         if not provider.active:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Провайдер неактивен"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Провайдер неактивен"
             )
-        
+
         # Здесь будет реальное тестирование AI провайдера
         # Пока возвращаем заглушку
-        import time
         import random
-        
+        import time
+
         start_time = time.time()
-        
+
         # Симуляция запроса
         time.sleep(random.uniform(0.5, 2.0))
-        
+
         response_time = int((time.time() - start_time) * 1000)
-        
+
         # Тестовый ответ
-        test_response = f"Тестовый ответ от {provider.display_name}: {test_request.test_prompt}"
-        
+        test_response = (
+            f"Тестовый ответ от {provider.display_name}: {test_request.test_prompt}"
+        )
+
         # Логируем тест
         crud_ai.create_ai_usage_log(
             db=db,
@@ -195,9 +207,9 @@ def test_ai_provider(
             task_type="test",
             tokens_used=len(test_request.test_prompt.split()) * 2,  # Примерная оценка
             response_time_ms=response_time,
-            success=True
+            success=True,
         )
-        
+
         return AITestResult(
             success=True,
             response_text=test_response,
@@ -206,10 +218,10 @@ def test_ai_provider(
             provider_info={
                 "name": provider.name,
                 "model": provider.model,
-                "temperature": provider.temperature
-            }
+                "temperature": provider.temperature,
+            },
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -220,21 +232,21 @@ def test_ai_provider(
             provider_id=provider_id,
             task_type="test",
             success=False,
-            error_message=str(e)
+            error_message=str(e),
         )
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования AI провайдера: {str(e)}"
+            detail=f"Ошибка тестирования AI провайдера: {str(e)}",
         )
 
 
 # ===================== СИСТЕМНЫЕ НАСТРОЙКИ =====================
 
+
 @router.get("/ai/settings")
 def get_ai_settings(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
     """Получить настройки AI системы"""
     try:
@@ -243,7 +255,7 @@ def get_ai_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек AI: {str(e)}"
+            detail=f"Ошибка получения настроек AI: {str(e)}",
         )
 
 
@@ -251,7 +263,7 @@ def get_ai_settings(
 def update_ai_settings(
     settings: AISystemSettings,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки AI системы"""
     try:
@@ -261,16 +273,17 @@ def update_ai_settings(
         return {
             "success": True,
             "message": "Настройки AI обновлены",
-            "settings": updated_settings
+            "settings": updated_settings,
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек AI: {str(e)}"
+            detail=f"Ошибка обновления настроек AI: {str(e)}",
         )
 
 
 # ===================== СТАТИСТИКА =====================
+
 
 @router.get("/ai/stats", response_model=AIStatsResponse)
 def get_ai_stats(
@@ -278,7 +291,7 @@ def get_ai_stats(
     provider_id: Optional[int] = None,
     specialty: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить статистику использования AI"""
     try:
@@ -289,7 +302,7 @@ def get_ai_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики AI: {str(e)}"
+            detail=f"Ошибка получения статистики AI: {str(e)}",
         )
 
 
@@ -301,23 +314,28 @@ def get_ai_usage_logs(
     task_type: Optional[str] = None,
     success_only: Optional[bool] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить логи использования AI"""
     try:
         query = db.query(crud_ai.AIUsageLog)
-        
+
         if provider_id:
             query = query.filter(crud_ai.AIUsageLog.provider_id == provider_id)
         if task_type:
             query = query.filter(crud_ai.AIUsageLog.task_type == task_type)
         if success_only is not None:
             query = query.filter(crud_ai.AIUsageLog.success == success_only)
-        
-        logs = query.order_by(desc(crud_ai.AIUsageLog.created_at)).offset(skip).limit(limit).all()
+
+        logs = (
+            query.order_by(desc(crud_ai.AIUsageLog.created_at))
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
         return logs
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения логов AI: {str(e)}"
+            detail=f"Ошибка получения логов AI: {str(e)}",
         )

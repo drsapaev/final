@@ -1,6 +1,7 @@
 """
 CRUD endpoints для управления отделениями в админ-панели
 """
+
 from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -11,22 +12,22 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.models.appointment import Appointment
+from app.models.clinic import ClinicSettings, Doctor, ServiceCategory
 from app.models.department import (
     Department,
-    DepartmentService,
     DepartmentQueueSettings,
     DepartmentRegistrationSettings,
+    DepartmentService,
 )
-from app.models.clinic import ClinicSettings, Doctor, ServiceCategory
-from app.models.service import Service
-from app.models.appointment import Appointment
-from app.models.visit import Visit
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.service import Service
 from app.models.user import User
+from app.models.visit import Visit
 from app.schemas.department import (
-    DepartmentServiceCreate,
     DepartmentQueueSettingsUpdate,
     DepartmentRegistrationSettingsUpdate,
+    DepartmentServiceCreate,
 )
 from app.services.service_mapping import normalize_service_code
 
@@ -51,6 +52,7 @@ class DepartmentIntegrationOptions(BaseModel):
 
 class DepartmentCreate(BaseModel):
     """Схема для создания отделения"""
+
     key: str
     name_ru: str
     name_uz: Optional[str] = None
@@ -65,6 +67,7 @@ class DepartmentCreate(BaseModel):
 
 class DepartmentUpdate(BaseModel):
     """Схема для обновления отделения"""
+
     name_ru: Optional[str] = None
     name_uz: Optional[str] = None
     icon: Optional[str] = None
@@ -77,6 +80,7 @@ class DepartmentUpdate(BaseModel):
 
 class DepartmentResponse(BaseModel):
     """Схема ответа отделения"""
+
     id: int
     key: str
     name_ru: str
@@ -91,10 +95,11 @@ class DepartmentResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class DepartmentResponseWithSettings(DepartmentResponse):
     """Схема ответа отделения с настройками"""
-    queue_prefix: Optional[str] = None
 
+    queue_prefix: Optional[str] = None
 
 
 def _default_stats() -> Dict[str, int]:
@@ -201,7 +206,9 @@ def _ensure_department_integrations(
         integration_result["clinic_settings_updated"].append(max_per_day_key)
 
     # Service category
-    category_code = (opts.get("service_category_code") or department.key[:1] or "O").upper()
+    category_code = (
+        opts.get("service_category_code") or department.key[:1] or "O"
+    ).upper()
     service_category = (
         db.query(ServiceCategory).filter(ServiceCategory.code == category_code).first()
     )
@@ -247,9 +254,7 @@ def _ensure_department_integrations(
         suffix = 1
         unique_code = normalized_code.upper()
         while (
-            db.query(Service)
-            .filter(Service.service_code == unique_code)
-            .first()
+            db.query(Service).filter(Service.service_code == unique_code).first()
             is not None
         ):
             suffix += 1
@@ -410,7 +415,7 @@ def _collect_department_overview(db: Session) -> Dict[str, Any]:
 def list_departments(
     active_only: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Получить список всех отделений
@@ -432,17 +437,12 @@ def list_departments(
             dept_dict["queue_prefix"] = dept.queue_settings.queue_prefix
         data.append(dept_dict)
 
-    return {
-        "success": True,
-        "data": data,
-        "count": len(departments)
-    }
+    return {"success": True, "data": data, "count": len(departments)}
 
 
 @router.get("/overview", response_model=dict)
 def get_departments_overview(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
     """
     Получить реальные показатели по отделениям (очередь, услуги, визиты)
@@ -458,7 +458,7 @@ def get_departments_overview(
 def get_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Получить отделение по ID
@@ -470,20 +470,17 @@ def get_department(
     if not department:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Department with id {department_id} not found"
+            detail=f"Department with id {department_id} not found",
         )
 
-    return {
-        "success": True,
-        "data": DepartmentResponse.from_orm(department).dict()
-    }
+    return {"success": True, "data": DepartmentResponse.from_orm(department).dict()}
 
 
 @router.post("", response_model=dict, status_code=status.HTTP_201_CREATED)
 def create_department(
     department_data: DepartmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Создать новое отделение
@@ -491,11 +488,13 @@ def create_department(
     Доступно только для администраторов
     """
     # Проверяем уникальность ключа
-    existing = db.query(Department).filter(Department.key == department_data.key).first()
+    existing = (
+        db.query(Department).filter(Department.key == department_data.key).first()
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Department with key '{department_data.key}' already exists"
+            detail=f"Department with key '{department_data.key}' already exists",
         )
 
     payload = department_data.dict(exclude={"integration"})
@@ -515,23 +514,21 @@ def create_department(
     # Создаем дефолтные настройки очереди
     queue_settings = DepartmentQueueSettings(
         department_id=department.id,
-        queue_prefix=department.key.upper()[0] if department.key else "Q"
+        queue_prefix=department.key.upper()[0] if department.key else "Q",
     )
     db.add(queue_settings)
 
     # Создаем дефолтные настройки регистрации
-    reg_settings = DepartmentRegistrationSettings(
-        department_id=department.id
-    )
+    reg_settings = DepartmentRegistrationSettings(department_id=department.id)
     db.add(reg_settings)
-    
+
     db.commit()
 
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
         "integration": integration_result,
-        "message": "Department created successfully"
+        "message": "Department created successfully",
     }
 
 
@@ -540,7 +537,7 @@ def update_department(
     department_id: int,
     department_data: DepartmentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Обновить отделение
@@ -552,7 +549,7 @@ def update_department(
     if not department:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Department with id {department_id} not found"
+            detail=f"Department with id {department_id} not found",
         )
 
     # Обновляем только переданные поля
@@ -566,7 +563,7 @@ def update_department(
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
-        "message": "Department updated successfully"
+        "message": "Department updated successfully",
     }
 
 
@@ -575,7 +572,7 @@ def initialize_department(
     department_id: int,
     integration: Optional[DepartmentIntegrationOptions] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Повторно синхронизировать отделение с очередями/услугами
@@ -587,7 +584,7 @@ def initialize_department(
     if not department:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Department with id {department_id} not found"
+            detail=f"Department with id {department_id} not found",
         )
 
     integration_result = _ensure_department_integrations(db, department, integration)
@@ -598,7 +595,7 @@ def initialize_department(
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
         "integration": integration_result,
-        "message": "Department integrations initialized"
+        "message": "Department integrations initialized",
     }
 
 
@@ -606,7 +603,7 @@ def initialize_department(
 def delete_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Удалить отделение
@@ -618,7 +615,7 @@ def delete_department(
     if not department:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Department with id {department_id} not found"
+            detail=f"Department with id {department_id} not found",
         )
 
     db.delete(department)
@@ -626,7 +623,7 @@ def delete_department(
 
     return {
         "success": True,
-        "message": f"Department '{department.name_ru}' deleted successfully"
+        "message": f"Department '{department.name_ru}' deleted successfully",
     }
 
 
@@ -634,7 +631,7 @@ def delete_department(
 def toggle_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """
     Переключить активность отделения
@@ -646,7 +643,7 @@ def toggle_department(
     if not department:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Department with id {department_id} not found"
+            detail=f"Department with id {department_id} not found",
         )
 
     # Переключаем active
@@ -659,7 +656,7 @@ def toggle_department(
     return {
         "success": True,
         "data": DepartmentResponse.from_orm(department).dict(),
-        "message": f"Department '{department.name_ru}' {status_text}"
+        "message": f"Department '{department.name_ru}' {status_text}",
     }
 
 
@@ -667,20 +664,24 @@ def toggle_department(
 # УПРАВЛЕНИЕ УСЛУГАМИ ОТДЕЛЕНИЯ
 # ============================================================
 
+
 @router.get("/{department_id}/services", response_model=dict)
 def get_department_services(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить услуги отделения"""
     department = db.query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
 
-    services = db.query(DepartmentService).filter(
-        DepartmentService.department_id == department_id
-    ).order_by(DepartmentService.display_order).all()
+    services = (
+        db.query(DepartmentService)
+        .filter(DepartmentService.department_id == department_id)
+        .order_by(DepartmentService.display_order)
+        .all()
+    )
 
     return {
         "success": True,
@@ -691,15 +692,17 @@ def get_department_services(
                     "id": ds.service.id,
                     "name": ds.service.name,
                     "code": ds.service.code,
-                    "base_price": float(ds.service.price) if ds.service.price else None
+                    "base_price": float(ds.service.price) if ds.service.price else None,
                 },
                 "is_default": ds.is_default,
                 "display_order": ds.display_order,
-                "price_override": float(ds.price_override) if ds.price_override else None
+                "price_override": (
+                    float(ds.price_override) if ds.price_override else None
+                ),
             }
             for ds in services
         ],
-        "count": len(services)
+        "count": len(services),
     }
 
 
@@ -709,7 +712,7 @@ def add_service_to_department(
     service_id: int,
     data: DepartmentServiceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Добавить услугу в отделение"""
     # Проверки
@@ -722,27 +725,28 @@ def add_service_to_department(
         raise HTTPException(status_code=404, detail="Service not found")
 
     # Проверка дубликатов
-    existing = db.query(DepartmentService).filter(
-        DepartmentService.department_id == department_id,
-        DepartmentService.service_id == service_id
-    ).first()
+    existing = (
+        db.query(DepartmentService)
+        .filter(
+            DepartmentService.department_id == department_id,
+            DepartmentService.service_id == service_id,
+        )
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Service already added to department")
+        raise HTTPException(
+            status_code=400, detail="Service already added to department"
+        )
 
     # Создание привязки
     dept_service = DepartmentService(
-        department_id=department_id,
-        service_id=service_id,
-        **data.dict()
+        department_id=department_id, service_id=service_id, **data.dict()
     )
     db.add(dept_service)
     db.commit()
     db.refresh(dept_service)
 
-    return {
-        "success": True,
-        "message": f"Service '{service.name}' added to department"
-    }
+    return {"success": True, "message": f"Service '{service.name}' added to department"}
 
 
 @router.delete("/{department_id}/services/{service_id}", response_model=dict)
@@ -750,13 +754,17 @@ def remove_service_from_department(
     department_id: int,
     service_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Удалить услугу из отделения"""
-    dept_service = db.query(DepartmentService).filter(
-        DepartmentService.department_id == department_id,
-        DepartmentService.service_id == service_id
-    ).first()
+    dept_service = (
+        db.query(DepartmentService)
+        .filter(
+            DepartmentService.department_id == department_id,
+            DepartmentService.service_id == service_id,
+        )
+        .first()
+    )
 
     if not dept_service:
         raise HTTPException(status_code=404, detail="Service not found in department")
@@ -764,26 +772,26 @@ def remove_service_from_department(
     db.delete(dept_service)
     db.commit()
 
-    return {
-        "success": True,
-        "message": "Service removed from department"
-    }
+    return {"success": True, "message": "Service removed from department"}
 
 
 # ============================================================
 # УПРАВЛЕНИЕ НАСТРОЙКАМИ ОЧЕРЕДИ
 # ============================================================
 
+
 @router.get("/{department_id}/settings/queue", response_model=dict)
 def get_queue_settings(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить настройки очереди отделения"""
-    settings = db.query(DepartmentQueueSettings).filter(
-        DepartmentQueueSettings.department_id == department_id
-    ).first()
+    settings = (
+        db.query(DepartmentQueueSettings)
+        .filter(DepartmentQueueSettings.department_id == department_id)
+        .first()
+    )
 
     if not settings:
         raise HTTPException(status_code=404, detail="Queue settings not found")
@@ -798,8 +806,8 @@ def get_queue_settings(
             "max_concurrent_queue": settings.max_concurrent_queue,
             "avg_wait_time": settings.avg_wait_time,
             "show_on_display": settings.show_on_display,
-            "auto_close_time": settings.auto_close_time
-        }
+            "auto_close_time": settings.auto_close_time,
+        },
     }
 
 
@@ -808,19 +816,20 @@ def update_queue_settings(
     department_id: int,
     data: DepartmentQueueSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки очереди отделения"""
-    settings = db.query(DepartmentQueueSettings).filter(
-        DepartmentQueueSettings.department_id == department_id
-    ).first()
+    settings = (
+        db.query(DepartmentQueueSettings)
+        .filter(DepartmentQueueSettings.department_id == department_id)
+        .first()
+    )
 
     if not settings:
         # Если настроек нет, создаем их
         settings = DepartmentQueueSettings(department_id=department_id)
         db.add(settings)
         # Не делаем commit здесь, он будет ниже
-
 
     # Обновление полей
     for field, value in data.dict(exclude_unset=True).items():
@@ -829,20 +838,17 @@ def update_queue_settings(
     db.commit()
     db.refresh(settings)
 
-    return {
-        "success": True,
-        "message": "Queue settings updated"
-    }
+    return {"success": True, "message": "Queue settings updated"}
 
 
 # ============================================================
 # ОБЗОР СТАТИСТИКИ ОТДЕЛЕНИЙ
 # ============================================================
 
+
 @router.get("/overview", response_model=dict)
 def get_departments_overview(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ):
     """Получить обзор статистики всех отделений"""
     departments = db.query(Department).order_by(Department.display_order).all()
@@ -858,40 +864,47 @@ def get_departments_overview(
     departments_overview = []
     for dept in departments:
         # Получаем настройки очереди
-        queue_settings = db.query(DepartmentQueueSettings).filter(
-            DepartmentQueueSettings.department_id == dept.id
-        ).first()
+        queue_settings = (
+            db.query(DepartmentQueueSettings)
+            .filter(DepartmentQueueSettings.department_id == dept.id)
+            .first()
+        )
 
         # Получаем настройки регистрации
-        reg_settings = db.query(DepartmentRegistrationSettings).filter(
-            DepartmentRegistrationSettings.department_id == dept.id
-        ).first()
+        reg_settings = (
+            db.query(DepartmentRegistrationSettings)
+            .filter(DepartmentRegistrationSettings.department_id == dept.id)
+            .first()
+        )
 
         # Получаем услуги отделения
-        dept_services = db.query(DepartmentService).filter(
-            DepartmentService.department_id == dept.id
-        ).all()
+        dept_services = (
+            db.query(DepartmentService)
+            .filter(DepartmentService.department_id == dept.id)
+            .all()
+        )
 
         # Получаем врачей отделения
-        doctors = db.query(Doctor).filter(
-            Doctor.department_id == dept.id
-        ).all()
+        doctors = db.query(Doctor).filter(Doctor.department_id == dept.id).all()
 
         # Подсчитываем сегодняшние записи
         from datetime import date
+
         today = date.today()
 
         # Записи на сегодня
-        appointments_today = db.query(Appointment).filter(
-            Appointment.department_id == dept.id,
-            Appointment.date == today
-        ).count()
+        appointments_today = (
+            db.query(Appointment)
+            .filter(Appointment.department_id == dept.id, Appointment.date == today)
+            .count()
+        )
 
         # Визиты на сегодня
-        visits_today = db.query(Visit).filter(
-            Visit.department_id == dept.id,
-            Visit.created_at >= today
-        ).count()
+        visits_today = (
+            db.query(Visit)
+            .filter(Visit.department_id == dept.id, Visit.created_at >= today)
+            .count()
+        )
 
         # Записи в очереди на сегодня
         queue_entries_today = 0
@@ -901,32 +914,37 @@ def get_departments_overview(
         totals["appointments_today"] += appointments_today
         totals["visits_today"] += visits_today
 
-        departments_overview.append({
-            "key": dept.key,
-            "stats": {
-                "appointments_today": appointments_today,
-                "visits_today": visits_today,
-                "queue_entries_today": queue_entries_today,
-                "services": len(dept_services),
-                "doctors": len(doctors),
-            },
-            "integrations": {
-                "has_queue_settings": queue_settings is not None,
-                "has_registration_settings": reg_settings is not None,
-                "has_services": len(dept_services) > 0,
-                "has_service_category": bool(dept_services),  # Упрощенно
-                "queue_prefix": queue_settings.queue_prefix if queue_settings else None,
-                "start_number": queue_settings.start_number_online if queue_settings else None,
-                "max_per_day": queue_settings.max_daily_queue if queue_settings else None,
+        departments_overview.append(
+            {
+                "key": dept.key,
+                "stats": {
+                    "appointments_today": appointments_today,
+                    "visits_today": visits_today,
+                    "queue_entries_today": queue_entries_today,
+                    "services": len(dept_services),
+                    "doctors": len(doctors),
+                },
+                "integrations": {
+                    "has_queue_settings": queue_settings is not None,
+                    "has_registration_settings": reg_settings is not None,
+                    "has_services": len(dept_services) > 0,
+                    "has_service_category": bool(dept_services),  # Упрощенно
+                    "queue_prefix": (
+                        queue_settings.queue_prefix if queue_settings else None
+                    ),
+                    "start_number": (
+                        queue_settings.start_number_online if queue_settings else None
+                    ),
+                    "max_per_day": (
+                        queue_settings.max_daily_queue if queue_settings else None
+                    ),
+                },
             }
-        })
+        )
 
     return {
         "success": True,
-        "data": {
-            "totals": totals,
-            "departments": departments_overview
-        }
+        "data": {"totals": totals, "departments": departments_overview},
     }
 
 
@@ -935,7 +953,7 @@ def initialize_department(
     department_id: int,
     payload: Optional[Dict[str, Any]] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Инициализировать отделение - создать настройки очередей и регистрации"""
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -944,9 +962,11 @@ def initialize_department(
 
     try:
         # Создаем настройки очереди если их нет
-        queue_settings = db.query(DepartmentQueueSettings).filter(
-            DepartmentQueueSettings.department_id == department_id
-        ).first()
+        queue_settings = (
+            db.query(DepartmentQueueSettings)
+            .filter(DepartmentQueueSettings.department_id == department_id)
+            .first()
+        )
 
         if not queue_settings:
             queue_settings = DepartmentQueueSettings(
@@ -957,14 +977,16 @@ def initialize_department(
                 max_daily_queue=payload.get("max_daily_queue", 50) if payload else 50,
                 avg_wait_time=20,
                 show_on_display=True,
-                auto_close_time="09:00"
+                auto_close_time="09:00",
             )
             db.add(queue_settings)
 
         # Создаем настройки регистрации если их нет
-        reg_settings = db.query(DepartmentRegistrationSettings).filter(
-            DepartmentRegistrationSettings.department_id == department_id
-        ).first()
+        reg_settings = (
+            db.query(DepartmentRegistrationSettings)
+            .filter(DepartmentRegistrationSettings.department_id == department_id)
+            .first()
+        )
 
         if not reg_settings:
             reg_settings = DepartmentRegistrationSettings(
@@ -974,27 +996,35 @@ def initialize_department(
                 min_booking_hours=2,
                 max_booking_days=30,
                 auto_assign_doctor=False,
-                allow_walkin=True
+                allow_walkin=True,
             )
             db.add(reg_settings)
 
         # Создаем дефолтную услугу если переданы данные
         if payload and (payload.get("service_name") or payload.get("service_code")):
             # Проверяем, что услуга не существует
-            existing_service = db.query(Service).filter(
-                Service.code == payload.get("service_code")
-            ).first()
+            existing_service = (
+                db.query(Service)
+                .filter(Service.code == payload.get("service_code"))
+                .first()
+            )
 
             if not existing_service:
                 # Находим категорию услуги
                 category = None
                 if payload.get("service_category_code"):
-                    category = db.query(ServiceCategory).filter(
-                        ServiceCategory.code == payload.get("service_category_code")
-                    ).first()
+                    category = (
+                        db.query(ServiceCategory)
+                        .filter(
+                            ServiceCategory.code == payload.get("service_category_code")
+                        )
+                        .first()
+                    )
 
                 service = Service(
-                    name=payload.get("service_name", f"Услуга отделения {department.name_ru}"),
+                    name=payload.get(
+                        "service_name", f"Услуга отделения {department.name_ru}"
+                    ),
                     code=payload.get("service_code"),
                     department_key=department.key,
                     category_code=payload.get("service_category_code"),
@@ -1003,7 +1033,7 @@ def initialize_department(
                     currency=payload.get("service_currency", "UZS"),
                     active=True,
                     requires_doctor=True,
-                    category_id=category.id if category else None
+                    category_id=category.id if category else None,
                 )
                 db.add(service)
 
@@ -1013,7 +1043,7 @@ def initialize_department(
                     service=service,
                     is_default=True,
                     display_order=1,
-                    price_override=payload.get("service_price")
+                    price_override=payload.get("service_price"),
                 )
                 db.add(dept_service)
 
@@ -1021,14 +1051,13 @@ def initialize_department(
 
         return {
             "success": True,
-            "message": f"Отделение '{department.name_ru}' инициализировано"
+            "message": f"Отделение '{department.name_ru}' инициализировано",
         }
 
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка инициализации отделения: {str(e)}"
+            status_code=500, detail=f"Ошибка инициализации отделения: {str(e)}"
         )
 
 
@@ -1036,16 +1065,19 @@ def initialize_department(
 # УПРАВЛЕНИЕ НАСТРОЙКАМИ РЕГИСТРАЦИИ
 # ============================================================
 
+
 @router.get("/{department_id}/settings/registration", response_model=dict)
 def get_registration_settings(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить настройки регистрации отделения"""
-    settings = db.query(DepartmentRegistrationSettings).filter(
-        DepartmentRegistrationSettings.department_id == department_id
-    ).first()
+    settings = (
+        db.query(DepartmentRegistrationSettings)
+        .filter(DepartmentRegistrationSettings.department_id == department_id)
+        .first()
+    )
 
     if not settings:
         raise HTTPException(status_code=404, detail="Registration settings not found")
@@ -1058,8 +1090,8 @@ def get_registration_settings(
             "min_booking_hours": settings.min_booking_hours,
             "max_booking_days": settings.max_booking_days,
             "auto_assign_doctor": settings.auto_assign_doctor,
-            "allow_walkin": settings.allow_walkin
-        }
+            "allow_walkin": settings.allow_walkin,
+        },
     }
 
 
@@ -1068,18 +1100,19 @@ def update_registration_settings(
     department_id: int,
     data: DepartmentRegistrationSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки регистрации отделения"""
-    settings = db.query(DepartmentRegistrationSettings).filter(
-        DepartmentRegistrationSettings.department_id == department_id
-    ).first()
+    settings = (
+        db.query(DepartmentRegistrationSettings)
+        .filter(DepartmentRegistrationSettings.department_id == department_id)
+        .first()
+    )
 
     if not settings:
         # Если настроек нет, создаем их
         settings = DepartmentRegistrationSettings(department_id=department_id)
         db.add(settings)
-
 
     # Обновление полей
     for field, value in data.dict(exclude_unset=True).items():
@@ -1088,30 +1121,26 @@ def update_registration_settings(
     db.commit()
     db.refresh(settings)
 
-    return {
-        "success": True,
-        "message": "Registration settings updated"
-    }
+    return {"success": True, "message": "Registration settings updated"}
 
 
 # ============================================================
 # УПРАВЛЕНИЕ ВРАЧАМИ ОТДЕЛЕНИЯ
 # ============================================================
 
+
 @router.get("/{department_id}/doctors", response_model=dict)
 def get_department_doctors(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список врачей отделения"""
     department = db.query(Department).filter(Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
 
-    doctors = db.query(Doctor).filter(
-        Doctor.department_id == department_id
-    ).all()
+    doctors = db.query(Doctor).filter(Doctor.department_id == department_id).all()
 
     return {
         "success": True,
@@ -1120,11 +1149,11 @@ def get_department_doctors(
                 "id": doctor.id,
                 "user_id": doctor.user_id,
                 "name": doctor.user.full_name if doctor.user else None,
-                "specialty": doctor.specialty
+                "specialty": doctor.specialty,
             }
             for doctor in doctors
         ],
-        "count": len(doctors)
+        "count": len(doctors),
     }
 
 
@@ -1133,7 +1162,7 @@ def assign_doctor_to_department(
     department_id: int,
     doctor_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Назначить врача в отделение"""
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -1151,7 +1180,7 @@ def assign_doctor_to_department(
 
     return {
         "success": True,
-        "message": f"Doctor assigned to department '{department.name_ru}'"
+        "message": f"Doctor assigned to department '{department.name_ru}'",
     }
 
 
@@ -1160,22 +1189,22 @@ def remove_doctor_from_department(
     department_id: int,
     doctor_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Убрать врача из отделения"""
-    doctor = db.query(Doctor).filter(
-        Doctor.id == doctor_id,
-        Doctor.department_id == department_id
-    ).first()
+    doctor = (
+        db.query(Doctor)
+        .filter(Doctor.id == doctor_id, Doctor.department_id == department_id)
+        .first()
+    )
 
     if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor not found in this department")
+        raise HTTPException(
+            status_code=404, detail="Doctor not found in this department"
+        )
 
     # Убираем привязку
     doctor.department_id = None
     db.commit()
 
-    return {
-        "success": True,
-        "message": "Doctor removed from department"
-    }
+    return {"success": True, "message": "Doctor removed from department"}

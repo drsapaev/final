@@ -8,30 +8,34 @@ API endpoints для системы очередей
 
 Этот модуль сохранен для обратной совместимости и будет удален в будущих версиях.
 """
-from datetime import datetime, date
+
+import logging
+from datetime import date, datetime
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.models.user import User
-from app.models.clinic import Doctor
+
 # from app.models.patient import Patient  # Временно отключено
 from app.api.deps import get_current_user
+from app.db.session import get_db
+from app.models.clinic import Doctor
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.user import User
 from app.services.queue_service import (
     get_queue_service,
-    QueueValidationError,
-    QueueNotFoundError,
     QueueConflictError,
+    QueueNotFoundError,
+    QueueValidationError,
 )
-from pydantic import BaseModel
-import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Timezone для Узбекистана (UTC+5)
 TASHKENT_OFFSET = 5
+
 
 # Pydantic схемы
 class QueueTokenResponse(BaseModel):
@@ -41,11 +45,13 @@ class QueueTokenResponse(BaseModel):
     specialist_name: str
     day: date
 
+
 class QueueJoinRequest(BaseModel):
     token: str
     phone: Optional[str] = None
     telegram_id: Optional[str] = None
     patient_name: Optional[str] = None
+
 
 class QueueJoinResponse(BaseModel):
     success: bool
@@ -53,6 +59,7 @@ class QueueJoinResponse(BaseModel):
     message: str
     duplicate: bool = False
     queue_info: Optional[dict] = None
+
 
 class QueueEntryResponse(BaseModel):
     id: int
@@ -62,6 +69,7 @@ class QueueEntryResponse(BaseModel):
     status: str
     created_at: datetime
     called_at: Optional[datetime]
+
 
 class QueueStatusResponse(BaseModel):
     queue_id: int
@@ -79,32 +87,35 @@ def generate_qr_token(
     day: date = Query(..., description="День для очереди (YYYY-MM-DD)"),
     specialist_id: int = Query(..., description="ID специалиста"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Генерация QR токена для онлайн-очереди
     Доступно только регистраторам и админам
-    
+
     ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
     Используйте вместо него: POST /api/v1/queue/admin/qr-tokens/generate
-    
+
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
         # Проверка прав доступа
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
-        
-        specialist = db.query(User).filter(
-            User.id == specialist_id,
-            User.role == "Doctor"
-        ).first()
-        
+
+        specialist = (
+            db.query(User)
+            .filter(User.id == specialist_id, User.role == "Doctor")
+            .first()
+        )
+
         if not specialist:
             raise HTTPException(status_code=404, detail="Специалист не найден")
-        
+
         if day < date.today():
-            raise HTTPException(status_code=400, detail="Нельзя создать очередь на прошедший день")
+            raise HTTPException(
+                status_code=400, detail="Нельзя создать очередь на прошедший день"
+            )
 
         queue_service = get_queue_service()
         token_value, token_meta = queue_service.assign_queue_token(
@@ -122,8 +133,10 @@ def generate_qr_token(
             token=token_value,
             qr_url=qr_url,
             expires_at=token_meta.get("expires_at"),
-            specialist_name=token_meta.get("specialist_name") or specialist.full_name or specialist.username,
-            day=token_meta.get("day", day)
+            specialist_name=token_meta.get("specialist_name")
+            or specialist.full_name
+            or specialist.username,
+            day=token_meta.get("day", day),
         )
     except HTTPException:
         raise
@@ -132,19 +145,16 @@ def generate_qr_token(
 
 
 @router.post("/join", response_model=QueueJoinResponse)
-def join_queue(
-    request: QueueJoinRequest,
-    db: Session = Depends(get_db)
-):
+def join_queue(request: QueueJoinRequest, db: Session = Depends(get_db)):
     """
     Вступление в онлайн-очередь по токену
     Доступно всем (публичный endpoint)
-    
+
     ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
     Используйте вместо него:
     - POST /api/v1/queue/join/start (начало сессии)
     - POST /api/v1/queue/join/complete (завершение присоединения)
-    
+
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
@@ -171,9 +181,11 @@ def join_queue(
         queue_day = (
             str(daily_queue.day)
             if daily_queue and daily_queue.day
-            else queue_entry.queue.day.isoformat()
-            if queue_entry.queue and queue_entry.queue.day
-            else None
+            else (
+                queue_entry.queue.day.isoformat()
+                if queue_entry.queue and queue_entry.queue.day
+                else None
+            )
         )
 
         if join_result["duplicate"]:
@@ -192,28 +204,32 @@ def join_queue(
                     "day": queue_day,
                     "position": queue_entry.number,
                     "status": queue_entry.status,
-                    "created_at": queue_entry.created_at.isoformat()
-                    if queue_entry.created_at
-                    else None,
+                    "created_at": (
+                        queue_entry.created_at.isoformat()
+                        if queue_entry.created_at
+                        else None
+                    ),
                     "estimated_time": "Ожидайте вызова",
                 },
             )
 
         try:
             import asyncio
+
             from app.services.display_websocket import get_display_manager
 
             async def send_queue_update():
                 manager = get_display_manager()
                 await manager.broadcast_queue_update(
-                    queue_entry=queue_entry,
-                    event_type="queue.created"
+                    queue_entry=queue_entry, event_type="queue.created"
                 )
 
             asyncio.create_task(send_queue_update())
 
         except Exception as ws_error:
-            logger.warning("Не удалось отправить обновление очереди: %s", ws_error, exc_info=True)
+            logger.warning(
+                "Не удалось отправить обновление очереди: %s", ws_error, exc_info=True
+            )
 
         return QueueJoinResponse(
             success=True,
@@ -224,16 +240,13 @@ def join_queue(
                 "specialist": specialist_display,
                 "day": queue_day,
                 "position": queue_entry.number,
-                "estimated_time": "Придите к открытию приема"
-            }
+                "estimated_time": "Придите к открытию приема",
+            },
         )
 
     except Exception as e:
         logger.error(f"Ошибка при записи в очередь: {str(e)}")
-        return QueueJoinResponse(
-            success=False,
-            message=f"Ошибка сервера: {str(e)}"
-        )
+        return QueueJoinResponse(success=False, message=f"Ошибка сервера: {str(e)}")
 
 
 @router.get("/statistics/{specialist_id}")
@@ -241,29 +254,27 @@ def get_queue_statistics(
     specialist_id: int,
     day: date = Query(default_factory=date.today, description="День для статистики"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Получить статистику очереди для специалиста
-    
+
     ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
     Используйте вместо него: GET /api/v1/queue/admin/queue-analytics/{specialist_id}
-    
+
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     # Валидация specialist_id
     if not isinstance(specialist_id, int) or specialist_id <= 0:
-        raise HTTPException(
-            status_code=422,
-            detail="Некорректный ID специалиста"
-        )
-    
+        raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
+
     # Получаем очередь
-    daily_queue = db.query(DailyQueue).filter(
-        DailyQueue.day == day,
-        DailyQueue.specialist_id == specialist_id
-    ).first()
-    
+    daily_queue = (
+        db.query(DailyQueue)
+        .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
+        .first()
+    )
+
     if not daily_queue:
         return {
             "success": False,
@@ -277,22 +288,26 @@ def get_queue_statistics(
                 "max_slots": 0,
                 "available_slots": 0,
                 "is_open": False,
-                "opened_at": None
-            }
+                "opened_at": None,
+            },
         }
-    
+
     # Используем сервис для получения статистики
     queue_service = get_queue_service()
     stats = queue_service.get_queue_statistics(db, daily_queue)
-    
+
     return {
         "success": True,
         "statistics": stats,
         "specialist": {
             "id": specialist_id,
-            "name": daily_queue.specialist.user.full_name if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{specialist_id}"
+            "name": (
+                daily_queue.specialist.user.full_name
+                if (daily_queue.specialist and daily_queue.specialist.user)
+                else f"Врач #{specialist_id}"
+            ),
         },
-        "day": day.isoformat()
+        "day": day.isoformat(),
     }
 
 
@@ -301,50 +316,47 @@ def open_queue(
     day: date = Query(..., description="День очереди"),
     specialist_id: int = Query(..., description="ID специалиста"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Открытие приема (закрывает онлайн-запись)
     Доступно только регистраторам и админам
-    
+
     ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
     Проверьте документацию для альтернативных endpoints.
-    
+
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     try:
         # Проверка прав доступа
         if current_user.role not in ["Admin", "Registrar"]:
             raise HTTPException(status_code=403, detail="Недостаточно прав")
-        
+
         # Получение или создание очереди
-        daily_queue = db.query(DailyQueue).filter(
-            DailyQueue.day == day,
-            DailyQueue.specialist_id == specialist_id
-        ).first()
-        
+        daily_queue = (
+            db.query(DailyQueue)
+            .filter(DailyQueue.day == day, DailyQueue.specialist_id == specialist_id)
+            .first()
+        )
+
         if not daily_queue:
             # Создаем очередь если её нет
-            daily_queue = DailyQueue(
-                day=day,
-                specialist_id=specialist_id,
-                active=True
-            )
+            daily_queue = DailyQueue(day=day, specialist_id=specialist_id, active=True)
             db.add(daily_queue)
             db.commit()
             db.refresh(daily_queue)
-        
+
         if daily_queue.opened_at:
             raise HTTPException(status_code=400, detail="Прием уже открыт")
-        
+
         # Открытие приема
         daily_queue.opened_at = datetime.now()
         db.commit()
-    
+
         return {
             "success": True,
             "message": "Прием открыт. Онлайн-запись закрыта",
-            "opened_at": daily_queue.opened_at
+            "opened_at": daily_queue.opened_at,
         }
     except HTTPException:
         raise
@@ -356,53 +368,58 @@ def open_queue(
 def get_today_queue(
     specialist_id: int = Query(..., description="ID специалиста"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Получение текущей очереди на сегодня
-    
+
     ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
     Используйте вместо него: GET /api/v1/queue/status/{specialist_id}
-    
+
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     # Валидация specialist_id
     if not isinstance(specialist_id, int) or specialist_id <= 0:
-        raise HTTPException(
-            status_code=422,
-            detail="Некорректный ID специалиста"
-        )
-    
+        raise HTTPException(status_code=422, detail="Некорректный ID специалиста")
+
     # Проверка существования специалиста
     specialist = db.query(Doctor).filter(Doctor.id == specialist_id).first()
     if not specialist:
-        raise HTTPException(
-            status_code=404,
-            detail="Специалист не найден"
-        )
-    
+        raise HTTPException(status_code=404, detail="Специалист не найден")
+
     today = date.today()
-    
+
     # Получение очереди
-    daily_queue = db.query(DailyQueue).filter(
-        DailyQueue.day == today,
-        DailyQueue.specialist_id == specialist_id
-    ).first()
-    
+    daily_queue = (
+        db.query(DailyQueue)
+        .filter(DailyQueue.day == today, DailyQueue.specialist_id == specialist_id)
+        .first()
+    )
+
     if not daily_queue:
         raise HTTPException(status_code=404, detail="Очередь на сегодня не найдена")
-    
+
     # Получение записей
-    entries = db.query(OnlineQueueEntry).filter(
-        OnlineQueueEntry.queue_id == daily_queue.id
-    ).order_by(OnlineQueueEntry.number).all()
-    
+    entries = (
+        db.query(OnlineQueueEntry)
+        .filter(OnlineQueueEntry.queue_id == daily_queue.id)
+        .order_by(OnlineQueueEntry.number)
+        .all()
+    )
+
     waiting_count = sum(1 for entry in entries if entry.status == "waiting")
 
     return QueueStatusResponse(
         queue_id=daily_queue.id,
         day=daily_queue.day,
-        specialist_name=(daily_queue.specialist.user.full_name or daily_queue.specialist.user.username) if (daily_queue.specialist and daily_queue.specialist.user) else f"Врач #{daily_queue.specialist_id}",
+        specialist_name=(
+            (
+                daily_queue.specialist.user.full_name
+                or daily_queue.specialist.user.username
+            )
+            if (daily_queue.specialist and daily_queue.specialist.user)
+            else f"Врач #{daily_queue.specialist_id}"
+        ),
         is_open=daily_queue.opened_at is not None,
         opened_at=daily_queue.opened_at,
         total_entries=len(entries),
@@ -415,9 +432,10 @@ def get_today_queue(
                 phone=entry.phone,
                 status=entry.status,
                 created_at=entry.created_at,
-                called_at=entry.called_at
-            ) for entry in entries
-        ]
+                called_at=entry.called_at,
+            )
+            for entry in entries
+        ],
     )
     # Остальные исключения обрабатываются централизованными обработчиками
     # (exception_handlers.py)
@@ -427,56 +445,61 @@ def get_today_queue(
 def call_patient(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Вызов пациента (для табло)
-    
+
     ⚠️ DEPRECATED: Этот endpoint устарел и будет удален в будущих версиях.
     Используйте вместо него: POST /api/v1/queue/{specialist_id}/call-next
-    
+
     См. документацию: docs/QUEUE_ENDPOINTS_MIGRATION_GUIDE.md
     """
     # Проверка прав доступа
     if current_user.role not in ["Admin", "Registrar", "Doctor"]:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
-    
+
     entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
-    
+
     if not entry:
         raise HTTPException(status_code=404, detail="Запись не найдена")
-    
+
     if entry.status != "waiting":
         raise HTTPException(status_code=400, detail="Пациент уже вызван или обслужен")
-    
+
     # Обновление статуса
     entry.status = "called"
     entry.called_at = datetime.now()
-    
+
     db.commit()
-    
+
     # Отправка WebSocket события для табло
     try:
         import asyncio
+
         from app.services.display_websocket import get_display_manager
-        
+
         async def send_to_display():
             manager = get_display_manager()
-            specialist_name = entry.queue.specialist.full_name if entry.queue.specialist else f"Специалист #{entry.queue.specialist_id}"
-            
+            specialist_name = (
+                entry.queue.specialist.full_name
+                if entry.queue.specialist
+                else f"Специалист #{entry.queue.specialist_id}"
+            )
+
             await manager.broadcast_patient_call(
                 queue_entry=entry,
                 doctor_name=specialist_name,
-                cabinet=None  # TODO: Добавить кабинет в модель
+                cabinet=None,  # TODO: Добавить кабинет в модель
             )
-        
+
         # Запускаем асинхронную отправку в фоне
         asyncio.create_task(send_to_display())
-        
+
     except Exception as ws_error:
         # Не прерываем основной процесс если WebSocket не работает
         logger.warning("Не удалось отправить на табло: %s", ws_error, exc_info=True)
-    
+
     return {
         "success": True,
         "message": f"Пациент №{entry.number} вызван",
@@ -484,6 +507,6 @@ def call_patient(
             "id": entry.id,
             "number": entry.number,
             "patient_name": entry.patient_name,
-            "called_at": entry.called_at
-        }
+            "called_at": entry.called_at,
+        },
     }

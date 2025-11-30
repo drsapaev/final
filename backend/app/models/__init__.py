@@ -1,15 +1,75 @@
 from __future__ import annotations
 
-# Package marker for app.models
-
-# Import all models to ensure they are registered with SQLAlchemy
-from .user import User
-from .patient import Patient
-from .visit import Visit, VisitService
-from .service import Service, ServiceCatalog
-from .payment import Payment
-from .payment_webhook import PaymentWebhook, PaymentProvider, PaymentTransaction
+from .activation import Activation
 from .appointment import Appointment
+from .audit import AuditLog
+from .authentication import (
+    EmailVerificationToken,
+    LoginAttempt,
+    PasswordResetToken,
+    RefreshToken,
+    SecurityEvent,
+    UserActivity,
+    UserSession,
+)
+from .clinic import (
+    Backup,
+    BackupStatus,
+    BackupType,
+    Branch,
+    BranchStatus,
+    ClinicSettings,
+    Doctor,
+    Equipment,
+    EquipmentMaintenance,
+    EquipmentStatus,
+    EquipmentType,
+    License,
+    LicenseActivation,
+    LicenseStatus,
+    LicenseType,
+    Schedule,
+    ServiceCategory,
+    SystemInfo,
+)
+from .department import (
+    Department,
+    DepartmentQueueSettings,
+    DepartmentRegistrationSettings,
+    DepartmentService,
+)
+from .doctor_price_override import DoctorPriceOverride
+from .emr import EMR, Prescription
+from .emr_template import EMRTemplate
+from .emr_version import EMRVersion
+from .file_system import (
+    File,
+    FileAccessLog,
+    FileFolder,
+    FilePermission,
+    FileQuota,
+    FileShare,
+    FileStatus,
+    FileStorage,
+    FileType,
+    FileVersion,
+)
+
+# КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
+from .lab import LabOrder, LabResult
+from .notification import (
+    NotificationHistory,
+    NotificationSettings,
+    NotificationTemplate,
+)
+from .online import OnlineDay
+from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from .patient import Patient
+from .payment import Payment
+from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from .payment_webhook import PaymentProvider, PaymentTransaction, PaymentWebhook
+from .role_permission import Permission, Role, UserGroup, UserPermissionOverride
+
 # Временно отключены из-за проблем с relationships
 # from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
 # from .billing import Invoice, InvoiceItem, BillingPayment, InvoiceTemplate, BillingRule, PaymentReminder
@@ -40,46 +100,43 @@ from .appointment import Appointment
 # from .payment_webhook import PaymentWebhook, PaymentProvider, PaymentTransaction
 # QueueTicket заменен на новые модели в queue.py
 from .schedule import ScheduleTemplate
-from .emr import EMR, Prescription
-from .emr_template import EMRTemplate
-from .emr_version import EMRVersion
-from .two_factor_auth import TwoFactorAuth, TwoFactorBackupCode, TwoFactorRecovery, TwoFactorSession, TwoFactorDevice
-from .authentication import RefreshToken, UserSession, PasswordResetToken, EmailVerificationToken, LoginAttempt, UserActivity, SecurityEvent
-from .user_profile import (
-    UserProfile, UserPreferences, UserNotificationSettings, UserAuditLog
-)
-from .role_permission import Role, Permission, UserGroup, UserPermissionOverride
-# КРИТИЧЕСКИ ВАЖНО: UserGroup и связанные модели ТОЛЬКО из role_permission.py!
-from .lab import LabOrder, LabResult
-from .audit import AuditLog
-from .notification import NotificationTemplate, NotificationHistory, NotificationSettings
+from .service import Service, ServiceCatalog
 from .setting import Setting
-from .activation import Activation
-from .online import OnlineDay
-from .clinic import (
-    ClinicSettings, Doctor, Schedule, ServiceCategory, Branch, BranchStatus,
-    Equipment, EquipmentStatus, EquipmentType, EquipmentMaintenance,
-    License, LicenseStatus, LicenseType, LicenseActivation,
-    Backup, BackupStatus, BackupType, SystemInfo
+from .telegram_config import (
+    TelegramConfig,
+    TelegramMessage,
+    TelegramTemplate,
+    TelegramUser,
 )
-from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
-from .file_system import (
-    File, FileVersion, FileShare, FileFolder, FileAccessLog, 
-    FileStorage, FileQuota, FileType, FileStatus, FilePermission
+from .two_factor_auth import (
+    TwoFactorAuth,
+    TwoFactorBackupCode,
+    TwoFactorDevice,
+    TwoFactorRecovery,
+    TwoFactorSession,
 )
-from .telegram_config import TelegramConfig, TelegramTemplate, TelegramUser, TelegramMessage
-from .doctor_price_override import DoctorPriceOverride
-from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
-from .department import Department, DepartmentService, DepartmentQueueSettings, DepartmentRegistrationSettings
+
+# Import all models to ensure they are registered with SQLAlchemy
+from .user import User
+from .user_profile import (
+    UserAuditLog,
+    UserNotificationSettings,
+    UserPreferences,
+    UserProfile,
+)
+from .visit import Visit, VisitService
+
+# Package marker for app.models
+
 
 # Make sure all models are available
 __all__ = [
     "User",
-    "Patient", 
+    "Patient",
     "Visit",
     "VisitService",
     "Service",
-    "ServiceCatalog", 
+    "ServiceCatalog",
     "Payment",
     "PaymentWebhook",
     "PaymentProvider",
@@ -92,7 +149,7 @@ __all__ = [
     "EMRTemplate",
     "EMRVersion",
     "TwoFactorAuth",
-    "TwoFactorBackupCode", 
+    "TwoFactorBackupCode",
     "TwoFactorRecovery",
     "TwoFactorSession",
     "TwoFactorDevice",
@@ -116,7 +173,7 @@ __all__ = [
     "LabResult",
     "AuditLog",
     "NotificationTemplate",
-    "NotificationHistory", 
+    "NotificationHistory",
     "NotificationSettings",
     "Setting",
     "Activation",
@@ -140,11 +197,11 @@ __all__ = [
     "BackupType",
     "SystemInfo",
     "DailyQueue",
-    "OnlineQueueEntry", 
+    "OnlineQueueEntry",
     "QueueToken",
     "TelegramConfig",
     "TelegramTemplate",
-    "TelegramUser", 
+    "TelegramUser",
     "TelegramMessage",
     "DoctorPriceOverride",
     "PaymentInvoice",
