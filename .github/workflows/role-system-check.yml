@@ -191,6 +191,12 @@ jobs:
         echo "Running role system tests..."
         python test_role_routing.py
 
+    - name: Check system integrity
+      run: |
+        cd backend
+        echo "Checking system integrity..."
+        python check_system_integrity.py
+
     - name: Stop backend server
       if: always()
       run: |
@@ -202,12 +208,6 @@ jobs:
         # Дополнительная очистка процессов uvicorn
         pkill -f "uvicorn.*8000" 2>/dev/null || true
         echo "OK: Сервер остановлен"
-
-    - name: Check system integrity
-      run: |
-        cd backend
-        echo "Checking system integrity..."
-        python check_system_integrity.py
 
     - name: Validate role consistency
       run: |
