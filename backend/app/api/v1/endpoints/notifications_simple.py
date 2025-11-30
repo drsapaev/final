@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_db, require_roles
 
 router = APIRouter()
+
 
 @router.get("/history/stats")
 async def get_notification_stats_simple(
@@ -19,10 +21,13 @@ async def get_notification_stats_simple(
             "failed_today": 0,
             "success_rate": 100.0,
             "recent_activity": [],
-            "period_days": days
+            "period_days": days,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+        )
+
 
 @router.get("/history")
 async def get_notification_history_simple(
@@ -34,14 +39,12 @@ async def get_notification_history_simple(
     """Упрощенная история уведомлений"""
     try:
         # Простая история без сложных запросов
-        return {
-            "notifications": [],
-            "total": 0,
-            "limit": limit,
-            "offset": offset
-        }
+        return {"notifications": [], "total": 0, "limit": limit, "offset": offset}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения истории: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения истории: {str(e)}"
+        )
+
 
 @router.get("/templates")
 async def get_notification_templates_simple(
@@ -58,17 +61,19 @@ async def get_notification_templates_simple(
                     "name": "Напоминание о записи",
                     "subject": "Напоминание о записи к врачу",
                     "content": "У вас запись к врачу завтра в {time}",
-                    "type": "appointment_reminder"
+                    "type": "appointment_reminder",
                 },
                 {
                     "id": 2,
                     "name": "Подтверждение записи",
                     "subject": "Запись подтверждена",
                     "content": "Ваша запись к врачу {doctor} подтверждена",
-                    "type": "appointment_confirmation"
-                }
+                    "type": "appointment_confirmation",
+                },
             ],
-            "total": 2
+            "total": 2,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения шаблонов: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения шаблонов: {str(e)}"
+        )

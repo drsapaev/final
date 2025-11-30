@@ -490,4 +490,3 @@ async def send_bulk_notification(
         "recipients_count": len(recipients),
         "channels": request.channels,
     }
-

@@ -1,12 +1,14 @@
 """
 API endpoints для управления табло в админ панели
 """
-from datetime import datetime
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
-from sqlalchemy.orm import Session
+
 import shutil
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, status, UploadFile
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User
@@ -15,11 +17,12 @@ router = APIRouter()
 
 # ===================== УПРАВЛЕНИЕ ТАБЛО =====================
 
+
 @router.get("/display/boards")
 def get_display_boards(
     active_only: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить список табло"""
     try:
@@ -46,16 +49,16 @@ def get_display_boards(
                     "primary": "#0066cc",
                     "secondary": "#f8f9fa",
                     "text": "#333333",
-                    "background": "#ffffff"
+                    "background": "#ffffff",
                 },
                 "active": True,
-                "created_at": "2025-01-27T10:00:00Z"
+                "created_at": "2025-01-27T10:00:00Z",
             }
         ]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения списка табло: {str(e)}"
+            detail=f"Ошибка получения списка табло: {str(e)}",
         )
 
 
@@ -63,7 +66,7 @@ def get_display_boards(
 def get_display_board(
     board_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить конфигурацию табло"""
     try:
@@ -85,19 +88,19 @@ def get_display_board(
                 "volume_level": 70,
                 "active": True,
                 "banners": [],
-                "videos": []
+                "videos": [],
             }
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Табло с ID {board_id} не найдено"
+                detail=f"Табло с ID {board_id} не найдено",
             )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения табло: {str(e)}"
+            detail=f"Ошибка получения табло: {str(e)}",
         )
 
 
@@ -106,33 +109,34 @@ def update_display_board(
     board_id: int,
     board_data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки табло"""
     try:
         # Здесь будет реальная логика обновления
         # Пока возвращаем успех
-        
+
         return {
             "success": True,
             "message": "Настройки табло обновлены",
-            "board_id": board_id
+            "board_id": board_id,
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления табло: {str(e)}"
+            detail=f"Ошибка обновления табло: {str(e)}",
         )
 
 
 # ===================== БАННЕРЫ =====================
+
 
 @router.get("/display/boards/{board_id}/banners")
 def get_display_banners(
     board_id: int,
     active_only: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить баннеры табло"""
     try:
@@ -141,7 +145,7 @@ def get_display_banners(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения баннеров: {str(e)}"
+            detail=f"Ошибка получения баннеров: {str(e)}",
         )
 
 
@@ -150,27 +154,22 @@ def create_display_banner(
     board_id: int,
     banner_data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Создать баннер для табло"""
     try:
         # Здесь будет реальная логика создания баннера
-        return {
-            "success": True,
-            "message": "Баннер создан",
-            "banner_id": 1
-        }
+        return {"success": True, "message": "Баннер создан", "banner_id": 1}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания баннера: {str(e)}"
+            detail=f"Ошибка создания баннера: {str(e)}",
         )
 
 
 @router.post("/display/upload-banner")
 def upload_banner_image(
-    file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("Admin"))
+    file: UploadFile = File(...), current_user: User = Depends(require_roles("Admin"))
 ):
     """Загрузить изображение для баннера"""
     try:
@@ -178,54 +177,56 @@ def upload_banner_image(
         if not file.content_type.startswith("image/"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Файл должен быть изображением"
+                detail="Файл должен быть изображением",
             )
-        
+
         # Проверяем размер файла (макс 10MB)
         if file.size > 10 * 1024 * 1024:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Размер файла не должен превышать 10MB"
+                detail="Размер файла не должен превышать 10MB",
             )
-        
+
         # Создаем директорию
         upload_dir = Path("static/uploads/banners")
         upload_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Сохраняем файл
         import uuid
+
         file_extension = file.filename.split(".")[-1] if file.filename else "png"
         filename = f"{uuid.uuid4()}.{file_extension}"
         file_path = upload_dir / filename
-        
+
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
         banner_url = f"/static/uploads/banners/{filename}"
-        
+
         return {
             "success": True,
             "banner_url": banner_url,
             "filename": filename,
-            "size": file.size
+            "size": file.size,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка загрузки баннера: {str(e)}"
+            detail=f"Ошибка загрузки баннера: {str(e)}",
         )
 
 
 # ===================== ТЕМЫ =====================
 
+
 @router.get("/display/themes")
 def get_display_themes(
     active_only: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить темы оформления табло"""
     try:
@@ -240,11 +241,11 @@ def get_display_themes(
                     "--secondary-color": "#f8f9fa",
                     "--text-color": "#333333",
                     "--background-color": "#ffffff",
-                    "--border-color": "#dee2e6"
+                    "--border-color": "#dee2e6",
                 },
                 "font_family": "system-ui, sans-serif",
                 "active": True,
-                "is_default": True
+                "is_default": True,
             },
             {
                 "id": 2,
@@ -255,11 +256,11 @@ def get_display_themes(
                     "--secondary-color": "#1a1a1a",
                     "--text-color": "#ffffff",
                     "--background-color": "#000000",
-                    "--border-color": "#333333"
+                    "--border-color": "#333333",
                 },
                 "font_family": "system-ui, sans-serif",
                 "active": True,
-                "is_default": False
+                "is_default": False,
             },
             {
                 "id": 3,
@@ -270,36 +271,37 @@ def get_display_themes(
                     "--secondary-color": "#e8f5e8",
                     "--text-color": "#2c3e50",
                     "--background-color": "#f8fff8",
-                    "--border-color": "#c3e6cb"
+                    "--border-color": "#c3e6cb",
                 },
                 "font_family": "system-ui, sans-serif",
                 "active": True,
-                "is_default": False
-            }
+                "is_default": False,
+            },
         ]
-        
+
         return themes if not active_only else [t for t in themes if t["active"]]
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения тем: {str(e)}"
+            detail=f"Ошибка получения тем: {str(e)}",
         )
 
 
 # ===================== ТЕСТИРОВАНИЕ ТАБЛО =====================
+
 
 @router.post("/display/boards/{board_id}/test")
 def test_display_board(
     board_id: int,
     test_data: Dict[str, Any],
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Тестировать табло"""
     try:
         test_type = test_data.get("test_type", "call")
-        
+
         if test_type == "call":
             # Тестовый вызов пациента
             return {
@@ -310,8 +312,8 @@ def test_display_board(
                     "patient_name": "Тестовый П.",
                     "doctor_name": "Доктор Тест",
                     "cabinet": "101",
-                    "call_time": datetime.utcnow().isoformat()
-                }
+                    "call_time": datetime.utcnow().isoformat(),
+                },
             }
         elif test_type == "announcement":
             # Тестовое объявление
@@ -320,29 +322,27 @@ def test_display_board(
                 "message": "Тестовое объявление отправлено",
                 "test_data": {
                     "announcement": "Тестовое объявление от админ панели",
-                    "type": "info"
-                }
+                    "type": "info",
+                },
             }
         else:
-            return {
-                "success": True,
-                "message": f"Тест типа {test_type} выполнен"
-            }
-            
+            return {"success": True, "message": f"Тест типа {test_type} выполнен"}
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка тестирования табло: {str(e)}"
+            detail=f"Ошибка тестирования табло: {str(e)}",
         )
 
 
 # ===================== СТАТИСТИКА ТАБЛО =====================
 
+
 @router.get("/display/stats")
 def get_display_stats(
     days_back: int = 7,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Получить статистику табло"""
     try:
@@ -355,15 +355,11 @@ def get_display_stats(
             "total_banners": 2,
             "uptime_percentage": 99.8,
             "by_board": {
-                "main_board": {
-                    "calls": 45,
-                    "announcements": 3,
-                    "uptime": 99.8
-                }
-            }
+                "main_board": {"calls": 45, "announcements": 3, "uptime": 99.8}
+            },
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения статистики табло: {str(e)}"
+            detail=f"Ошибка получения статистики табло: {str(e)}",
         )

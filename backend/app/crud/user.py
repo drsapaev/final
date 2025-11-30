@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, List
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
-from sqlalchemy import select, or_
+from passlib.context import CryptContext
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 
-from app.models.user import User
 from app.core.config import settings
+from app.models.user import User
 
 # Контекст для хеширования паролей
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
@@ -53,6 +53,7 @@ async def a_get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
 
 # === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
 
+
 def get_user_by_phone(db: Session, phone: str) -> Optional[User]:
     """Получить пользователя по номеру телефона"""
     stmt = select(User).where(User.phone == phone)
@@ -70,12 +71,12 @@ def create_user(db: Session, user_data: dict) -> User:
     # Хешируем пароль если он есть
     if "password" in user_data:
         user_data["hashed_password"] = pwd_context.hash(user_data.pop("password"))
-    
+
     # Устанавливаем значения по умолчанию
     user_data.setdefault("is_active", True)
     user_data.setdefault("is_superuser", False)
     user_data.setdefault("created_at", datetime.utcnow())
-    
+
     user = User(**user_data)
     db.add(user)
     db.commit()
@@ -93,72 +94,112 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     user = get_user_by_username(db, username)
     if not user:
         return None
-    
+
     # Если user - это словарь, получаем объект User
     if isinstance(user, dict):
-        user_obj = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+        user_obj = db.execute(
+            select(User).where(User.username == username)
+        ).scalar_one_or_none()
         if not user_obj or not verify_password(password, user_obj.hashed_password):
             return None
         return user_obj
-    
+
     if not verify_password(password, user.hashed_password):
         return None
-    
+
     return user
 
 
 def get_user_permissions(user: User) -> List[str]:
     """Получить разрешения пользователя"""
     permissions = []
-    
+
     # Базовые разрешения для всех пользователей
     permissions.extend(["read:profile", "update:profile"])
-    
+
     # Разрешения в зависимости от роли
     if user.role == "Admin":
-        permissions.extend([
-            "read:all", "create:all", "update:all", "delete:all",
-            "manage:users", "manage:appointments", "manage:patients",
-            "view:analytics", "manage:settings"
-        ])
+        permissions.extend(
+            [
+                "read:all",
+                "create:all",
+                "update:all",
+                "delete:all",
+                "manage:users",
+                "manage:appointments",
+                "manage:patients",
+                "view:analytics",
+                "manage:settings",
+            ]
+        )
     elif user.role == "Doctor":
-        permissions.extend([
-            "read:patients", "create:appointments", "update:appointments",
-            "read:medical_records", "create:medical_records", "update:medical_records",
-            "read:lab_results", "create:prescriptions"
-        ])
+        permissions.extend(
+            [
+                "read:patients",
+                "create:appointments",
+                "update:appointments",
+                "read:medical_records",
+                "create:medical_records",
+                "update:medical_records",
+                "read:lab_results",
+                "create:prescriptions",
+            ]
+        )
     elif user.role == "Patient":
-        permissions.extend([
-            "read:own_appointments", "create:appointments", "read:own_medical_records",
-            "read:own_lab_results", "read:own_payments"
-        ])
+        permissions.extend(
+            [
+                "read:own_appointments",
+                "create:appointments",
+                "read:own_medical_records",
+                "read:own_lab_results",
+                "read:own_payments",
+            ]
+        )
     elif user.role == "Registrar":
-        permissions.extend([
-            "read:patients", "create:appointments", "update:appointments",
-            "read:appointments", "manage:queue"
-        ])
+        permissions.extend(
+            [
+                "read:patients",
+                "create:appointments",
+                "update:appointments",
+                "read:appointments",
+                "manage:queue",
+            ]
+        )
     elif user.role == "Cashier":
-        permissions.extend([
-            "read:appointments", "update:payments", "read:payments",
-            "create:payments", "read:patients"
-        ])
+        permissions.extend(
+            [
+                "read:appointments",
+                "update:payments",
+                "read:payments",
+                "create:payments",
+                "read:patients",
+            ]
+        )
     elif user.role == "Lab":
-        permissions.extend([
-            "read:lab_tests", "create:lab_tests", "update:lab_tests",
-            "read:lab_results", "create:lab_results", "update:lab_results"
-        ])
-    
+        permissions.extend(
+            [
+                "read:lab_tests",
+                "create:lab_tests",
+                "update:lab_tests",
+                "read:lab_results",
+                "create:lab_results",
+                "update:lab_results",
+            ]
+        )
+
     return permissions
 
 
 def create_access_token(data: dict) -> str:
     """Создать токен доступа"""
     from jose import jwt
-    
+
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.AUTH_SECRET, algorithm=settings.AUTH_ALGORITHM)
+    encoded_jwt = jwt.encode(
+        to_encode, settings.AUTH_SECRET, algorithm=settings.AUTH_ALGORITHM
+    )
     return encoded_jwt
 
 
@@ -167,16 +208,20 @@ def search_users(db: Session, query: str, limit: int = 10) -> List[User]:
     Поиск пользователей по имени, телефону или email
     """
     search_pattern = f"%{query}%"
-    
-    stmt = select(User).where(
-        or_(
-            User.full_name.ilike(search_pattern),
-            User.username.ilike(search_pattern),
-            User.email.ilike(search_pattern),
-            User.phone.ilike(search_pattern)
+
+    stmt = (
+        select(User)
+        .where(
+            or_(
+                User.full_name.ilike(search_pattern),
+                User.username.ilike(search_pattern),
+                User.email.ilike(search_pattern),
+                User.phone.ilike(search_pattern),
+            )
         )
-    ).limit(limit)
-    
+        .limit(limit)
+    )
+
     result = db.execute(stmt)
     return result.scalars().all()
 

@@ -46,6 +46,7 @@ app = FastAPI(
 # Регистрация обработчиков исключений
 # -----------------------------------------------------------------------------
 from app.core.exception_handlers import register_exception_handlers  # noqa: E402
+
 register_exception_handlers(app)
 log.info("Exception handlers registered")
 

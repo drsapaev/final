@@ -11,14 +11,15 @@
 - Error handling
 - Access control
 """
-import pytest
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.models.user import User
+import pytest
+
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
+from app.models.user import User
 
 
 @pytest.fixture(scope="function")

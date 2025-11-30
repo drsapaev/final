@@ -8,7 +8,7 @@ from enum import Enum
 
 class Roles(str, Enum):
     """Роли пользователей в системе"""
-    
+
     # Основные роли
     ADMIN = "Admin"
     REGISTRAR = "Registrar"
@@ -16,12 +16,12 @@ class Roles(str, Enum):
     LAB = "Lab"
     CASHIER = "Cashier"
     MANAGER = "Manager"
-    
+
     # Специализированные роли врачей
     CARDIO = "cardio"
     DERMA = "derma"
     DENTIST = "dentist"
-    
+
     # Дополнительные роли
     NURSE = "Nurse"
     RECEPTIONIST = "Receptionist"
@@ -109,4 +109,3 @@ def get_role_hierarchy(role: str) -> int:
 def has_role_permission(user_role: str, required_role: str) -> bool:
     """Проверяет, имеет ли пользователь достаточные права для доступа"""
     return get_role_hierarchy(user_role) >= get_role_hierarchy(required_role)
-

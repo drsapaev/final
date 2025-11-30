@@ -4,29 +4,32 @@ API endpoints для облачной печати
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
-from app.api.deps import get_db, get_current_user, require_roles
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_user, get_db, require_roles
 from app.core.roles import Roles
 from app.models.user import User
 from app.services.cloud_printing_service import (
-    get_cloud_printing_service,
     CloudPrintingService,
     DocumentFormat,
+    get_cloud_printing_service,
+    PrinterStatus,
     PrintJobStatus,
-    PrinterStatus
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 # Pydantic Models for Requests and Responses
 class PrinterResponse(BaseModel):
     """Ответ с информацией о принтере"""
+
     id: str
     name: str
     description: str
@@ -38,6 +41,7 @@ class PrinterResponse(BaseModel):
 
 class PrintJobRequest(BaseModel):
     """Запрос на печать"""
+
     provider_name: str = Field(..., description="Имя провайдера печати")
     printer_id: str = Field(..., description="ID принтера")
     title: str = Field(..., description="Название документа")
@@ -50,6 +54,7 @@ class PrintJobRequest(BaseModel):
 
 class MedicalDocumentRequest(BaseModel):
     """Запрос на печать медицинского документа"""
+
     provider_name: str = Field(..., description="Имя провайдера печати")
     printer_id: str = Field(..., description="ID принтера")
     document_type: str = Field(..., pattern="^(prescription|receipt|ticket|report)$")
@@ -59,6 +64,7 @@ class MedicalDocumentRequest(BaseModel):
 
 class PrintJobResponse(BaseModel):
     """Ответ с информацией о задании печати"""
+
     success: bool
     job_id: Optional[str] = None
     message: str
@@ -67,6 +73,7 @@ class PrintJobResponse(BaseModel):
 
 class JobStatusResponse(BaseModel):
     """Ответ со статусом задания"""
+
     job_id: str
     status: str
     provider_name: str
@@ -74,17 +81,18 @@ class JobStatusResponse(BaseModel):
 
 # ===================== ПРИНТЕРЫ =====================
 
+
 @router.get("/printers")
 async def get_all_printers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Получить список всех доступных принтеров"""
     try:
         printing_service = get_cloud_printing_service(db)
         all_printers = await printing_service.get_all_printers()
-        
+
         # Преобразуем в плоский список с указанием провайдера
         printers_list = []
         for provider_name, printers in all_printers.items():
@@ -96,15 +104,15 @@ async def get_all_printers(
                     status=printer.status.value,
                     location=printer.location,
                     capabilities=printer.capabilities,
-                    provider=provider_name
+                    provider=provider_name,
                 )
                 printers_list.append(printer_response)
-        
+
         return {
             "success": True,
             "printers": printers_list,
             "total_count": len(printers_list),
-            "providers": list(all_printers.keys())
+            "providers": list(all_printers.keys()),
         }
     except Exception as e:
         logger.error(f"Ошибка получения принтеров: {e}")
@@ -116,19 +124,21 @@ async def get_printers_by_provider(
     provider_name: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Получить принтеры конкретного провайдера"""
     try:
         printing_service = get_cloud_printing_service(db)
         all_printers = await printing_service.get_all_printers()
-        
+
         if provider_name not in all_printers:
-            raise HTTPException(status_code=404, detail=f"Провайдер {provider_name} не найден")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Провайдер {provider_name} не найден"
+            )
+
         printers = all_printers[provider_name]
         printers_list = []
-        
+
         for printer in printers:
             printer_response = PrinterResponse(
                 id=printer.id,
@@ -137,15 +147,15 @@ async def get_printers_by_provider(
                 status=printer.status.value,
                 location=printer.location,
                 capabilities=printer.capabilities,
-                provider=provider_name
+                provider=provider_name,
             )
             printers_list.append(printer_response)
-        
+
         return {
             "success": True,
             "provider": provider_name,
             "printers": printers_list,
-            "count": len(printers_list)
+            "count": len(printers_list),
         }
     except HTTPException:
         raise
@@ -160,16 +170,16 @@ async def get_printer_info(
     printer_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Получить информацию о конкретном принтере"""
     try:
         printing_service = get_cloud_printing_service(db)
         printer = await printing_service.get_printer_by_id(provider_name, printer_id)
-        
+
         if not printer:
             raise HTTPException(status_code=404, detail="Принтер не найден")
-        
+
         return {
             "success": True,
             "printer": PrinterResponse(
@@ -179,8 +189,8 @@ async def get_printer_info(
                 status=printer.status.value,
                 location=printer.location,
                 capabilities=printer.capabilities,
-                provider=provider_name
-            )
+                provider=provider_name,
+            ),
         }
     except HTTPException:
         raise
@@ -191,26 +201,29 @@ async def get_printer_info(
 
 # ===================== ПЕЧАТЬ =====================
 
+
 @router.post("/print", response_model=PrintJobResponse)
 async def print_document(
     request: PrintJobRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Печать документа"""
     try:
         printing_service = get_cloud_printing_service(db)
-        
+
         # Проверяем существование принтера
-        printer = await printing_service.get_printer_by_id(request.provider_name, request.printer_id)
+        printer = await printing_service.get_printer_by_id(
+            request.provider_name, request.printer_id
+        )
         if not printer:
             return PrintJobResponse(
                 success=False,
                 message="Принтер не найден",
-                error="Указанный принтер не существует или недоступен"
+                error="Указанный принтер не существует или недоступен",
             )
-        
+
         # Отправляем задание на печать
         job_id = await printing_service.print_document(
             provider_name=request.provider_name,
@@ -220,29 +233,25 @@ async def print_document(
             format=DocumentFormat(request.format),
             copies=request.copies,
             color=request.color,
-            duplex=request.duplex
+            duplex=request.duplex,
         )
-        
+
         if job_id:
-            logger.info(f"Пользователь {current_user.email} отправил документ '{request.title}' на печать")
+            logger.info(
+                f"Пользователь {current_user.email} отправил документ '{request.title}' на печать"
+            )
             return PrintJobResponse(
-                success=True,
-                job_id=job_id,
-                message="Документ отправлен на печать"
+                success=True, job_id=job_id, message="Документ отправлен на печать"
             )
         else:
             return PrintJobResponse(
                 success=False,
                 message="Не удалось отправить документ на печать",
-                error="Ошибка при создании задания печати"
+                error="Ошибка при создании задания печати",
             )
     except Exception as e:
         logger.error(f"Ошибка печати документа: {e}")
-        return PrintJobResponse(
-            success=False,
-            message="Ошибка печати",
-            error=str(e)
-        )
+        return PrintJobResponse(success=False, message="Ошибка печати", error=str(e))
 
 
 @router.post("/print/medical", response_model=PrintJobResponse)
@@ -250,53 +259,56 @@ async def print_medical_document(
     request: MedicalDocumentRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Печать медицинского документа"""
     try:
         printing_service = get_cloud_printing_service(db)
-        
+
         # Проверяем существование принтера
-        printer = await printing_service.get_printer_by_id(request.provider_name, request.printer_id)
+        printer = await printing_service.get_printer_by_id(
+            request.provider_name, request.printer_id
+        )
         if not printer:
             return PrintJobResponse(
                 success=False,
                 message="Принтер не найден",
-                error="Указанный принтер не существует или недоступен"
+                error="Указанный принтер не существует или недоступен",
             )
-        
+
         # Отправляем медицинский документ на печать
         job_id = await printing_service.print_medical_document(
             provider_name=request.provider_name,
             printer_id=request.printer_id,
             document_type=request.document_type,
             patient_data=request.patient_data,
-            template_data=request.template_data
+            template_data=request.template_data,
         )
-        
+
         if job_id:
-            logger.info(f"Пользователь {current_user.email} отправил медицинский документ '{request.document_type}' на печать")
+            logger.info(
+                f"Пользователь {current_user.email} отправил медицинский документ '{request.document_type}' на печать"
+            )
             return PrintJobResponse(
                 success=True,
                 job_id=job_id,
-                message=f"Медицинский документ '{request.document_type}' отправлен на печать"
+                message=f"Медицинский документ '{request.document_type}' отправлен на печать",
             )
         else:
             return PrintJobResponse(
                 success=False,
                 message="Не удалось отправить медицинский документ на печать",
-                error="Ошибка при создании задания печати"
+                error="Ошибка при создании задания печати",
             )
     except Exception as e:
         logger.error(f"Ошибка печати медицинского документа: {e}")
         return PrintJobResponse(
-            success=False,
-            message="Ошибка печати медицинского документа",
-            error=str(e)
+            success=False, message="Ошибка печати медицинского документа", error=str(e)
         )
 
 
 # ===================== УПРАВЛЕНИЕ ЗАДАНИЯМИ =====================
+
 
 @router.get("/jobs/{provider_name}/{job_id}/status", response_model=JobStatusResponse)
 async def get_job_status(
@@ -304,20 +316,18 @@ async def get_job_status(
     job_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Получить статус задания печати"""
     try:
         printing_service = get_cloud_printing_service(db)
         status = await printing_service.get_job_status(provider_name, job_id)
-        
+
         if status is None:
             raise HTTPException(status_code=404, detail="Задание не найдено")
-        
+
         return JobStatusResponse(
-            job_id=job_id,
-            status=status.value,
-            provider_name=provider_name
+            job_id=job_id, status=status.value, provider_name=provider_name
         )
     except HTTPException:
         raise
@@ -332,25 +342,27 @@ async def cancel_job(
     job_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR, Roles.DOCTOR])),
 ):
     """Отменить задание печати"""
     try:
         printing_service = get_cloud_printing_service(db)
         success = await printing_service.cancel_job(provider_name, job_id)
-        
+
         if success:
-            logger.info(f"Пользователь {current_user.email} отменил задание печати {job_id}")
+            logger.info(
+                f"Пользователь {current_user.email} отменил задание печати {job_id}"
+            )
             return {
                 "success": True,
                 "message": "Задание печати отменено",
-                "job_id": job_id
+                "job_id": job_id,
             }
         else:
             return {
                 "success": False,
                 "message": "Не удалось отменить задание печати",
-                "job_id": job_id
+                "job_id": job_id,
             }
     except Exception as e:
         logger.error(f"Ошибка отмены задания {job_id}: {e}")
@@ -358,6 +370,7 @@ async def cancel_job(
 
 
 # ===================== БЫСТРЫЕ ДЕЙСТВИЯ =====================
+
 
 @router.post("/quick-print/prescription")
 async def quick_print_prescription(
@@ -369,29 +382,33 @@ async def quick_print_prescription(
     doctor_name: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.DOCTOR]))
+    _: None = Depends(require_roles([Roles.DOCTOR])),
 ):
     """Быстрая печать рецепта"""
     try:
         printing_service = get_cloud_printing_service(db)
-        
+
         patient_data = {"patient_name": patient_name}
         template_data = {
             "diagnosis": diagnosis,
             "prescription_text": prescription_text,
-            "doctor_name": doctor_name
+            "doctor_name": doctor_name,
         }
-        
+
         job_id = await printing_service.print_medical_document(
             provider_name=provider_name,
             printer_id=printer_id,
             document_type="prescription",
             patient_data=patient_data,
-            template_data=template_data
+            template_data=template_data,
         )
-        
+
         if job_id:
-            return {"success": True, "job_id": job_id, "message": "Рецепт отправлен на печать"}
+            return {
+                "success": True,
+                "job_id": job_id,
+                "message": "Рецепт отправлен на печать",
+            }
         else:
             return {"success": False, "message": "Не удалось напечатать рецепт"}
     except Exception as e:
@@ -409,29 +426,33 @@ async def quick_print_ticket(
     cabinet: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.REGISTRAR])),
 ):
     """Быстрая печать талона"""
     try:
         printing_service = get_cloud_printing_service(db)
-        
+
         patient_data = {"patient_name": patient_name}
         template_data = {
             "queue_number": queue_number,
             "doctor_name": doctor_name,
-            "cabinet": cabinet
+            "cabinet": cabinet,
         }
-        
+
         job_id = await printing_service.print_medical_document(
             provider_name=provider_name,
             printer_id=printer_id,
             document_type="ticket",
             patient_data=patient_data,
-            template_data=template_data
+            template_data=template_data,
         )
-        
+
         if job_id:
-            return {"success": True, "job_id": job_id, "message": "Талон отправлен на печать"}
+            return {
+                "success": True,
+                "job_id": job_id,
+                "message": "Талон отправлен на печать",
+            }
         else:
             return {"success": False, "message": "Не удалось напечатать талон"}
     except Exception as e:
@@ -441,18 +462,19 @@ async def quick_print_ticket(
 
 # ===================== ТЕСТИРОВАНИЕ =====================
 
+
 @router.post("/test/{provider_name}/{printer_id}")
 async def test_printer(
     provider_name: str,
     printer_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN]))
+    _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Тестовая печать"""
     try:
         printing_service = get_cloud_printing_service(db)
-        
+
         test_content = f"""
         <html>
         <head>
@@ -469,18 +491,22 @@ async def test_printer(
         </body>
         </html>
         """
-        
+
         job_id = await printing_service.print_document(
             provider_name=provider_name,
             printer_id=printer_id,
             title="Тестовая печать",
             content=test_content,
             format=DocumentFormat.HTML,
-            copies=1
+            copies=1,
         )
-        
+
         if job_id:
-            return {"success": True, "job_id": job_id, "message": "Тестовая печать отправлена"}
+            return {
+                "success": True,
+                "job_id": job_id,
+                "message": "Тестовая печать отправлена",
+            }
         else:
             return {"success": False, "message": "Не удалось выполнить тестовую печать"}
     except Exception as e:
@@ -490,29 +516,30 @@ async def test_printer(
 
 # ===================== СТАТИСТИКА =====================
 
+
 @router.get("/statistics")
 async def get_printing_statistics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER]))
+    _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
 ):
     """Получить статистику печати"""
     try:
         printing_service = get_cloud_printing_service(db)
         all_printers = await printing_service.get_all_printers()
-        
+
         # Подсчет статистики
         total_printers = sum(len(printers) for printers in all_printers.values())
         online_printers = 0
         offline_printers = 0
-        
+
         for printers in all_printers.values():
             for printer in printers:
                 if printer.status == PrinterStatus.ONLINE:
                     online_printers += 1
                 else:
                     offline_printers += 1
-        
+
         return {
             "success": True,
             "statistics": {
@@ -520,8 +547,8 @@ async def get_printing_statistics(
                 "online_printers": online_printers,
                 "offline_printers": offline_printers,
                 "providers_count": len(all_printers),
-                "providers": list(all_printers.keys())
-            }
+                "providers": list(all_printers.keys()),
+            },
         }
     except Exception as e:
         logger.error(f"Ошибка получения статистики печати: {e}")

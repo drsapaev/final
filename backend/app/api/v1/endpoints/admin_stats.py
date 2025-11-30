@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, date, timedelta, time, timezone
-from typing import Dict, Any, List, Optional
+from datetime import date, datetime, time, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, desc
+from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit
-from app.models.payment_webhook import PaymentWebhook
 from app.models.appointment import Appointment
-
+from app.models.patient import Patient
+from app.models.payment_webhook import PaymentWebhook
+from app.models.user import User
+from app.models.visit import Visit
 
 router = APIRouter()
 
@@ -58,14 +57,11 @@ def get_admin_stats(
         # Используем сравнение datetime для SQLite совместимости
         today_start = datetime.combine(today, time.min)
         today_end = datetime.combine(today, time.max)
-        
+
         visits_today = (
             db.query(Visit)
             .filter(
-                and_(
-                    Visit.created_at >= today_start,
-                    Visit.created_at <= today_end
-                )
+                and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
             )
             .count()
         )
@@ -79,10 +75,7 @@ def get_admin_stats(
         new_patients_today = (
             db.query(Patient)
             .filter(
-                and_(
-                    Patient.created_at >= today_start,
-                    Patient.created_at <= today_end
-                )
+                and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
             )
             .count()
         )
@@ -130,14 +123,11 @@ def get_quick_stats(
         # Используем сравнение datetime для SQLite совместимости
         today_start = datetime.combine(today, time.min)
         today_end = datetime.combine(today, time.max)
-        
+
         today_visits = (
             db.query(Visit)
             .filter(
-                and_(
-                    Visit.created_at >= today_start,
-                    Visit.created_at <= today_end
-                )
+                and_(Visit.created_at >= today_start, Visit.created_at <= today_end)
             )
             .count()
         )
@@ -145,10 +135,7 @@ def get_quick_stats(
         today_patients = (
             db.query(Patient)
             .filter(
-                and_(
-                    Patient.created_at >= today_start,
-                    Patient.created_at <= today_end
-                )
+                and_(Patient.created_at >= today_start, Patient.created_at <= today_end)
             )
             .count()
         )
@@ -159,7 +146,7 @@ def get_quick_stats(
                 and_(
                     PaymentWebhook.status == "processed",
                     PaymentWebhook.created_at >= today_start,
-                    PaymentWebhook.created_at <= today_end
+                    PaymentWebhook.created_at <= today_end,
                 )
             )
             .all()
@@ -192,7 +179,6 @@ def get_recent_activities(
         activities = []
         now = datetime.now(timezone.utc)
 
-
         # Последние записи (appointments) - фильтруем только записи с created_at
         recent_appointments = (
             db.query(Appointment)
@@ -205,7 +191,9 @@ def get_recent_activities(
         for apt in recent_appointments:
             # Получаем имя пациента
             patient = db.query(Patient).filter(Patient.id == apt.patient_id).first()
-            patient_name = patient.short_name() if patient else f"Пациент #{apt.patient_id}"
+            patient_name = (
+                patient.short_name() if patient else f"Пациент #{apt.patient_id}"
+            )
 
             # Определяем тип сообщения в зависимости от статуса
             if apt.status == "pending":
@@ -243,15 +231,21 @@ def get_recent_activities(
                 days = int(time_diff.total_seconds() / 86400)
                 time_str = f"{days} дней назад"
 
-            activities.append({
-                "id": f"appointment_{apt.id}",
-                "type": "appointment_created" if apt.status == "pending" else "appointment_updated",
-                "message": message,
-                "user": patient_name,
-                "time": time_str,
-                "status": status,
-                "timestamp": apt.created_at.isoformat() if apt.created_at else None,
-            })
+            activities.append(
+                {
+                    "id": f"appointment_{apt.id}",
+                    "type": (
+                        "appointment_created"
+                        if apt.status == "pending"
+                        else "appointment_updated"
+                    ),
+                    "message": message,
+                    "user": patient_name,
+                    "time": time_str,
+                    "status": status,
+                    "timestamp": apt.created_at.isoformat() if apt.created_at else None,
+                }
+            )
 
         # Последние успешные платежи - фильтруем только записи с created_at
         recent_payments = (
@@ -259,7 +253,7 @@ def get_recent_activities(
             .filter(
                 and_(
                     PaymentWebhook.status == "processed",
-                    PaymentWebhook.created_at.isnot(None)
+                    PaymentWebhook.created_at.isnot(None),
                 )
             )
             .order_by(desc(PaymentWebhook.created_at))
@@ -291,15 +285,19 @@ def get_recent_activities(
                 days = int(time_diff.total_seconds() / 86400)
                 time_str = f"{days} дней назад"
 
-            activities.append({
-                "id": f"payment_{payment.id}",
-                "type": "payment_received",
-                "message": f"Получен платеж {amount:.2f} {payment.currency}",
-                "user": f"Транзакция #{payment.transaction_id[:8]}",
-                "time": time_str,
-                "status": "success",
-                "timestamp": payment.created_at.isoformat() if payment.created_at else None,
-            })
+            activities.append(
+                {
+                    "id": f"payment_{payment.id}",
+                    "type": "payment_received",
+                    "message": f"Получен платеж {amount:.2f} {payment.currency}",
+                    "user": f"Транзакция #{payment.transaction_id[:8]}",
+                    "time": time_str,
+                    "status": "success",
+                    "timestamp": (
+                        payment.created_at.isoformat() if payment.created_at else None
+                    ),
+                }
+            )
 
         # Новые регистрации пользователей - фильтруем только записи с created_at
         recent_users = (
@@ -335,19 +333,23 @@ def get_recent_activities(
 
             user_name = user.full_name if user.full_name else user.username
 
-            activities.append({
-                "id": f"user_{user.id}",
-                "type": "user_registration",
-                "message": "Новый пользователь зарегистрирован",
-                "user": user_name,
-                "time": time_str,
-                "status": "success",
-                "timestamp": user.created_at.isoformat() if user.created_at else None,
-            })
+            activities.append(
+                {
+                    "id": f"user_{user.id}",
+                    "type": "user_registration",
+                    "message": "Новый пользователь зарегистрирован",
+                    "user": user_name,
+                    "time": time_str,
+                    "status": "success",
+                    "timestamp": (
+                        user.created_at.isoformat() if user.created_at else None
+                    ),
+                }
+            )
 
         # Сортируем по времени (самые новые первыми)
         activities.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
-        
+
         # Ограничиваем количество
         activities = activities[:limit]
 
@@ -383,7 +385,7 @@ def get_activity_chart(
             # Создаем начало и конец дня как naive datetime (без timezone)
             day_start = datetime.combine(current_date, time.min)
             day_end = datetime.combine(current_date, time.max)
-            
+
             # Подсчет записей за день
             appointments_count = (
                 db.query(Appointment)
@@ -391,7 +393,7 @@ def get_activity_chart(
                     and_(
                         Appointment.created_at.isnot(None),
                         Appointment.created_at >= day_start,
-                        Appointment.created_at <= day_end
+                        Appointment.created_at <= day_end,
                     )
                 )
                 .count()
@@ -405,7 +407,7 @@ def get_activity_chart(
                         PaymentWebhook.status == "processed",
                         PaymentWebhook.created_at.isnot(None),
                         PaymentWebhook.created_at >= day_start,
-                        PaymentWebhook.created_at <= day_end
+                        PaymentWebhook.created_at <= day_end,
                     )
                 )
                 .count()
@@ -418,20 +420,22 @@ def get_activity_chart(
                     and_(
                         User.created_at.isnot(None),
                         User.created_at >= day_start,
-                        User.created_at <= day_end
+                        User.created_at <= day_end,
                     )
                 )
                 .count()
             )
 
             labels.append(current_date.strftime("%d.%m"))
-            chart_data.append({
-                "date": current_date.isoformat(),
-                "appointments": appointments_count,
-                "payments": payments_count,
-                "users": users_count,
-                "total": appointments_count + payments_count + users_count,
-            })
+            chart_data.append(
+                {
+                    "date": current_date.isoformat(),
+                    "appointments": appointments_count,
+                    "payments": payments_count,
+                    "users": users_count,
+                    "total": appointments_count + payments_count + users_count,
+                }
+            )
 
             current_date += timedelta(days=1)
 
@@ -454,7 +458,9 @@ def get_activity_chart(
 
 @router.get("/analytics/overview", summary="Обзор аналитики для админ-панели")
 def get_analytics_overview(
-    period: str = Query("week", description="Период: today, week, month, quarter, year"),
+    period: str = Query(
+        "week", description="Период: today, week, month, quarter, year"
+    ),
     department: Optional[str] = Query(None, description="Отделение (опционально)"),
     doctor_id: Optional[int] = Query(None, description="ID врача (опционально)"),
     db: Session = Depends(get_db),
@@ -464,7 +470,7 @@ def get_analytics_overview(
     try:
         now = datetime.utcnow()
         today = now.date()
-        
+
         # Определяем период
         if period == "today":
             start_date = today
@@ -488,46 +494,49 @@ def get_analytics_overview(
         # Используем сравнение datetime для SQLite совместимости
         start_datetime = datetime.combine(start_date, time.min)
         end_datetime = datetime.combine(end_date, time.max)
-        
+
         appointments_query = db.query(Appointment).filter(
             and_(
                 Appointment.created_at >= start_datetime,
-                Appointment.created_at <= end_datetime
+                Appointment.created_at <= end_datetime,
             )
         )
-        
+
         payments_query = db.query(PaymentWebhook).filter(
             and_(
                 PaymentWebhook.status == "processed",
                 PaymentWebhook.created_at >= start_datetime,
-                PaymentWebhook.created_at <= end_datetime
+                PaymentWebhook.created_at <= end_datetime,
             )
         )
 
         patients_query = db.query(Patient).filter(
             and_(
-                Patient.created_at >= start_datetime,
-                Patient.created_at <= end_datetime
+                Patient.created_at >= start_datetime, Patient.created_at <= end_datetime
             )
         )
 
         # Применяем фильтры
         if department and department != "all":
-            appointments_query = appointments_query.filter(Appointment.department == department)
-        
+            appointments_query = appointments_query.filter(
+                Appointment.department == department
+            )
+
         if doctor_id and doctor_id != 0:
-            appointments_query = appointments_query.filter(Appointment.doctor_id == doctor_id)
+            appointments_query = appointments_query.filter(
+                Appointment.doctor_id == doctor_id
+            )
 
         # Подсчеты
         total_appointments = appointments_query.count()
-        
+
         # Доходы
         payments = payments_query.all()
         total_revenue = sum(float(p.amount) / 100.0 for p in payments)
-        
+
         # Средний чек
         avg_check = total_revenue / len(payments) if len(payments) > 0 else 0
-        
+
         # Пациенты
         total_patients = patients_query.count()
 
@@ -540,33 +549,48 @@ def get_analytics_overview(
 
         # Топ врачи
         from collections import defaultdict
+
         doctor_stats = defaultdict(lambda: {"appointments": 0, "revenue": 0.0})
-        
+
         for apt in appointments_all:
             if apt.doctor_id:
                 doctor_stats[apt.doctor_id]["appointments"] += 1
                 # Доход от этого appointment (если есть payment)
-                apt_payments = [p for p in payments if getattr(p, 'appointment_id', None) == apt.id]
+                apt_payments = [
+                    p for p in payments if getattr(p, 'appointment_id', None) == apt.id
+                ]
                 if apt_payments:
-                    doctor_stats[apt.doctor_id]["revenue"] += sum(float(p.amount) / 100.0 for p in apt_payments)
+                    doctor_stats[apt.doctor_id]["revenue"] += sum(
+                        float(p.amount) / 100.0 for p in apt_payments
+                    )
                 elif apt.payment_amount:
                     doctor_stats[apt.doctor_id]["revenue"] += float(apt.payment_amount)
 
         # Получаем имена врачей
         top_doctors = []
-        for doctor_id, stats in sorted(doctor_stats.items(), key=lambda x: x[1]["appointments"], reverse=True)[:5]:
+        for doctor_id, stats in sorted(
+            doctor_stats.items(), key=lambda x: x[1]["appointments"], reverse=True
+        )[:5]:
             doctor = db.query(User).filter(User.id == doctor_id).first()
             if doctor:
                 doctor_name = doctor.full_name if doctor.full_name else doctor.username
                 # Получаем отделение из первого appointment этого врача
-                doctor_appointments = [apt for apt in appointments_all if apt.doctor_id == doctor_id]
-                department = doctor_appointments[0].department if doctor_appointments and doctor_appointments[0].department else "Неизвестно"
-                top_doctors.append({
-                    "name": doctor_name,
-                    "department": department,
-                    "patients": stats["appointments"],
-                    "revenue": f"{stats['revenue']:.0f} UZS"
-                })
+                doctor_appointments = [
+                    apt for apt in appointments_all if apt.doctor_id == doctor_id
+                ]
+                department = (
+                    doctor_appointments[0].department
+                    if doctor_appointments and doctor_appointments[0].department
+                    else "Неизвестно"
+                )
+                top_doctors.append(
+                    {
+                        "name": doctor_name,
+                        "department": department,
+                        "patients": stats["appointments"],
+                        "revenue": f"{stats['revenue']:.0f} UZS",
+                    }
+                )
 
         return {
             "period": period,
@@ -576,10 +600,10 @@ def get_analytics_overview(
                 "totalAppointments": total_appointments,
                 "totalRevenue": total_revenue,
                 "totalPatients": total_patients,
-                "averageCheck": avg_check
+                "averageCheck": avg_check,
             },
             "appointmentsByStatus": [
-                {"status": status, "count": count} 
+                {"status": status, "count": count}
                 for status, count in status_counts.items()
             ],
             "topDoctors": top_doctors,
@@ -587,15 +611,17 @@ def get_analytics_overview(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Ошибка получения аналитики: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Ошибка получения аналитики: {e}")
 
 
 @router.get("/analytics/charts", summary="Данные для графиков аналитики")
 def get_analytics_charts(
-    period: str = Query("week", description="Период: today, week, month, quarter, year"),
-    chart_type: str = Query("appointments", description="Тип графика: appointments, revenue"),
+    period: str = Query(
+        "week", description="Период: today, week, month, quarter, year"
+    ),
+    chart_type: str = Query(
+        "appointments", description="Тип графика: appointments, revenue"
+    ),
     department: Optional[str] = Query(None, description="Отделение (опционально)"),
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("Admin")),
@@ -604,7 +630,7 @@ def get_analytics_charts(
     try:
         now = datetime.utcnow()
         today = now.date()
-        
+
         # Определяем период
         if period == "today":
             days = 1
@@ -630,15 +656,17 @@ def get_analytics_charts(
             # Используем сравнение datetime для SQLite совместимости
             day_start = datetime.combine(current_date, time.min)
             day_end = datetime.combine(current_date, time.max)
-            
+
             appointments_query = db.query(Appointment).filter(
                 and_(
                     Appointment.created_at >= day_start,
-                    Appointment.created_at <= day_end
+                    Appointment.created_at <= day_end,
                 )
             )
             if department and department != "all":
-                appointments_query = appointments_query.filter(Appointment.department == department)
+                appointments_query = appointments_query.filter(
+                    Appointment.department == department
+                )
             appointments_count = appointments_query.count()
 
             # Доходы за день
@@ -648,7 +676,7 @@ def get_analytics_charts(
                     and_(
                         PaymentWebhook.status == "processed",
                         PaymentWebhook.created_at >= day_start,
-                        PaymentWebhook.created_at <= day_end
+                        PaymentWebhook.created_at <= day_end,
                     )
                 )
                 .all()
@@ -656,11 +684,13 @@ def get_analytics_charts(
             revenue = sum(float(p.amount) / 100.0 for p in payments)
 
             labels.append(current_date.strftime("%d.%m"))
-            chart_data.append({
-                "date": current_date.isoformat(),
-                "appointments": appointments_count,
-                "revenue": revenue
-            })
+            chart_data.append(
+                {
+                    "date": current_date.isoformat(),
+                    "appointments": appointments_count,
+                    "revenue": revenue,
+                }
+            )
 
             current_date += timedelta(days=1)
 

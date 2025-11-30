@@ -20,8 +20,12 @@ class AppointmentBase(ORMModel):
     )  # scheduled, confirmed, cancelled, completed
 
     # Дополнительные поля для регистратуры
-    visit_type: Optional[str] = Field(default="paid", max_length=16)  # paid, repeat, free
-    payment_type: Optional[str] = Field(default="cash", max_length=16)  # cash, card, online
+    visit_type: Optional[str] = Field(
+        default="paid", max_length=16
+    )  # paid, repeat, free
+    payment_type: Optional[str] = Field(
+        default="cash", max_length=16
+    )  # cash, card, online
     services: Optional[List[str]] = Field(default_factory=list)  # Список услуг
 
     # Поля для интеграции с платежами

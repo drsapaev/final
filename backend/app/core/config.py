@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     # --- Auth / JWT ---
     # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите SECRET_KEY через переменную окружения!
     # Используйте: python -c "import secrets; print(secrets.token_urlsafe(32))" для генерации безопасного ключа
-    SECRET_KEY: str = Field(default="dev-secret-key-for-clinic-management-system-change-in-production")  # ⚠️ DEV ONLY: замените в продакшене!
+    SECRET_KEY: str = Field(
+        default="dev-secret-key-for-clinic-management-system-change-in-production"
+    )  # ⚠️ DEV ONLY: замените в продакшене!
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "http://localhost:8080",
-            "http://127.0.0.1:8080"
+            "http://127.0.0.1:8080",
         ]
     )
 
@@ -56,7 +58,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Clinic Manager"
     APP_VERSION: str = "0.9.0"
     ENV: str = "dev"
-    
+
     # --- MCP Settings ---
     MCP_ENABLED: bool = True
     MCP_LOG_REQUESTS: bool = True
@@ -76,39 +78,39 @@ class Settings(BaseSettings):
 
     # ESC/POS settings (may be missing in env; safe defaults)
     PRINTER_TYPE: Optional[str] = None  # none|network|usb
-    
+
     # --- SMS Providers ---
     # Eskiz SMS (Узбекистан)
     ESKIZ_EMAIL: Optional[str] = None
     ESKIZ_PASSWORD: Optional[str] = None
-    
+
     # PlayMobile SMS (Узбекистан)
     PLAYMOBILE_API_KEY: Optional[str] = None
     PLAYMOBILE_API_SECRET: Optional[str] = None
-    
+
     # SMS общие настройки
     SMS_SENDER: str = "Clinic"
     SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock
-    
+
     # --- Firebase Cloud Messaging (FCM) ---
     FCM_SERVER_KEY: Optional[str] = None
     FCM_SENDER_ID: Optional[str] = None
     FCM_PROJECT_ID: Optional[str] = None
     FCM_ENABLED: bool = False
-    
+
     # --- Email Settings ---
     SMTP_SERVER: Optional[str] = None
     SMTP_PORT: int = 587
     SMTP_USERNAME: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_USE_TLS: bool = True
-    
+
     # --- Cloud Printing Settings ---
     # Microsoft Universal Print
     MICROSOFT_PRINT_TENANT_ID: Optional[str] = None
     MICROSOFT_PRINT_CLIENT_ID: Optional[str] = None
     MICROSOFT_PRINT_CLIENT_SECRET: Optional[str] = None
-    
+
     # Cloud Printing общие настройки
     CLOUD_PRINTING_ENABLED: bool = True
     CLOUD_PRINTING_DEFAULT_PROVIDER: str = "mock"  # microsoft, mock

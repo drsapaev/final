@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, Integer, String, ForeignKey
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -13,7 +13,9 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, unique=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, unique=True
+    )
     last_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     middle_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
@@ -44,20 +46,24 @@ class Patient(Base):
         last_name = (self.last_name or "").strip()
         first_name = (self.first_name or "").strip()
         middle_name = (self.middle_name or "").strip() if self.middle_name else ""
-        
+
         # Если оба поля пустые - это ошибка данных, но возвращаем fallback
         if not last_name and not first_name:
             return f"Пациент ID={self.id}" if self.id else "Неизвестный пациент"
-        
+
         # Если одно из полей пустое - используем другое для обоих
         if not last_name and first_name:
             last_name = first_name
         elif last_name and not first_name:
             first_name = last_name
-        
+
         # Формируем имя
         mid = f" {middle_name}" if middle_name else ""
         result = f"{last_name} {first_name}{mid}".strip()
-        
+
         # Финальная проверка - если все еще пустое (не должно произойти)
-        return result if result else f"Пациент ID={self.id}" if self.id else "Неизвестный пациент"
+        return (
+            result
+            if result
+            else f"Пациент ID={self.id}" if self.id else "Неизвестный пациент"
+        )

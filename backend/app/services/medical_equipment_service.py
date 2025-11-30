@@ -3,19 +3,20 @@
 Поддерживает различные типы медицинских устройств и протоколы связи
 """
 
-import logging
-import json
 import asyncio
-import serial
+import json
+import logging
 import socket
 import struct
-from typing import Dict, List, Optional, Any, Union
-from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, asdict
-from sqlalchemy.orm import Session
+from typing import Any, Dict, List, Optional, Union
+
 import requests
+import serial
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class DeviceType(str, Enum):
     """Типы медицинских устройств"""
+
     ECG = "ecg"  # ЭКГ аппарат
     BLOOD_PRESSURE = "blood_pressure"  # Тонометр
     PULSE_OXIMETER = "pulse_oximeter"  # Пульсоксиметр
@@ -39,6 +41,7 @@ class DeviceType(str, Enum):
 
 class DeviceStatus(str, Enum):
     """Статусы устройств"""
+
     ONLINE = "online"
     OFFLINE = "offline"
     ERROR = "error"
@@ -49,6 +52,7 @@ class DeviceStatus(str, Enum):
 
 class ConnectionType(str, Enum):
     """Типы подключения"""
+
     SERIAL = "serial"  # COM порт
     TCP = "tcp"  # TCP/IP
     UDP = "udp"  # UDP
@@ -61,6 +65,7 @@ class ConnectionType(str, Enum):
 @dataclass
 class MeasurementData:
     """Данные измерения"""
+
     device_id: str
     device_type: DeviceType
     timestamp: datetime
@@ -80,6 +85,7 @@ class MeasurementData:
 @dataclass
 class DeviceInfo:
     """Информация об устройстве"""
+
     id: str
     name: str
     device_type: DeviceType
@@ -125,7 +131,9 @@ class BaseDeviceDriver(ABC):
         pass
 
     @abstractmethod
-    async def take_measurement(self, patient_id: Optional[str] = None) -> Optional[MeasurementData]:
+    async def take_measurement(
+        self, patient_id: Optional[str] = None
+    ) -> Optional[MeasurementData]:
         """Выполнить измерение"""
         pass
 
@@ -151,12 +159,14 @@ class SerialDeviceDriver(BaseDeviceDriver):
                 bytesize=params.get('bytesize', 8),
                 parity=params.get('parity', 'N'),
                 stopbits=params.get('stopbits', 1),
-                timeout=params.get('timeout', 1)
+                timeout=params.get('timeout', 1),
             )
             self.is_connected = True
             self.device_info.status = DeviceStatus.ONLINE
             self.device_info.last_seen = datetime.now()
-            logger.info(f"Подключено к устройству {self.device_info.id} через {params.get('port')}")
+            logger.info(
+                f"Подключено к устройству {self.device_info.id} через {params.get('port')}"
+            )
             return True
         except Exception as e:
             logger.error(f"Ошибка подключения к устройству {self.device_info.id}: {e}")
@@ -178,7 +188,7 @@ class SerialDeviceDriver(BaseDeviceDriver):
     async def get_status(self) -> DeviceStatus:
         if not self.is_connected:
             return DeviceStatus.OFFLINE
-        
+
         try:
             # Отправляем команду статуса (зависит от протокола устройства)
             if self.connection and self.connection.is_open:
@@ -189,23 +199,27 @@ class SerialDeviceDriver(BaseDeviceDriver):
                     return DeviceStatus.ONLINE
             return DeviceStatus.ERROR
         except Exception as e:
-            logger.error(f"Ошибка получения статуса устройства {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка получения статуса устройства {self.device_info.id}: {e}"
+            )
             return DeviceStatus.ERROR
 
-    async def take_measurement(self, patient_id: Optional[str] = None) -> Optional[MeasurementData]:
+    async def take_measurement(
+        self, patient_id: Optional[str] = None
+    ) -> Optional[MeasurementData]:
         if not self.is_connected:
             await self.connect()
-        
+
         try:
             # Отправляем команду измерения
             self.connection.write(b'MEASURE\r\n')
             await asyncio.sleep(2)  # Ждем завершения измерения
-            
+
             response = self.connection.readline().decode().strip()
             if response:
                 # Парсим ответ в зависимости от типа устройства
                 measurements = self._parse_measurement_data(response)
-                
+
                 measurement = MeasurementData(
                     device_id=self.device_info.id,
                     device_type=self.device_info.device_type,
@@ -213,26 +227,26 @@ class SerialDeviceDriver(BaseDeviceDriver):
                     patient_id=patient_id,
                     measurements=measurements,
                     raw_data=response,
-                    quality_score=self._calculate_quality_score(measurements)
+                    quality_score=self._calculate_quality_score(measurements),
                 )
-                
+
                 self.device_info.last_measurement = datetime.now()
                 logger.info(f"Измерение выполнено устройством {self.device_info.id}")
                 return measurement
         except Exception as e:
             logger.error(f"Ошибка измерения устройством {self.device_info.id}: {e}")
-        
+
         return None
 
     async def calibrate(self) -> bool:
         try:
             if not self.is_connected:
                 await self.connect()
-            
+
             self.device_info.status = DeviceStatus.CALIBRATING
             self.connection.write(b'CALIBRATE\r\n')
             await asyncio.sleep(10)  # Ждем завершения калибровки
-            
+
             response = self.connection.readline().decode().strip()
             if 'OK' in response:
                 self.device_info.calibration_date = datetime.now()
@@ -250,7 +264,7 @@ class SerialDeviceDriver(BaseDeviceDriver):
     def _parse_measurement_data(self, raw_data: str) -> Dict[str, Any]:
         """Парсинг данных измерения в зависимости от типа устройства"""
         measurements = {}
-        
+
         try:
             if self.device_info.device_type == DeviceType.BLOOD_PRESSURE:
                 # Пример: "SYS:120,DIA:80,PULSE:72"
@@ -258,34 +272,34 @@ class SerialDeviceDriver(BaseDeviceDriver):
                 for part in parts:
                     key, value = part.split(':')
                     measurements[key.lower()] = int(value)
-            
+
             elif self.device_info.device_type == DeviceType.PULSE_OXIMETER:
                 # Пример: "SPO2:98,PULSE:75"
                 parts = raw_data.split(',')
                 for part in parts:
                     key, value = part.split(':')
                     measurements[key.lower()] = int(value)
-            
+
             elif self.device_info.device_type == DeviceType.GLUCOMETER:
                 # Пример: "GLUCOSE:5.6"
                 measurements['glucose'] = float(raw_data.split(':')[1])
-            
+
             elif self.device_info.device_type == DeviceType.THERMOMETER:
                 # Пример: "TEMP:36.6"
                 measurements['temperature'] = float(raw_data.split(':')[1])
-            
+
             elif self.device_info.device_type == DeviceType.SCALE:
                 # Пример: "WEIGHT:70.5"
                 measurements['weight'] = float(raw_data.split(':')[1])
-            
+
             else:
                 # Общий парсинг
                 measurements['value'] = raw_data
-        
+
         except Exception as e:
             logger.error(f"Ошибка парсинга данных {raw_data}: {e}")
             measurements['raw'] = raw_data
-        
+
         return measurements
 
     def _calculate_quality_score(self, measurements: Dict[str, Any]) -> float:
@@ -293,13 +307,13 @@ class SerialDeviceDriver(BaseDeviceDriver):
         # Простая оценка качества на основе наличия данных
         if not measurements:
             return 0.0
-        
+
         score = 1.0
-        
+
         # Проверяем наличие основных параметров
         if 'raw' in measurements:
             score *= 0.5  # Низкое качество если не удалось распарсить
-        
+
         # Дополнительные проверки в зависимости от типа устройства
         if self.device_info.device_type == DeviceType.BLOOD_PRESSURE:
             if 'sys' in measurements and 'dia' in measurements:
@@ -309,7 +323,7 @@ class SerialDeviceDriver(BaseDeviceDriver):
                     score *= 1.0
                 else:
                     score *= 0.7  # Подозрительные значения
-        
+
         return min(score, 1.0)
 
 
@@ -328,7 +342,9 @@ class TCPDeviceDriver(BaseDeviceDriver):
             logger.info(f"TCP подключение к устройству {self.device_info.id}")
             return True
         except Exception as e:
-            logger.error(f"Ошибка TCP подключения к устройству {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка TCP подключения к устройству {self.device_info.id}: {e}"
+            )
             self.device_info.status = DeviceStatus.ERROR
             return False
 
@@ -340,13 +356,15 @@ class TCPDeviceDriver(BaseDeviceDriver):
             self.device_info.status = DeviceStatus.OFFLINE
             return True
         except Exception as e:
-            logger.error(f"Ошибка TCP отключения от устройства {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка TCP отключения от устройства {self.device_info.id}: {e}"
+            )
             return False
 
     async def get_status(self) -> DeviceStatus:
         if not self.is_connected:
             return DeviceStatus.OFFLINE
-        
+
         try:
             self.connection.send(b'STATUS\n')
             response = self.connection.recv(1024).decode().strip()
@@ -355,45 +373,49 @@ class TCPDeviceDriver(BaseDeviceDriver):
                 return DeviceStatus.ONLINE
             return DeviceStatus.ERROR
         except Exception as e:
-            logger.error(f"Ошибка получения TCP статуса устройства {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка получения TCP статуса устройства {self.device_info.id}: {e}"
+            )
             return DeviceStatus.ERROR
 
-    async def take_measurement(self, patient_id: Optional[str] = None) -> Optional[MeasurementData]:
+    async def take_measurement(
+        self, patient_id: Optional[str] = None
+    ) -> Optional[MeasurementData]:
         if not self.is_connected:
             await self.connect()
-        
+
         try:
             self.connection.send(b'MEASURE\n')
             response = self.connection.recv(1024).decode().strip()
-            
+
             if response:
                 measurements = self._parse_tcp_data(response)
-                
+
                 measurement = MeasurementData(
                     device_id=self.device_info.id,
                     device_type=self.device_info.device_type,
                     timestamp=datetime.now(),
                     patient_id=patient_id,
                     measurements=measurements,
-                    raw_data=response
+                    raw_data=response,
                 )
-                
+
                 self.device_info.last_measurement = datetime.now()
                 return measurement
         except Exception as e:
             logger.error(f"Ошибка TCP измерения устройством {self.device_info.id}: {e}")
-        
+
         return None
 
     async def calibrate(self) -> bool:
         try:
             if not self.is_connected:
                 await self.connect()
-            
+
             self.device_info.status = DeviceStatus.CALIBRATING
             self.connection.send(b'CALIBRATE\n')
             response = self.connection.recv(1024).decode().strip()
-            
+
             if 'OK' in response:
                 self.device_info.calibration_date = datetime.now()
                 self.device_info.status = DeviceStatus.ONLINE
@@ -433,14 +455,14 @@ class HTTPDeviceDriver(BaseDeviceDriver):
             params = self.device_info.connection_params
             base_url = params.get('base_url')
             auth = params.get('auth', {})
-            
+
             # Тестовый запрос для проверки подключения
             response = requests.get(
                 f"{base_url}/status",
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
-                timeout=params.get('timeout', 5)
+                timeout=params.get('timeout', 5),
             )
-            
+
             if response.status_code == 200:
                 self.is_connected = True
                 self.device_info.status = DeviceStatus.ONLINE
@@ -451,7 +473,9 @@ class HTTPDeviceDriver(BaseDeviceDriver):
                 self.device_info.status = DeviceStatus.ERROR
                 return False
         except Exception as e:
-            logger.error(f"Ошибка HTTP подключения к устройству {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка HTTP подключения к устройству {self.device_info.id}: {e}"
+            )
             self.device_info.status = DeviceStatus.ERROR
             return False
 
@@ -465,40 +489,44 @@ class HTTPDeviceDriver(BaseDeviceDriver):
             params = self.device_info.connection_params
             base_url = params.get('base_url')
             auth = params.get('auth', {})
-            
+
             response = requests.get(
                 f"{base_url}/status",
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
-                timeout=params.get('timeout', 5)
+                timeout=params.get('timeout', 5),
             )
-            
+
             if response.status_code == 200:
                 self.device_info.last_seen = datetime.now()
                 return DeviceStatus.ONLINE
             else:
                 return DeviceStatus.ERROR
         except Exception as e:
-            logger.error(f"Ошибка получения HTTP статуса устройства {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка получения HTTP статуса устройства {self.device_info.id}: {e}"
+            )
             return DeviceStatus.ERROR
 
-    async def take_measurement(self, patient_id: Optional[str] = None) -> Optional[MeasurementData]:
+    async def take_measurement(
+        self, patient_id: Optional[str] = None
+    ) -> Optional[MeasurementData]:
         try:
             params = self.device_info.connection_params
             base_url = params.get('base_url')
             auth = params.get('auth', {})
-            
+
             data = {'patient_id': patient_id} if patient_id else {}
-            
+
             response = requests.post(
                 f"{base_url}/measure",
                 json=data,
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
-                timeout=params.get('timeout', 30)
+                timeout=params.get('timeout', 30),
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
-                
+
                 measurement = MeasurementData(
                     device_id=self.device_info.id,
                     device_type=self.device_info.device_type,
@@ -506,14 +534,16 @@ class HTTPDeviceDriver(BaseDeviceDriver):
                     patient_id=patient_id,
                     measurements=result.get('measurements', {}),
                     raw_data=json.dumps(result),
-                    quality_score=result.get('quality_score', 1.0)
+                    quality_score=result.get('quality_score', 1.0),
                 )
-                
+
                 self.device_info.last_measurement = datetime.now()
                 return measurement
         except Exception as e:
-            logger.error(f"Ошибка HTTP измерения устройством {self.device_info.id}: {e}")
-        
+            logger.error(
+                f"Ошибка HTTP измерения устройством {self.device_info.id}: {e}"
+            )
+
         return None
 
     async def calibrate(self) -> bool:
@@ -521,26 +551,28 @@ class HTTPDeviceDriver(BaseDeviceDriver):
             params = self.device_info.connection_params
             base_url = params.get('base_url')
             auth = params.get('auth', {})
-            
+
             self.device_info.status = DeviceStatus.CALIBRATING
-            
+
             response = requests.post(
                 f"{base_url}/calibrate",
                 auth=(auth.get('username'), auth.get('password')) if auth else None,
-                timeout=params.get('timeout', 60)
+                timeout=params.get('timeout', 60),
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
                 if result.get('success'):
                     self.device_info.calibration_date = datetime.now()
                     self.device_info.status = DeviceStatus.ONLINE
                     return True
-            
+
             self.device_info.status = DeviceStatus.ERROR
             return False
         except Exception as e:
-            logger.error(f"Ошибка HTTP калибровки устройства {self.device_info.id}: {e}")
+            logger.error(
+                f"Ошибка HTTP калибровки устройства {self.device_info.id}: {e}"
+            )
             self.device_info.status = DeviceStatus.ERROR
             return False
 
@@ -565,12 +597,14 @@ class MockDeviceDriver(BaseDeviceDriver):
         self.device_info.last_seen = datetime.now()
         return DeviceStatus.ONLINE if self.is_connected else DeviceStatus.OFFLINE
 
-    async def take_measurement(self, patient_id: Optional[str] = None) -> Optional[MeasurementData]:
+    async def take_measurement(
+        self, patient_id: Optional[str] = None
+    ) -> Optional[MeasurementData]:
         await asyncio.sleep(1)  # Имитация измерения
-        
+
         # Генерируем тестовые данные в зависимости от типа устройства
         measurements = self._generate_mock_data()
-        
+
         measurement = MeasurementData(
             device_id=self.device_info.id,
             device_type=self.device_info.device_type,
@@ -578,9 +612,9 @@ class MockDeviceDriver(BaseDeviceDriver):
             patient_id=patient_id,
             measurements=measurements,
             raw_data=json.dumps(measurements),
-            quality_score=0.95
+            quality_score=0.95,
         )
-        
+
         self.device_info.last_measurement = datetime.now()
         return measurement
 
@@ -592,35 +626,23 @@ class MockDeviceDriver(BaseDeviceDriver):
     def _generate_mock_data(self) -> Dict[str, Any]:
         """Генерация тестовых данных"""
         import random
-        
+
         if self.device_info.device_type == DeviceType.BLOOD_PRESSURE:
             return {
                 'sys': random.randint(110, 140),
                 'dia': random.randint(70, 90),
-                'pulse': random.randint(60, 80)
+                'pulse': random.randint(60, 80),
             }
         elif self.device_info.device_type == DeviceType.PULSE_OXIMETER:
-            return {
-                'spo2': random.randint(95, 100),
-                'pulse': random.randint(60, 80)
-            }
+            return {'spo2': random.randint(95, 100), 'pulse': random.randint(60, 80)}
         elif self.device_info.device_type == DeviceType.GLUCOMETER:
-            return {
-                'glucose': round(random.uniform(4.0, 7.0), 1)
-            }
+            return {'glucose': round(random.uniform(4.0, 7.0), 1)}
         elif self.device_info.device_type == DeviceType.THERMOMETER:
-            return {
-                'temperature': round(random.uniform(36.0, 37.5), 1)
-            }
+            return {'temperature': round(random.uniform(36.0, 37.5), 1)}
         elif self.device_info.device_type == DeviceType.SCALE:
-            return {
-                'weight': round(random.uniform(50.0, 100.0), 1)
-            }
+            return {'weight': round(random.uniform(50.0, 100.0), 1)}
         else:
-            return {
-                'value': random.randint(50, 150),
-                'unit': 'units'
-            }
+            return {'value': random.randint(50, 150), 'unit': 'units'}
 
 
 class MedicalEquipmentService:
@@ -647,7 +669,7 @@ class MedicalEquipmentService:
                 connection_type=ConnectionType.MOCK,
                 connection_params={},
                 status=DeviceStatus.OFFLINE,
-                location="Кабинет 101"
+                location="Кабинет 101",
             ),
             DeviceInfo(
                 id="po-001",
@@ -660,7 +682,7 @@ class MedicalEquipmentService:
                 connection_type=ConnectionType.MOCK,
                 connection_params={},
                 status=DeviceStatus.OFFLINE,
-                location="Кабинет 102"
+                location="Кабинет 102",
             ),
             DeviceInfo(
                 id="gl-001",
@@ -673,7 +695,7 @@ class MedicalEquipmentService:
                 connection_type=ConnectionType.MOCK,
                 connection_params={},
                 status=DeviceStatus.OFFLINE,
-                location="Лаборатория"
+                location="Лаборатория",
             ),
             DeviceInfo(
                 id="th-001",
@@ -686,7 +708,7 @@ class MedicalEquipmentService:
                 connection_type=ConnectionType.MOCK,
                 connection_params={},
                 status=DeviceStatus.OFFLINE,
-                location="Приемная"
+                location="Приемная",
             ),
             DeviceInfo(
                 id="sc-001",
@@ -699,8 +721,8 @@ class MedicalEquipmentService:
                 connection_type=ConnectionType.MOCK,
                 connection_params={},
                 status=DeviceStatus.OFFLINE,
-                location="Кабинет врача"
-            )
+                location="Кабинет врача",
+            ),
         ]
 
         for device_info in mock_devices:
@@ -722,10 +744,14 @@ class MedicalEquipmentService:
             elif device_info.connection_type == ConnectionType.MOCK:
                 return MockDeviceDriver(device_info)
             else:
-                logger.warning(f"Неподдерживаемый тип подключения: {device_info.connection_type}")
+                logger.warning(
+                    f"Неподдерживаемый тип подключения: {device_info.connection_type}"
+                )
                 return None
         except Exception as e:
-            logger.error(f"Ошибка создания драйвера для устройства {device_info.id}: {e}")
+            logger.error(
+                f"Ошибка создания драйвера для устройства {device_info.id}: {e}"
+            )
             return None
 
     async def get_all_devices(self) -> List[DeviceInfo]:
@@ -764,14 +790,18 @@ class MedicalEquipmentService:
             return await driver.get_status()
         return None
 
-    async def take_measurement(self, device_id: str, patient_id: Optional[str] = None) -> Optional[MeasurementData]:
+    async def take_measurement(
+        self, device_id: str, patient_id: Optional[str] = None
+    ) -> Optional[MeasurementData]:
         """Выполнить измерение"""
         driver = self.devices.get(device_id)
         if driver:
             measurement = await driver.take_measurement(patient_id)
             if measurement:
                 self.measurements.append(measurement)
-                logger.info(f"Измерение сохранено: {device_id} -> {measurement.measurements}")
+                logger.info(
+                    f"Измерение сохранено: {device_id} -> {measurement.measurements}"
+                )
             return measurement
         return None
 
@@ -789,25 +819,35 @@ class MedicalEquipmentService:
         device_type: Optional[DeviceType] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[MeasurementData]:
         """Получить измерения с фильтрацией"""
         filtered_measurements = self.measurements
 
         if device_id:
-            filtered_measurements = [m for m in filtered_measurements if m.device_id == device_id]
-        
+            filtered_measurements = [
+                m for m in filtered_measurements if m.device_id == device_id
+            ]
+
         if patient_id:
-            filtered_measurements = [m for m in filtered_measurements if m.patient_id == patient_id]
-        
+            filtered_measurements = [
+                m for m in filtered_measurements if m.patient_id == patient_id
+            ]
+
         if device_type:
-            filtered_measurements = [m for m in filtered_measurements if m.device_type == device_type]
-        
+            filtered_measurements = [
+                m for m in filtered_measurements if m.device_type == device_type
+            ]
+
         if start_date:
-            filtered_measurements = [m for m in filtered_measurements if m.timestamp >= start_date]
-        
+            filtered_measurements = [
+                m for m in filtered_measurements if m.timestamp >= start_date
+            ]
+
         if end_date:
-            filtered_measurements = [m for m in filtered_measurements if m.timestamp <= end_date]
+            filtered_measurements = [
+                m for m in filtered_measurements if m.timestamp <= end_date
+            ]
 
         # Сортируем по времени (новые первые) и ограничиваем количество
         filtered_measurements.sort(key=lambda x: x.timestamp, reverse=True)
@@ -816,27 +856,41 @@ class MedicalEquipmentService:
     async def get_device_statistics(self, device_id: str) -> Dict[str, Any]:
         """Получить статистику устройства"""
         device_measurements = [m for m in self.measurements if m.device_id == device_id]
-        
+
         if not device_measurements:
             return {
                 "total_measurements": 0,
                 "last_measurement": None,
-                "average_quality": 0.0
+                "average_quality": 0.0,
             }
 
         total_measurements = len(device_measurements)
         last_measurement = max(device_measurements, key=lambda x: x.timestamp)
-        quality_scores = [m.quality_score for m in device_measurements if m.quality_score is not None]
-        average_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+        quality_scores = [
+            m.quality_score for m in device_measurements if m.quality_score is not None
+        ]
+        average_quality = (
+            sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+        )
 
         return {
             "total_measurements": total_measurements,
             "last_measurement": last_measurement.timestamp,
             "average_quality": round(average_quality, 2),
-            "measurements_today": len([m for m in device_measurements 
-                                     if m.timestamp.date() == datetime.now().date()]),
-            "measurements_this_week": len([m for m in device_measurements 
-                                         if m.timestamp >= datetime.now() - timedelta(days=7)])
+            "measurements_today": len(
+                [
+                    m
+                    for m in device_measurements
+                    if m.timestamp.date() == datetime.now().date()
+                ]
+            ),
+            "measurements_this_week": len(
+                [
+                    m
+                    for m in device_measurements
+                    if m.timestamp >= datetime.now() - timedelta(days=7)
+                ]
+            ),
         }
 
     async def run_diagnostics(self, device_id: str) -> Dict[str, Any]:
@@ -845,18 +899,16 @@ class MedicalEquipmentService:
         if not driver:
             return {"success": False, "error": "Устройство не найдено"}
 
-        results = {
-            "device_id": device_id,
-            "timestamp": datetime.now(),
-            "tests": {}
-        }
+        results = {"device_id": device_id, "timestamp": datetime.now(), "tests": {}}
 
         try:
             # Тест подключения
             connection_test = await driver.connect()
             results["tests"]["connection"] = {
                 "passed": connection_test,
-                "message": "Подключение успешно" if connection_test else "Ошибка подключения"
+                "message": (
+                    "Подключение успешно" if connection_test else "Ошибка подключения"
+                ),
             }
 
             if connection_test:
@@ -865,7 +917,7 @@ class MedicalEquipmentService:
                 results["tests"]["status"] = {
                     "passed": status == DeviceStatus.ONLINE,
                     "status": status.value,
-                    "message": f"Статус: {status.value}"
+                    "message": f"Статус: {status.value}",
                 }
 
                 # Тест измерения
@@ -873,24 +925,32 @@ class MedicalEquipmentService:
                     measurement = await driver.take_measurement()
                     results["tests"]["measurement"] = {
                         "passed": measurement is not None,
-                        "message": "Тестовое измерение выполнено" if measurement else "Ошибка измерения",
-                        "data": asdict(measurement) if measurement else None
+                        "message": (
+                            "Тестовое измерение выполнено"
+                            if measurement
+                            else "Ошибка измерения"
+                        ),
+                        "data": asdict(measurement) if measurement else None,
                     }
                 except Exception as e:
                     results["tests"]["measurement"] = {
                         "passed": False,
-                        "message": f"Ошибка измерения: {str(e)}"
+                        "message": f"Ошибка измерения: {str(e)}",
                     }
 
-            results["success"] = all(test["passed"] for test in results["tests"].values())
-            
+            results["success"] = all(
+                test["passed"] for test in results["tests"].values()
+            )
+
         except Exception as e:
             results["success"] = False
             results["error"] = str(e)
 
         return results
 
-    async def update_device_config(self, device_id: str, config: Dict[str, Any]) -> bool:
+    async def update_device_config(
+        self, device_id: str, config: Dict[str, Any]
+    ) -> bool:
         """Обновить конфигурацию устройства"""
         driver = self.devices.get(device_id)
         if not driver:
@@ -900,7 +960,7 @@ class MedicalEquipmentService:
             # Обновляем параметры подключения
             if 'connection_params' in config:
                 driver.device_info.connection_params.update(config['connection_params'])
-            
+
             # Обновляем другие параметры
             for key, value in config.items():
                 if hasattr(driver.device_info, key) and key != 'connection_params':
@@ -917,14 +977,11 @@ class MedicalEquipmentService:
         format: str = "json",
         device_id: Optional[str] = None,
         start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
+        end_date: Optional[datetime] = None,
     ) -> Optional[str]:
         """Экспорт измерений"""
         measurements = await self.get_measurements(
-            device_id=device_id,
-            start_date=start_date,
-            end_date=end_date,
-            limit=10000
+            device_id=device_id, start_date=start_date, end_date=end_date, limit=10000
         )
 
         if not measurements:
@@ -932,29 +989,40 @@ class MedicalEquipmentService:
 
         try:
             if format.lower() == "json":
-                return json.dumps([asdict(m) for m in measurements], default=str, indent=2)
+                return json.dumps(
+                    [asdict(m) for m in measurements], default=str, indent=2
+                )
             elif format.lower() == "csv":
                 import csv
                 import io
-                
+
                 output = io.StringIO()
                 writer = csv.writer(output)
-                
+
                 # Заголовки
-                headers = ['device_id', 'device_type', 'timestamp', 'patient_id', 'measurements', 'quality_score']
+                headers = [
+                    'device_id',
+                    'device_type',
+                    'timestamp',
+                    'patient_id',
+                    'measurements',
+                    'quality_score',
+                ]
                 writer.writerow(headers)
-                
+
                 # Данные
                 for m in measurements:
-                    writer.writerow([
-                        m.device_id,
-                        m.device_type.value,
-                        m.timestamp.isoformat(),
-                        m.patient_id or '',
-                        json.dumps(m.measurements),
-                        m.quality_score or ''
-                    ])
-                
+                    writer.writerow(
+                        [
+                            m.device_id,
+                            m.device_type.value,
+                            m.timestamp.isoformat(),
+                            m.patient_id or '',
+                            json.dumps(m.measurements),
+                            m.quality_score or '',
+                        ]
+                    )
+
                 return output.getvalue()
             else:
                 return None
@@ -966,4 +1034,3 @@ class MedicalEquipmentService:
 def get_medical_equipment_service(db: Session) -> MedicalEquipmentService:
     """Получить экземпляр сервиса медицинского оборудования"""
     return MedicalEquipmentService(db)
-

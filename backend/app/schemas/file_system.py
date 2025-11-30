@@ -1,12 +1,14 @@
 """
 Схемы для файловой системы
 """
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any
+
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from app.models.file_system import FileType, FileStatus, FilePermission
+from pydantic import BaseModel, Field, validator
+
+from app.models.file_system import FilePermission, FileStatus, FileType
 
 
 class FileTypeEnum(str, Enum):
@@ -41,6 +43,7 @@ class FilePermissionEnum(str, Enum):
 
 
 # ===================== ФАЙЛЫ =====================
+
 
 class FileBase(BaseModel):
     filename: str = Field(..., max_length=255)
@@ -82,7 +85,7 @@ class FileOut(FileBase):
     owner_id: int
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -96,6 +99,7 @@ class FileList(BaseModel):
 
 
 # ===================== ВЕРСИИ ФАЙЛОВ =====================
+
 
 class FileVersionBase(BaseModel):
     version_number: int = Field(..., gt=0)
@@ -116,12 +120,13 @@ class FileVersionOut(FileVersionBase):
     file_hash: Optional[str]
     created_by: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 # ===================== СОВМЕСТНОЕ ИСПОЛЬЗОВАНИЕ =====================
+
 
 class FileShareBase(BaseModel):
     shared_with_user_id: Optional[int] = None
@@ -147,12 +152,13 @@ class FileShareOut(FileShareBase):
     is_active: bool
     created_by: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 # ===================== ПАПКИ =====================
+
 
 class FileFolderBase(BaseModel):
     name: str = Field(..., max_length=255)
@@ -176,7 +182,7 @@ class FileFolderOut(FileFolderBase):
     is_system: bool
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -187,6 +193,7 @@ class FileFolderTree(FileFolderOut):
 
 
 # ===================== ЗАГРУЗКА ФАЙЛОВ =====================
+
 
 class FileUploadRequest(BaseModel):
     filename: str = Field(..., max_length=255)
@@ -219,6 +226,7 @@ class FileUploadComplete(BaseModel):
 
 # ===================== ПОИСК И ФИЛЬТРАЦИЯ =====================
 
+
 class FileSearchRequest(BaseModel):
     query: Optional[str] = None
     file_type: Optional[FileTypeEnum] = None
@@ -248,6 +256,7 @@ class FileSearchResponse(BaseModel):
 
 # ===================== КВОТЫ =====================
 
+
 class FileQuotaBase(BaseModel):
     max_storage_bytes: int = Field(..., gt=0)
     max_files: Optional[int] = Field(None, gt=0)
@@ -269,12 +278,13 @@ class FileQuotaOut(FileQuotaBase):
     used_files: int
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 # ===================== ХРАНИЛИЩЕ =====================
+
 
 class FileStorageBase(BaseModel):
     name: str = Field(..., max_length=100)
@@ -302,12 +312,13 @@ class FileStorageOut(FileStorageBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 # ===================== СТАТИСТИКА =====================
+
 
 class FileStats(BaseModel):
     total_files: int
@@ -319,6 +330,7 @@ class FileStats(BaseModel):
 
 
 # ===================== ЭКСПОРТ/ИМПОРТ =====================
+
 
 class FileExportRequest(BaseModel):
     file_ids: List[int]
@@ -350,6 +362,7 @@ class FileImportResponse(BaseModel):
 
 # ===================== ВАЛИДАТОРЫ =====================
 
+
 @validator('tags')
 def validate_tags(cls, v):
     if v is not None:
@@ -365,6 +378,7 @@ def validate_tags(cls, v):
 def validate_email(cls, v):
     if v is not None:
         import re
+
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, v):
             raise ValueError('Неверный формат email')

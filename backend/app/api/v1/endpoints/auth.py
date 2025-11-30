@@ -9,14 +9,13 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select
 from pydantic import BaseModel
-from typing import Dict, Any
+from sqlalchemy import select
 
 # helpers from deps
 from app.api.deps import create_access_token, get_current_user
@@ -116,6 +115,7 @@ async def me(current_user: User = Depends(get_current_user)):
 
 class JSONLoginRequest(BaseModel):
     """Схема для JSON входа"""
+
     username: str
     password: str
     remember_me: bool = False
@@ -123,19 +123,17 @@ class JSONLoginRequest(BaseModel):
 
 class JSONLoginResponse(BaseModel):
     """Схема ответа JSON входа"""
+
     access_token: str
     token_type: str = "bearer"
     user: Dict[str, Any]
 
 
 @router.post("/json-login", response_model=JSONLoginResponse)
-async def json_login(
-    request_data: JSONLoginRequest,
-    db=Depends(get_db)
-) -> Any:
+async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
     """
     JSON login endpoint (альтернатива OAuth2 form).
-    
+
     Accepts JSON:
       - username (email или username)
       - password
@@ -145,59 +143,65 @@ async def json_login(
     """
     try:
         print(f"DEBUG: JSON login called with username={request_data.username}")
-        
+
         # Определяем тип сессии БД
-        is_async = inspect.iscoroutinefunction(db.__class__.__aenter__ if hasattr(db.__class__, '__aenter__') else lambda: None)
-        
+        is_async = inspect.iscoroutinefunction(
+            db.__class__.__aenter__
+            if hasattr(db.__class__, '__aenter__')
+            else lambda: None
+        )
+
         if is_async:
             # Async session
             stmt = select(User).where(
-                (User.username == request_data.username) | 
-                (User.email == request_data.username)
+                (User.username == request_data.username)
+                | (User.email == request_data.username)
             )
             result = await db.execute(stmt)
             user = result.scalar_one_or_none()
         else:
             # Sync session
             user = await run_in_threadpool(
-                lambda: db.query(User).filter(
-                    (User.username == request_data.username) | 
-                    (User.email == request_data.username)
-                ).first()
+                lambda: db.query(User)
+                .filter(
+                    (User.username == request_data.username)
+                    | (User.email == request_data.username)
+                )
+                .first()
             )
-        
+
         if not user:
             print(f"DEBUG: User not found")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверные учетные данные"
+                detail="Неверные учетные данные",
             )
-        
+
         print(f"DEBUG: User found: {user.username}")
-        
+
         if not user.is_active:
             print(f"DEBUG: User is inactive")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Пользователь деактивирован"
+                detail="Пользователь деактивирован",
             )
-        
+
         # Проверяем пароль
         password_valid = verify_password(request_data.password, user.hashed_password)
         print(f"DEBUG: Password valid: {password_valid}")
-        
+
         if not password_valid:
             print(f"DEBUG: Invalid password")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверные учетные данные"
+                detail="Неверные учетные данные",
             )
-        
+
         # Создаем токен
         access_token = create_access_token(data={"sub": str(user.id)})
-        
+
         print(f"DEBUG: Token created successfully")
-        
+
         return JSONLoginResponse(
             access_token=access_token,
             token_type="bearer",
@@ -209,14 +213,14 @@ async def json_login(
                 "role": user.role,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
-            }
+            },
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"DEBUG: Exception in JSON login: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(e)}"
+            detail=f"Ошибка входа: {str(e)}",
         )

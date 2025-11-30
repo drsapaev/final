@@ -15,20 +15,20 @@
 - number присвоен справедливо
 - Старые записи НЕ изменились при редактировании
 """
-import pytest
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
+
+import pytest
 from sqlalchemy.orm import Session
 
-from app.models.user import User
+from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.patient import Patient
 from app.models.service import Service
+from app.models.user import User
 from app.models.visit import Visit
-from app.models.online_queue import DailyQueue, OnlineQueueEntry
-from app.services.queue_service import queue_service
-from app.services.qr_queue_service import QRQueueService
 from app.services.morning_assignment import MorningAssignmentService
-
+from app.services.qr_queue_service import QRQueueService
+from app.services.queue_service import queue_service
 
 # ==================== FIXTURES ====================
 

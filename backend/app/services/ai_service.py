@@ -2,20 +2,23 @@
 Сервис для работы с AI провайдерами
 Основа: passport.md стр. 3325-3888, detail.md стр. 3889-4282
 """
+
 import asyncio
 import json
-import aiohttp
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
+import aiohttp
 from sqlalchemy.orm import Session
 
-from app.models.ai_config import AIProvider, AIPromptTemplate, AIUsageLog
-from app.crud import ai_config as crud_ai
 from app.core.config import settings
+from app.crud import ai_config as crud_ai
+from app.models.ai_config import AIPromptTemplate, AIProvider, AIUsageLog
+
 
 class AIService:
     """Сервис для работы с AI провайдерами"""
-    
+
     def __init__(self, db: Session):
         self.db = db
         self.session = None
@@ -31,10 +34,7 @@ class AIService:
             await self.session.close()
 
     async def analyze_complaints(
-        self,
-        complaints_text: str,
-        specialty: str = "general",
-        language: str = "ru"
+        self, complaints_text: str, specialty: str = "general", language: str = "ru"
     ) -> Dict[str, Any]:
         """
         Анализ жалоб пациента с помощью AI
@@ -51,54 +51,54 @@ class AIService:
                 self.db,
                 task_type="complaints_analysis",
                 specialty=specialty,
-                language=language
+                language=language,
             )
-            
+
             if not template:
                 # Используем базовый шаблон
                 template = self._get_default_complaints_template()
 
             # Формируем промпт
-            prompt = self._build_prompt(template, {
-                "complaints": complaints_text,
-                "specialty": specialty,
-                "language": language
-            })
+            prompt = self._build_prompt(
+                template,
+                {
+                    "complaints": complaints_text,
+                    "specialty": specialty,
+                    "language": language,
+                },
+            )
 
             # Отправляем запрос к AI
             response = await self._call_ai_provider(provider, prompt)
-            
+
             # Логируем использование
             self._log_ai_usage(
                 provider.id,
                 "complaints_analysis",
                 prompt,
                 response,
-                len(complaints_text)
+                len(complaints_text),
             )
 
             # Парсим ответ
             result = self._parse_complaints_response(response)
-            
+
             return {
                 "success": True,
                 "analysis": result,
                 "provider": provider.name,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def suggest_icd10(
-        self,
-        diagnosis: str,
-        specialty: str = "general",
-        language: str = "ru"
+        self, diagnosis: str, specialty: str = "general", language: str = "ru"
     ) -> Dict[str, Any]:
         """
         Подбор кодов МКБ-10 по диагнозу
@@ -114,49 +114,44 @@ class AIService:
                 self.db,
                 task_type="icd10_lookup",
                 specialty=specialty,
-                language=language
+                language=language,
             )
-            
+
             if not template:
                 template = self._get_default_icd10_template()
 
-            prompt = self._build_prompt(template, {
-                "diagnosis": diagnosis,
-                "specialty": specialty,
-                "language": language
-            })
+            prompt = self._build_prompt(
+                template,
+                {"diagnosis": diagnosis, "specialty": specialty, "language": language},
+            )
 
             response = await self._call_ai_provider(provider, prompt)
-            
+
             self._log_ai_usage(
-                provider.id,
-                "icd10_lookup",
-                prompt,
-                response,
-                len(diagnosis)
+                provider.id, "icd10_lookup", prompt, response, len(diagnosis)
             )
 
             result = self._parse_icd10_response(response)
-            
+
             return {
                 "success": True,
                 "suggestions": result,
                 "provider": provider.name,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def analyze_document(
         self,
         document_text: str,
         document_type: str = "medical_report",
-        specialty: str = "general"
+        specialty: str = "general",
     ) -> Dict[str, Any]:
         """
         Анализ медицинских документов
@@ -168,44 +163,41 @@ class AIService:
                 raise Exception("AI провайдер не настроен")
 
             template = crud_ai.get_prompt_template(
-                self.db,
-                task_type="document_analysis",
-                specialty=specialty
+                self.db, task_type="document_analysis", specialty=specialty
             )
-            
+
             if not template:
                 template = self._get_default_document_template()
 
-            prompt = self._build_prompt(template, {
-                "document_text": document_text,
-                "document_type": document_type,
-                "specialty": specialty
-            })
+            prompt = self._build_prompt(
+                template,
+                {
+                    "document_text": document_text,
+                    "document_type": document_type,
+                    "specialty": specialty,
+                },
+            )
 
             response = await self._call_ai_provider(provider, prompt)
-            
+
             self._log_ai_usage(
-                provider.id,
-                "document_analysis",
-                prompt,
-                response,
-                len(document_text)
+                provider.id, "document_analysis", prompt, response, len(document_text)
             )
 
             result = self._parse_document_response(response)
-            
+
             return {
                 "success": True,
                 "analysis": result,
                 "provider": provider.name,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
     async def _call_ai_provider(self, provider: AIProvider, prompt: str) -> str:
@@ -219,26 +211,26 @@ class AIService:
                 return await self._call_yandex_gpt(provider, prompt)
             else:
                 raise Exception(f"Неподдерживаемый провайдер: {provider.name}")
-                
+
         except Exception as e:
             raise Exception(f"Ошибка вызова AI провайдера: {str(e)}")
 
     async def _call_openai(self, provider: AIProvider, prompt: str) -> str:
         """Вызов OpenAI API"""
         url = provider.api_url or "https://api.openai.com/v1/chat/completions"
-        
+
         headers = {
             "Authorization": f"Bearer {provider.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
+
         data = {
             "model": provider.model or "gpt-4",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": provider.temperature,
-            "max_tokens": provider.max_tokens
+            "max_tokens": provider.max_tokens,
         }
-        
+
         async with self.session.post(url, headers=headers, json=data) as response:
             if response.status == 200:
                 result = await response.json()
@@ -250,112 +242,130 @@ class AIService:
     async def _call_anthropic(self, provider: AIProvider, prompt: str) -> str:
         """Вызов Anthropic Claude API"""
         url = provider.api_url or "https://api.anthropic.com/v1/messages"
-        
+
         headers = {
             "x-api-key": provider.api_key,
             "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01"
+            "anthropic-version": "2023-06-01",
         }
-        
+
         data = {
             "model": provider.model or "claude-3-sonnet-20240229",
             "max_tokens": provider.max_tokens,
             "temperature": provider.temperature,
-            "messages": [{"role": "user", "content": prompt}]
+            "messages": [{"role": "user", "content": prompt}],
         }
-        
+
         async with self.session.post(url, headers=headers, json=data) as response:
             if response.status == 200:
                 result = await response.json()
                 return result["content"][0]["text"]
             else:
                 error_text = await response.text()
-                raise Exception(f"Anthropic API error: {response.status} - {error_text}")
+                raise Exception(
+                    f"Anthropic API error: {response.status} - {error_text}"
+                )
 
     async def _call_yandex_gpt(self, provider: AIProvider, prompt: str) -> str:
         """Вызов Yandex GPT API"""
-        url = provider.api_url or "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
-        
+        url = (
+            provider.api_url
+            or "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+        )
+
         headers = {
             "Authorization": f"Api-Key {provider.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        
+
         data = {
             "modelUri": f"gpt://{provider.model or 'yandexgpt-lite'}",
             "completionOptions": {
                 "stream": False,
                 "temperature": provider.temperature,
-                "maxTokens": str(provider.max_tokens)
+                "maxTokens": str(provider.max_tokens),
             },
-            "messages": [
-                {"role": "user", "text": prompt}
-            ]
+            "messages": [{"role": "user", "text": prompt}],
         }
-        
+
         async with self.session.post(url, headers=headers, json=data) as response:
             if response.status == 200:
                 result = await response.json()
                 return result["result"]["alternatives"][0]["message"]["text"]
             else:
                 error_text = await response.text()
-                raise Exception(f"Yandex GPT API error: {response.status} - {error_text}")
+                raise Exception(
+                    f"Yandex GPT API error: {response.status} - {error_text}"
+                )
 
     def _build_prompt(self, template: AIPromptTemplate, data: Dict[str, Any]) -> str:
         """Построить промпт из шаблона"""
         try:
             from jinja2 import Environment
+
             env = Environment()
-            
+
             # Формируем полный промпт
             full_prompt = template.system_prompt
-            
+
             if template.context_template:
                 context_template = env.from_string(template.context_template)
                 context = context_template.render(**data)
                 full_prompt += f"\n\nКонтекст:\n{context}"
-            
+
             task_template = env.from_string(template.task_template)
             task = task_template.render(**data)
             full_prompt += f"\n\nЗадача:\n{task}"
-            
+
             # Добавляем примеры если есть
             if template.examples:
                 full_prompt += "\n\nПримеры:"
                 for example in template.examples:
                     full_prompt += f"\n{example}"
-            
+
             return full_prompt
-            
+
         except Exception as e:
             raise Exception(f"Ошибка построения промпта: {str(e)}")
 
     def _get_default_complaints_template(self) -> AIPromptTemplate:
         """Базовый шаблон для анализа жалоб"""
-        return type('Template', (), {
-            'system_prompt': 'Ты опытный врач. Проанализируй жалобы пациента и предложи план обследования.',
-            'context_template': 'Специальность: {{ specialty }}\\nЯзык: {{ language }}',
-            'task_template': 'Жалобы пациента: {{ complaints }}\\n\\nПроанализируй и предложи:\\n1. Возможные диагнозы\\n2. План обследования\\n3. Рекомендации',
-            'examples': []
-        })()
+        return type(
+            'Template',
+            (),
+            {
+                'system_prompt': 'Ты опытный врач. Проанализируй жалобы пациента и предложи план обследования.',
+                'context_template': 'Специальность: {{ specialty }}\\nЯзык: {{ language }}',
+                'task_template': 'Жалобы пациента: {{ complaints }}\\n\\nПроанализируй и предложи:\\n1. Возможные диагнозы\\n2. План обследования\\n3. Рекомендации',
+                'examples': [],
+            },
+        )()
 
     def _get_default_icd10_template(self) -> AIPromptTemplate:
         """Базовый шаблон для МКБ-10"""
-        return type('Template', (), {
-            'system_prompt': 'Ты эксперт по МКБ-10. Найди подходящие коды для диагноза.',
-            'context_template': 'Специальность: {{ specialty }}\\nЯзык: {{ language }}',
-            'task_template': 'Диагноз: {{ diagnosis }}\\n\\nНайди подходящие коды МКБ-10 с описанием.',
-            'examples': []
-        })()
+        return type(
+            'Template',
+            (),
+            {
+                'system_prompt': 'Ты эксперт по МКБ-10. Найди подходящие коды для диагноза.',
+                'context_template': 'Специальность: {{ specialty }}\\nЯзык: {{ language }}',
+                'task_template': 'Диагноз: {{ diagnosis }}\\n\\nНайди подходящие коды МКБ-10 с описанием.',
+                'examples': [],
+            },
+        )()
 
     def _get_default_document_template(self) -> AIPromptTemplate:
         """Базовый шаблон для анализа документов"""
-        return type('Template', (), {
-            'system_prompt': 'Ты медицинский ассистент. Проанализируй медицинский документ и извлеки ключевую информацию.',
-            'context_template': 'Тип документа: {{ document_type }}\\nСпециальность: {{ specialty }}',
-            'task_template': 'Текст документа:\\n{{ document_text }}\\n\\nИзвлеки:\\n1. Диагнозы\\n2. Назначения\\n3. Рекомендации\\n4. Ключевые показатели',
-            'examples': []
-        })()
+        return type(
+            'Template',
+            (),
+            {
+                'system_prompt': 'Ты медицинский ассистент. Проанализируй медицинский документ и извлеки ключевую информацию.',
+                'context_template': 'Тип документа: {{ document_type }}\\nСпециальность: {{ specialty }}',
+                'task_template': 'Текст документа:\\n{{ document_text }}\\n\\nИзвлеки:\\n1. Диагнозы\\n2. Назначения\\n3. Рекомендации\\n4. Ключевые показатели',
+                'examples': [],
+            },
+        )()
 
     def _parse_complaints_response(self, response: str) -> Dict[str, Any]:
         """Парсинг ответа анализа жалоб"""
@@ -368,7 +378,7 @@ class AIService:
                 "analysis_text": response,
                 "possible_diagnoses": [],
                 "examination_plan": [],
-                "recommendations": []
+                "recommendations": [],
             }
 
     def _parse_icd10_response(self, response: str) -> List[Dict[str, Any]]:
@@ -388,7 +398,7 @@ class AIService:
                 {
                     "code": "Z00.0",
                     "description": "Общее медицинское обследование",
-                    "ai_suggestion": response
+                    "ai_suggestion": response,
                 }
             ]
 
@@ -402,7 +412,7 @@ class AIService:
                 "diagnoses": [],
                 "prescriptions": [],
                 "recommendations": [],
-                "key_findings": []
+                "key_findings": [],
             }
 
     def _log_ai_usage(
@@ -411,7 +421,7 @@ class AIService:
         task_type: str,
         prompt: str,
         response: str,
-        input_tokens: int
+        input_tokens: int,
     ):
         """Логирование использования AI"""
         try:
@@ -423,13 +433,14 @@ class AIService:
                 "input_tokens": input_tokens,
                 "output_tokens": len(response),
                 "status": "completed",
-                "response_time_ms": 1000  # Заглушка
+                "response_time_ms": 1000,  # Заглушка
             }
-            
+
             crud_ai.create_usage_log(self.db, log_data)
-            
+
         except Exception as e:
             print(f"Ошибка логирования AI: {e}")
+
 
 # Глобальные функции для использования в API
 async def get_ai_service(db: Session) -> AIService:

@@ -1,38 +1,41 @@
 """
 API endpoints для экспорта аналитических отчетов
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
 from app.api.deps import get_current_user
-from app.services.analytics_export_service import get_analytics_export_service, AnalyticsExportService
+from app.db.session import get_db
+from app.services.advanced_analytics import (
+    AdvancedAnalyticsService,
+    get_advanced_analytics_service,
+)
 from app.services.analytics import AnalyticsService
-from app.services.advanced_analytics import get_advanced_analytics_service, AdvancedAnalyticsService
+from app.services.analytics_export_service import (
+    AnalyticsExportService,
+    get_analytics_export_service,
+)
 
 router = APIRouter()
 
 
 @router.get("/formats")
 async def get_export_formats(
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)
 ):
     """Получить список поддерживаемых форматов экспорта"""
     try:
         export_service = await get_analytics_export_service()
         formats = await export_service.get_export_formats()
-        
-        return {
-            "formats": formats,
-            "count": len(formats)
-        }
+
+        return {"formats": formats, "count": len(formats)}
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения форматов экспорта: {str(e)}"
+            status_code=500, detail=f"Ошибка получения форматов экспорта: {str(e)}"
         )
 
 
@@ -43,7 +46,7 @@ async def export_kpi_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Экспорт отчета KPI в указанном формате"""
     try:
@@ -59,10 +62,10 @@ async def export_kpi_report(
 
     # Получаем данные KPI через SSOT
     kpi_data = AnalyticsService.calculate_statistics(db, start, end, department)
-    
+
     # Экспортируем в указанном формате
     export_service = await get_analytics_export_service()
-    
+
     if format == "json":
         result = await export_service.export_to_json(kpi_data)
     elif format == "csv":
@@ -75,13 +78,11 @@ async def export_kpi_report(
         result = await export_service.export_to_zip(kpi_data)
     else:
         raise HTTPException(status_code=400, detail="Неподдерживаемый формат экспорта")
-    
+
     return Response(
         content=result["content"],
         media_type=result["mime_type"],
-        headers={
-            "Content-Disposition": f"attachment; filename={result['filename']}"
-        }
+        headers={"Content-Disposition": f"attachment; filename={result['filename']}"},
     )
 
 
@@ -91,9 +92,11 @@ async def export_comprehensive_report(
     start_date: str = Query(..., description="Начальная дата (YYYY-MM-DD)"),
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
-    include_predictive: bool = Query(True, description="Включить предиктивную аналитику"),
+    include_predictive: bool = Query(
+        True, description="Включить предиктивную аналитику"
+    ),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Экспорт комплексного отчета в указанном формате"""
     try:
@@ -109,26 +112,34 @@ async def export_comprehensive_report(
 
     # Получаем комплексные данные
     analytics_service = get_advanced_analytics_service()
-    
+
     report_data = {
         "report_period": {
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
             "department": department or "all",
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.utcnow().isoformat(),
         },
-        "kpi_metrics": AnalyticsService.calculate_statistics(db, start, end, department),
-        "doctor_performance": analytics_service.get_doctor_performance(db, start, end, department),
+        "kpi_metrics": AnalyticsService.calculate_statistics(
+            db, start, end, department
+        ),
+        "doctor_performance": analytics_service.get_doctor_performance(
+            db, start, end, department
+        ),
         "patient_analytics": analytics_service.get_patient_analytics(db, start, end),
-        "revenue_analytics": AnalyticsService.calculate_revenue(db, start, end, department)
+        "revenue_analytics": AnalyticsService.calculate_revenue(
+            db, start, end, department
+        ),
     }
-    
+
     if include_predictive:
-        report_data["predictive_analytics"] = analytics_service.get_predictive_analytics(db, 30)
-    
+        report_data["predictive_analytics"] = (
+            analytics_service.get_predictive_analytics(db, 30)
+        )
+
     # Экспортируем в указанном формате
     export_service = await get_analytics_export_service()
-    
+
     if format == "json":
         result = await export_service.export_to_json(report_data)
     elif format == "csv":
@@ -141,13 +152,11 @@ async def export_comprehensive_report(
         result = await export_service.export_to_zip(report_data)
     else:
         raise HTTPException(status_code=400, detail="Неподдерживаемый формат экспорта")
-    
+
     return Response(
         content=result["content"],
         media_type=result["mime_type"],
-        headers={
-            "Content-Disposition": f"attachment; filename={result['filename']}"
-        }
+        headers={"Content-Disposition": f"attachment; filename={result['filename']}"},
     )
 
 
@@ -158,7 +167,7 @@ async def export_doctor_performance_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Экспорт отчета по эффективности врачей в указанном формате"""
     try:
@@ -175,10 +184,10 @@ async def export_doctor_performance_report(
     # Получаем данные по врачам
     analytics_service = get_advanced_analytics_service()
     doctor_data = analytics_service.get_doctor_performance(db, start, end, department)
-    
+
     # Экспортируем в указанном формате
     export_service = await get_analytics_export_service()
-    
+
     if format == "json":
         result = await export_service.export_to_json(doctor_data)
     elif format == "csv":
@@ -191,13 +200,11 @@ async def export_doctor_performance_report(
         result = await export_service.export_to_zip(doctor_data)
     else:
         raise HTTPException(status_code=400, detail="Неподдерживаемый формат экспорта")
-    
+
     return Response(
         content=result["content"],
         media_type=result["mime_type"],
-        headers={
-            "Content-Disposition": f"attachment; filename={result['filename']}"
-        }
+        headers={"Content-Disposition": f"attachment; filename={result['filename']}"},
     )
 
 
@@ -208,7 +215,7 @@ async def export_revenue_report(
     end_date: str = Query(..., description="Конечная дата (YYYY-MM-DD)"),
     department: Optional[str] = Query(None, description="Отделение"),
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     """Экспорт отчета по доходам в указанном формате"""
     try:
@@ -224,10 +231,10 @@ async def export_revenue_report(
 
     # Получаем данные по доходам через SSOT
     revenue_data = AnalyticsService.calculate_revenue(db, start, end, department)
-    
+
     # Экспортируем в указанном формате
     export_service = await get_analytics_export_service()
-    
+
     if format == "json":
         result = await export_service.export_to_json(revenue_data)
     elif format == "csv":
@@ -240,13 +247,11 @@ async def export_revenue_report(
         result = await export_service.export_to_zip(revenue_data)
     else:
         raise HTTPException(status_code=400, detail="Неподдерживаемый формат экспорта")
-    
+
     return Response(
         content=result["content"],
         media_type=result["mime_type"],
-        headers={
-            "Content-Disposition": f"attachment; filename={result['filename']}"
-        }
+        headers={"Content-Disposition": f"attachment; filename={result['filename']}"},
     )
 
 
@@ -261,6 +266,6 @@ async def export_health_check():
             "kpi_export",
             "comprehensive_export",
             "doctor_performance_export",
-            "revenue_export"
-        ]
+            "revenue_export",
+        ],
     }

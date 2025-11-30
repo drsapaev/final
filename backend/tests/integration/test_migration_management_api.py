@@ -1,11 +1,12 @@
 """
 Интеграционные тесты для API управления миграциями
 """
-import pytest
 import json
-import tempfile
 import os
+import tempfile
 from datetime import date, datetime, timedelta
+
+import pytest
 
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 

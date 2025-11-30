@@ -1,24 +1,26 @@
 """
 Улучшенный сервис для работы с AI провайдерами с трекингом моделей
 """
+
 import asyncio
 import json
-import aiohttp
 import time
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
+import aiohttp
 from sqlalchemy.orm import Session
 
-from app.models.ai_config import AIProvider, AIPromptTemplate, AIUsageLog
-from app.crud import ai_config as crud_ai
 from app.core.config import settings
+from app.crud import ai_config as crud_ai
+from app.models.ai_config import AIPromptTemplate, AIProvider, AIUsageLog
+from app.schemas.ai_tracking import AIRequestTracking, AIResponseWithTracking
 from app.services.ai_tracking_service import AITrackingService, get_ai_tracking_service
-from app.schemas.ai_tracking import AIResponseWithTracking, AIRequestTracking
 
 
 class EnhancedAIService:
     """Улучшенный сервис для работы с AI провайдерами с полным трекингом"""
-    
+
     def __init__(self, db: Session):
         self.db = db
         self.session = None
@@ -39,14 +41,14 @@ class EnhancedAIService:
         complaints_text: str,
         specialty: str = "general",
         language: str = "ru",
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
     ) -> AIResponseWithTracking:
         """
         Анализ жалоб пациента с полным трекингом AI модели
         """
         start_time = time.time()
         tracking = None
-        
+
         try:
             # Получаем провайдер по умолчанию
             provider = crud_ai.get_default_provider(self.db)
@@ -59,7 +61,7 @@ class EnhancedAIService:
                 task_type="complaints_analysis",
                 specialty=specialty,
                 user_id=user_id,
-                request_data={"complaints": complaints_text, "language": language}
+                request_data={"complaints": complaints_text, "language": language},
             )
 
             # Получаем шаблон для анализа жалоб
@@ -67,24 +69,20 @@ class EnhancedAIService:
                 self.db,
                 task_type="complaints_analysis",
                 specialty=specialty,
-                language=language
+                language=language,
             )
-            
+
             if not template:
                 template = self._get_default_complaints_template()
 
             # Формируем промпт
             prompt = template.format(
-                complaints=complaints_text,
-                specialty=specialty,
-                language=language
+                complaints=complaints_text, specialty=specialty, language=language
             )
 
             # Выполняем запрос к AI
             response_data = await self._call_ai_provider(
-                provider=provider,
-                prompt=prompt,
-                task_type="complaints_analysis"
+                provider=provider, prompt=prompt, task_type="complaints_analysis"
             )
 
             # Подсчитываем токены (упрощенная версия)
@@ -95,7 +93,7 @@ class EnhancedAIService:
                 tracking=tracking,
                 response_data=response_data,
                 tokens_used=tokens_used,
-                success=True
+                success=True,
             )
 
             return result
@@ -108,13 +106,13 @@ class EnhancedAIService:
                     response_data={},
                     tokens_used=0,
                     success=False,
-                    error_message=str(e)
+                    error_message=str(e),
                 )
-            
+
             # Возвращаем ответ с ошибкой
             return AIResponseWithTracking(
                 data={"error": str(e)},
-                tracking=tracking or self._create_error_tracking(str(e))
+                tracking=tracking or self._create_error_tracking(str(e)),
             )
 
     async def generate_prescription_with_tracking(
@@ -122,14 +120,14 @@ class EnhancedAIService:
         patient_data: Dict[str, Any],
         diagnosis: str,
         specialty: str = "general",
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
     ) -> AIResponseWithTracking:
         """
         Генерация рецепта с полным трекингом AI модели
         """
         start_time = time.time()
         tracking = None
-        
+
         try:
             # Получаем провайдер по умолчанию
             provider = crud_ai.get_default_provider(self.db)
@@ -142,16 +140,14 @@ class EnhancedAIService:
                 task_type="prescription_generation",
                 specialty=specialty,
                 user_id=user_id,
-                request_data={"patient_data": patient_data, "diagnosis": diagnosis}
+                request_data={"patient_data": patient_data, "diagnosis": diagnosis},
             )
 
             # Получаем шаблон для генерации рецепта
             template = crud_ai.get_prompt_template(
-                self.db,
-                task_type="prescription_generation",
-                specialty=specialty
+                self.db, task_type="prescription_generation", specialty=specialty
             )
-            
+
             if not template:
                 template = self._get_default_prescription_template()
 
@@ -160,14 +156,12 @@ class EnhancedAIService:
                 patient_name=patient_data.get("name", "Пациент"),
                 patient_age=patient_data.get("age", "не указан"),
                 diagnosis=diagnosis,
-                specialty=specialty
+                specialty=specialty,
             )
 
             # Выполняем запрос к AI
             response_data = await self._call_ai_provider(
-                provider=provider,
-                prompt=prompt,
-                task_type="prescription_generation"
+                provider=provider, prompt=prompt, task_type="prescription_generation"
             )
 
             # Подсчитываем токены
@@ -178,7 +172,7 @@ class EnhancedAIService:
                 tracking=tracking,
                 response_data=response_data,
                 tokens_used=tokens_used,
-                success=True
+                success=True,
             )
 
             return result
@@ -191,22 +185,19 @@ class EnhancedAIService:
                     response_data={},
                     tokens_used=0,
                     success=False,
-                    error_message=str(e)
+                    error_message=str(e),
                 )
-            
+
             return AIResponseWithTracking(
                 data={"error": str(e)},
-                tracking=tracking or self._create_error_tracking(str(e))
+                tracking=tracking or self._create_error_tracking(str(e)),
             )
 
     async def _call_ai_provider(
-        self,
-        provider: AIProvider,
-        prompt: str,
-        task_type: str
+        self, provider: AIProvider, prompt: str, task_type: str
     ) -> Dict[str, Any]:
         """Вызов AI провайдера"""
-        
+
         if provider.name == "openai":
             return await self._call_openai(provider, prompt)
         elif provider.name == "gemini":
@@ -223,7 +214,7 @@ class EnhancedAIService:
         return {
             "summary": f"Анализ выполнен с помощью {provider.display_name}",
             "model_used": provider.model,
-            "confidence": 0.85
+            "confidence": 0.85,
         }
 
     async def _call_gemini(self, provider: AIProvider, prompt: str) -> Dict[str, Any]:
@@ -232,7 +223,7 @@ class EnhancedAIService:
         return {
             "summary": f"Анализ выполнен с помощью {provider.display_name}",
             "model_used": provider.model,
-            "confidence": 0.82
+            "confidence": 0.82,
         }
 
     async def _call_deepseek(self, provider: AIProvider, prompt: str) -> Dict[str, Any]:
@@ -241,7 +232,7 @@ class EnhancedAIService:
         return {
             "summary": f"Анализ выполнен с помощью {provider.display_name}",
             "model_used": provider.model,
-            "confidence": 0.80
+            "confidence": 0.80,
         }
 
     def _get_default_complaints_template(self) -> str:
@@ -281,15 +272,15 @@ class EnhancedAIService:
         """Создать трекинг для ошибки"""
         # Создаем минимальный трекинг для ошибки
         from app.schemas.ai_tracking import AIModelInfo
-        
+
         model_info = AIModelInfo(
             provider_id=0,
             provider_name="unknown",
             model_name="unknown",
             temperature=0.0,
-            max_tokens=0
+            max_tokens=0,
         )
-        
+
         return AIRequestTracking(
             request_id="error",
             task_type="error",
@@ -297,7 +288,7 @@ class EnhancedAIService:
             response_time_ms=0,
             tokens_used=0,
             success=False,
-            error_message=error_message
+            error_message=error_message,
         )
 
     def get_model_stats(self, days_back: int = 30) -> List[Dict[str, Any]]:

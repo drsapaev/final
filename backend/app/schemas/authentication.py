@@ -1,16 +1,19 @@
 """
 Pydantic схемы для системы аутентификации
 """
+
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator, EmailStr
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, EmailStr, Field, validator
 from pydantic.config import ConfigDict
 
 
 class LoginRequest(BaseModel):
     """Схема для запроса входа"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=6, max_length=100)
     remember_me: bool = Field(False, description="Запомнить пользователя")
@@ -19,8 +22,9 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     """Схема для ответа входа"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
     token_type: str = "bearer"
@@ -33,15 +37,17 @@ class LoginResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     """Схема для запроса обновления токена"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     refresh_token: str = Field(..., min_length=1)
 
 
 class RefreshTokenResponse(BaseModel):
     """Схема для ответа обновления токена"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -50,34 +56,38 @@ class RefreshTokenResponse(BaseModel):
 
 class LogoutRequest(BaseModel):
     """Схема для запроса выхода"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     refresh_token: Optional[str] = None
     logout_all_devices: bool = False
 
 
 class LogoutResponse(BaseModel):
     """Схема для ответа выхода"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     success: bool
     message: str
 
 
 class PasswordResetRequest(BaseModel):
     """Схема для запроса сброса пароля"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     email: EmailStr
 
 
 class PasswordResetConfirmRequest(BaseModel):
     """Схема для подтверждения сброса пароля"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     token: str = Field(..., min_length=32, max_length=64)
     new_password: str = Field(..., min_length=8, max_length=100)
-    
+
     @validator('new_password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -93,11 +103,12 @@ class PasswordResetConfirmRequest(BaseModel):
 
 class PasswordChangeRequest(BaseModel):
     """Схема для смены пароля"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8, max_length=100)
-    
+
     @validator('new_password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -113,22 +124,25 @@ class PasswordChangeRequest(BaseModel):
 
 class EmailVerificationRequest(BaseModel):
     """Схема для запроса верификации email"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     email: EmailStr
 
 
 class EmailVerificationConfirmRequest(BaseModel):
     """Схема для подтверждения верификации email"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     token: str = Field(..., min_length=32, max_length=64)
 
 
 class UserProfileUpdateRequest(BaseModel):
     """Схема для обновления профиля пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(None, min_length=10, max_length=20)
@@ -137,8 +151,9 @@ class UserProfileUpdateRequest(BaseModel):
 
 class UserProfileResponse(BaseModel):
     """Схема для ответа профиля пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     username: str
     full_name: Optional[str] = None
@@ -157,8 +172,9 @@ class UserProfileResponse(BaseModel):
 
 class UserSessionResponse(BaseModel):
     """Схема для ответа сессии пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     session_id: str
     created_at: datetime
@@ -173,8 +189,9 @@ class UserSessionResponse(BaseModel):
 
 class LoginAttemptResponse(BaseModel):
     """Схема для ответа попытки входа"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     username: Optional[str] = None
     email: Optional[str] = None
@@ -186,8 +203,9 @@ class LoginAttemptResponse(BaseModel):
 
 class UserActivityResponse(BaseModel):
     """Схема для ответа активности пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     activity_type: str
     description: Optional[str] = None
@@ -198,8 +216,9 @@ class UserActivityResponse(BaseModel):
 
 class SecurityEventResponse(BaseModel):
     """Схема для ответа события безопасности"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     event_type: str
     severity: str
@@ -213,8 +232,9 @@ class SecurityEventResponse(BaseModel):
 
 class TokenValidationResponse(BaseModel):
     """Схема для ответа валидации токена"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     valid: bool
     user_id: Optional[int] = None
     username: Optional[str] = None
@@ -226,8 +246,9 @@ class TokenValidationResponse(BaseModel):
 
 class AuthStatusResponse(BaseModel):
     """Схема для ответа статуса аутентификации"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     authenticated: bool
     user: Optional[UserProfileResponse] = None
     session: Optional[UserSessionResponse] = None
@@ -237,8 +258,9 @@ class AuthStatusResponse(BaseModel):
 
 class PasswordStrengthResponse(BaseModel):
     """Схема для ответа проверки силы пароля"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     score: int = Field(..., ge=0, le=100)
     strength: str = Field(..., pattern="^(weak|fair|good|strong|very_strong)$")
     suggestions: List[str] = []
@@ -246,8 +268,9 @@ class PasswordStrengthResponse(BaseModel):
 
 class DeviceInfoResponse(BaseModel):
     """Схема для ответа информации об устройстве"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     device_fingerprint: str
     ip_address: str
     user_agent: str
@@ -258,8 +281,9 @@ class DeviceInfoResponse(BaseModel):
 
 class AuthErrorResponse(BaseModel):
     """Схема для ответа ошибки аутентификации"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     error: str
     error_description: str
     error_code: str
@@ -268,8 +292,9 @@ class AuthErrorResponse(BaseModel):
 
 class AuthSuccessResponse(BaseModel):
     """Схема для ответа успешной аутентификации"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     success: bool
     message: str
     data: Optional[Dict[str, Any]] = None
@@ -277,10 +302,12 @@ class AuthSuccessResponse(BaseModel):
 
 # Схемы для административных функций
 
+
 class UserListResponse(BaseModel):
     """Схема для ответа списка пользователей"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     users: List[UserProfileResponse]
     total: int
     page: int
@@ -290,8 +317,9 @@ class UserListResponse(BaseModel):
 
 class UserCreateRequest(BaseModel):
     """Схема для создания пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -299,7 +327,7 @@ class UserCreateRequest(BaseModel):
     role: str = Field(..., pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
     is_active: bool = True
     is_superuser: bool = False
-    
+
     @validator('password')
     def validate_password(cls, v):
         if len(v) < 8:
@@ -315,27 +343,34 @@ class UserCreateRequest(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     """Схема для обновления пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     email: Optional[EmailStr] = None
-    role: Optional[str] = Field(None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$")
+    role: Optional[str] = Field(
+        None, pattern="^(Admin|Doctor|Nurse|Receptionist|Patient)$"
+    )
     is_active: Optional[bool] = None
     is_superuser: Optional[bool] = None
 
 
 class UserDeleteRequest(BaseModel):
     """Схема для удаления пользователя"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     confirm: bool = Field(True, description="Подтверждение удаления")
-    transfer_to: Optional[int] = Field(None, description="ID пользователя для передачи данных")
+    transfer_to: Optional[int] = Field(
+        None, description="ID пользователя для передачи данных"
+    )
 
 
 class SessionListResponse(BaseModel):
     """Схема для ответа списка сессий"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     sessions: List[UserSessionResponse]
     total: int
     page: int
@@ -345,16 +380,18 @@ class SessionListResponse(BaseModel):
 
 class SessionRevokeRequest(BaseModel):
     """Схема для отзыва сессии"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     session_id: int
     reason: Optional[str] = Field(None, max_length=200)
 
 
 class SecurityEventListResponse(BaseModel):
     """Схема для ответа списка событий безопасности"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     events: List[SecurityEventResponse]
     total: int
     page: int
@@ -364,18 +401,21 @@ class SecurityEventListResponse(BaseModel):
 
 class SecurityEventResolveRequest(BaseModel):
     """Схема для разрешения события безопасности"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     event_id: int
     resolution_notes: Optional[str] = Field(None, max_length=500)
 
 
 # Схемы для статистики
 
+
 class AuthStatsResponse(BaseModel):
     """Схема для ответа статистики аутентификации"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     total_users: int
     active_users: int
     total_sessions: int

@@ -1,19 +1,22 @@
 """
 Pydantic схемы для Department API
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # ============================================================
 # DEPARTMENT SERVICE SCHEMAS
 # ============================================================
 
+
 class DepartmentServiceCreate(BaseModel):
     """Создание привязки услуги к отделению"""
+
     is_default: bool = False
     display_order: int = 999
     price_override: Optional[Decimal] = None
@@ -24,6 +27,7 @@ class DepartmentServiceCreate(BaseModel):
 
 class DepartmentServiceUpdate(BaseModel):
     """Обновление привязки услуги к отделению"""
+
     is_default: Optional[bool] = None
     display_order: Optional[int] = None
     price_override: Optional[Decimal] = None
@@ -34,6 +38,7 @@ class DepartmentServiceUpdate(BaseModel):
 
 class DepartmentServiceResponse(BaseModel):
     """Ответ с информацией о привязке услуги"""
+
     id: int
     department_id: int
     service_id: int
@@ -49,8 +54,10 @@ class DepartmentServiceResponse(BaseModel):
 # DEPARTMENT QUEUE SETTINGS SCHEMAS
 # ============================================================
 
+
 class DepartmentQueueSettingsUpdate(BaseModel):
     """Обновление настроек очереди отделения"""
+
     enabled: Optional[bool] = None
     queue_type: Optional[str] = Field(None, pattern="^(live|online|mixed)$")
     queue_prefix: Optional[str] = Field(None, max_length=10)
@@ -58,7 +65,9 @@ class DepartmentQueueSettingsUpdate(BaseModel):
     max_concurrent_queue: Optional[int] = Field(None, ge=1, le=50)
     avg_wait_time: Optional[int] = Field(None, ge=1, le=120)
     show_on_display: Optional[bool] = None
-    auto_close_time: Optional[str] = Field(None, pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    auto_close_time: Optional[str] = Field(
+        None, pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
+    )
 
     class Config:
         from_attributes = True
@@ -66,6 +75,7 @@ class DepartmentQueueSettingsUpdate(BaseModel):
 
 class DepartmentQueueSettingsResponse(BaseModel):
     """Ответ с настройками очереди"""
+
     id: int
     department_id: int
     enabled: bool
@@ -85,8 +95,10 @@ class DepartmentQueueSettingsResponse(BaseModel):
 # DEPARTMENT REGISTRATION SETTINGS SCHEMAS
 # ============================================================
 
+
 class DepartmentRegistrationSettingsUpdate(BaseModel):
     """Обновление настроек регистрации отделения"""
+
     online_booking_enabled: Optional[bool] = None
     requires_confirmation: Optional[bool] = None
     min_booking_hours: Optional[int] = Field(None, ge=0, le=168)  # Max 1 week
@@ -100,6 +112,7 @@ class DepartmentRegistrationSettingsUpdate(BaseModel):
 
 class DepartmentRegistrationSettingsResponse(BaseModel):
     """Ответ с настройками регистрации"""
+
     id: int
     department_id: int
     online_booking_enabled: bool
@@ -117,8 +130,10 @@ class DepartmentRegistrationSettingsResponse(BaseModel):
 # DEPARTMENT BASE SCHEMAS
 # ============================================================
 
+
 class DepartmentBase(BaseModel):
     """Базовая схема отделения"""
+
     key: str = Field(..., max_length=50)
     name_ru: str = Field(..., max_length=200)
     name_uz: Optional[str] = Field(None, max_length=200)
@@ -135,11 +150,13 @@ class DepartmentBase(BaseModel):
 
 class DepartmentCreate(DepartmentBase):
     """Создание отделения"""
+
     pass
 
 
 class DepartmentUpdate(BaseModel):
     """Обновление отделения"""
+
     key: Optional[str] = Field(None, max_length=50)
     name_ru: Optional[str] = Field(None, max_length=200)
     name_uz: Optional[str] = Field(None, max_length=200)
@@ -156,6 +173,7 @@ class DepartmentUpdate(BaseModel):
 
 class DepartmentResponse(DepartmentBase):
     """Ответ с информацией об отделении"""
+
     id: int
 
     class Config:
@@ -164,6 +182,7 @@ class DepartmentResponse(DepartmentBase):
 
 class DepartmentFullResponse(DepartmentResponse):
     """Полный ответ с настройками и статистикой"""
+
     services_count: Optional[int] = 0
     doctors_count: Optional[int] = 0
     has_queue_settings: bool = False

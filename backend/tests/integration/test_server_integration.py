@@ -1,8 +1,9 @@
 """
 Простые интеграционные тесты для запущенного сервера в CI/CD
 """
-import requests
 import json
+
+import requests
 
 
 def test_health_endpoint():

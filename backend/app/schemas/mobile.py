@@ -1,36 +1,45 @@
 """
 Схемы для мобильного API
 """
+
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MobileLoginRequest(BaseModel):
     """Запрос мобильной аутентификации"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     phone: str = Field(..., description="Номер телефона")
     password: Optional[str] = Field(None, description="Пароль (опционально)")
     telegram_id: Optional[str] = Field(None, description="Telegram ID")
-    device_token: Optional[str] = Field(None, description="Токен устройства для push-уведомлений")
+    device_token: Optional[str] = Field(
+        None, description="Токен устройства для push-уведомлений"
+    )
 
 
 class MobileLoginResponse(BaseModel):
     """Ответ мобильной аутентификации"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     access_token: str = Field(..., description="JWT токен")
     token_type: str = Field(default="bearer", description="Тип токена")
     expires_in: int = Field(..., description="Время жизни токена в секундах")
     user: Dict[str, Any] = Field(..., description="Информация о пользователе")
-    permissions: List[str] = Field(default_factory=list, description="Разрешения пользователя")
+    permissions: List[str] = Field(
+        default_factory=list, description="Разрешения пользователя"
+    )
 
 
 class MobilePatientProfile(BaseModel):
     """Профиль пациента для мобильного приложения"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     name: str
     phone: str
@@ -45,8 +54,9 @@ class MobilePatientProfile(BaseModel):
 
 class PatientProfileOut(BaseModel):
     """Профиль пациента для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     fio: str
     phone: str
@@ -58,8 +68,9 @@ class PatientProfileOut(BaseModel):
 
 class MobileAppointmentSummary(BaseModel):
     """Краткая информация о записи для мобильного приложения"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     doctor_name: str
     doctor_specialty: str
@@ -73,8 +84,9 @@ class MobileAppointmentSummary(BaseModel):
 
 class MobileAppointmentDetail(BaseModel):
     """Детальная информация о записи"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     doctor_name: str
     doctor_specialty: str
@@ -94,11 +106,14 @@ class MobileAppointmentDetail(BaseModel):
 
 class MobileBookAppointmentRequest(BaseModel):
     """Запрос на запись к врачу"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     doctor_id: int = Field(..., description="ID врача")
     preferred_date: str = Field(..., description="Предпочтительная дата (YYYY-MM-DD)")
-    preferred_time: Optional[str] = Field(None, description="Предпочтительное время (HH:MM)")
+    preferred_time: Optional[str] = Field(
+        None, description="Предпочтительное время (HH:MM)"
+    )
     complaint: Optional[str] = Field(None, description="Жалобы")
     services: List[int] = Field(default_factory=list, description="ID услуг")
     notes: Optional[str] = Field(None, description="Дополнительные заметки")
@@ -106,8 +121,9 @@ class MobileBookAppointmentRequest(BaseModel):
 
 class MobileBookAppointmentResponse(BaseModel):
     """Ответ на запись к врачу"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     appointment_id: int
     appointment_date: datetime
     doctor_name: str
@@ -121,8 +137,9 @@ class MobileBookAppointmentResponse(BaseModel):
 
 class MobileQueueRequest(BaseModel):
     """Запрос на запись в очередь"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     specialty: str = Field(..., description="Специализация")
     services: List[int] = Field(default_factory=list, description="ID услуг")
     notes: Optional[str] = Field(None, description="Дополнительные заметки")
@@ -130,8 +147,9 @@ class MobileQueueRequest(BaseModel):
 
 class MobileQueueResponse(BaseModel):
     """Ответ на запись в очередь"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     queue_id: int
     queue_number: int
     specialty: str
@@ -143,8 +161,9 @@ class MobileQueueResponse(BaseModel):
 
 class MobileLabResult(BaseModel):
     """Результат анализа для мобильного приложения"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     test_name: str
     result: str
@@ -157,8 +176,9 @@ class MobileLabResult(BaseModel):
 
 class MobilePaymentRequest(BaseModel):
     """Запрос на оплату"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     appointment_id: int
     amount: float
     payment_method: str  # card, payme, click
@@ -167,8 +187,9 @@ class MobilePaymentRequest(BaseModel):
 
 class MobilePaymentResponse(BaseModel):
     """Ответ на запрос оплаты"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     payment_id: int
     payment_url: str
     amount: float
@@ -179,8 +200,9 @@ class MobilePaymentResponse(BaseModel):
 
 class MobileNotificationSettings(BaseModel):
     """Настройки уведомлений для мобильного приложения"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     appointment_reminders: bool = True
     queue_updates: bool = True
     lab_results: bool = True
@@ -192,8 +214,9 @@ class MobileNotificationSettings(BaseModel):
 
 class MobileQuickStats(BaseModel):
     """Быстрая статистика для мобильного приложения"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     total_appointments: int = 0
     upcoming_appointments: int = 0
     completed_appointments: int = 0
@@ -205,8 +228,9 @@ class MobileQuickStats(BaseModel):
 
 class MobileErrorResponse(BaseModel):
     """Стандартный ответ об ошибке для мобильного API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     error: str = Field(..., description="Код ошибки")
     message: str = Field(..., description="Сообщение об ошибке")
     details: Optional[Dict[str, Any]] = Field(None, description="Дополнительные детали")
@@ -215,8 +239,9 @@ class MobileErrorResponse(BaseModel):
 
 class MobileSuccessResponse(BaseModel):
     """Стандартный ответ об успехе для мобильного API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     success: bool = Field(default=True)
     message: str = Field(..., description="Сообщение об успехе")
     data: Optional[Dict[str, Any]] = Field(None, description="Данные ответа")
@@ -225,10 +250,12 @@ class MobileSuccessResponse(BaseModel):
 
 # === ДОПОЛНИТЕЛЬНЫЕ СХЕМЫ ДЛЯ API ===
 
+
 class AppointmentUpcomingOut(BaseModel):
     """Предстоящие записи для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     doctor_name: str
     specialty: str
@@ -239,8 +266,9 @@ class AppointmentUpcomingOut(BaseModel):
 
 class BookAppointmentRequest(BaseModel):
     """Запрос на запись к врачу для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     doctor_id: int = Field(..., description="ID врача")
     appointment_date: datetime = Field(..., description="Дата записи")
     specialty: str = Field(..., description="Специализация")
@@ -251,8 +279,9 @@ class BookAppointmentRequest(BaseModel):
 
 class LabResultOut(BaseModel):
     """Результаты анализов для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     test_name: str
     result_value: str
@@ -265,8 +294,9 @@ class LabResultOut(BaseModel):
 
 class MobileNotificationOut(BaseModel):
     """Уведомления для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     title: str
     message: str
@@ -277,8 +307,9 @@ class MobileNotificationOut(BaseModel):
 
 class MobileNotificationCreate(BaseModel):
     """Создание уведомления для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     user_id: int
     title: str
     message: str
@@ -287,8 +318,9 @@ class MobileNotificationCreate(BaseModel):
 
 class MobileAppointmentDetailOut(BaseModel):
     """Детали записи для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     patient_id: int
     doctor_id: int
@@ -305,8 +337,9 @@ class MobileAppointmentDetailOut(BaseModel):
 
 class MobileVisitDetailOut(BaseModel):
     """Детали визита для API"""
+
     model_config = ConfigDict(protected_namespaces=())
-    
+
     id: int
     appointment_id: int
     patient_id: int

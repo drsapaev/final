@@ -19,9 +19,9 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
 
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.security import OAuth2PasswordBearer, HTTPBearer
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -30,7 +30,10 @@ logger = logging.getLogger(__name__)
 
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
-print(f"DEBUG: deps.py successfully imported settings. SECRET_KEY starts with: {settings.SECRET_KEY[:5]}")
+
+print(
+    f"DEBUG: deps.py successfully imported settings. SECRET_KEY starts with: {settings.SECRET_KEY[:5]}"
+)
 
 # import get_db lazily -- it may return AsyncSession or sync Session
 try:
@@ -99,11 +102,15 @@ def _username_from_token(token: str) -> Optional[str]:
         if isinstance(sub, str):
             # Если sub содержит @, то это username
             if '@' in sub:
-                logger.debug(f"_username_from_token: sub contains @, returning as username")
+                logger.debug(
+                    f"_username_from_token: sub contains @, returning as username"
+                )
                 return sub
             # Если sub содержит только цифры, то это ID как строка - возвращаем для поиска по ID
             elif sub.isdigit():
-                logger.debug(f"_username_from_token: sub is digit string, returning for ID search")
+                logger.debug(
+                    f"_username_from_token: sub is digit string, returning for ID search"
+                )
                 return sub
             else:
                 logger.debug(f"_username_from_token: returning sub as username")
@@ -190,7 +197,9 @@ async def _get_user_by_id(db, user_id: int) -> Optional[User]:
         logger.debug(f"_get_user_by_id: scalar_one_or_none error: {e}")
         try:
             user = result.scalars().first()
-            logger.debug(f"_get_user_by_id: found with scalars: {user.username if user else 'None'}")
+            logger.debug(
+                f"_get_user_by_id: found with scalars: {user.username if user else 'None'}"
+            )
             return user
         except Exception as e2:
             logger.debug(f"_get_user_by_id: scalars error: {e2}")
@@ -215,15 +224,23 @@ async def get_current_user(
 
     try:
         if username:
-            logger.debug(f"get_current_user: trying to find user by username={username}")
+            logger.debug(
+                f"get_current_user: trying to find user by username={username}"
+            )
             # Если username содержит только цифры, то это ID
             if username.isdigit():
-                logger.debug(f"get_current_user: username is digit, trying ID {int(username)}")
+                logger.debug(
+                    f"get_current_user: username is digit, trying ID {int(username)}"
+                )
                 user = await _get_user_by_id(db, int(username))
             else:
-                logger.debug(f"get_current_user: username is not digit, trying username {username}")
+                logger.debug(
+                    f"get_current_user: username is not digit, trying username {username}"
+                )
                 user = await _get_user_by_username(db, username)
-            logger.debug(f"get_current_user: user found={user.username if user else 'None'}")
+            logger.debug(
+                f"get_current_user: user found={user.username if user else 'None'}"
+            )
         else:
             logger.debug("get_current_user: no username, trying payload fallback")
             # Падаем обратно на извлечение sub и поиск по ID
@@ -237,15 +254,21 @@ async def get_current_user(
                 sub = payload.get("sub")
                 logger.debug(f"get_current_user: sub={sub}, type={type(sub)}")
                 if isinstance(sub, str) and sub.isdigit():
-                    logger.debug(f"get_current_user: sub is digit string, trying ID {int(sub)}")
+                    logger.debug(
+                        f"get_current_user: sub is digit string, trying ID {int(sub)}"
+                    )
                     user = await _get_user_by_id(db, int(sub))
                 elif isinstance(sub, int):
                     logger.debug(f"get_current_user: sub is int, trying ID {sub}")
                     user = await _get_user_by_id(db, sub)
                 elif isinstance(sub, str):
-                    logger.debug(f"get_current_user: sub is string, trying username {sub}")
+                    logger.debug(
+                        f"get_current_user: sub is string, trying username {sub}"
+                    )
                     user = await _get_user_by_username(db, sub)
-                logger.debug(f"get_current_user: user found by fallback={user.username if user else 'None'}")
+                logger.debug(
+                    f"get_current_user: user found by fallback={user.username if user else 'None'}"
+                )
             except JWTError:
                 logger.debug("get_current_user: JWT decode error")
                 user = None
@@ -268,7 +291,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        logger.debug(f"[deps.get_current_user] user ok id={getattr(user,'id',None)} username={getattr(user,'username',None)}")
+        logger.debug(
+            f"[deps.get_current_user] user ok id={getattr(user,'id',None)} username={getattr(user,'username',None)}"
+        )
     except Exception:
         pass
     return user
@@ -283,8 +308,7 @@ async def get_current_active_user(
     """
     if not current_user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Пользователь деактивирован"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь деактивирован"
         )
     return current_user
 
@@ -294,11 +318,12 @@ async def get_current_active_user(
 def require_roles(*roles: str) -> Callable[..., Any]:
     """
     Dependency factory для проверки ролей (перенаправляет на SSOT).
-    
+
     Эта функция теперь является алиасом для app.core.security.require_roles()
     для обратной совместимости. Новый код должен использовать security.require_roles().
     """
     from app.core.security import require_roles as _require_roles
+
     return _require_roles(*roles)
 
 
@@ -307,7 +332,7 @@ def get_current_user_from_request(request: Request) -> Optional[User]:
     user_id = getattr(request.state, 'user_id', None)
     if not user_id:
         return None
-    
+
     # Получаем сессию БД
     db = next(get_db())
     try:
@@ -332,8 +357,7 @@ def require_authentication(request: Request) -> User:
     user = get_current_user_from_request(request)
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Требуется аутентификация"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется аутентификация"
         )
     return user
 
@@ -343,8 +367,7 @@ def require_active_user(request: Request) -> User:
     user = require_authentication(request)
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Пользователь деактивирован"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Пользователь деактивирован"
         )
     return user
 
@@ -355,7 +378,7 @@ def require_superuser(request: Request) -> User:
     if not user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права суперпользователя"
+            detail="Требуются права суперпользователя",
         )
     return user
 
@@ -366,7 +389,7 @@ def require_admin(request: Request) -> User:
     if user.role != "Admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права администратора"
+            detail="Требуются права администратора",
         )
     return user
 
@@ -377,7 +400,7 @@ def require_doctor_or_admin(request: Request) -> User:
     if user.role not in ["Admin", "Doctor"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права врача или администратора"
+            detail="Требуются права врача или администратора",
         )
     return user
 
@@ -388,7 +411,7 @@ def require_staff(request: Request) -> User:
     if user.role not in ["Admin", "Doctor", "Nurse", "Receptionist"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права сотрудника клиники"
+            detail="Требуются права сотрудника клиники",
         )
     return user
 
@@ -402,7 +425,7 @@ def validate_token(token: str, db: Session) -> Optional[dict]:
     """Валидирует JWT токен"""
     if not get_authentication_service:
         return None
-    
+
     try:
         auth_service = get_authentication_service()
         payload = auth_service.verify_token(token, "access")
@@ -416,11 +439,11 @@ def get_user_from_token(token: str, db: Session) -> Optional[User]:
     payload = validate_token(token, db)
     if not payload:
         return None
-    
+
     user_id = payload.get("sub")
     if not user_id:
         return None
-    
+
     try:
         return db.query(User).filter(User.id == int(user_id)).first()
     except (ValueError, TypeError):

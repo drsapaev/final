@@ -7,7 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base_class import Base  # Base декларативной модели
 
-
 # ============================================================================
 # DEPRECATED: OnlineDay model is legacy department-based queue system
 # ============================================================================
@@ -36,6 +35,7 @@ from app.db.base_class import Base  # Base декларативной модел
 #   - app/models/online_queue.py (DailyQueue - preferred)
 #   - docs/QUEUE_SYSTEM_ARCHITECTURE.md (migration guide)
 # ============================================================================
+
 
 class OnlineDay(Base):
     __tablename__ = "online_days"

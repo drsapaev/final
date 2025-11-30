@@ -35,7 +35,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         for field in fields_to_exclude:
             if field in data:
                 del data[field]
-        
+
         # ✅ ЗАЩИТА: Не сохраняем пустые значения для first_name и last_name
         # Это предотвращает случайную перезапись нормализованных данных пустыми строками
         protected_fields = ["first_name", "last_name"]
@@ -45,8 +45,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 # Если значение пустое или состоит только из пробелов - удаляем из данных
                 # Валидатор схемы должен был это предотвратить, но это дополнительная защита
                 if not value or not str(value).strip():
-                    raise ValueError(f"Поле {field} не может быть пустым при создании пациента")
-        
+                    raise ValueError(
+                        f"Поле {field} не может быть пустым при создании пациента"
+                    )
+
         db_obj = self.model(**data)  # type: ignore[arg-type]
         db.add(db_obj)
         db.commit()
@@ -66,7 +68,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             update_data = obj_in.dict(exclude_unset=True)
         else:
             update_data = dict(obj_in)
-        
+
         # ✅ ЗАЩИТА: Не перезаписываем непустые first_name/last_name пустыми значениями
         # Это предотвращает случайную перезапись нормализованных данных пустыми строками
         protected_fields = ["first_name", "last_name"]
@@ -75,7 +77,11 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 new_value = update_data[field]
                 current_value = getattr(db_obj, field, None)
                 # Если новое значение пустое, а текущее не пустое - не перезаписываем
-                if (not new_value or not str(new_value).strip()) and current_value and str(current_value).strip():
+                if (
+                    (not new_value or not str(new_value).strip())
+                    and current_value
+                    and str(current_value).strip()
+                ):
                     del update_data[field]
 
         for field, value in update_data.items():

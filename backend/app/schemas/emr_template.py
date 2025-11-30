@@ -1,6 +1,7 @@
 """
 Схемы для шаблонов EMR
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -13,7 +14,7 @@ from app.schemas.base import ORMModel
 
 class EMRTemplateBase(ORMModel):
     """Базовая схема шаблона EMR"""
-    
+
     name: str = Field(..., max_length=255)
     description: Optional[str] = Field(None, max_length=5000)
     specialty: str = Field(..., max_length=100)
@@ -25,12 +26,13 @@ class EMRTemplateBase(ORMModel):
 
 class EMRTemplateCreate(EMRTemplateBase):
     """Схема создания шаблона EMR"""
+
     pass
 
 
 class EMRTemplateUpdate(ORMModel):
     """Схема обновления шаблона EMR"""
-    
+
     name: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = Field(None, max_length=5000)
     specialty: Optional[str] = Field(None, max_length=100)
@@ -41,7 +43,7 @@ class EMRTemplateUpdate(ORMModel):
 
 class EMRTemplateOut(EMRTemplateBase):
     """Схема вывода шаблона EMR"""
-    
+
     id: int
     version: int
     created_at: datetime
@@ -50,7 +52,7 @@ class EMRTemplateOut(EMRTemplateBase):
 
 class EMRVersionBase(ORMModel):
     """Базовая схема версии EMR"""
-    
+
     emr_id: int
     version_data: Dict[str, Any] = Field(...)
     version_number: int
@@ -61,21 +63,24 @@ class EMRVersionBase(ORMModel):
 
 class EMRVersionCreate(EMRVersionBase):
     """Схема создания версии EMR"""
+
     pass
 
 
 class EMRVersionOut(EMRVersionBase):
     """Схема вывода версии EMR"""
-    
+
     id: int
     created_at: datetime
 
 
 class EMRTemplateField(ORMModel):
     """Схема поля шаблона EMR"""
-    
+
     field_name: str = Field(..., max_length=100)
-    field_type: str = Field(..., max_length=50)  # text, textarea, select, checkbox, date
+    field_type: str = Field(
+        ..., max_length=50
+    )  # text, textarea, select, checkbox, date
     label: str = Field(..., max_length=255)
     placeholder: Optional[str] = Field(None, max_length=255)
     required: bool = False
@@ -86,7 +91,7 @@ class EMRTemplateField(ORMModel):
 
 class EMRTemplateSection(ORMModel):
     """Схема секции шаблона EMR"""
-    
+
     section_name: str = Field(..., max_length=255)
     section_title: str = Field(..., max_length=255)
     fields: List[EMRTemplateField] = Field(...)
@@ -97,7 +102,7 @@ class EMRTemplateSection(ORMModel):
 
 class EMRTemplateStructure(ORMModel):
     """Схема структуры шаблона EMR"""
-    
+
     template_name: str = Field(..., max_length=255)
     specialty: str = Field(..., max_length=100)
     sections: List[EMRTemplateSection] = Field(...)

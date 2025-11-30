@@ -318,10 +318,11 @@ appointment = CRUDAppointment(Appointment)
 
 # === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
 
+
 def count_upcoming_appointments(db: Session, patient_id: int) -> int:
     """Подсчитать предстоящие записи пациента"""
     from datetime import datetime
-    
+
     today = datetime.now().date()
     return (
         db.query(Appointment)
@@ -329,7 +330,7 @@ def count_upcoming_appointments(db: Session, patient_id: int) -> int:
             and_(
                 Appointment.patient_id == patient_id,
                 Appointment.appointment_date >= today,
-                Appointment.status.in_(["planned", "confirmed", "paid"])
+                Appointment.status.in_(["planned", "confirmed", "paid"]),
             )
         )
         .count()
@@ -343,7 +344,7 @@ def count_patient_visits(db: Session, patient_id: int) -> int:
         .filter(
             and_(
                 Appointment.patient_id == patient_id,
-                Appointment.status.in_(["completed", "in_visit"])
+                Appointment.status.in_(["completed", "in_visit"]),
             )
         )
         .count()
@@ -357,7 +358,7 @@ def get_last_visit(db: Session, patient_id: int) -> Optional[Appointment]:
         .filter(
             and_(
                 Appointment.patient_id == patient_id,
-                Appointment.status.in_(["completed", "in_visit"])
+                Appointment.status.in_(["completed", "in_visit"]),
             )
         )
         .order_by(Appointment.appointment_date.desc())
@@ -365,10 +366,12 @@ def get_last_visit(db: Session, patient_id: int) -> Optional[Appointment]:
     )
 
 
-def get_upcoming_appointments(db: Session, patient_id: int, limit: int = 10) -> List[Appointment]:
+def get_upcoming_appointments(
+    db: Session, patient_id: int, limit: int = 10
+) -> List[Appointment]:
     """Получить предстоящие записи пациента"""
     from datetime import datetime
-    
+
     today = datetime.now().date()
     return (
         db.query(Appointment)
@@ -376,7 +379,7 @@ def get_upcoming_appointments(db: Session, patient_id: int, limit: int = 10) -> 
             and_(
                 Appointment.patient_id == patient_id,
                 Appointment.appointment_date >= today,
-                Appointment.status.in_(["planned", "confirmed", "paid"])
+                Appointment.status.in_(["planned", "confirmed", "paid"]),
             )
         )
         .order_by(Appointment.appointment_date.asc())

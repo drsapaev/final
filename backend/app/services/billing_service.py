@@ -1,41 +1,51 @@
 """
 Сервис для автоматического выставления счетов
 """
-import logging
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-import json
-from jinja2 import Template
 
+import json
+import logging
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from jinja2 import Template
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session
+
+from app.models.appointment import Appointment
 from app.models.billing import (
-    Invoice, InvoiceItem, InvoiceTemplate, BillingRule, 
-    PaymentReminder, BillingSettings, InvoiceStatus, InvoiceType,
-    PaymentMethod, RecurrenceType
+    BillingRule,
+    BillingSettings,
+    Invoice,
+    InvoiceItem,
+    InvoiceStatus,
+    InvoiceTemplate,
+    InvoiceType,
+    PaymentMethod,
+    PaymentReminder,
+    RecurrenceType,
 )
+from app.models.enums import PaymentStatus, VisitStatus
+
 # ✅ ИСПРАВЛЕНО: BillingPayment удален из импортов - используем только Payment из app.models.payment (SSOT)
 from app.models.patient import Patient
-from app.models.visit import Visit, VisitService
-from app.models.appointment import Appointment
+from app.models.payment import Payment
 from app.models.service import Service
 from app.models.user import User
-from app.models.payment import Payment
-from app.models.enums import PaymentStatus, VisitStatus
-from app.services.service_mapping import normalize_service_code
+from app.models.visit import Visit, VisitService
 from app.services.queue_service import queue_service
+from app.services.service_mapping import normalize_service_code
 
 logger = logging.getLogger(__name__)
 
 
 class BillingService:
     """Сервис для управления счетами и автоматическим выставлением"""
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
+
     # === Создание счетов ===
-    
+
     def create_invoice(
         self,
         patient_id: int,
@@ -45,21 +55,25 @@ class BillingService:
         invoice_type: InvoiceType = InvoiceType.STANDARD,
         due_days: int = 30,
         auto_send: bool = False,
-        created_by: int = None
+        created_by: int = None,
     ) -> Invoice:
         """Создать счет"""
-        
+
         # Получаем настройки биллинга
         settings = self.get_billing_settings()
-        
+
         # Генерируем номер счета
         invoice_number = self._generate_invoice_number(settings)
-        
+
         # Рассчитываем суммы
         subtotal = sum(s.get('quantity', 1) * s.get('unit_price', 0) for s in services)
-        tax_amount = subtotal * (settings.default_tax_rate / 100) if settings.default_tax_rate else 0
+        tax_amount = (
+            subtotal * (settings.default_tax_rate / 100)
+            if settings.default_tax_rate
+            else 0
+        )
         total_amount = subtotal + tax_amount
-        
+
         # Создаем счет
         invoice = Invoice(
             invoice_number=invoice_number,
@@ -73,15 +87,16 @@ class BillingService:
             total_amount=total_amount,
             balance=total_amount,
             issue_date=queue_service.get_local_timestamp(self.db),
-            due_date=queue_service.get_local_timestamp(self.db) + timedelta(days=due_days),
+            due_date=queue_service.get_local_timestamp(self.db)
+            + timedelta(days=due_days),
             auto_send=auto_send,
             is_auto_generated=True,
-            created_by=created_by
+            created_by=created_by,
         )
-        
+
         self.db.add(invoice)
         self.db.flush()
-        
+
         # Добавляем позиции счета
         for i, service_data in enumerate(services):
             item = InvoiceItem(
@@ -91,108 +106,133 @@ class BillingService:
                 quantity=service_data.get('quantity', 1),
                 unit_price=service_data.get('unit_price', 0),
                 tax_rate=settings.default_tax_rate,
-                tax_amount=service_data.get('unit_price', 0) * service_data.get('quantity', 1) * (settings.default_tax_rate / 100) if settings.default_tax_rate else 0,
-                total_amount=service_data.get('unit_price', 0) * service_data.get('quantity', 1),
-                sort_order=i
+                tax_amount=(
+                    service_data.get('unit_price', 0)
+                    * service_data.get('quantity', 1)
+                    * (settings.default_tax_rate / 100)
+                    if settings.default_tax_rate
+                    else 0
+                ),
+                total_amount=service_data.get('unit_price', 0)
+                * service_data.get('quantity', 1),
+                sort_order=i,
             )
             self.db.add(item)
-        
+
         # Обновляем номер счета в настройках
         settings.next_invoice_number += 1
-        
+
         self.db.commit()
         self.db.refresh(invoice)
-        
+
         # Автоматически отправляем если нужно
         if auto_send:
             self.send_invoice(invoice.id)
-        
+
         return invoice
-    
+
     def auto_generate_invoice_for_visit(self, visit_id: int) -> Optional[Invoice]:
         """Автоматически создать счет для визита"""
-        
+
         visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             return None
-        
+
         # Проверяем правила биллинга
         applicable_rules = self._get_applicable_billing_rules('visit_completed', visit)
         if not applicable_rules:
             return None
-        
+
         # Берем правило с наивысшим приоритетом
         rule = max(applicable_rules, key=lambda r: r.priority)
-        
+
         # Получаем услуги из визита
         services = []
         for visit_service in visit.visit_services:
-            service = self.db.query(Service).filter(Service.id == visit_service.service_id).first()
+            service = (
+                self.db.query(Service)
+                .filter(Service.id == visit_service.service_id)
+                .first()
+            )
             if service:
-                services.append({
-                    'service_id': service.id,
-                    'description': service.name,
-                    'quantity': 1,
-                    'unit_price': visit_service.price or service.price
-                })
-        
+                services.append(
+                    {
+                        'service_id': service.id,
+                        'description': service.name,
+                        'quantity': 1,
+                        'unit_price': visit_service.price or service.price,
+                    }
+                )
+
         if not services:
             return None
-        
+
         # Создаем счет
         invoice = self.create_invoice(
             patient_id=visit.patient_id,
             services=services,
             visit_id=visit_id,
             due_days=rule.payment_terms_days,
-            auto_send=rule.auto_send
+            auto_send=rule.auto_send,
         )
-        
+
         return invoice
-    
-    def auto_generate_invoice_for_appointment(self, appointment_id: int) -> Optional[Invoice]:
+
+    def auto_generate_invoice_for_appointment(
+        self, appointment_id: int
+    ) -> Optional[Invoice]:
         """Автоматически создать счет для записи"""
-        
-        appointment = self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
+
+        appointment = (
+            self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
+        )
         if not appointment:
             return None
-        
+
         # Проверяем правила биллинга
-        applicable_rules = self._get_applicable_billing_rules('appointment_created', appointment)
+        applicable_rules = self._get_applicable_billing_rules(
+            'appointment_created', appointment
+        )
         if not applicable_rules:
             return None
-        
+
         # Берем правило с наивысшим приоритетом
         rule = max(applicable_rules, key=lambda r: r.priority)
-        
+
         # Получаем услуги из записи
         services = []
         if appointment.service_id:
-            service = self.db.query(Service).filter(Service.id == appointment.service_id).first()
+            service = (
+                self.db.query(Service)
+                .filter(Service.id == appointment.service_id)
+                .first()
+            )
             if service:
-                services.append({
-                    'service_id': service.id,
-                    'description': service.name,
-                    'quantity': 1,
-                    'unit_price': service.price
-                })
-        
+                services.append(
+                    {
+                        'service_id': service.id,
+                        'description': service.name,
+                        'quantity': 1,
+                        'unit_price': service.price,
+                    }
+                )
+
         if not services:
             return None
-        
+
         # Создаем счет
         invoice = self.create_invoice(
             patient_id=appointment.patient_id,
             services=services,
             appointment_id=appointment_id,
             due_days=rule.payment_terms_days,
-            auto_send=rule.auto_send
+            auto_send=rule.auto_send,
         )
-        
+
         return invoice
-    
+
     # === Управление платежами ===
-    
+
     def create_payment(
         self,
         visit_id: int,
@@ -208,7 +248,7 @@ class BillingService:
     ) -> Payment:
         """
         Создание платежа - единая функция для всех типов платежей (SSOT).
-        
+
         Args:
             visit_id: ID визита
             amount: Сумма платежа
@@ -220,10 +260,10 @@ class BillingService:
             provider: Провайдер платежа (для онлайн-платежей)
             provider_payment_id: ID платежа у провайдера
             commit: Коммитить транзакцию (по умолчанию True)
-        
+
         Returns:
             Payment - созданный платеж
-        
+
         Raises:
             ValueError: Если визит не найден или данные некорректны
         """
@@ -231,11 +271,11 @@ class BillingService:
         visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise ValueError(f"Визит {visit_id} не найден")
-        
+
         # Валидация суммы
         if amount <= 0:
             raise ValueError("Сумма платежа должна быть больше нуля")
-        
+
         # Создаем платеж
         payment = Payment(
             visit_id=visit_id,
@@ -248,22 +288,23 @@ class BillingService:
             provider=provider,
             provider_payment_id=provider_payment_id,
         )
-        
+
         # Устанавливаем paid_at если статус "paid"
         if status == PaymentStatus.PAID.value:
             from app.services.queue_service import queue_service
+
             payment.paid_at = queue_service.get_local_timestamp(self.db)
-        
+
         self.db.add(payment)
-        
+
         if commit:
             self.db.commit()
             self.db.refresh(payment)
         else:
             self.db.flush()
-        
+
         return payment
-    
+
     def get_payments_list(
         self,
         visit_id: Optional[int] = None,
@@ -274,59 +315,74 @@ class BillingService:
     ) -> List[Dict[str, Any]]:
         """
         Получить список платежей с обогащением данными (SSOT).
-        
+
         Args:
             visit_id: Фильтр по ID визита
             date_from: Дата начала (YYYY-MM-DD)
             date_to: Дата окончания (YYYY-MM-DD)
             limit: Лимит записей
             offset: Смещение
-        
+
         Returns:
             List[Dict[str, Any]] - список платежей с обогащёнными данными
         """
-        from app.crud.payment import list_payments as crud_list_payments
-        from app.models.service import Service
-        
         # ✅ ИСПРАВЛЕНО: Фильтрация по датам теперь на уровне SQL (в crud_list_payments)
         # Получаем платежи через CRUD с фильтрацией по датам
         import logging
+
+        from app.crud.payment import list_payments as crud_list_payments
+        from app.models.service import Service
+
         logger = logging.getLogger(__name__)
-        
-        logger.info(f"📊 get_payments_list: запрос с фильтрами visit_id={visit_id}, date_from={date_from}, date_to={date_to}, limit={limit}")
-        
+
+        logger.info(
+            f"📊 get_payments_list: запрос с фильтрами visit_id={visit_id}, date_from={date_from}, date_to={date_to}, limit={limit}"
+        )
+
         payments = crud_list_payments(
             self.db,
             visit_id=visit_id,
             date_from=date_from,
             date_to=date_to,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
-        
+
         logger.info(f"📊 get_payments_list: получено платежей из БД: {len(payments)}")
-        
+
         # ✅ УЛУЧШЕНИЕ: Фильтруем тестовые платежи - показываем только реальные платежи с реальными визитами
         # Исключаем платежи без визитов или с несуществующими визитами
         real_payments = []
         for payment in payments:
             if payment.visit_id:
-                visit = self.db.query(Visit).filter(Visit.id == payment.visit_id).first()
+                visit = (
+                    self.db.query(Visit).filter(Visit.id == payment.visit_id).first()
+                )
                 if visit and visit.patient_id:
                     # Проверяем, что визит связан с реальным пациентом
-                    patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                    patient = (
+                        self.db.query(Patient)
+                        .filter(Patient.id == visit.patient_id)
+                        .first()
+                    )
                     if patient:
                         real_payments.append(payment)
                     else:
-                        logger.warning(f"⚠️ Платеж {payment.id}: визит {payment.visit_id} не связан с реальным пациентом (patient_id={visit.patient_id})")
+                        logger.warning(
+                            f"⚠️ Платеж {payment.id}: визит {payment.visit_id} не связан с реальным пациентом (patient_id={visit.patient_id})"
+                        )
                 else:
-                    logger.warning(f"⚠️ Платеж {payment.id}: визит {payment.visit_id} не найден или не имеет patient_id")
+                    logger.warning(
+                        f"⚠️ Платеж {payment.id}: визит {payment.visit_id} не найден или не имеет patient_id"
+                    )
             else:
                 logger.warning(f"⚠️ Платеж {payment.id}: не имеет visit_id")
-        
-        logger.info(f"📊 get_payments_list: после фильтрации реальных платежей: {len(real_payments)}")
+
+        logger.info(
+            f"📊 get_payments_list: после фильтрации реальных платежей: {len(real_payments)}"
+        )
         payments = real_payments
-        
+
         # Обогащаем данные
         from app.models.payment import PaymentVisit
 
@@ -338,9 +394,11 @@ class BillingService:
             appointment_time = None
 
             # ✅ НОВОЕ: Проверяем, связан ли платёж с несколькими визитами через payment_visits
-            payment_visits = self.db.query(PaymentVisit).filter(
-                PaymentVisit.payment_id == payment.id
-            ).all()
+            payment_visits = (
+                self.db.query(PaymentVisit)
+                .filter(PaymentVisit.payment_id == payment.id)
+                .all()
+            )
 
             if payment_visits:
                 # Платёж связан с несколькими визитами - собираем все услуги
@@ -349,14 +407,23 @@ class BillingService:
                     if visit:
                         # Получаем информацию о пациенте (из первого визита)
                         if not patient_name and visit.patient_id:
-                            patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                            patient = (
+                                self.db.query(Patient)
+                                .filter(Patient.id == visit.patient_id)
+                                .first()
+                            )
                             if patient:
-                                patient_name = patient.short_name() or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+                                patient_name = (
+                                    patient.short_name()
+                                    or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+                                )
 
                         # Собираем все услуги этого визита
-                        visit_services = self.db.query(VisitService).filter(
-                            VisitService.visit_id == visit.id
-                        ).all()
+                        visit_services = (
+                            self.db.query(VisitService)
+                            .filter(VisitService.visit_id == visit.id)
+                            .all()
+                        )
                         for vs in visit_services:
                             if vs.code:
                                 # ✅ Нормализуем код через SSOT
@@ -367,18 +434,31 @@ class BillingService:
             else:
                 # Старая схема: один платёж = один визит
                 if payment.visit_id:
-                    visit = self.db.query(Visit).filter(Visit.id == payment.visit_id).first()
+                    visit = (
+                        self.db.query(Visit)
+                        .filter(Visit.id == payment.visit_id)
+                        .first()
+                    )
                     if visit:
                         # Получаем информацию о пациенте
                         if visit.patient_id:
-                            patient = self.db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                            patient = (
+                                self.db.query(Patient)
+                                .filter(Patient.id == visit.patient_id)
+                                .first()
+                            )
                             if patient:
-                                patient_name = patient.short_name() or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+                                patient_name = (
+                                    patient.short_name()
+                                    or f"{patient.first_name or ''} {patient.last_name or ''}".strip()
+                                )
 
                         # Получаем все услуги визита
-                        visit_services = self.db.query(VisitService).filter(
-                            VisitService.visit_id == visit.id
-                        ).all()
+                        visit_services = (
+                            self.db.query(VisitService)
+                            .filter(VisitService.visit_id == visit.id)
+                            .all()
+                        )
                         for vs in visit_services:
                             if vs.code:
                                 # ✅ Нормализуем код через SSOT
@@ -400,14 +480,22 @@ class BillingService:
                     method = payment.method.capitalize()
 
             # Формируем строку с кодами услуг
-            service_display = ', '.join(all_service_codes) if all_service_codes else 'Услуга'
+            service_display = (
+                ', '.join(all_service_codes) if all_service_codes else 'Услуга'
+            )
 
             # Форматируем дату и время
             time_str = '—'
             date_str = '—'
             if payment.created_at:
-                time_str = payment.created_at.strftime('%H:%M') if payment.created_at else '—'
-                date_str = payment.created_at.strftime('%d.%m.%Y') if payment.created_at else '—'
+                time_str = (
+                    payment.created_at.strftime('%H:%M') if payment.created_at else '—'
+                )
+                date_str = (
+                    payment.created_at.strftime('%d.%m.%Y')
+                    if payment.created_at
+                    else '—'
+                )
 
             # Формируем ответ
             payment_data = {
@@ -423,33 +511,37 @@ class BillingService:
                 'method': method,
                 'status': payment.status,
                 'currency': payment.currency,
-                'created_at': payment.created_at.isoformat() if payment.created_at else None,
+                'created_at': (
+                    payment.created_at.isoformat() if payment.created_at else None
+                ),
                 'paid_at': payment.paid_at.isoformat() if payment.paid_at else None,
-                'visit_count': len(payment_visits) if payment_visits else 1  # Количество визитов
+                'visit_count': (
+                    len(payment_visits) if payment_visits else 1
+                ),  # Количество визитов
             }
 
             payment_responses.append(payment_data)
 
         return payment_responses
-    
+
     def is_visit_paid(self, visit: Visit) -> bool:
         """
         Определить, оплачен ли визит (SSOT).
-        
+
         Использует многоуровневую проверку признаков оплаты:
         1. Статус визита (paid, in_visit, in_progress, completed, done)
         2. payment_processed_at (явный признак оплаты)
         3. Записи в таблице payments (статус 'paid' или наличие paid_at)
         4. discount_mode='paid' в сочетании с другими признаками
-        
+
         Args:
             visit: Объект Visit для проверки
-        
+
         Returns:
             True если визит оплачен, False если нет
         """
         is_paid = False
-        
+
         # Приоритет 1: Проверяем статус визита (используем enum)
         v_status = (getattr(visit, 'status', None) or '').lower()
         paid_statuses = [
@@ -457,55 +549,62 @@ class BillingService:
             VisitStatus.IN_VISIT.value,
             VisitStatus.IN_PROGRESS.value,
             VisitStatus.COMPLETED.value,
-            VisitStatus.DONE.value
+            VisitStatus.DONE.value,
         ]
         if v_status in paid_statuses:
             is_paid = True
-        
+
         # Приоритет 2: Проверяем payment_processed_at (явный признак оплаты)
         if not is_paid and getattr(visit, 'payment_processed_at', None):
             is_paid = True
-        
+
         # Приоритет 3: Проверка записей оплаты в таблице payments
         if not is_paid:
-            payment_row = self.db.query(Payment).filter(
-                Payment.visit_id == visit.id
-            ).order_by(Payment.created_at.desc()).first()
-            
+            payment_row = (
+                self.db.query(Payment)
+                .filter(Payment.visit_id == visit.id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+
             if payment_row:
-                payment_status = str(payment_row.status).lower() if payment_row.status else ''
+                payment_status = (
+                    str(payment_row.status).lower() if payment_row.status else ''
+                )
                 if payment_status == 'paid' or payment_row.paid_at:
                     is_paid = True
-        
+
         # Приоритет 4: Проверяем discount_mode ТОЛЬКО если есть другие признаки оплаты
         if not is_paid:
             discount_mode_value = getattr(visit, 'discount_mode', None)
             v_status = (getattr(visit, 'status', None) or '').lower()
-            
+
             if discount_mode_value == 'paid' and v_status in paid_statuses:
                 is_paid = True
-            elif discount_mode_value == 'paid' and getattr(visit, 'payment_processed_at', None):
+            elif discount_mode_value == 'paid' and getattr(
+                visit, 'payment_processed_at', None
+            ):
                 is_paid = True
-        
+
         return is_paid
-    
+
     def get_discount_mode_for_visit(self, visit: Visit) -> str:
         """
         Получить discount_mode для визита (SSOT).
-        
+
         Args:
             visit: Объект Visit
-        
+
         Returns:
             discount_mode: none|repeat|benefit|all_free|paid
         """
         # Если визит оплачен, возвращаем 'paid'
         if self.is_visit_paid(visit):
             return 'paid'
-        
+
         # Иначе возвращаем discount_mode из визита
         return getattr(visit, 'discount_mode', 'none') or 'none'
-    
+
     def calculate_total(
         self,
         visit_id: Optional[int] = None,
@@ -514,72 +613,88 @@ class BillingService:
     ) -> Dict[str, Any]:
         """
         Расчёт общей суммы визита с учётом скидок (SSOT).
-        
+
         Может работать с уже созданным визитом (visit_id) или с услугами до создания визита (services).
-        
+
         Args:
             visit_id: ID визита (если визит уже создан)
             services: Список услуг в формате [{"service_id": int, "quantity": int, "custom_price": Optional[float]}] (если визит ещё не создан)
             discount_mode: Режим скидки (none|repeat|benefit|all_free)
-        
+
         Returns:
             Dict с ключами: subtotal, discount, total, currency
-        
+
         Raises:
             ValueError: Если визит не найден или не указаны ни visit_id, ни services
         """
         from decimal import Decimal
-        
+
         subtotal = Decimal('0')
         original_total = Decimal('0')
-        
+
         if visit_id:
             # Работаем с уже созданным визитом
             visit = self.db.query(Visit).filter(Visit.id == visit_id).first()
             if not visit:
                 raise ValueError(f"Визит {visit_id} не найден")
-            
+
             # Получаем услуги визита
-            visit_services = self.db.query(VisitService).filter(
-                VisitService.visit_id == visit_id
-            ).all()
-            
+            visit_services = (
+                self.db.query(VisitService)
+                .filter(VisitService.visit_id == visit_id)
+                .all()
+            )
+
             for visit_service in visit_services:
                 # Базовая цена услуги
                 base_price = visit_service.price or Decimal('0')
                 item_total = base_price * Decimal(visit_service.qty or 1)
                 original_total += item_total
-                
+
                 # Применяем скидки
-                if discount_mode == "repeat" and visit_service.code and "consultation" in visit_service.code.lower():
+                if (
+                    discount_mode == "repeat"
+                    and visit_service.code
+                    and "consultation" in visit_service.code.lower()
+                ):
                     # Повторная консультация бесплатна
                     item_total = Decimal('0')
-                elif discount_mode == "benefit" and visit_service.code and "consultation" in visit_service.code.lower():
+                elif (
+                    discount_mode == "benefit"
+                    and visit_service.code
+                    and "consultation" in visit_service.code.lower()
+                ):
                     # Льготная консультация бесплатна
                     item_total = Decimal('0')
                 elif discount_mode == "all_free":
                     # Всё бесплатно
                     item_total = Decimal('0')
-                
+
                 subtotal += item_total
-        
+
         elif services:
             # Работаем с услугами до создания визита
             for service_item in services:
                 service_id = service_item.get('service_id')
                 quantity = service_item.get('quantity', 1)
                 custom_price = service_item.get('custom_price')
-                
+
                 # Получаем услугу из БД
-                service = self.db.query(Service).filter(Service.id == service_id).first()
+                service = (
+                    self.db.query(Service).filter(Service.id == service_id).first()
+                )
                 if not service:
                     continue
-                
+
                 # Базовая цена (кастомная или из справочника)
-                base_price = Decimal(str(custom_price)) if custom_price else (service.price or Decimal('0'))
+                base_price = (
+                    Decimal(str(custom_price))
+                    if custom_price
+                    else (service.price or Decimal('0'))
+                )
                 item_total = base_price * Decimal(quantity)
                 original_total += item_total
-                
+
                 # Применяем скидки
                 if discount_mode == "repeat" and service.is_consultation:
                     # Повторная консультация бесплатна
@@ -590,24 +705,24 @@ class BillingService:
                 elif discount_mode == "all_free":
                     # Всё бесплатно
                     item_total = Decimal('0')
-                
+
                 subtotal += item_total
         else:
             raise ValueError("Необходимо указать либо visit_id, либо services")
-        
+
         # Расчёт скидки
         discount = original_total - subtotal
-        
+
         total = subtotal
         currency = "UZS"  # По умолчанию
-        
+
         return {
             "subtotal": float(subtotal),
             "discount": float(discount),
             "total": float(total),
             "currency": currency,
         }
-    
+
     def validate_payment_amount(
         self,
         visit_id: int,
@@ -615,32 +730,32 @@ class BillingService:
     ) -> bool:
         """
         Валидация суммы платежа (SSOT).
-        
+
         Проверяет, что сумма платежа не превышает сумму визита.
-        
+
         Args:
             visit_id: ID визита
             amount: Сумма платежа
-        
+
         Returns:
             True если валидна, False если нет
         """
         try:
             total_info = self.calculate_total(visit_id, discount_mode="none")
             total_amount = total_info["total"]
-            
+
             # Сумма платежа не должна превышать сумму визита
             if amount > total_amount:
                 return False
-            
+
             # Сумма платежа должна быть больше нуля
             if amount <= 0:
                 return False
-            
+
             return True
         except Exception:
             return False
-    
+
     def update_payment_status(
         self,
         payment_id: int,
@@ -649,63 +764,79 @@ class BillingService:
     ) -> Payment:
         """
         Обновление статуса платежа (SSOT).
-        
+
         Args:
             payment_id: ID платежа
             new_status: Новый статус (pending|processing|paid|failed|cancelled|refunded|void)
             meta: Метаданные (опционально)
-        
+
         Returns:
             Payment - обновлённый платеж
-        
+
         Raises:
             ValueError: Если платеж не найден или переход статуса недопустим
         """
         payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
         if not payment:
             raise ValueError(f"Платеж {payment_id} не найден")
-        
+
         # Валидация перехода статуса
         current_status = payment.status.lower() if payment.status else ""
         new_status_lower = new_status.lower()
-        
+
         # Разрешённые переходы (используем enum для валидации)
         allowed_transitions = {
-            PaymentStatus.PENDING.value: [PaymentStatus.PROCESSING.value, PaymentStatus.PAID.value, PaymentStatus.FAILED.value, PaymentStatus.CANCELLED.value],
-            PaymentStatus.PROCESSING.value: [PaymentStatus.PAID.value, PaymentStatus.FAILED.value, PaymentStatus.CANCELLED.value],
-            PaymentStatus.PAID.value: [PaymentStatus.REFUNDED.value, PaymentStatus.VOID.value],
-            PaymentStatus.FAILED.value: [PaymentStatus.PENDING.value, PaymentStatus.CANCELLED.value],
+            PaymentStatus.PENDING.value: [
+                PaymentStatus.PROCESSING.value,
+                PaymentStatus.PAID.value,
+                PaymentStatus.FAILED.value,
+                PaymentStatus.CANCELLED.value,
+            ],
+            PaymentStatus.PROCESSING.value: [
+                PaymentStatus.PAID.value,
+                PaymentStatus.FAILED.value,
+                PaymentStatus.CANCELLED.value,
+            ],
+            PaymentStatus.PAID.value: [
+                PaymentStatus.REFUNDED.value,
+                PaymentStatus.VOID.value,
+            ],
+            PaymentStatus.FAILED.value: [
+                PaymentStatus.PENDING.value,
+                PaymentStatus.CANCELLED.value,
+            ],
             PaymentStatus.CANCELLED.value: [],
             PaymentStatus.REFUNDED.value: [],
             PaymentStatus.VOID.value: [],
         }
-        
+
         if current_status in allowed_transitions:
             if new_status_lower not in allowed_transitions[current_status]:
                 raise ValueError(
                     f"Переход статуса с '{current_status}' на '{new_status}' недопустим"
                 )
-        
+
         # Обновляем статус
         payment.status = new_status
-        
+
         # Устанавливаем paid_at если статус "paid"
         if new_status_lower == "paid" and not payment.paid_at:
             from app.services.queue_service import queue_service
+
             payment.paid_at = queue_service.get_local_timestamp(self.db)
-        
+
         # Обновляем метаданные если переданы
         if meta:
             if payment.provider_data:
                 payment.provider_data.update(meta)
             else:
                 payment.provider_data = meta
-        
+
         self.db.commit()
         self.db.refresh(payment)
-        
+
         return payment
-    
+
     def update_visit_discount_mode(
         self,
         visit: Visit,
@@ -713,19 +844,19 @@ class BillingService:
     ) -> bool:
         """
         Обновить discount_mode визита на основе фактического статуса оплаты (SSOT).
-        
+
         Если визит оплачен (по любым признакам), но discount_mode не установлен как 'paid',
         обновляет discount_mode в базе данных.
-        
+
         Args:
             visit: Объект Visit для обновления
             force_update: Принудительно обновить даже если discount_mode уже 'paid'
-        
+
         Returns:
             True если было выполнено обновление, False если нет
         """
         is_paid = self.is_visit_paid(visit)
-        
+
         if is_paid:
             if visit.discount_mode != 'paid' or force_update:
                 visit.discount_mode = 'paid'
@@ -735,10 +866,12 @@ class BillingService:
                     return True
                 except Exception as e:
                     self.db.rollback()
-                    raise ValueError(f"Не удалось сохранить discount_mode для Visit {visit.id}: {e}")
-        
+                    raise ValueError(
+                        f"Не удалось сохранить discount_mode для Visit {visit.id}: {e}"
+                    )
+
         return False
-    
+
     def record_payment(
         self,
         invoice_id: int,
@@ -746,24 +879,24 @@ class BillingService:
         payment_method: PaymentMethod,
         reference_number: str = None,
         description: str = None,
-        created_by: int = None
+        created_by: int = None,
     ):
         """
         Записать платеж (устаревший метод - используйте create_payment вместо этого).
-        
+
         ⚠️ ВНИМАНИЕ: Этот метод использует BillingPayment, который конфликтует с Payment.
         Рекомендуется использовать create_payment() для создания платежей через SSOT.
         """
         # ✅ ИСПРАВЛЕНО: Импортируем BillingPayment локально, чтобы избежать конфликта
         from app.models.billing import BillingPayment
-        
+
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice:
             raise ValueError("Счет не найден")
-        
+
         # Генерируем номер платежа
         payment_number = self._generate_payment_number()
-        
+
         # Создаем платеж
         payment = BillingPayment(
             payment_number=payment_number,
@@ -773,55 +906,61 @@ class BillingService:
             payment_method=payment_method,
             reference_number=reference_number,
             description=description,
-            created_by=created_by
+            created_by=created_by,
         )
-        
+
         self.db.add(payment)
-        
+
         # Обновляем статус счета
         invoice.paid_amount += amount
         invoice.balance = invoice.total_amount - invoice.paid_amount
-        
+
         if invoice.balance <= 0:
             invoice.status = InvoiceStatus.PAID
             invoice.paid_date = queue_service.get_local_timestamp(self.db)
         elif invoice.paid_amount > 0:
             invoice.status = InvoiceStatus.PARTIALLY_PAID
-        
+
         self.db.commit()
         self.db.refresh(payment)
-        
+
         return payment
-    
+
     # === Шаблоны счетов ===
-    
+
     def generate_invoice_html(self, invoice_id: int, template_id: int = None) -> str:
         """Сгенерировать HTML счета"""
-        
+
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice:
             raise ValueError("Счет не найден")
-        
+
         # Получаем шаблон
         if template_id:
-            template = self.db.query(InvoiceTemplate).filter(
-                InvoiceTemplate.id == template_id
-            ).first()
+            template = (
+                self.db.query(InvoiceTemplate)
+                .filter(InvoiceTemplate.id == template_id)
+                .first()
+            )
         else:
-            template = self.db.query(InvoiceTemplate).filter(
-                InvoiceTemplate.is_default == True,
-                InvoiceTemplate.is_active == True
-            ).first()
-        
+            template = (
+                self.db.query(InvoiceTemplate)
+                .filter(
+                    InvoiceTemplate.is_default == True,
+                    InvoiceTemplate.is_active == True,
+                )
+                .first()
+            )
+
         if not template:
             # Используем базовый шаблон
             template_content = self._get_default_template()
         else:
             template_content = template.template_content
-        
+
         # Подготавливаем данные для шаблона
         settings = self.get_billing_settings()
-        
+
         template_data = {
             'invoice': invoice,
             'patient': invoice.patient,
@@ -832,31 +971,33 @@ class BillingService:
                 'address': settings.company_address,
                 'phone': settings.company_phone,
                 'email': settings.company_email,
-                'website': settings.company_website
+                'website': settings.company_website,
             },
-            'total_in_words': self._amount_to_words(invoice.total_amount)
+            'total_in_words': self._amount_to_words(invoice.total_amount),
         }
-        
+
         # Рендерим шаблон
         jinja_template = Template(template_content)
         html_content = jinja_template.render(**template_data)
-        
+
         return html_content
-    
+
     # === Напоминания ===
-    
+
     def create_payment_reminders(self, invoice_id: int):
         """Создать напоминания об оплате для счета"""
-        
+
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice or not invoice.send_reminders:
             return
-        
+
         settings = self.get_billing_settings()
-        
+
         # Напоминания до срока оплаты
         if settings.reminder_days_before:
-            days_before = [int(d.strip()) for d in settings.reminder_days_before.split(',')]
+            days_before = [
+                int(d.strip()) for d in settings.reminder_days_before.split(',')
+            ]
             for days in days_before:
                 reminder_date = invoice.due_date - timedelta(days=days)
                 if reminder_date > queue_service.get_local_timestamp(self.db):
@@ -866,12 +1007,14 @@ class BillingService:
                         scheduled_at=reminder_date,
                         days_before_due=days,
                         subject=f'Напоминание об оплате счета {invoice.invoice_number}',
-                        message=f'Уважаемый пациент! Напоминаем, что через {days} дней истекает срок оплаты счета {invoice.invoice_number} на сумму {invoice.total_amount} {settings.currency_symbol}.'
+                        message=f'Уважаемый пациент! Напоминаем, что через {days} дней истекает срок оплаты счета {invoice.invoice_number} на сумму {invoice.total_amount} {settings.currency_symbol}.',
                     )
-        
+
         # Напоминания после просрочки
         if settings.reminder_days_after:
-            days_after = [int(d.strip()) for d in settings.reminder_days_after.split(',')]
+            days_after = [
+                int(d.strip()) for d in settings.reminder_days_after.split(',')
+            ]
             for days in days_after:
                 reminder_date = invoice.due_date + timedelta(days=days)
                 self._create_reminder(
@@ -880,22 +1023,25 @@ class BillingService:
                     scheduled_at=reminder_date,
                     days_after_due=days,
                     subject=f'Просроченный счет {invoice.invoice_number}',
-                    message=f'Уважаемый пациент! Счет {invoice.invoice_number} на сумму {invoice.total_amount} {settings.currency_symbol} просрочен на {days} дней. Просим погасить задолженность.'
+                    message=f'Уважаемый пациент! Счет {invoice.invoice_number} на сумму {invoice.total_amount} {settings.currency_symbol} просрочен на {days} дней. Просим погасить задолженность.',
                 )
-    
+
     def send_due_reminders(self) -> int:
         """Отправить напоминания, которые пора отправлять"""
-        
+
         now = queue_service.get_local_timestamp(self.db)
-        
+
         # Получаем напоминания к отправке
-        reminders = self.db.query(PaymentReminder).filter(
-            PaymentReminder.is_sent == False,
-            PaymentReminder.scheduled_at <= now
-        ).all()
-        
+        reminders = (
+            self.db.query(PaymentReminder)
+            .filter(
+                PaymentReminder.is_sent == False, PaymentReminder.scheduled_at <= now
+            )
+            .all()
+        )
+
         sent_count = 0
-        
+
         for reminder in reminders:
             try:
                 # Отправляем напоминание
@@ -903,41 +1049,49 @@ class BillingService:
                     self._send_email_reminder(reminder)
                 elif reminder.reminder_type == 'sms':
                     self._send_sms_reminder(reminder)
-                
+
                 # Отмечаем как отправленное
                 reminder.is_sent = True
                 reminder.sent_at = now
                 reminder.delivery_status = 'delivered'
                 sent_count += 1
-                
+
             except Exception as e:
                 reminder.delivery_status = 'failed'
-                logger.error("Ошибка отправки напоминания %d: %s", reminder.id, e, exc_info=True)
-        
+                logger.error(
+                    "Ошибка отправки напоминания %d: %s", reminder.id, e, exc_info=True
+                )
+
         self.db.commit()
         return sent_count
-    
+
     # === Периодические счета ===
-    
+
     def create_recurring_invoices(self) -> int:
         """Создать периодические счета"""
-        
+
         now = queue_service.get_local_timestamp(self.db)
-        
+
         # Получаем счета для создания периодических
-        recurring_invoices = self.db.query(Invoice).filter(
-            Invoice.is_recurring == True,
-            Invoice.next_invoice_date <= now,
-            Invoice.status != InvoiceStatus.CANCELLED
-        ).all()
-        
+        recurring_invoices = (
+            self.db.query(Invoice)
+            .filter(
+                Invoice.is_recurring == True,
+                Invoice.next_invoice_date <= now,
+                Invoice.status != InvoiceStatus.CANCELLED,
+            )
+            .all()
+        )
+
         created_count = 0
-        
+
         for parent_invoice in recurring_invoices:
             try:
                 # Создаем новый счет на основе родительского
                 new_invoice = Invoice(
-                    invoice_number=self._generate_invoice_number(self.get_billing_settings()),
+                    invoice_number=self._generate_invoice_number(
+                        self.get_billing_settings()
+                    ),
                     patient_id=parent_invoice.patient_id,
                     invoice_type=parent_invoice.invoice_type,
                     subtotal=parent_invoice.subtotal,
@@ -952,12 +1106,12 @@ class BillingService:
                     is_auto_generated=True,
                     auto_send=parent_invoice.auto_send,
                     send_reminders=parent_invoice.send_reminders,
-                    parent_invoice_id=parent_invoice.id
+                    parent_invoice_id=parent_invoice.id,
                 )
-                
+
                 self.db.add(new_invoice)
                 self.db.flush()
-                
+
                 # Копируем позиции
                 for item in parent_invoice.invoice_items:
                     new_item = InvoiceItem(
@@ -971,31 +1125,36 @@ class BillingService:
                         tax_rate=item.tax_rate,
                         tax_amount=item.tax_amount,
                         total_amount=item.total_amount,
-                        sort_order=item.sort_order
+                        sort_order=item.sort_order,
                     )
                     self.db.add(new_item)
-                
+
                 # Обновляем дату следующего счета
                 parent_invoice.next_invoice_date = self._calculate_next_recurrence_date(
                     parent_invoice.next_invoice_date,
                     parent_invoice.recurrence_type,
-                    parent_invoice.recurrence_interval
+                    parent_invoice.recurrence_interval,
                 )
-                
+
                 created_count += 1
-                
+
                 # Автоматически отправляем если нужно
                 if new_invoice.auto_send:
                     self.send_invoice(new_invoice.id)
-                
+
             except Exception as e:
-                logger.error("Ошибка создания периодического счета для %d: %s", parent_invoice.id, e, exc_info=True)
-        
+                logger.error(
+                    "Ошибка создания периодического счета для %d: %s",
+                    parent_invoice.id,
+                    e,
+                    exc_info=True,
+                )
+
         self.db.commit()
         return created_count
-    
+
     # === Утилиты ===
-    
+
     def get_billing_settings(self) -> BillingSettings:
         """Получить настройки биллинга"""
         settings = self.db.query(BillingSettings).first()
@@ -1006,47 +1165,58 @@ class BillingService:
             self.db.commit()
             self.db.refresh(settings)
         return settings
-    
+
     def _generate_invoice_number(self, settings: BillingSettings) -> str:
         """Сгенерировать номер счета"""
         year = queue_service.get_local_timestamp(self.db).year
         number = settings.next_invoice_number
-        
+
         return settings.invoice_number_format.format(
-            prefix=settings.invoice_number_prefix,
-            year=year,
-            number=number
+            prefix=settings.invoice_number_prefix, year=year, number=number
         )
-    
+
     def _generate_payment_number(self) -> str:
         """Сгенерировать номер платежа"""
         now = queue_service.get_local_timestamp(self.db)
         return f"PAY-{now.year}-{now.month:02d}-{now.day:02d}-{now.hour:02d}{now.minute:02d}{now.second:02d}"
-    
-    def _get_applicable_billing_rules(self, trigger_event: str, entity) -> List[BillingRule]:
+
+    def _get_applicable_billing_rules(
+        self, trigger_event: str, entity
+    ) -> List[BillingRule]:
         """Получить применимые правила биллинга"""
-        rules = self.db.query(BillingRule).filter(
-            BillingRule.is_active == True,
-            BillingRule.trigger_event == trigger_event
-        ).all()
-        
+        rules = (
+            self.db.query(BillingRule)
+            .filter(
+                BillingRule.is_active == True,
+                BillingRule.trigger_event == trigger_event,
+            )
+            .all()
+        )
+
         applicable_rules = []
-        
+
         for rule in rules:
             if self._rule_matches_entity(rule, entity):
                 applicable_rules.append(rule)
-        
+
         return applicable_rules
-    
+
     def _rule_matches_entity(self, rule: BillingRule, entity) -> bool:
         """Проверить, подходит ли правило для сущности"""
         # Здесь можно добавить более сложную логику проверки
         # На основе типов услуг, категорий пациентов, сумм и т.д.
         return True
-    
-    def _create_reminder(self, invoice_id: int, reminder_type: str, scheduled_at: datetime, 
-                        days_before_due: int = 0, days_after_due: int = 0, 
-                        subject: str = '', message: str = ''):
+
+    def _create_reminder(
+        self,
+        invoice_id: int,
+        reminder_type: str,
+        scheduled_at: datetime,
+        days_before_due: int = 0,
+        days_after_due: int = 0,
+        subject: str = '',
+        message: str = '',
+    ):
         """Создать напоминание"""
         reminder = PaymentReminder(
             invoice_id=invoice_id,
@@ -1055,28 +1225,28 @@ class BillingService:
             days_after_due=days_after_due,
             subject=subject,
             message=message,
-            scheduled_at=scheduled_at
+            scheduled_at=scheduled_at,
         )
         self.db.add(reminder)
-    
+
     def _send_email_reminder(self, reminder: PaymentReminder):
         """Отправить напоминание по email"""
         # Здесь интеграция с email сервисом
         pass
-    
+
     def _send_sms_reminder(self, reminder: PaymentReminder):
         """Отправить напоминание по SMS"""
         # Здесь интеграция с SMS сервисом
         pass
-    
+
     def send_invoice(self, invoice_id: int):
         """Отправить счет пациенту"""
         # Здесь логика отправки счета
         pass
-    
-    def _calculate_next_recurrence_date(self, current_date: datetime, 
-                                      recurrence_type: RecurrenceType, 
-                                      interval: int) -> datetime:
+
+    def _calculate_next_recurrence_date(
+        self, current_date: datetime, recurrence_type: RecurrenceType, interval: int
+    ) -> datetime:
         """Рассчитать дату следующего периодического счета"""
         if recurrence_type == RecurrenceType.DAILY:
             return current_date + timedelta(days=interval)
@@ -1090,12 +1260,12 @@ class BillingService:
             return current_date + timedelta(days=365 * interval)  # Упрощенно
         else:
             return current_date + timedelta(days=30)
-    
+
     def _amount_to_words(self, amount: float) -> str:
         """Преобразовать сумму в слова"""
         # Упрощенная реализация
         return f"{int(amount)} сум"
-    
+
     def _get_default_template(self) -> str:
         """Получить базовый шаблон счета"""
         return """
@@ -1160,14 +1330,15 @@ class BillingService:
 
 # ===== Хелперы для работы с visit и appointment (SSOT) =====
 
+
 def get_discount_mode_for_visit(db: Session, visit: Visit) -> str:
     """
     Получить discount_mode для визита (SSOT helper function).
-    
+
     Args:
         db: Database session
         visit: Объект Visit
-    
+
     Returns:
         discount_mode: none|repeat|benefit|all_free|paid
     """
@@ -1178,56 +1349,60 @@ def get_discount_mode_for_visit(db: Session, visit: Visit) -> str:
 def is_appointment_paid(db: Session, appointment) -> bool:
     """
     Проверить, оплачен ли appointment (SSOT helper function).
-    
+
     Args:
         db: Database session
         appointment: Объект Appointment
-    
+
     Returns:
         True если appointment оплачен, False если нет
     """
     # Проверяем payment_processed_at
     if getattr(appointment, 'payment_processed_at', None):
         return True
-    
+
     # Проверяем visit_type
     visit_type = getattr(appointment, 'visit_type', None) or ''
     if visit_type.lower() == 'paid':
         return True
-    
+
     # Проверяем статус
     status = getattr(appointment, 'status', None) or ''
     paid_statuses = ['paid', 'completed', 'done']
     if status.lower() in paid_statuses:
         return True
-    
+
     # Проверяем наличие платежей
     from app.models.payment import Payment
-    payment = db.query(Payment).filter(
-        Payment.appointment_id == appointment.id
-    ).order_by(Payment.created_at.desc()).first()
-    
+
+    payment = (
+        db.query(Payment)
+        .filter(Payment.appointment_id == appointment.id)
+        .order_by(Payment.created_at.desc())
+        .first()
+    )
+
     if payment:
         payment_status = str(payment.status).lower() if payment.status else ''
         if payment_status == 'paid' or payment.paid_at:
             return True
-    
+
     return False
 
 
 def update_appointment_payment_status(db: Session, appointment) -> bool:
     """
     Обновить статус оплаты appointment (SSOT helper function).
-    
+
     Args:
         db: Database session
         appointment: Объект Appointment
-    
+
     Returns:
         True если было выполнено обновление, False если нет
     """
     is_paid = is_appointment_paid(db, appointment)
-    
+
     if is_paid and getattr(appointment, 'visit_type', None) != 'paid':
         appointment.visit_type = 'paid'
         try:
@@ -1236,30 +1411,32 @@ def update_appointment_payment_status(db: Session, appointment) -> bool:
             return True
         except Exception as e:
             db.rollback()
-            raise ValueError(f"Не удалось сохранить visit_type для Appointment {appointment.id}: {e}")
-    
+            raise ValueError(
+                f"Не удалось сохранить visit_type для Appointment {appointment.id}: {e}"
+            )
+
     return False
 
 
 def get_discount_mode_for_appointment(db: Session, appointment) -> str:
     """
     Получить discount_mode для appointment (SSOT helper function).
-    
+
     Args:
         db: Database session
         appointment: Объект Appointment
-    
+
     Returns:
         discount_mode: none|repeat|benefit|all_free|paid
     """
     # Если appointment оплачен, возвращаем 'paid'
     if is_appointment_paid(db, appointment):
         return 'paid'
-    
+
     # Иначе маппим visit_type в discount_mode
     visit_type = getattr(appointment, 'visit_type', None) or 'paid'
     visit_type_lower = visit_type.lower()
-    
+
     if visit_type_lower == 'paid':
         return 'none'
     elif visit_type_lower == 'repeat':

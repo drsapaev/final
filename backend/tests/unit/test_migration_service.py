@@ -1,16 +1,17 @@
 """
 Юнит тесты для сервиса миграций
 """
-import pytest
 import json
-import tempfile
 import os
+import tempfile
 from datetime import date, datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from app.services.migration_service import MigrationService
+import pytest
+
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.visit import Visit
+from app.services.migration_service import MigrationService
 
 
 @pytest.mark.unit

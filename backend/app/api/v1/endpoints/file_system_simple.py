@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_db, require_roles
 
 router = APIRouter()
+
 
 @router.get("/stats")
 async def get_file_stats_simple(
@@ -18,10 +20,13 @@ async def get_file_stats_simple(
             "files_by_type": {},
             "recent_uploads": [],
             "storage_used": 0,
-            "storage_available": 1000000000  # 1GB
+            "storage_available": 1000000000,  # 1GB
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+        )
+
 
 @router.get("/")
 async def get_files_simple(
@@ -33,14 +38,12 @@ async def get_files_simple(
     """Упрощенный список файлов"""
     try:
         # Простой список без сложных запросов
-        return {
-            "files": [],
-            "total": 0,
-            "limit": limit,
-            "offset": offset
-        }
+        return {"files": [], "total": 0, "limit": limit, "offset": offset}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения файлов: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения файлов: {str(e)}"
+        )
+
 
 @router.post("/upload")
 async def upload_file_simple(
@@ -54,7 +57,7 @@ async def upload_file_simple(
             "message": "Файл успешно загружен",
             "file_id": 1,
             "filename": "test.txt",
-            "size": 1024
+            "size": 1024,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки файла: {str(e)}")

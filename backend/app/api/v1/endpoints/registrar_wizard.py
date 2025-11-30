@@ -2,26 +2,26 @@
 API endpoints для мастера регистрации с поддержкой корзины
 Расширение существующего registrar_integration.py
 """
+
 import logging
 from datetime import date, datetime, timedelta
-from typing import List, Optional, Dict, Any
 from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import String
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import String
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit, VisitService
-from app.models.service import Service
-from app.models.clinic import Doctor, ClinicSettings
-from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.crud import clinic as crud_clinic, online_queue as crud_queue
+from app.models.clinic import ClinicSettings, Doctor
 from app.models.doctor_price_override import DoctorPriceOverride
-from app.crud import clinic as crud_clinic
-from app.crud import online_queue as crud_queue
+from app.models.patient import Patient
+from app.models.payment_invoice import PaymentInvoice, PaymentInvoiceVisit
+from app.models.service import Service
+from app.models.user import User
+from app.models.visit import Visit, VisitService
 from app.services.feature_flags import is_feature_enabled
 from app.services.queue_service import queue_service
 from app.services.service_mapping import normalize_service_code
@@ -32,10 +32,12 @@ router = APIRouter()
 
 # ===================== СХЕМЫ ДЛЯ КОРЗИНЫ =====================
 
+
 class ServiceItemRequest(BaseModel):
     service_id: int
     quantity: int = Field(default=1, ge=1)
     custom_price: Optional[Decimal] = None  # Для врачебного переопределения цены
+
 
 class VisitRequest(BaseModel):
     doctor_id: Optional[int] = None  # Может быть None для лабораторных услуг
@@ -45,6 +47,7 @@ class VisitRequest(BaseModel):
     department: Optional[str] = None
     notes: Optional[str] = None
 
+
 class CartRequest(BaseModel):
     patient_id: int
     visits: List[VisitRequest]
@@ -53,70 +56,81 @@ class CartRequest(BaseModel):
     all_free: bool = Field(default=False)  # Чекбокс "All Free"
     notes: Optional[str] = None
 
+
 class CartResponse(BaseModel):
     success: bool
     message: str
     invoice_id: int
     visit_ids: List[int]
     total_amount: Decimal
-    queue_numbers: Dict[int, List[Dict]]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
+    queue_numbers: Dict[
+        int, List[Dict]
+    ]  # visit_id -> [{"queue_tag": str, "number": int, "queue_id": int}]
     print_tickets: List[Dict[str, Any]]
-    created_visits: Optional[List[Dict[str, Any]]] = None  # Информация о созданных визитах
+    created_visits: Optional[List[Dict[str, Any]]] = (
+        None  # Информация о созданных визитах
+    )
+
 
 # ===================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====================
 
+
 def _check_repeat_visit_eligibility(
-    db: Session, 
-    patient_id: int, 
-    doctor_id: int, 
-    service_ids: List[int]
+    db: Session, patient_id: int, doctor_id: int, service_ids: List[int]
 ) -> bool:
     """
     Проверка права на повторный визит (≤21 день у того же специалиста)
     """
     # Получаем консультации этого врача за последние 21 день
     cutoff_date = date.today() - timedelta(days=21)
-    
-    recent_visits = db.query(Visit).filter(
-        Visit.patient_id == patient_id,
-        Visit.doctor_id == doctor_id,
-        Visit.visit_date >= cutoff_date,
-        Visit.status != "cancelled"
-    ).all()
-    
+
+    recent_visits = (
+        db.query(Visit)
+        .filter(
+            Visit.patient_id == patient_id,
+            Visit.doctor_id == doctor_id,
+            Visit.visit_date >= cutoff_date,
+            Visit.status != "cancelled",
+        )
+        .all()
+    )
+
     if not recent_visits:
         return False
-    
+
     # Проверяем, есть ли среди выбранных услуг консультации
-    consultation_services = db.query(Service).filter(
-        Service.id.in_(service_ids),
-        Service.is_consultation == True
-    ).all()
-    
+    consultation_services = (
+        db.query(Service)
+        .filter(Service.id.in_(service_ids), Service.is_consultation == True)
+        .all()
+    )
+
     return len(consultation_services) > 0
+
 
 # _calculate_visit_price() удалена - используйте billing_service.calculate_total() (SSOT)
 
+
 def _create_queue_entries(
-    db: Session,
-    visits: List[Visit],
-    queue_settings: Dict[str, Any]
+    db: Session, visits: List[Visit], queue_settings: Dict[str, Any]
 ) -> Dict[int, int]:
     """
     Создание записей в очереди для визитов на сегодня
     """
     queue_numbers = {}
     today = date.today()
-    
+
     for visit in visits:
         if visit.visit_date != today:
             continue
-            
+
         # Определяем все уникальные типы очередей для услуг визита
-        visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        visit_services = (
+            db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        )
         service_ids = [vs.service_id for vs in visit_services]
         services = db.query(Service).filter(Service.id.in_(service_ids)).all()
-        
+
         # Собираем все уникальные queue_tag для создания отдельных очередей
         unique_queue_tags = set()
         for service in services:
@@ -124,54 +138,71 @@ def _create_queue_entries(
                 unique_queue_tags.add(service.queue_tag)
             else:
                 unique_queue_tags.add("general")  # По умолчанию
-        
+
         # Создаём отдельную запись в очереди для каждого типа услуг
         visit_queue_numbers = []
         try:
             for queue_tag in unique_queue_tags:
                 # Определяем врача для очереди
                 doctor_id = visit.doctor_id
-                
+
                 # Для очередей без конкретного врача используем ресурс-врачей
                 if queue_tag == "ecg" and not doctor_id:
                     # Ищем ресурс-врача ЭКГ
                     from app.models.user import User
-                    ecg_resource = db.query(User).filter(
-                        User.username == "ecg_resource",
-                        User.is_active == True
-                    ).first()
+
+                    ecg_resource = (
+                        db.query(User)
+                        .filter(User.username == "ecg_resource", User.is_active == True)
+                        .first()
+                    )
                     if ecg_resource:
                         doctor_id = ecg_resource.id
                     else:
-                        logger.warning("ЭКГ ресурс-врач не найден для queue_tag=%s", queue_tag)
+                        logger.warning(
+                            "ЭКГ ресурс-врач не найден для queue_tag=%s", queue_tag
+                        )
                         continue
-                        
+
                 elif queue_tag == "lab" and not doctor_id:
                     # Ищем ресурс-врача лаборатории
                     from app.models.user import User
-                    lab_resource = db.query(User).filter(
-                        User.username == "lab_resource",
-                        User.is_active == True
-                    ).first()
+
+                    lab_resource = (
+                        db.query(User)
+                        .filter(User.username == "lab_resource", User.is_active == True)
+                        .first()
+                    )
                     if lab_resource:
                         # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
-                        lab_doctor = db.query(Doctor).filter(
-                            Doctor.user_id == lab_resource.id
-                        ).first()
+                        lab_doctor = (
+                            db.query(Doctor)
+                            .filter(Doctor.user_id == lab_resource.id)
+                            .first()
+                        )
                         if lab_doctor:
-                            doctor_id = lab_doctor.id  # Используем doctor_id, а не user_id
-                            logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})")
+                            doctor_id = (
+                                lab_doctor.id
+                            )  # Используем doctor_id, а не user_id
+                            logger.info(
+                                f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})"
+                            )
                         else:
-                            logger.warning(f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors")
+                            logger.warning(
+                                f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors"
+                            )
                             continue
                     else:
-                        logger.warning("Лаборатория ресурс-врач не найден для queue_tag=%s", queue_tag)
+                        logger.warning(
+                            "Лаборатория ресурс-врач не найден для queue_tag=%s",
+                            queue_tag,
+                        )
                         continue
-                
+
                 daily_queue = crud_queue.get_or_create_daily_queue(
                     db, today, doctor_id, queue_tag
                 )
-                
+
                 start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
                 next_number = queue_service.get_next_queue_number(
                     db,
@@ -179,29 +210,38 @@ def _create_queue_entries(
                     queue_tag=queue_tag,
                     default_start=start_number,
                 )
-                
+
                 queue_entry = queue_service.create_queue_entry(
-                    db, 
+                    db,
                     daily_queue=daily_queue,
                     patient_id=visit.patient_id,
                     number=next_number,
                     source="desk",
                 )
-                
-                visit_queue_numbers.append({
-                    "queue_tag": queue_tag,
-                    "number": next_number,
-                    "queue_id": daily_queue.id
-                })
-            
+
+                visit_queue_numbers.append(
+                    {
+                        "queue_tag": queue_tag,
+                        "number": next_number,
+                        "queue_id": daily_queue.id,
+                    }
+                )
+
             # Сохраняем все номера очередей для визита
             queue_numbers[visit.id] = visit_queue_numbers
         except Exception as e:
-            logger.warning("Could not create queue entries for visit %d: %s", visit.id, e, exc_info=True)
-    
+            logger.warning(
+                "Could not create queue entries for visit %d: %s",
+                visit.id,
+                e,
+                exc_info=True,
+            )
+
     return queue_numbers
 
+
 # ===================== CLICK ИНТЕГРАЦИЯ =====================
+
 
 class InvoicePaymentRequest(BaseModel):
     invoice_id: int
@@ -209,63 +249,71 @@ class InvoicePaymentRequest(BaseModel):
     return_url: Optional[str] = None
     cancel_url: Optional[str] = None
 
+
 class InvoicePaymentResponse(BaseModel):
     success: bool
     payment_url: Optional[str] = None
     provider_payment_id: Optional[str] = None
     error_message: Optional[str] = None
 
+
 @router.post("/registrar/invoice/init-payment", response_model=InvoicePaymentResponse)
 def init_invoice_payment(
     payment_req: InvoicePaymentRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Инициация оплаты для invoice через Click/PayMe
     """
     try:
         # Получаем invoice
-        invoice = db.query(PaymentInvoice).filter(PaymentInvoice.id == payment_req.invoice_id).first()
+        invoice = (
+            db.query(PaymentInvoice)
+            .filter(PaymentInvoice.id == payment_req.invoice_id)
+            .first()
+        )
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice не найден")
-        
+
         if invoice.status != "pending":
-            raise HTTPException(status_code=400, detail=f"Invoice уже обработан: {invoice.status}")
-        
+            raise HTTPException(
+                status_code=400, detail=f"Invoice уже обработан: {invoice.status}"
+            )
+
         # Инициализируем провайдер платежей
         if payment_req.provider == "click":
             from app.services.payment_providers.click import ClickProvider
-            
+
             # Конфигурация Click (в реальном проекте из настроек)
             provider_config = {
                 "service_id": "test_service",
-                "merchant_id": "test_merchant", 
+                "merchant_id": "test_merchant",
                 "secret_key": "test_secret",
-                "base_url": "https://api.click.uz/v2"
+                "base_url": "https://api.click.uz/v2",
             }
-            
+
             provider = ClickProvider(provider_config)
-            
+
         elif payment_req.provider == "payme":
             from app.services.payment_providers.payme import PayMeProvider
-            
+
             # Конфигурация PayMe (в реальном проекте из настроек)
             provider_config = {
                 "merchant_id": "test_merchant_payme",
                 "secret_key": "test_secret_payme",
                 "base_url": "https://checkout.paycom.uz",
-                "api_url": "https://api.paycom.uz"
+                "api_url": "https://api.paycom.uz",
             }
-            
+
             provider = PayMeProvider(provider_config)
-            
+
         else:
             return InvoicePaymentResponse(
                 success=False,
-                error_message=f"Провайдер {payment_req.provider} не поддерживается"
+                error_message=f"Провайдер {payment_req.provider} не поддерживается",
             )
-        
+
         # Создаём платёж
         result = provider.create_payment(
             amount=invoice.total_amount,
@@ -273,9 +321,9 @@ def init_invoice_payment(
             order_id=f"invoice_{invoice.id}",
             description=f"Оплата визитов #{invoice.id}",
             return_url=payment_req.return_url,
-            cancel_url=payment_req.cancel_url
+            cancel_url=payment_req.cancel_url,
         )
-        
+
         if result.success:
             # Обновляем invoice
             invoice.provider_payment_id = result.payment_id
@@ -284,40 +332,41 @@ def init_invoice_payment(
             invoice.status = "processing"
             invoice.provider_data = result.provider_data
             db.commit()
-            
+
             return InvoicePaymentResponse(
                 success=True,
                 payment_url=result.payment_url,
-                provider_payment_id=result.payment_id
+                provider_payment_id=result.payment_id,
             )
         else:
             return InvoicePaymentResponse(
-                success=False,
-                error_message=result.error_message
+                success=False, error_message=result.error_message
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка инициации платежа: {str(e)}"
+            status_code=500, detail=f"Ошибка инициации платежа: {str(e)}"
         )
+
 
 @router.get("/registrar/invoice/{invoice_id}/status")
 def check_invoice_status(
     invoice_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Проверка статуса оплаты invoice
     """
     try:
-        invoice = db.query(PaymentInvoice).filter(PaymentInvoice.id == invoice_id).first()
+        invoice = (
+            db.query(PaymentInvoice).filter(PaymentInvoice.id == invoice_id).first()
+        )
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice не найден")
-        
+
         # Если статус уже финальный, возвращаем как есть
         if invoice.status in ["paid", "failed", "cancelled"]:
             return {
@@ -325,65 +374,75 @@ def check_invoice_status(
                 "status": invoice.status,
                 "total_amount": invoice.total_amount,
                 "currency": invoice.currency,
-                "provider_payment_id": invoice.provider_payment_id
+                "provider_payment_id": invoice.provider_payment_id,
             }
-        
+
         # Проверяем статус у провайдера
         if invoice.provider_payment_id and invoice.provider:
             provider = None
-            
+
             if invoice.provider == "click":
                 from app.services.payment_providers.click import ClickProvider
-                
+
                 provider_config = {
                     "service_id": "test_service",
                     "merchant_id": "test_merchant",
                     "secret_key": "test_secret",
-                    "base_url": "https://api.click.uz/v2"
+                    "base_url": "https://api.click.uz/v2",
                 }
-                
+
                 provider = ClickProvider(provider_config)
-                
+
             elif invoice.provider == "payme":
                 from app.services.payment_providers.payme import PayMeProvider
-                
+
                 provider_config = {
                     "merchant_id": "test_merchant_payme",
                     "secret_key": "test_secret_payme",
                     "base_url": "https://checkout.paycom.uz",
-                    "api_url": "https://api.paycom.uz"
+                    "api_url": "https://api.paycom.uz",
                 }
-                
+
                 provider = PayMeProvider(provider_config)
-            
+
             if provider:
                 result = provider.check_payment_status(invoice.provider_payment_id)
-                
+
                 if result.success:
                     # Обновляем статус invoice
                     if result.status == "completed":
                         invoice.status = "paid"
                         invoice.paid_at = datetime.utcnow()
-                        
+
                         # [OK] ИСПРАВЛЕНО: Создаем платежи для всех визитов через SSOT
                         from app.services.billing_service import BillingService
+
                         billing_service = BillingService(db)
-                        
+
                         # Помечаем все визиты как оплаченные и создаем платежи
-                        invoice_visits = db.query(PaymentInvoiceVisit).filter(
-                            PaymentInvoiceVisit.invoice_id == invoice.id
-                        ).all()
-                        
+                        invoice_visits = (
+                            db.query(PaymentInvoiceVisit)
+                            .filter(PaymentInvoiceVisit.invoice_id == invoice.id)
+                            .all()
+                        )
+
                         for iv in invoice_visits:
-                            visit = db.query(Visit).filter(Visit.id == iv.visit_id).first()
+                            visit = (
+                                db.query(Visit).filter(Visit.id == iv.visit_id).first()
+                            )
                             if visit:
                                 # Проверяем, не создан ли уже платеж
                                 from app.models.payment import Payment
-                                existing_payment = db.query(Payment).filter(
-                                    Payment.visit_id == visit.id,
-                                    Payment.status == "paid"
-                                ).first()
-                                
+
+                                existing_payment = (
+                                    db.query(Payment)
+                                    .filter(
+                                        Payment.visit_id == visit.id,
+                                        Payment.status == "paid",
+                                    )
+                                    .first()
+                                )
+
                                 if not existing_payment:
                                     # Создаем платеж через SSOT
                                     payment = billing_service.create_payment(
@@ -393,64 +452,80 @@ def check_invoice_status(
                                         method="online",  # Онлайн оплата через провайдера
                                         status="paid",
                                         provider=invoice.provider,
-                                        note=f"Оплата через {invoice.provider} (invoice {invoice.id})"
+                                        note=f"Оплата через {invoice.provider} (invoice {invoice.id})",
                                     )
-                                    logger.info("check_invoice_status: Создан платеж ID=%d для визита %d", payment.id, visit.id)
-                                
+                                    logger.info(
+                                        "check_invoice_status: Создан платеж ID=%d для визита %d",
+                                        payment.id,
+                                        visit.id,
+                                    )
+
                                 visit.status = "confirmed"  # Оплачено и подтверждено
-                        
+
                         db.commit()
                     elif result.status in ["failed", "cancelled"]:
                         invoice.status = result.status
                         db.commit()
-        
+
         return {
             "invoice_id": invoice.id,
             "status": invoice.status,
             "total_amount": invoice.total_amount,
             "currency": invoice.currency,
             "provider_payment_id": invoice.provider_payment_id,
-            "paid_at": invoice.paid_at
+            "paid_at": invoice.paid_at,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка проверки статуса: {str(e)}"
+            status_code=500, detail=f"Ошибка проверки статуса: {str(e)}"
         )
 
+
 # ===================== ОСНОВНОЙ ENDPOINT =====================
+
 
 @router.post("/registrar/cart", response_model=CartResponse)
 def create_cart_appointments(
     cart_data: CartRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Создание корзины визитов с единым платежом
     Поддерживает: повторные/льготные визиты, All Free, динамические цены, очереди по queue_tag
     """
-    logger.info("REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Payment method: %s",
-                cart_data.patient_id, len(cart_data.visits), cart_data.discount_mode, cart_data.payment_method)
+    logger.info(
+        "REGISTRATION: Получен запрос на создание корзины. Patient ID: %s, Визитов: %d, Discount mode: %s, Payment method: %s",
+        cart_data.patient_id,
+        len(cart_data.visits),
+        cart_data.discount_mode,
+        cart_data.payment_method,
+    )
 
     try:
         # Валидация пациента
         # (Предполагаем, что пациент уже существует, так как он выбран в мастере)
-        
+
         # Получаем настройки очереди
         queue_settings = crud_clinic.get_queue_settings(db)
-        
+
         created_visits = []
         total_invoice_amount = Decimal('0')
-        
+
         # Создаём визиты
         from time import sleep
+
         logger.info("REGISTRATION: Создаём %d визитов", len(cart_data.visits))
         for idx, visit_req in enumerate(cart_data.visits):
-            logger.debug("REGISTRATION: Визит %d: department=%s, services=%d", idx+1, visit_req.department, len(visit_req.services))
+            logger.debug(
+                "REGISTRATION: Визит %d: department=%s, services=%d",
+                idx + 1,
+                visit_req.department,
+                len(visit_req.services),
+            )
             # Проверяем право на повторный визит
             if cart_data.discount_mode == "repeat" and visit_req.doctor_id:
                 service_ids = [s.service_id for s in visit_req.services]
@@ -459,66 +534,82 @@ def create_cart_appointments(
                 ):
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Повторный визит недоступен: нет консультации у этого врача за последние 21 день"
+                        detail=f"Повторный визит недоступен: нет консультации у этого врача за последние 21 день",
                     )
-            
+
             # Рассчитываем цену визита через SSOT
             from app.services.billing_service import BillingService
+
             billing_service = BillingService(db)
             services_data = [
                 {
                     "service_id": s.service_id,
                     "quantity": s.quantity,
-                    "custom_price": s.custom_price
+                    "custom_price": s.custom_price,
                 }
                 for s in visit_req.services
             ]
             total_info = billing_service.calculate_total(
-                services=services_data,
-                discount_mode=cart_data.discount_mode
+                services=services_data, discount_mode=cart_data.discount_mode
             )
             visit_amount = Decimal(str(total_info["total"]))
-            
+
             # [OK] ИСПРАВЛЕНО: Регистратор всегда создаёт подтверждённые записи
             # Фича-флаг "confirmation_before_queue" применяется только для онлайн-записей (телеграм/PWA)
             # Записи от регистратора сразу попадают в очередь
             visit_status = "confirmed"
             confirmed_at = datetime.utcnow()
             confirmed_by = f"registrar_{current_user.id}"
-            
+
             # [OK] ИСПРАВЛЕНО: Добавляем микрозадержку для разных created_at
             # Это гарантирует, что визиты одного пациента будут иметь разные временные метки
             if idx > 0:
                 sleep(0.001)  # 1 миллисекунда задержки между визитами
-            
+
             # Подготавливаем услуги для передачи в create_visit
             services_data = []
             for service_item in visit_req.services:
-                service = db.query(Service).filter(Service.id == service_item.service_id).first()
+                service = (
+                    db.query(Service)
+                    .filter(Service.id == service_item.service_id)
+                    .first()
+                )
                 if not service:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"Услуга с ID {service_item.service_id} не найдена"
+                        detail=f"Услуга с ID {service_item.service_id} не найдена",
                     )
-                
+
                 # Цена с учётом скидок
                 if cart_data.discount_mode == "all_free":
                     item_price = Decimal('0')
-                elif cart_data.discount_mode in ["repeat", "benefit"] and service.is_consultation:
+                elif (
+                    cart_data.discount_mode in ["repeat", "benefit"]
+                    and service.is_consultation
+                ):
                     item_price = Decimal('0')
                 else:
-                    item_price = service_item.custom_price or service.price or Decimal('0')
-                
-                services_data.append({
-                    "service_id": service.id,
-                    "code": normalize_service_code(service.code) if service.code else None,
-                    "name": service.name,
-                    "qty": service_item.quantity,
-                    "price": float(item_price)
-                })
-            
+                    item_price = (
+                        service_item.custom_price or service.price or Decimal('0')
+                    )
+
+                services_data.append(
+                    {
+                        "service_id": service.id,
+                        "code": (
+                            normalize_service_code(service.code)
+                            if service.code
+                            else None
+                        ),
+                        "name": service.name,
+                        "qty": service_item.quantity,
+                        "price": float(item_price),
+                    }
+                )
+
             # Создаём визит используя единую функцию create_visit для обеспечения Single Source of Truth
             from app.crud.visit import create_visit
+
             visit = create_visit(
                 db=db,
                 patient_id=cart_data.patient_id,
@@ -530,19 +621,25 @@ def create_cart_appointments(
                 discount_mode=cart_data.discount_mode,
                 services=services_data,
                 status=visit_status,
-                approval_status="approved" if cart_data.discount_mode != "all_free" else "pending",
+                approval_status=(
+                    "approved" if cart_data.discount_mode != "all_free" else "pending"
+                ),
                 confirmed_at=confirmed_at,
                 confirmed_by=confirmed_by,
                 auto_status=False,  # Статус уже установлен выше
                 notify=False,  # Уведомления отправляются отдельно
-                log=True
+                log=True,
             )
             logger.info("REGISTRATION: Визит %d создан через create_visit()", visit.id)
-            
+
             created_visits.append(visit)
             total_invoice_amount += visit_amount
-            logger.info("REGISTRATION: Визит %d создан успешно для пациента %d", visit.id, cart_data.patient_id)
-        
+            logger.info(
+                "REGISTRATION: Визит %d создан успешно для пациента %d",
+                visit.id,
+                cart_data.patient_id,
+            )
+
         # Создаём единый invoice
         logger.info("REGISTRATION: Создаём инвойс на сумму %s", total_invoice_amount)
         invoice = PaymentInvoice(
@@ -551,42 +648,41 @@ def create_cart_appointments(
             currency="UZS",
             status="pending",
             payment_method=cart_data.payment_method,
-            notes=cart_data.notes
+            notes=cart_data.notes,
         )
         db.add(invoice)
         db.flush()  # Получаем ID invoice
         logger.info("REGISTRATION: Инвойс %d создан", invoice.id)
-        
+
         # Связываем визиты с invoice
         from app.services.billing_service import BillingService
+
         billing_service = BillingService(db)
         for visit in created_visits:
             # Рассчитываем цену визита через SSOT
             total_info = billing_service.calculate_total(
-                visit_id=visit.id,
-                discount_mode=cart_data.discount_mode
+                visit_id=visit.id, discount_mode=cart_data.discount_mode
             )
             visit_amount = Decimal(str(total_info["total"]))
 
             invoice_visit = PaymentInvoiceVisit(
-                invoice_id=invoice.id,
-                visit_id=visit.id,
-                visit_amount=visit_amount
+                invoice_id=invoice.id, visit_id=visit.id, visit_amount=visit_amount
             )
             db.add(invoice_visit)
-        
+
         # Создаём записи в очереди для подтвержденных визитов на сегодня
         # В новом режиме визиты создаются сразу подтвержденными (регистратор)
         queue_numbers = {}
         today = date.today()
-        
+
         for visit in created_visits:
             if visit.visit_date == today and visit.status == "confirmed":
                 try:
                     # Используем функцию из утренней сборки для присвоения номеров
-                    from app.services.morning_assignment import MorningAssignmentService
                     # [OK] ИСПРАВЛЕНО: Убеждаемся, что VisitService импортирован для использования в morning_assignment
                     from app.models.visit import VisitService
+                    from app.services.morning_assignment import MorningAssignmentService
+
                     service = MorningAssignmentService()
                     service.db = db  # Используем существующую сессию
                     # Для ручной регистрации через мастера источник должен быть 'desk'
@@ -617,66 +713,99 @@ def create_cart_appointments(
                     )
                     # Не прерываем создание визита из-за ошибки очередей
                     continue
-        
+
         db.commit()
         logger.info("REGISTRATION: Транзакция зафиксирована в базе данных")
-        
+
         # Формируем талоны для визитов с присвоенными номерами очередей
         print_tickets = []
         # Блок формирования талонов пропускаем, так как queue_numbers пустой
-        
+
         # Формируем информацию о созданных визитах
         created_visits_info = []
         try:
             for visit in created_visits:
                 # Получаем данные пациента
-                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-                patient_name = patient.short_name() if patient else "Неизвестный пациент"
-                
-                # Получаем данные врача  
-                doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
+                patient = (
+                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                )
+                patient_name = (
+                    patient.short_name() if patient else "Неизвестный пациент"
+                )
+
+                # Получаем данные врача
+                doctor = (
+                    db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                    if visit.doctor_id
+                    else None
+                )
                 # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
                 if doctor and doctor.user_id:
                     user = db.query(User).filter(User.id == doctor.user_id).first()
-                    doctor_name = (user.full_name or user.username) if user else "Без врача"
+                    doctor_name = (
+                        (user.full_name or user.username) if user else "Без врача"
+                    )
                 else:
                     doctor_name = "Без врача"
-                
+
                 # Получаем услуги визита
-                visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+                visit_services = (
+                    db.query(VisitService)
+                    .filter(VisitService.visit_id == visit.id)
+                    .all()
+                )
                 services_info = []
                 for vs in visit_services:
-                    services_info.append({
-                        "name": vs.name,
-                        "code": normalize_service_code(vs.code) if vs.code else None,
-                        "quantity": vs.qty,
-                        "price": float(vs.price) if vs.price else 0
-                    })
-                
-                created_visits_info.append({
-                    "visit_id": visit.id,
-                    "patient_name": patient_name,
-                    "doctor_name": doctor_name,
-                    "visit_date": visit.visit_date.isoformat(),
-                    "visit_time": visit.visit_time,
-                    "status": visit.status,
-                    "department": visit.department,
-                    "services": services_info,
-                    "confirmation_required": visit.status == "pending_confirmation",
-                    "confirmation_token": visit.confirmation_token if visit.status == "pending_confirmation" else None
-                })
+                    services_info.append(
+                        {
+                            "name": vs.name,
+                            "code": (
+                                normalize_service_code(vs.code) if vs.code else None
+                            ),
+                            "quantity": vs.qty,
+                            "price": float(vs.price) if vs.price else 0,
+                        }
+                    )
+
+                created_visits_info.append(
+                    {
+                        "visit_id": visit.id,
+                        "patient_name": patient_name,
+                        "doctor_name": doctor_name,
+                        "visit_date": visit.visit_date.isoformat(),
+                        "visit_time": visit.visit_time,
+                        "status": visit.status,
+                        "department": visit.department,
+                        "services": services_info,
+                        "confirmation_required": visit.status == "pending_confirmation",
+                        "confirmation_token": (
+                            visit.confirmation_token
+                            if visit.status == "pending_confirmation"
+                            else None
+                        ),
+                    }
+                )
         except Exception as e:
-            logger.warning("REGISTRATION: Ошибка формирования ответа (визиты уже сохранены): %s", str(e), exc_info=True)
+            logger.warning(
+                "REGISTRATION: Ошибка формирования ответа (визиты уже сохранены): %s",
+                str(e),
+                exc_info=True,
+            )
             # Визиты уже сохранены, поэтому не откатываем транзакцию
-        
+
         # Определяем сообщение в зависимости от результата
         if queue_numbers:
             message = f"Корзина создана успешно. Присвоено номеров в очередях: {sum(len(assignments) for assignments in queue_numbers.values())}"
         else:
             message = "Визиты созданы. Номера в очередях будут присвоены в день визита."
-        
-        logger.info("REGISTRATION: Корзина создана успешно. Создано визитов: %d, ID визитов: %s, Invoice ID: %d, Total amount: %s",
-                    len(created_visits), [v.id for v in created_visits], invoice.id, total_invoice_amount)
+
+        logger.info(
+            "REGISTRATION: Корзина создана успешно. Создано визитов: %d, ID визитов: %s, Invoice ID: %d, Total amount: %s",
+            len(created_visits),
+            [v.id for v in created_visits],
+            invoice.id,
+            total_invoice_amount,
+        )
 
         return CartResponse(
             success=True,
@@ -686,22 +815,24 @@ def create_cart_appointments(
             total_amount=total_invoice_amount,
             queue_numbers=queue_numbers,
             print_tickets=print_tickets,
-            created_visits=created_visits_info
+            created_visits=created_visits_info,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error("REGISTRATION: Ошибка создания корзины: %s", str(e), exc_info=True)
         import traceback
+
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка создания корзины: {str(e)}\nTRACE: {traceback.format_exc()}"
+            detail=f"Ошибка создания корзины: {str(e)}\nTRACE: {traceback.format_exc()}",
         )
 
 
 # ===================== УПРАВЛЕНИЕ ИЗМЕНЕНИЯМИ ЦЕН =====================
+
 
 class PriceOverrideApprovalRequest(BaseModel):
     override_id: int
@@ -725,11 +856,15 @@ class PriceOverrideListResponse(BaseModel):
     created_at: datetime
 
 
-@router.get("/registrar/price-overrides", summary="Получить все изменения цен для одобрения")
+@router.get(
+    "/registrar/price-overrides", summary="Получить все изменения цен для одобрения"
+)
 def get_pending_price_overrides(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin", "Registrar")),
-    status_filter: Optional[str] = Query(default="pending", pattern="^(pending|approved|rejected|all)$"),
+    status_filter: Optional[str] = Query(
+        default="pending", pattern="^(pending|approved|rejected|all)$"
+    ),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> List[PriceOverrideListResponse]:
     """
@@ -737,12 +872,14 @@ def get_pending_price_overrides(
     """
     try:
         query = db.query(DoctorPriceOverride).join(Service).join(Doctor)
-        
+
         if status_filter != "all":
             query = query.filter(DoctorPriceOverride.status == status_filter)
-        
-        overrides = query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
-        
+
+        overrides = (
+            query.order_by(DoctorPriceOverride.created_at.desc()).limit(limit).all()
+        )
+
         result = []
         for override in overrides:
             # Получаем данные визита и пациента
@@ -752,110 +889,117 @@ def get_pending_price_overrides(
                 # Здесь нужно получить имя пациента из модели Patient
                 # Пока используем заглушку
                 patient_name = f"Пациент #{visit.patient_id}"
-            
-            result.append(PriceOverrideListResponse(
-                id=override.id,
-                visit_id=override.visit_id,
-                service_id=override.service_id,
-                service_name=override.service.name,
-                doctor_name=f"Врач #{override.doctor.id}",  # Здесь нужно получить имя врача
-                doctor_specialty=override.doctor.specialty,
-                patient_name=patient_name,
-                original_price=override.original_price,
-                new_price=override.new_price,
-                reason=override.reason,
-                details=override.details,
-                status=override.status,
-                created_at=override.created_at
-            ))
-        
+
+            result.append(
+                PriceOverrideListResponse(
+                    id=override.id,
+                    visit_id=override.visit_id,
+                    service_id=override.service_id,
+                    service_name=override.service.name,
+                    doctor_name=f"Врач #{override.doctor.id}",  # Здесь нужно получить имя врача
+                    doctor_specialty=override.doctor.specialty,
+                    patient_name=patient_name,
+                    original_price=override.original_price,
+                    new_price=override.new_price,
+                    reason=override.reason,
+                    details=override.details,
+                    status=override.status,
+                    created_at=override.created_at,
+                )
+            )
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения изменений цен: {str(e)}"
+            detail=f"Ошибка получения изменений цен: {str(e)}",
         )
 
 
-@router.post("/registrar/price-override/approve", summary="Одобрить или отклонить изменение цены")
+@router.post(
+    "/registrar/price-override/approve", summary="Одобрить или отклонить изменение цены"
+)
 def approve_price_override(
     approval_data: PriceOverrideApprovalRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ) -> Dict[str, Any]:
     """
     Одобрить или отклонить изменение цены врачом
     """
     try:
         # Получаем изменение цены
-        override = db.query(DoctorPriceOverride).filter(
-            DoctorPriceOverride.id == approval_data.override_id
-        ).first()
-        
+        override = (
+            db.query(DoctorPriceOverride)
+            .filter(DoctorPriceOverride.id == approval_data.override_id)
+            .first()
+        )
+
         if not override:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Изменение цены не найдено"
+                detail="Изменение цены не найдено",
             )
-        
+
         if override.status != "pending":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Изменение цены уже обработано (статус: {override.status})"
+                detail=f"Изменение цены уже обработано (статус: {override.status})",
             )
-        
+
         # Обновляем статус
         if approval_data.action == "approve":
             override.status = "approved"
             override.approved_by = current_user.id
             override.approved_at = datetime.utcnow()
-            
+
             # Обновляем цену в визите
             visit = db.query(Visit).filter(Visit.id == override.visit_id).first()
             if visit:
                 # Обновляем doctor_price_override в JSON поле
                 if not visit.doctor_price_override:
                     visit.doctor_price_override = {}
-                
+
                 visit.doctor_price_override[str(override.service_id)] = {
                     "original_price": float(override.original_price),
                     "new_price": float(override.new_price),
                     "override_id": override.id,
-                    "approved_at": override.approved_at.isoformat()
+                    "approved_at": override.approved_at.isoformat(),
                 }
-            
+
             message = "Изменение цены одобрено"
-            
+
         elif approval_data.action == "reject":
             override.status = "rejected"
             override.approved_by = current_user.id
             override.approved_at = datetime.utcnow()
             override.rejection_reason = approval_data.rejection_reason
-            
+
             message = "Изменение цены отклонено"
-        
+
         db.commit()
         db.refresh(override)
-        
+
         return {
             "success": True,
             "message": message,
             "override_id": override.id,
-            "new_status": override.status
+            "new_status": override.status,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обработки изменения цены: {str(e)}"
+            detail=f"Ошибка обработки изменения цены: {str(e)}",
         )
 
 
 # ===================== УПРАВЛЕНИЕ ЛЬГОТАМИ ALL FREE =====================
+
 
 class AllFreeApprovalRequest(BaseModel):
     visit_id: int
@@ -879,11 +1023,15 @@ class AllFreeVisitResponse(BaseModel):
     approval_status: str
 
 
-@router.get("/admin/all-free-requests", summary="Получить заявки All Free для одобрения")
+@router.get(
+    "/admin/all-free-requests", summary="Получить заявки All Free для одобрения"
+)
 def get_all_free_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("Admin")),
-    status_filter: Optional[str] = Query(default="pending", pattern="^(pending|approved|rejected|all)$"),
+    status_filter: Optional[str] = Query(
+        default="pending", pattern="^(pending|approved|rejected|all)$"
+    ),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> List[AllFreeVisitResponse]:
     """
@@ -891,54 +1039,71 @@ def get_all_free_requests(
     """
     try:
         query = db.query(Visit).filter(Visit.discount_mode == "all_free")
-        
+
         if status_filter != "all":
             query = query.filter(Visit.approval_status == status_filter)
-        
+
         visits = query.order_by(Visit.created_at.desc()).limit(limit).all()
-        
+
         result = []
         for visit in visits:
             # Получаем услуги визита
-            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            visit_services = (
+                db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            )
             service_names = []
             total_original_amount = Decimal('0')
-            
+
             for vs in visit_services:
                 service = db.query(Service).filter(Service.id == vs.service_id).first()
                 if service:
                     service_names.append(service.name)
                     total_original_amount += (service.price or Decimal('0')) * vs.qty
-            
+
             # Получаем данные врача
             doctor_name = None
             doctor_specialty = None
             if visit.doctor_id:
                 try:
-                    doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                    doctor = (
+                        db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+                    )
                     if doctor:
                         # Получаем имя врача из связанного пользователя
                         # [OK] ИСПРАВЛЕНО: Используем явный запрос вместо relationship, чтобы избежать ошибок
                         if doctor.user_id:
-                            user = db.query(User).filter(User.id == doctor.user_id).first()
+                            user = (
+                                db.query(User).filter(User.id == doctor.user_id).first()
+                            )
                             if user:
                                 # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
-                                doctor_name = (user.full_name or user.username) if user else f"Врач #{doctor.id}"
+                                doctor_name = (
+                                    (user.full_name or user.username)
+                                    if user
+                                    else f"Врач #{doctor.id}"
+                                )
                             else:
                                 doctor_name = f"Врач #{doctor.id}"
                         else:
                             doctor_name = f"Врач #{doctor.id}"
                         doctor_specialty = doctor.specialty
                 except Exception as e:
-                    logger.warning("get_all_free_requests: Ошибка получения данных врача для visit %d: %s", visit.id, e, exc_info=True)
+                    logger.warning(
+                        "get_all_free_requests: Ошибка получения данных врача для visit %d: %s",
+                        visit.id,
+                        e,
+                        exc_info=True,
+                    )
                     doctor_name = f"Врач #{visit.doctor_id}"
                     doctor_specialty = None
-            
+
             # [OK] ИСПРАВЛЕНО: Получаем реальные данные пациента
             patient_name = f"Пациент #{visit.patient_id}"
             patient_phone = None
             if visit.patient_id:
-                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                patient = (
+                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                )
                 if patient:
                     # Формируем ФИО пациента
                     name_parts = []
@@ -948,39 +1113,47 @@ def get_all_free_requests(
                         name_parts.append(patient.first_name)
                     if patient.middle_name:
                         name_parts.append(patient.middle_name)
-                    patient_name = ' '.join(name_parts) if name_parts else f"Пациент #{visit.patient_id}"
+                    patient_name = (
+                        ' '.join(name_parts)
+                        if name_parts
+                        else f"Пациент #{visit.patient_id}"
+                    )
                     patient_phone = patient.phone
-            
-            result.append(AllFreeVisitResponse(
-                id=visit.id,
-                patient_id=visit.patient_id,
-                patient_name=patient_name,
-                patient_phone=patient_phone,
-                services=service_names,
-                total_original_amount=total_original_amount,
-                doctor_name=doctor_name,
-                doctor_specialty=doctor_specialty,
-                visit_date=visit.visit_date,
-                visit_time=visit.visit_time,
-                notes=visit.notes,
-                created_at=visit.created_at,
-                approval_status=visit.approval_status
-            ))
-        
+
+            result.append(
+                AllFreeVisitResponse(
+                    id=visit.id,
+                    patient_id=visit.patient_id,
+                    patient_name=patient_name,
+                    patient_phone=patient_phone,
+                    services=service_names,
+                    total_original_amount=total_original_amount,
+                    doctor_name=doctor_name,
+                    doctor_specialty=doctor_specialty,
+                    visit_date=visit.visit_date,
+                    visit_time=visit.visit_time,
+                    notes=visit.notes,
+                    created_at=visit.created_at,
+                    approval_status=visit.approval_status,
+                )
+            )
+
         return result
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения заявок All Free: {str(e)}"
+            detail=f"Ошибка получения заявок All Free: {str(e)}",
         )
 
 
-@router.post("/admin/all-free-approve", summary="Одобрить или отклонить заявку All Free")
+@router.post(
+    "/admin/all-free-approve", summary="Одобрить или отклонить заявку All Free"
+)
 def approve_all_free_request(
     approval_data: AllFreeApprovalRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ) -> Dict[str, Any]:
     """
     Одобрить или отклонить заявку All Free администратором
@@ -988,64 +1161,71 @@ def approve_all_free_request(
     try:
         # Получаем визит
         visit = db.query(Visit).filter(Visit.id == approval_data.visit_id).first()
-        
+
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
             )
-        
+
         if visit.discount_mode != "all_free":
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Это не заявка All Free"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Это не заявка All Free"
             )
-        
+
         if visit.approval_status != "pending":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Заявка уже обработана (статус: {visit.approval_status})"
+                detail=f"Заявка уже обработана (статус: {visit.approval_status})",
             )
-        
+
         # Обновляем статус
         if approval_data.action == "approve":
             visit.approval_status = "approved"
             message = "Заявка All Free одобрена"
-            
+
         elif approval_data.action == "reject":
             visit.approval_status = "rejected"
             # Можно добавить поле для причины отклонения в модель Visit
             if approval_data.rejection_reason:
-                visit.notes = (visit.notes or "") + f"\nОтклонено: {approval_data.rejection_reason}"
-            
+                visit.notes = (
+                    visit.notes or ""
+                ) + f"\nОтклонено: {approval_data.rejection_reason}"
+
             message = "Заявка All Free отклонена"
-        
+
         db.commit()
         db.refresh(visit)
-        
+
         return {
             "success": True,
             "message": message,
             "visit_id": visit.id,
-            "new_status": visit.approval_status
+            "new_status": visit.approval_status,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обработки заявки All Free: {str(e)}"
+            detail=f"Ошибка обработки заявки All Free: {str(e)}",
         )
 
 
 # ===================== НАСТРОЙКИ ЛЬГОТ =====================
 
+
 class BenefitSettingsRequest(BaseModel):
-    repeat_visit_days: int = Field(default=21, ge=1, le=365)  # Окно повторного визита в днях
-    repeat_visit_discount: int = Field(default=0, ge=0, le=100)  # Скидка на повторный визит в %
-    benefit_consultation_free: bool = Field(default=True)  # Льготные консультации бесплатны
+    repeat_visit_days: int = Field(
+        default=21, ge=1, le=365
+    )  # Окно повторного визита в днях
+    repeat_visit_discount: int = Field(
+        default=0, ge=0, le=100
+    )  # Скидка на повторный визит в %
+    benefit_consultation_free: bool = Field(
+        default=True
+    )  # Льготные консультации бесплатны
     all_free_auto_approve: bool = Field(default=False)  # Автоодобрение All Free заявок
 
 
@@ -1059,8 +1239,7 @@ class BenefitSettingsResponse(BaseModel):
 
 @router.get("/admin/benefit-settings", summary="Получить настройки льгот")
 def get_benefit_settings(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
 ) -> BenefitSettingsResponse:
     """
     Получить текущие настройки льгот и повторных визитов
@@ -1068,53 +1247,78 @@ def get_benefit_settings(
     try:
         # Получаем настройки из базы данных
         settings = {}
-        
+
         # Окно повторного визита (дни)
-        repeat_days_setting = db.query(ClinicSettings).filter(
-            ClinicSettings.key == "repeat_visit_days"
-        ).first()
-        settings['repeat_visit_days'] = int(repeat_days_setting.value) if repeat_days_setting else 21
-        
+        repeat_days_setting = (
+            db.query(ClinicSettings)
+            .filter(ClinicSettings.key == "repeat_visit_days")
+            .first()
+        )
+        settings['repeat_visit_days'] = (
+            int(repeat_days_setting.value) if repeat_days_setting else 21
+        )
+
         # Скидка на повторный визит (%)
-        repeat_discount_setting = db.query(ClinicSettings).filter(
-            ClinicSettings.key == "repeat_visit_discount"
-        ).first()
-        settings['repeat_visit_discount'] = int(repeat_discount_setting.value) if repeat_discount_setting else 0
-        
+        repeat_discount_setting = (
+            db.query(ClinicSettings)
+            .filter(ClinicSettings.key == "repeat_visit_discount")
+            .first()
+        )
+        settings['repeat_visit_discount'] = (
+            int(repeat_discount_setting.value) if repeat_discount_setting else 0
+        )
+
         # Льготные консультации бесплатны
-        benefit_free_setting = db.query(ClinicSettings).filter(
-            ClinicSettings.key == "benefit_consultation_free"
-        ).first()
-        settings['benefit_consultation_free'] = bool(benefit_free_setting.value) if benefit_free_setting else True
-        
+        benefit_free_setting = (
+            db.query(ClinicSettings)
+            .filter(ClinicSettings.key == "benefit_consultation_free")
+            .first()
+        )
+        settings['benefit_consultation_free'] = (
+            bool(benefit_free_setting.value) if benefit_free_setting else True
+        )
+
         # Автоодобрение All Free заявок
-        auto_approve_setting = db.query(ClinicSettings).filter(
-            ClinicSettings.key == "all_free_auto_approve"
-        ).first()
-        settings['all_free_auto_approve'] = bool(auto_approve_setting.value) if auto_approve_setting else False
-        
+        auto_approve_setting = (
+            db.query(ClinicSettings)
+            .filter(ClinicSettings.key == "all_free_auto_approve")
+            .first()
+        )
+        settings['all_free_auto_approve'] = (
+            bool(auto_approve_setting.value) if auto_approve_setting else False
+        )
+
         # Время последнего обновления
-        latest_update = db.query(ClinicSettings).filter(
-            ClinicSettings.key.in_([
-                "repeat_visit_days", "repeat_visit_discount", 
-                "benefit_consultation_free", "all_free_auto_approve"
-            ])
-        ).order_by(ClinicSettings.updated_at.desc()).first()
-        
+        latest_update = (
+            db.query(ClinicSettings)
+            .filter(
+                ClinicSettings.key.in_(
+                    [
+                        "repeat_visit_days",
+                        "repeat_visit_discount",
+                        "benefit_consultation_free",
+                        "all_free_auto_approve",
+                    ]
+                )
+            )
+            .order_by(ClinicSettings.updated_at.desc())
+            .first()
+        )
+
         updated_at = latest_update.updated_at if latest_update else datetime.utcnow()
-        
+
         return BenefitSettingsResponse(
             repeat_visit_days=settings['repeat_visit_days'],
             repeat_visit_discount=settings['repeat_visit_discount'],
             benefit_consultation_free=settings['benefit_consultation_free'],
             all_free_auto_approve=settings['all_free_auto_approve'],
-            updated_at=updated_at
+            updated_at=updated_at,
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения настроек льгот: {str(e)}"
+            detail=f"Ошибка получения настроек льгот: {str(e)}",
         )
 
 
@@ -1122,7 +1326,7 @@ def get_benefit_settings(
 def update_benefit_settings(
     settings_data: BenefitSettingsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ) -> Dict[str, Any]:
     """
     Обновить настройки льгот и повторных визитов
@@ -1133,31 +1337,33 @@ def update_benefit_settings(
             {
                 "key": "repeat_visit_days",
                 "value": settings_data.repeat_visit_days,
-                "description": "Окно повторного визита в днях"
+                "description": "Окно повторного визита в днях",
             },
             {
                 "key": "repeat_visit_discount",
                 "value": settings_data.repeat_visit_discount,
-                "description": "Скидка на повторный визит в процентах"
+                "description": "Скидка на повторный визит в процентах",
             },
             {
                 "key": "benefit_consultation_free",
                 "value": settings_data.benefit_consultation_free,
-                "description": "Льготные консультации бесплатны"
+                "description": "Льготные консультации бесплатны",
             },
             {
                 "key": "all_free_auto_approve",
                 "value": settings_data.all_free_auto_approve,
-                "description": "Автоматическое одобрение All Free заявок"
-            }
+                "description": "Автоматическое одобрение All Free заявок",
+            },
         ]
-        
+
         # Обновляем каждую настройку
         for setting_data in settings_to_update:
-            setting = db.query(ClinicSettings).filter(
-                ClinicSettings.key == setting_data["key"]
-            ).first()
-            
+            setting = (
+                db.query(ClinicSettings)
+                .filter(ClinicSettings.key == setting_data["key"])
+                .first()
+            )
+
             if setting:
                 # Обновляем существующую настройку
                 setting.value = setting_data["value"]
@@ -1170,12 +1376,12 @@ def update_benefit_settings(
                     value=setting_data["value"],
                     category="benefits",
                     description=setting_data["description"],
-                    updated_by=current_user.id
+                    updated_by=current_user.id,
                 )
                 db.add(setting)
-        
+
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Настройки льгот обновлены успешно",
@@ -1183,109 +1389,123 @@ def update_benefit_settings(
                 "repeat_visit_days": settings_data.repeat_visit_days,
                 "repeat_visit_discount": settings_data.repeat_visit_discount,
                 "benefit_consultation_free": settings_data.benefit_consultation_free,
-                "all_free_auto_approve": settings_data.all_free_auto_approve
-            }
+                "all_free_auto_approve": settings_data.all_free_auto_approve,
+            },
         }
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления настроек льгот: {str(e)}"
+            detail=f"Ошибка обновления настроек льгот: {str(e)}",
         )
 
 
 # ==================== НАСТРОЙКИ МАСТЕРА РЕГИСТРАЦИИ ====================
 
+
 class WizardSettingsResponse(BaseModel):
     use_new_wizard: bool
     updated_at: datetime
 
+
 class WizardSettingsRequest(BaseModel):
-    use_new_wizard: bool = Field(default=False, description="Использовать новый мастер регистрации")
+    use_new_wizard: bool = Field(
+        default=False, description="Использовать новый мастер регистрации"
+    )
+
 
 @router.get("/admin/wizard-settings", summary="Получить настройки мастера регистрации")
 def get_wizard_settings(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """Получить настройки мастера регистрации"""
     try:
         # Получаем настройку использования нового мастера
-        use_new_wizard_setting = db.query(ClinicSettings).filter(
-            ClinicSettings.key == "wizard_use_new_version"
-        ).first()
-        
+        use_new_wizard_setting = (
+            db.query(ClinicSettings)
+            .filter(ClinicSettings.key == "wizard_use_new_version")
+            .first()
+        )
+
         use_new_wizard = False
         updated_at = datetime.utcnow()
-        
+
         if use_new_wizard_setting:
-            use_new_wizard = use_new_wizard_setting.value.get("enabled", False) if use_new_wizard_setting.value else False
+            use_new_wizard = (
+                use_new_wizard_setting.value.get("enabled", False)
+                if use_new_wizard_setting.value
+                else False
+            )
             updated_at = use_new_wizard_setting.updated_at or updated_at
-        
+
         return WizardSettingsResponse(
-            use_new_wizard=use_new_wizard,
-            updated_at=updated_at
+            use_new_wizard=use_new_wizard, updated_at=updated_at
         )
-        
+
     except Exception as e:
         logger.error(f"Error getting wizard settings: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при получении настроек мастера"
+            detail="Ошибка при получении настроек мастера",
         )
+
 
 @router.post("/admin/wizard-settings", summary="Обновить настройки мастера регистрации")
 def update_wizard_settings(
     settings_data: WizardSettingsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin"))
+    current_user: User = Depends(require_roles("Admin")),
 ):
     """Обновить настройки мастера регистрации"""
     try:
         # Обновляем или создаем настройку
-        use_new_wizard_setting = db.query(ClinicSettings).filter(
-            ClinicSettings.key == "wizard_use_new_version"
-        ).first()
-        
+        use_new_wizard_setting = (
+            db.query(ClinicSettings)
+            .filter(ClinicSettings.key == "wizard_use_new_version")
+            .first()
+        )
+
         if not use_new_wizard_setting:
             use_new_wizard_setting = ClinicSettings(
                 key="wizard_use_new_version",
                 category="wizard",
-                description="Использовать новый мастер регистрации вместо старого"
+                description="Использовать новый мастер регистрации вместо старого",
             )
             db.add(use_new_wizard_setting)
-        
+
         use_new_wizard_setting.value = {
             "enabled": settings_data.use_new_wizard,
-            "updated_by": current_user.id
+            "updated_by": current_user.id,
         }
         use_new_wizard_setting.updated_by = current_user.id
         use_new_wizard_setting.updated_at = datetime.utcnow()
-        
+
         db.commit()
         db.refresh(use_new_wizard_setting)
-        
+
         settings_response = WizardSettingsResponse(
             use_new_wizard=settings_data.use_new_wizard,
-            updated_at=use_new_wizard_setting.updated_at
+            updated_at=use_new_wizard_setting.updated_at,
         )
-        
+
         return {
             "success": True,
             "message": f"Настройки мастера обновлены. {'Включен новый мастер' if settings_data.use_new_wizard else 'Включен старый мастер'}",
-            "settings": settings_response
+            "settings": settings_response,
         }
-        
+
     except Exception as e:
         logger.error(f"Error updating wizard settings: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при обновлении настроек мастера"
+            detail="Ошибка при обновлении настроек мастера",
         )
 
 
 # ===================== ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ ЗАПИСЕЙ ИЗ VISITS =====================
+
 
 class VisitResponse(BaseModel):
     id: int
@@ -1305,6 +1525,7 @@ class VisitResponse(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
 
+
 @router.get("/registrar/visits", response_model=List[VisitResponse])
 def get_visits(
     db: Session = Depends(get_db),
@@ -1319,18 +1540,23 @@ def get_visits(
 ):
     """Получить объединенный список записей из таблиц visits (новый мастер) и appointments (старый мастер)"""
     try:
-        from app.models.visit import Visit, VisitService
-        from app.models.service import Service
+        from app.models.appointment import Appointment
         from app.models.clinic import Doctor
         from app.models.patient import Patient
-        from app.models.appointment import Appointment
-        
+        from app.models.service import Service
+        from app.models.visit import Visit, VisitService
+
         result = []
-        
+
         # 1. ПОЛУЧАЕМ ЗАПИСИ ИЗ СТАРОЙ ТАБЛИЦЫ APPOINTMENTS СНАЧАЛА
         try:
-            appointments = db.query(Appointment).order_by(Appointment.created_at.desc()).limit(5).all()
-            
+            appointments = (
+                db.query(Appointment)
+                .order_by(Appointment.created_at.desc())
+                .limit(5)
+                .all()
+            )
+
             # Обрабатываем записи из appointments
             for appointment in appointments:
                 # Получаем данные пациента
@@ -1338,37 +1564,44 @@ def get_visits(
                 patient_phone = None
                 try:
                     if appointment.patient_id:
-                        patient = db.query(Patient).filter(Patient.id == appointment.patient_id).first()
+                        patient = (
+                            db.query(Patient)
+                            .filter(Patient.id == appointment.patient_id)
+                            .first()
+                        )
                         if patient:
                             patient_fio = patient.short_name()
                             patient_phone = patient.phone
                 except Exception:
                     pass
-                
-                result.append(VisitResponse(
-                    id=appointment.id + 10000,  # Добавляем смещение чтобы избежать конфликтов ID
-                    patient_id=appointment.patient_id,
-                    patient_fio=patient_fio,
-                    patient_phone=patient_phone,
-                    doctor_id=appointment.doctor_id,
-                    doctor_name=None,
-                    doctor_specialty=None,
-                    department=appointment.department,
-                    visit_date=appointment.appointment_date,
-                    visit_time=appointment.appointment_time,
-                    status=appointment.status,
-                    discount_mode="none",
-                    approval_status="approved",
-                    services=appointment.services or [],
-                    notes=appointment.notes,
-                    created_at=appointment.created_at
-                ))
+
+                result.append(
+                    VisitResponse(
+                        id=appointment.id
+                        + 10000,  # Добавляем смещение чтобы избежать конфликтов ID
+                        patient_id=appointment.patient_id,
+                        patient_fio=patient_fio,
+                        patient_phone=patient_phone,
+                        doctor_id=appointment.doctor_id,
+                        doctor_name=None,
+                        doctor_specialty=None,
+                        department=appointment.department,
+                        visit_date=appointment.appointment_date,
+                        visit_time=appointment.appointment_time,
+                        status=appointment.status,
+                        discount_mode="none",
+                        approval_status="approved",
+                        services=appointment.services or [],
+                        notes=appointment.notes,
+                        created_at=appointment.created_at,
+                    )
+                )
         except Exception as e:
             logger.error("Error processing appointments: %s", e, exc_info=True)
-        
+
         # 2. ПОЛУЧАЕМ ЗАПИСИ ИЗ НОВОЙ ТАБЛИЦЫ VISITS
         visits_query = db.query(Visit)
-        
+
         # Фильтры для visits
         if patient_id:
             visits_query = visits_query.filter(Visit.patient_id == patient_id)
@@ -1388,22 +1621,26 @@ def get_visits(
                 visits_query = visits_query.filter(Visit.visit_date <= to_date)
             except ValueError:
                 pass
-        
+
         visits = visits_query.order_by(Visit.created_at.desc()).all()
-        
+
         # Обрабатываем записи из visits
         for visit in visits:
             # Получаем услуги визита
-            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            visit_services = (
+                db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            )
             service_names = []
             for vs in visit_services:
                 if vs.name:  # Используем сохраненное имя
                     service_names.append(vs.name)
                 else:  # Fallback - ищем в таблице services
-                    service = db.query(Service).filter(Service.id == vs.service_id).first()
+                    service = (
+                        db.query(Service).filter(Service.id == vs.service_id).first()
+                    )
                     if service:
                         service_names.append(service.name)
-            
+
             # Получаем данные врача
             doctor_name = None
             doctor_specialty = None
@@ -1413,109 +1650,141 @@ def get_visits(
                     # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
                     if doctor.user_id:
                         user = db.query(User).filter(User.id == doctor.user_id).first()
-                        doctor_name = (user.full_name or user.username) if user else f"Врач #{doctor.id}"
+                        doctor_name = (
+                            (user.full_name or user.username)
+                            if user
+                            else f"Врач #{doctor.id}"
+                        )
                     else:
                         doctor_name = f"Врач #{doctor.id}"
                     doctor_specialty = doctor.specialty
-            
+
             # Получаем данные пациента
             patient_fio = f"Пациент #{visit.patient_id}"
             patient_phone = None
             if visit.patient_id:
-                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                patient = (
+                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                )
                 if patient:
                     patient_fio = patient.short_name()
                     patient_phone = patient.phone
-            
-            result.append(VisitResponse(
-                id=visit.id,
-                patient_id=visit.patient_id,
-                patient_fio=patient_fio,
-                patient_phone=patient_phone,
-                doctor_id=visit.doctor_id,
-                doctor_name=doctor_name,
-                doctor_specialty=doctor_specialty,
-                department=visit.department,
-                visit_date=visit.visit_date,
-                visit_time=visit.visit_time,
-                status=visit.status,
-                discount_mode=visit.discount_mode,
-                approval_status=visit.approval_status,
-                services=service_names,
-                notes=visit.notes,
-                created_at=visit.created_at
-            ))
-        
-        
+
+            result.append(
+                VisitResponse(
+                    id=visit.id,
+                    patient_id=visit.patient_id,
+                    patient_fio=patient_fio,
+                    patient_phone=patient_phone,
+                    doctor_id=visit.doctor_id,
+                    doctor_name=doctor_name,
+                    doctor_specialty=doctor_specialty,
+                    department=visit.department,
+                    visit_date=visit.visit_date,
+                    visit_time=visit.visit_time,
+                    status=visit.status,
+                    discount_mode=visit.discount_mode,
+                    approval_status=visit.approval_status,
+                    services=service_names,
+                    notes=visit.notes,
+                    created_at=visit.created_at,
+                )
+            )
+
         # Сортируем объединенный результат по дате создания
         result.sort(key=lambda x: x.created_at, reverse=True)
-        
+
         # Применяем пагинацию к объединенному результату
-        total_results = result[skip:skip + limit]
-        
+        total_results = result[skip : skip + limit]
+
         return total_results
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения записей: {str(e)}"
+            detail=f"Ошибка получения записей: {str(e)}",
         )
 
 
 # ===================== ПРОСТОЙ ЭНДПОИНТ ДЛЯ ОБЪЕДИНЕНИЯ ДАННЫХ =====================
 
 
-
 @router.get("/registrar/all-appointments")
 def get_all_appointments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Doctor", "cardio", "cardiology", "derma", "dentist", "Lab")),
+    current_user: User = Depends(
+        require_roles(
+            "Admin",
+            "Registrar",
+            "Doctor",
+            "cardio",
+            "cardiology",
+            "derma",
+            "dentist",
+            "Lab",
+        )
+    ),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     date_from: Optional[str] = Query(None, description="Дата начала (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
-    search: Optional[str] = Query(None, description="Поиск по ФИО, телефону или услугам")
+    search: Optional[str] = Query(
+        None, description="Поиск по ФИО, телефону или услугам"
+    ),
 ):
     """Простое объединение appointments + visits для фронтенда"""
     try:
+        from sqlalchemy import func, or_
+
         from app.models.appointment import Appointment
-        from app.models.visit import Visit
         from app.models.patient import Patient
-        from sqlalchemy import or_, func
-        
+        from app.models.visit import Visit
+
         result = []
-        
+
         # 1. Получаем старые appointments с фильтрацией
         appointments_query = db.query(Appointment)
-        
+
         # Применяем фильтры по дате
         if date_from:
-            appointments_query = appointments_query.filter(Appointment.appointment_date >= date_from)
+            appointments_query = appointments_query.filter(
+                Appointment.appointment_date >= date_from
+            )
         if date_to:
-            appointments_query = appointments_query.filter(Appointment.appointment_date <= date_to)
-        
+            appointments_query = appointments_query.filter(
+                Appointment.appointment_date <= date_to
+            )
+
         # Применяем поиск
         if search:
             # Для поиска по телефону извлекаем только цифры
             search_digits = ''.join(filter(str.isdigit, search))
-            
+
             if search_digits:
                 # Поиск по ФИО, телефону и ID записи (включая только цифры)
-                appointments_query = appointments_query.join(Patient, Appointment.patient_id == Patient.id).filter(
+                appointments_query = appointments_query.join(
+                    Patient, Appointment.patient_id == Patient.id
+                ).filter(
                     or_(
                         Patient.full_name.ilike(f"%{search}%"),
                         Patient.phone.ilike(f"%{search}%"),
-                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(f"%{search_digits}%"),
-                        Appointment.id.cast(String).ilike(f"%{search_digits}%")
+                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
+                            f"%{search_digits}%"
+                        ),
+                        Appointment.id.cast(String).ilike(f"%{search_digits}%"),
                     )
                 )
             else:
                 # Если нет цифр, ищем только по ФИО
-                appointments_query = appointments_query.join(Patient, Appointment.patient_id == Patient.id).filter(
-                    Patient.full_name.ilike(f"%{search}%")
-                )
-        
-        appointments = appointments_query.order_by(Appointment.created_at.desc()).limit(limit//2).all()
+                appointments_query = appointments_query.join(
+                    Patient, Appointment.patient_id == Patient.id
+                ).filter(Patient.full_name.ilike(f"%{search}%"))
+
+        appointments = (
+            appointments_query.order_by(Appointment.created_at.desc())
+            .limit(limit // 2)
+            .all()
+        )
         for apt in appointments:
             # Получаем имя пациента
             patient_fio = None
@@ -1523,28 +1792,35 @@ def get_all_appointments(
                 patient = db.query(Patient).filter(Patient.id == apt.patient_id).first()
                 if patient:
                     patient_fio = patient.short_name()
-            
+
             # Преобразуем ID услуг в названия для appointments
             service_names = []
             service_codes = []
             total_amount = 0
-            
+
             if apt.services and isinstance(apt.services, list):
                 from app.models.service import Service
+
                 for service_id in apt.services:
                     try:
                         service_id_int = int(service_id)
-                        service = db.query(Service).filter(Service.id == service_id_int).first()
+                        service = (
+                            db.query(Service)
+                            .filter(Service.id == service_id_int)
+                            .first()
+                        )
                         if service:
                             service_names.append(service.name)
                             if service.code:
-                                service_codes.append(normalize_service_code(service.code))
+                                service_codes.append(
+                                    normalize_service_code(service.code)
+                                )
                             if service.price:
                                 total_amount += float(service.price)
                     except (ValueError, TypeError):
                         # Если service_id не число, возможно это уже название
                         service_names.append(str(service_id))
-            
+
             # Определяем payment_status для Appointment
             payment_status = 'pending'
             is_paid = False
@@ -1552,7 +1828,12 @@ def get_all_appointments(
             if visit_type == 'paid':
                 payment_status = 'paid'
                 is_paid = True
-            elif apt.status and apt.status.lower() in ('paid', 'in_visit', 'completed', 'done'):
+            elif apt.status and apt.status.lower() in (
+                'paid',
+                'in_visit',
+                'completed',
+                'done',
+            ):
                 payment_status = 'paid'
                 is_paid = True
             elif getattr(apt, 'payment_processed_at', None):
@@ -1561,19 +1842,33 @@ def get_all_appointments(
             else:
                 # Проверяем Payment table
                 try:
-                    from app.models.payment import Payment
                     from sqlalchemy import and_
+
+                    from app.models.payment import Payment
+
                     # Ищем связанный Visit
-                    related_visit = db.query(Visit).filter(
-                        and_(
-                            Visit.patient_id == apt.patient_id,
-                            Visit.visit_date == apt.appointment_date,
-                            Visit.doctor_id == apt.doctor_id
+                    related_visit = (
+                        db.query(Visit)
+                        .filter(
+                            and_(
+                                Visit.patient_id == apt.patient_id,
+                                Visit.visit_date == apt.appointment_date,
+                                Visit.doctor_id == apt.doctor_id,
+                            )
                         )
-                    ).first()
+                        .first()
+                    )
                     if related_visit:
-                        payment_row = db.query(Payment).filter(Payment.visit_id == related_visit.id).order_by(Payment.created_at.desc()).first()
-                        if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+                        payment_row = (
+                            db.query(Payment)
+                            .filter(Payment.visit_id == related_visit.id)
+                            .order_by(Payment.created_at.desc())
+                            .first()
+                        )
+                        if payment_row and (
+                            str(payment_row.status).lower() == 'paid'
+                            or payment_row.paid_at
+                        ):
                             payment_status = 'paid'
                             is_paid = True
                 except Exception:
@@ -1588,130 +1883,156 @@ def get_all_appointments(
                 except Exception:
                     db.rollback()
 
-            result.append({
-                'id': apt.id,
-                'patient_id': apt.patient_id,
-                'patient_fio': patient_fio,
-                'doctor_id': apt.doctor_id,
-                'department': apt.department,
-                'appointment_date': apt.appointment_date,
-                'appointment_time': apt.appointment_time,
-                'status': apt.status,
-                'services': service_names,  # Преобразованные названия услуг
-                'service_codes': service_codes,  # Коды услуг для фильтрации
-                'total_amount': total_amount,  # Общая сумма услуг
-                'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
-                'visit_type': visit_type,  # Тип визита для совместимости
-                'notes': apt.notes,
-                'created_at': apt.created_at,
-                'source': 'appointments',
-                'queue_numbers': [],  # Старые appointments не имеют номеров в новых очередях
-                'confirmation_status': 'none',  # Старые appointments не требуют подтверждения
-                'confirmed_at': None,
-                'confirmed_by': None
-            })
-        
+            result.append(
+                {
+                    'id': apt.id,
+                    'patient_id': apt.patient_id,
+                    'patient_fio': patient_fio,
+                    'doctor_id': apt.doctor_id,
+                    'department': apt.department,
+                    'appointment_date': apt.appointment_date,
+                    'appointment_time': apt.appointment_time,
+                    'status': apt.status,
+                    'services': service_names,  # Преобразованные названия услуг
+                    'service_codes': service_codes,  # Коды услуг для фильтрации
+                    'total_amount': total_amount,  # Общая сумма услуг
+                    'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                    'visit_type': visit_type,  # Тип визита для совместимости
+                    'notes': apt.notes,
+                    'created_at': apt.created_at,
+                    'source': 'appointments',
+                    'queue_numbers': [],  # Старые appointments не имеют номеров в новых очередях
+                    'confirmation_status': 'none',  # Старые appointments не требуют подтверждения
+                    'confirmed_at': None,
+                    'confirmed_by': None,
+                }
+            )
+
         # 2. Получаем новые visits с фильтрацией
         visits_query = db.query(Visit)
-        
+
         # Применяем фильтры по дате
         if date_from:
             visits_query = visits_query.filter(Visit.visit_date >= date_from)
         if date_to:
             visits_query = visits_query.filter(Visit.visit_date <= date_to)
-        
+
         # Применяем поиск
         if search:
             # Для поиска по телефону извлекаем только цифры
             search_digits = ''.join(filter(str.isdigit, search))
-            
+
             if search_digits:
                 # Поиск по ФИО, телефону и ID записи (включая только цифры)
-                visits_query = visits_query.join(Patient, Visit.patient_id == Patient.id).filter(
+                visits_query = visits_query.join(
+                    Patient, Visit.patient_id == Patient.id
+                ).filter(
                     or_(
                         Patient.full_name.ilike(f"%{search}%"),
                         Patient.phone.ilike(f"%{search}%"),
-                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(f"%{search_digits}%"),
-                        Visit.id.cast(String).ilike(f"%{search_digits}%")
+                        func.regexp_replace(Patient.phone, r'[^\d]', '', 'g').ilike(
+                            f"%{search_digits}%"
+                        ),
+                        Visit.id.cast(String).ilike(f"%{search_digits}%"),
                     )
                 )
             else:
                 # Если нет цифр, ищем только по ФИО
-                visits_query = visits_query.join(Patient, Visit.patient_id == Patient.id).filter(
-                    Patient.full_name.ilike(f"%{search}%")
-                )
-        
-        visits = visits_query.order_by(Visit.created_at.desc()).limit(limit//2).all()
+                visits_query = visits_query.join(
+                    Patient, Visit.patient_id == Patient.id
+                ).filter(Patient.full_name.ilike(f"%{search}%"))
+
+        visits = visits_query.order_by(Visit.created_at.desc()).limit(limit // 2).all()
         for visit in visits:
             # Получаем имя пациента
             patient_fio = None
             if visit.patient_id:
-                patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                patient = (
+                    db.query(Patient).filter(Patient.id == visit.patient_id).first()
+                )
                 if patient:
                     patient_fio = patient.short_name()
-            
+
             # Получаем услуги визита
-            from app.models.visit import VisitService
             from app.models.service import Service
-            
-            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            from app.models.visit import VisitService
+
+            visit_services = (
+                db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+            )
             service_names = []
             service_codes = []
             total_amount = 0
-            
+
             for vs in visit_services:
                 service_price = 0
                 if vs.price is not None:  # Используем сохраненную цену (включая 0)
                     service_price = float(vs.price)
                 elif vs.service_id:  # Fallback - ищем цену в таблице services
-                    service = db.query(Service).filter(Service.id == vs.service_id).first()
+                    service = (
+                        db.query(Service).filter(Service.id == vs.service_id).first()
+                    )
                     if service and service.price:
                         service_price = float(service.price)
-                
+
                 total_amount += service_price * (vs.qty or 1)
-                
+
                 if vs.name:  # Используем сохраненное имя
                     service_names.append(vs.name)
                     if vs.code:
                         service_codes.append(normalize_service_code(vs.code))
                 else:  # Fallback - ищем в таблице services
-                    service = db.query(Service).filter(Service.id == vs.service_id).first()
+                    service = (
+                        db.query(Service).filter(Service.id == vs.service_id).first()
+                    )
                     if service:
                         service_names.append(service.name)
                         if service.code:
                             service_codes.append(normalize_service_code(service.code))
-            
+
             # Получаем информацию о номерах в очередях для визита
             queue_numbers = []
             confirmation_status = None
-            
+
             if visit.visit_date == date.today():
                 # Ищем записи в очередях для этого визита
-                from app.models.online_queue import OnlineQueueEntry, DailyQueue
-                queue_entries = db.query(OnlineQueueEntry).filter(
-                    OnlineQueueEntry.visit_id == visit.id
-                ).all()
-                
+                from app.models.online_queue import DailyQueue, OnlineQueueEntry
+
+                queue_entries = (
+                    db.query(OnlineQueueEntry)
+                    .filter(OnlineQueueEntry.visit_id == visit.id)
+                    .all()
+                )
+
                 for entry in queue_entries:
-                    queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+                    queue = (
+                        db.query(DailyQueue)
+                        .filter(DailyQueue.id == entry.queue_id)
+                        .first()
+                    )
                     if queue:
                         queue_names = {
                             "ecg": "ЭКГ",
                             "cardiology_common": "Кардиолог",
-                            "dermatology": "Дерматолог", 
+                            "dermatology": "Дерматолог",
                             "stomatology": "Стоматолог",
                             "cosmetology": "Косметолог",
                             "lab": "Лаборатория",
-                            "general": "Общая очередь"
+                            "general": "Общая очередь",
                         }
-                        
-                        queue_numbers.append({
-                            "queue_tag": queue.queue_tag or "general",
-                            "queue_name": queue_names.get(queue.queue_tag or "general", queue.queue_tag or "Общая"),
-                            "number": entry.number,
-                            "status": entry.status
-                        })
-            
+
+                        queue_numbers.append(
+                            {
+                                "queue_tag": queue.queue_tag or "general",
+                                "queue_name": queue_names.get(
+                                    queue.queue_tag or "general",
+                                    queue.queue_tag or "Общая",
+                                ),
+                                "number": entry.number,
+                                "status": entry.status,
+                            }
+                        )
+
             # Определяем статус подтверждения
             if visit.status == "pending_confirmation":
                 confirmation_status = "pending"
@@ -1734,14 +2055,30 @@ def get_all_appointments(
                 else:
                     # Проверяем Payment table
                     from app.models.payment import Payment
-                    payment_row = db.query(Payment).filter(Payment.visit_id == visit.id).order_by(Payment.created_at.desc()).first()
-                    if payment_row and (str(payment_row.status).lower() == 'paid' or payment_row.paid_at):
+
+                    payment_row = (
+                        db.query(Payment)
+                        .filter(Payment.visit_id == visit.id)
+                        .order_by(Payment.created_at.desc())
+                        .first()
+                    )
+                    if payment_row and (
+                        str(payment_row.status).lower() == 'paid' or payment_row.paid_at
+                    ):
                         payment_status = 'paid'
                         is_paid = True
-                    elif visit.discount_mode == 'paid' and v_status in ("paid", "in_visit", "in progress", "completed", "done"):
+                    elif visit.discount_mode == 'paid' and v_status in (
+                        "paid",
+                        "in_visit",
+                        "in progress",
+                        "completed",
+                        "done",
+                    ):
                         payment_status = 'paid'
                         is_paid = True
-                    elif visit.discount_mode == 'paid' and getattr(visit, 'payment_processed_at', None):
+                    elif visit.discount_mode == 'paid' and getattr(
+                        visit, 'payment_processed_at', None
+                    ):
                         payment_status = 'paid'
                         is_paid = True
             except Exception:
@@ -1756,11 +2093,13 @@ def get_all_appointments(
             if is_paid and visit.discount_mode != 'paid':
                 # Проверяем, что платеж действительно существует
                 from app.models.payment import Payment
-                existing_payment = db.query(Payment).filter(
-                    Payment.visit_id == visit.id,
-                    Payment.status == "paid"
-                ).first()
-                
+
+                existing_payment = (
+                    db.query(Payment)
+                    .filter(Payment.visit_id == visit.id, Payment.status == "paid")
+                    .first()
+                )
+
                 if existing_payment:
                     # Платеж существует - обновляем discount_mode
                     visit.discount_mode = 'paid'
@@ -1772,109 +2111,124 @@ def get_all_appointments(
                 # Если платежа нет, но is_paid=True - НЕ создаем платеж в GET endpoint
                 # Платеж должен быть создан через соответствующие POST endpoints
 
-            result.append({
-                'id': visit.id + 20000,  # Смещение для избежания конфликтов
-                'patient_id': visit.patient_id,
-                'patient_fio': patient_fio,
-                'doctor_id': visit.doctor_id,
-                'department': visit.department,
-                'appointment_date': visit.visit_date,
-                'appointment_time': visit.visit_time,
-                'status': visit.status,
-                'services': service_names,  # Реальные названия услуг
-                'service_codes': service_codes,  # Коды услуг для фильтрации
-                'total_amount': total_amount,  # Общая сумма услуг
-                'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
-                'discount_mode': visit.discount_mode,  # Тип визита для отображения
-                'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
-                'notes': visit.notes,
-                'created_at': visit.created_at,
-                'source': 'visits',
-                'queue_numbers': queue_numbers,  # Номера в очередях
-                'confirmation_status': confirmation_status,  # Статус подтверждения
-                'confirmed_at': visit.confirmed_at.isoformat() if visit.confirmed_at else None,
-                'confirmed_by': visit.confirmed_by
-            })
-        
+            result.append(
+                {
+                    'id': visit.id + 20000,  # Смещение для избежания конфликтов
+                    'patient_id': visit.patient_id,
+                    'patient_fio': patient_fio,
+                    'doctor_id': visit.doctor_id,
+                    'department': visit.department,
+                    'appointment_date': visit.visit_date,
+                    'appointment_time': visit.visit_time,
+                    'status': visit.status,
+                    'services': service_names,  # Реальные названия услуг
+                    'service_codes': service_codes,  # Коды услуг для фильтрации
+                    'total_amount': total_amount,  # Общая сумма услуг
+                    'payment_status': payment_status,  # [OK] ДОБАВЛЕНО: Статус оплаты
+                    'discount_mode': visit.discount_mode,  # Тип визита для отображения
+                    'approval_status': visit.approval_status,  # [OK] ДОБАВЛЕНО: Статус одобрения для all_free
+                    'notes': visit.notes,
+                    'created_at': visit.created_at,
+                    'source': 'visits',
+                    'queue_numbers': queue_numbers,  # Номера в очередях
+                    'confirmation_status': confirmation_status,  # Статус подтверждения
+                    'confirmed_at': (
+                        visit.confirmed_at.isoformat() if visit.confirmed_at else None
+                    ),
+                    'confirmed_by': visit.confirmed_by,
+                }
+            )
+
         # Сортируем по дате создания
         result.sort(key=lambda x: x['created_at'], reverse=True)
-        
+
         # Применяем пагинацию
-        paginated_result = result[offset:offset + limit]
-        
+        paginated_result = result[offset : offset + limit]
+
         return {
             "data": paginated_result,
             "total": len(result),
             "limit": limit,
             "offset": offset,
-            "has_more": offset + limit < len(result)
+            "has_more": offset + limit < len(result),
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка получения записей: {str(e)}"
+            detail=f"Ошибка получения записей: {str(e)}",
         )
 
 
 # ===================== ЭНДПОИНТ ДЛЯ ОТМЕТКИ ЗАПИСЕЙ ИЗ VISITS КАК ОПЛАЧЕННЫХ =====================
 
+
 @router.post("/registrar/visits/{visit_id}/mark-paid")
 def mark_visit_as_paid(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor"))
+    current_user: User = Depends(
+        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
+    ),
 ):
     """Отметить запись из таблицы visits как оплаченную и создать платеж (SSOT)"""
     try:
         from app.models.visit import Visit
         from app.services.billing_service import BillingService
-        
+
         # Логирование для диагностики
-        logger.info("mark_visit_as_paid: User: %s, Role: %s, Visit ID: %d", current_user.username, current_user.role, visit_id)
-        
+        logger.info(
+            "mark_visit_as_paid: User: %s, Role: %s, Visit ID: %d",
+            current_user.username,
+            current_user.role,
+            visit_id,
+        )
+
         # Находим запись
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
-        
+
         # [OK] ИСПРАВЛЕНО: Проверяем, не создан ли уже платеж для этого визита
         from app.models.payment import Payment
-        existing_payment = db.query(Payment).filter(
-            Payment.visit_id == visit_id,
-            Payment.status == "paid"
-        ).first()
-        
+
+        existing_payment = (
+            db.query(Payment)
+            .filter(Payment.visit_id == visit_id, Payment.status == "paid")
+            .first()
+        )
+
         if not existing_payment:
             # [OK] ИСПРАВЛЕНО: Создаем платеж через SSOT перед пометкой визита как оплаченного
             billing_service = BillingService(db)
-            
+
             # Рассчитываем сумму визита через SSOT
             total_info = billing_service.calculate_total(
-                visit_id=visit_id,
-                discount_mode=visit.discount_mode or "none"
+                visit_id=visit_id, discount_mode=visit.discount_mode or "none"
             )
             payment_amount = float(total_info["total"])
-            
+
             # [OK] ИСПРАВЛЕНО: Используем прямой SQL для создания платежа, чтобы обойти конфликт моделей
             # (BillingPayment и Payment используют одну таблицу, что вызывает проблемы)
-            from sqlalchemy import text
             from datetime import datetime, timezone
-            
+
+            from sqlalchemy import text
+
             currency = total_info.get("currency", "UZS")
             note = f"Оплата визита {visit_id} через панель кассира"
             paid_at = datetime.now(timezone.utc)
-            
+
             # Создаем платеж через прямой SQL
             result = db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO payments 
                     (visit_id, amount, currency, method, status, note, paid_at, created_at)
                     VALUES (:visit_id, :amount, :currency, :method, :status, :note, :paid_at, :created_at)
-                """),
+                """
+                ),
                 {
                     "visit_id": visit_id,
                     "amount": payment_amount,
@@ -1883,30 +2237,44 @@ def mark_visit_as_paid(
                     "status": "paid",
                     "note": note,
                     "paid_at": paid_at,
-                    "created_at": paid_at
-                }
+                    "created_at": paid_at,
+                },
             )
             db.commit()
-            
+
             # Получаем созданный платеж
-            payment = db.query(Payment).filter(Payment.visit_id == visit_id).order_by(Payment.created_at.desc()).first()
-            
-            logger.info("mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s", payment.id, visit_id, payment_amount)
+            payment = (
+                db.query(Payment)
+                .filter(Payment.visit_id == visit_id)
+                .order_by(Payment.created_at.desc())
+                .first()
+            )
+
+            logger.info(
+                "mark_visit_as_paid: Создан платеж ID=%d для визита %d, сумма=%s",
+                payment.id,
+                visit_id,
+                payment_amount,
+            )
         else:
-            logger.warning("mark_visit_as_paid: Платеж уже существует для визита %d, ID=%d", visit_id, existing_payment.id)
-        
+            logger.warning(
+                "mark_visit_as_paid: Платеж уже существует для визита %d, ID=%d",
+                visit_id,
+                existing_payment.id,
+            )
+
         # Обновляем статус и discount_mode
         visit.status = "paid"
         visit.discount_mode = "paid"  # [OK] ВАЖНО: устанавливаем discount_mode для корректного отображения payment_status
         db.commit()
         db.refresh(visit)
-        
+
         return {
             "id": visit.id,
             "status": visit.status,
-            "message": "Запись отмечена как оплаченная"
+            "message": "Запись отмечена как оплаченная",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1914,7 +2282,7 @@ def mark_visit_as_paid(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}"
+            detail=f"Ошибка обновления записи: {str(e)}",
         )
 
 
@@ -1922,35 +2290,32 @@ def mark_visit_as_paid(
 def complete_visit(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor"))
+    current_user: User = Depends(
+        require_roles("Admin", "Registrar", "Cashier", "Receptionist", "Doctor")
+    ),
 ):
     """Завершить запись из таблицы visits"""
     try:
         from app.models.visit import Visit
-        
+
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
-        
+
         visit.status = "completed"
         db.commit()
         db.refresh(visit)
-        
-        return {
-            "id": visit.id,
-            "status": visit.status,
-            "message": "Запись завершена"
-        }
-        
+
+        return {"id": visit.id, "status": visit.status, "message": "Запись завершена"}
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}"
+            detail=f"Ошибка обновления записи: {str(e)}",
         )
 
 
@@ -1958,36 +2323,33 @@ def complete_visit(
 def start_visit(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """Начать прием (в кабинете) для записи из таблицы visits"""
     try:
         from app.models.visit import Visit
-        
+
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Запись не найдена"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена"
             )
-        
+
         visit.status = "in_progress"
         db.commit()
         db.refresh(visit)
-        
-        return {
-            "id": visit.id,
-            "status": visit.status,
-            "message": "Прием начат"
-        }
-        
+
+        return {"id": visit.id, "status": visit.status, "message": "Прием начат"}
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка обновления записи: {str(e)}"
+            detail=f"Ошибка обновления записи: {str(e)}",
         )
+
+
 """
 Эндпоинты подтверждения визитов
 Временный файл для добавления в registrar_wizard.py
@@ -1995,10 +2357,12 @@ def start_visit(
 
 # ===================== ПОДТВЕРЖДЕНИЕ ВИЗИТОВ =====================
 
+
 class ConfirmVisitRequest(BaseModel):
     confirmation_method: str = Field(default="phone", pattern="^(phone|manual)$")
     confirmed_by: Optional[str] = None  # Номер телефона или ID сотрудника
     notes: Optional[str] = None
+
 
 class ConfirmVisitResponse(BaseModel):
     success: bool
@@ -2008,12 +2372,15 @@ class ConfirmVisitResponse(BaseModel):
     queue_numbers: Optional[Dict[str, Any]] = None
     print_tickets: Optional[List[Dict[str, Any]]] = None
 
-@router.post("/registrar/visits/{visit_id}/confirm", response_model=ConfirmVisitResponse)
+
+@router.post(
+    "/registrar/visits/{visit_id}/confirm", response_model=ConfirmVisitResponse
+)
 def confirm_visit_by_registrar(
     visit_id: int,
     request: ConfirmVisitRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar"))
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Подтверждение визита регистратором (по телефону)
@@ -2024,126 +2391,142 @@ def confirm_visit_by_registrar(
         visit = db.query(Visit).filter(Visit.id == visit_id).first()
         if not visit:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Визит не найден"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Визит не найден"
             )
-        
+
         # Проверяем что визит ожидает подтверждения
         if visit.status != "pending_confirmation":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Визит уже имеет статус: {visit.status}"
+                detail=f"Визит уже имеет статус: {visit.status}",
             )
-        
+
         # Проверяем что токен не истек
-        if visit.confirmation_expires_at and visit.confirmation_expires_at < datetime.utcnow():
+        if (
+            visit.confirmation_expires_at
+            and visit.confirmation_expires_at < datetime.utcnow()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Срок подтверждения истек"
+                detail="Срок подтверждения истек",
             )
-        
+
         # Подтверждаем визит
         visit.confirmed_at = datetime.utcnow()
         visit.confirmed_by = request.confirmed_by or f"registrar_{current_user.id}"
         visit.status = "confirmed"
-        
+
         queue_numbers = {}
         print_tickets = []
-        
+
         # Если визит на сегодня - присваиваем номера в очередях
         if visit.visit_date == date.today():
-            queue_numbers, print_tickets = _assign_queue_numbers_on_confirmation(db, visit)
+            queue_numbers, print_tickets = _assign_queue_numbers_on_confirmation(
+                db, visit
+            )
             visit.status = "open"  # Готов к приему
-        
+
         db.commit()
         db.refresh(visit)
-        
+
         return ConfirmVisitResponse(
             success=True,
             message=f"Визит подтвержден. {'Номера в очередях присвоены.' if queue_numbers else 'Номера будут присвоены утром в день визита.'}",
             visit_id=visit.id,
             status=visit.status,
             queue_numbers=queue_numbers,
-            print_tickets=print_tickets
+            print_tickets=print_tickets,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка подтверждения визита: {str(e)}"
+            detail=f"Ошибка подтверждения визита: {str(e)}",
         )
 
 
-def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
+def _assign_queue_numbers_on_confirmation(
+    db: Session, visit: Visit
+) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Присваивает номера в очередях при подтверждении визита на сегодня
     Возвращает (queue_numbers, print_tickets)
     """
     from app.models.online_queue import DailyQueue, OnlineQueueEntry
-    
+
     # Получаем услуги визита
-    visit_services = db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
-    
+    visit_services = (
+        db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+    )
+
     # Определяем уникальные queue_tag из услуг
     unique_queue_tags = set()
     for vs in visit_services:
         service = db.query(Service).filter(Service.id == vs.service_id).first()
         if service and service.queue_tag:
             unique_queue_tags.add(service.queue_tag)
-    
+
     if not unique_queue_tags:
         return {}, []
-    
+
     today = date.today()
     queue_numbers = {}
     print_tickets = []
-    
+
     # Получаем настройки очередей
     queue_settings = {}  # Можно загрузить из настроек
-    
+
     for queue_tag in unique_queue_tags:
         # Определяем врача для очереди
         doctor_id = visit.doctor_id
-        
+
         # Для очередей без конкретного врача используем ресурс-врачей
         if queue_tag == "ecg" and not doctor_id:
-            ecg_resource = db.query(User).filter(
-                User.username == "ecg_resource",
-                User.is_active == True
-            ).first()
+            ecg_resource = (
+                db.query(User)
+                .filter(User.username == "ecg_resource", User.is_active == True)
+                .first()
+            )
             if ecg_resource:
                 doctor_id = ecg_resource.id
             else:
                 continue
-                
+
         elif queue_tag == "lab" and not doctor_id:
-            lab_resource = db.query(User).filter(
-                User.username == "lab_resource",
-                User.is_active == True
-            ).first()
+            lab_resource = (
+                db.query(User)
+                .filter(User.username == "lab_resource", User.is_active == True)
+                .first()
+            )
             if lab_resource:
                 # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
-                lab_doctor = db.query(Doctor).filter(
-                    Doctor.user_id == lab_resource.id
-                ).first()
+                lab_doctor = (
+                    db.query(Doctor).filter(Doctor.user_id == lab_resource.id).first()
+                )
                 if lab_doctor:
                     doctor_id = lab_doctor.id  # Используем doctor_id, а не user_id
-                    logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})")
+                    logger.info(
+                        f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})"
+                    )
                 else:
-                    logger.warning(f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors")
+                    logger.warning(
+                        f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors"
+                    )
                     continue
             else:
                 continue
-        
+
         if not doctor_id:
             continue
-        
+
         # Получаем или создаем дневную очередь
-        daily_queue = crud_queue.get_or_create_daily_queue(db, today, doctor_id, queue_tag)
-        
+        daily_queue = crud_queue.get_or_create_daily_queue(
+            db, today, doctor_id, queue_tag
+        )
+
         start_number = queue_settings.get("start_numbers", {}).get(queue_tag, 1)
         next_number = queue_service.get_next_queue_number(
             db,
@@ -2151,63 +2534,72 @@ def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Di
             queue_tag=queue_tag,
             default_start=start_number,
         )
-        
+
         # Создаем запись в очереди
         # queue_time - бизнес-время регистрации
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         queue_settings = crud_clinic.get_queue_settings(db)
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
         queue_time = datetime.now(timezone)
-        
+
         queue_entry = OnlineQueueEntry(
             queue_id=daily_queue.id,
             patient_id=visit.patient_id,
             number=next_number,
             status="waiting",
             source="confirmation",  # Источник: подтверждение визита
-            queue_time=queue_time  # Устанавливаем время регистрации
+            queue_time=queue_time,  # Устанавливаем время регистрации
         )
         db.add(queue_entry)
-        
+
         queue_numbers[queue_tag] = {
             "queue_tag": queue_tag,
             "number": next_number,
-            "queue_id": daily_queue.id
+            "queue_id": daily_queue.id,
         }
-        
+
         # Подготавливаем данные для печати талона
         queue_names = {
             "ecg": "ЭКГ",
             "cardiology_common": "Кардиолог",
-            "dermatology": "Дерматолог", 
+            "dermatology": "Дерматолог",
             "stomatology": "Стоматолог",
             "cosmetology": "Косметолог",
             "lab": "Лаборатория",
-            "general": "Общая очередь"
+            "general": "Общая очередь",
         }
-        
-        doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first() if visit.doctor_id else None
+
+        doctor = (
+            db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
+            if visit.doctor_id
+            else None
+        )
         patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()
-        
+
         # [OK] ИСПРАВЛЕНО: User имеет full_name, а не first_name/last_name
         doctor_name = "Без врача"
         if doctor and doctor.user_id:
             user = db.query(User).filter(User.id == doctor.user_id).first()
             doctor_name = (user.full_name or user.username) if user else "Без врача"
-        
-        print_tickets.append({
-            "visit_id": visit.id,
-            "queue_tag": queue_tag,
-            "queue_name": queue_names.get(queue_tag, queue_tag),
-            "queue_number": next_number,
-            "queue_id": daily_queue.id,
-            "patient_id": visit.patient_id,
-            "patient_name": patient.short_name() if patient else "Неизвестный пациент",
-            "doctor_name": doctor_name,
-            "department": visit.department,
-            "visit_date": visit.visit_date.isoformat(),
-            "visit_time": visit.visit_time
-        })
-    
+
+        print_tickets.append(
+            {
+                "visit_id": visit.id,
+                "queue_tag": queue_tag,
+                "queue_name": queue_names.get(queue_tag, queue_tag),
+                "queue_number": next_number,
+                "queue_id": daily_queue.id,
+                "patient_id": visit.patient_id,
+                "patient_name": (
+                    patient.short_name() if patient else "Неизвестный пациент"
+                ),
+                "doctor_name": doctor_name,
+                "department": visit.department,
+                "visit_date": visit.visit_date.isoformat(),
+                "visit_time": visit.visit_time,
+            }
+        )
+
     return queue_numbers, print_tickets

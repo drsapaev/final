@@ -96,11 +96,14 @@ def list_results(db: Session, order_id: int) -> List[dict]:
 
 # === ФУНКЦИИ ДЛЯ МОБИЛЬНОГО API ===
 
-def get_patient_lab_results(db: Session, patient_id: int, limit: int = 50) -> List[dict]:
+
+def get_patient_lab_results(
+    db: Session, patient_id: int, limit: int = 50
+) -> List[dict]:
     """Получить результаты анализов пациента"""
     r = _results(db)
     o = _orders(db)
-    
+
     # Получаем результаты через заказы пациента
     rows = (
         db.execute(
@@ -113,5 +116,5 @@ def get_patient_lab_results(db: Session, patient_id: int, limit: int = 50) -> Li
         .mappings()
         .all()
     )
-    
+
     return [dict(row) for row in rows]

@@ -1,13 +1,14 @@
 """
 Сервис для экспорта аналитических отчетов
 """
-import json
+
 import csv
+import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Any, Optional
-from io import BytesIO, StringIO
 import zipfile
+from datetime import datetime
+from io import BytesIO, StringIO
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,154 +20,156 @@ class AnalyticsExportService:
         self.supported_formats = ["json", "csv", "pdf", "excel", "zip"]
 
     async def export_to_json(
-        self, 
-        data: Dict[str, Any],
-        filename: Optional[str] = None
+        self, data: Dict[str, Any], filename: Optional[str] = None
     ) -> Dict[str, Any]:
         """Экспорт данных в JSON формат"""
         try:
             if not filename:
-                filename = f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            
+                filename = (
+                    f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                )
+
             # Добавляем метаданные экспорта
             export_data = {
                 "export_metadata": {
                     "exported_at": datetime.utcnow().isoformat(),
                     "export_format": "json",
                     "export_version": "1.0",
-                    "filename": filename
+                    "filename": filename,
                 },
-                "data": data
+                "data": data,
             }
-            
+
             return {
                 "content": json.dumps(export_data, ensure_ascii=False, indent=2),
                 "filename": filename,
                 "mime_type": "application/json",
-                "size": len(json.dumps(export_data, ensure_ascii=False))
+                "size": len(json.dumps(export_data, ensure_ascii=False)),
             }
-            
+
         except Exception as e:
             logger.error(f"Ошибка экспорта в JSON: {e}")
             raise
 
     async def export_to_csv(
-        self, 
-        data: Dict[str, Any],
-        filename: Optional[str] = None
+        self, data: Dict[str, Any], filename: Optional[str] = None
     ) -> Dict[str, Any]:
         """Экспорт данных в CSV формат"""
         try:
             if not filename:
-                filename = f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            
+                filename = (
+                    f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                )
+
             # Создаем CSV данные
             csv_buffer = StringIO()
             writer = csv.writer(csv_buffer)
-            
+
             # Записываем метаданные
             writer.writerow(["Analytics Report"])
             writer.writerow(["Exported at", datetime.utcnow().isoformat()])
             writer.writerow(["Export format", "CSV"])
             writer.writerow([])
-            
+
             # Записываем основные данные
             self._write_dict_to_csv(writer, data, "")
-            
+
             csv_content = csv_buffer.getvalue()
-            
+
             return {
                 "content": csv_content,
                 "filename": filename,
                 "mime_type": "text/csv",
-                "size": len(csv_content)
+                "size": len(csv_content),
             }
-            
+
         except Exception as e:
             logger.error(f"Ошибка экспорта в CSV: {e}")
             raise
 
     async def export_to_pdf(
-        self, 
-        data: Dict[str, Any],
-        filename: Optional[str] = None
+        self, data: Dict[str, Any], filename: Optional[str] = None
     ) -> Dict[str, Any]:
         """Экспорт данных в PDF формат"""
         try:
             if not filename:
-                filename = f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            
+                filename = (
+                    f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                )
+
             # Здесь будет интеграция с библиотекой для создания PDF
             # Пока возвращаем текстовую версию
             pdf_content = self._generate_text_report(data)
-            
+
             return {
                 "content": pdf_content.encode('utf-8'),
                 "filename": filename,
                 "mime_type": "application/pdf",
-                "size": len(pdf_content)
+                "size": len(pdf_content),
             }
-            
+
         except Exception as e:
             logger.error(f"Ошибка экспорта в PDF: {e}")
             raise
 
     async def export_to_excel(
-        self, 
-        data: Dict[str, Any],
-        filename: Optional[str] = None
+        self, data: Dict[str, Any], filename: Optional[str] = None
     ) -> Dict[str, Any]:
         """Экспорт данных в Excel формат"""
         try:
             if not filename:
-                filename = f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            
+                filename = (
+                    f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                )
+
             # Здесь будет интеграция с openpyxl или xlsxwriter
             # Пока возвращаем CSV как заглушку
             csv_data = await self.export_to_csv(data, filename.replace('.xlsx', '.csv'))
-            
+
             return {
                 "content": csv_data["content"],
                 "filename": filename,
                 "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "size": csv_data["size"]
+                "size": csv_data["size"],
             }
-            
+
         except Exception as e:
             logger.error(f"Ошибка экспорта в Excel: {e}")
             raise
 
     async def export_to_zip(
-        self, 
+        self,
         data: Dict[str, Any],
         include_all_formats: bool = True,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Экспорт данных в ZIP архив"""
         try:
             if not filename:
-                filename = f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-            
+                filename = (
+                    f"analytics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                )
+
             zip_buffer = BytesIO()
-            
+
             with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 # JSON версия
                 json_data = await self.export_to_json(data)
                 zip_file.writestr("analytics_report.json", json_data["content"])
-                
+
                 # CSV версия
                 csv_data = await self.export_to_csv(data)
                 zip_file.writestr("analytics_report.csv", csv_data["content"])
-                
+
                 if include_all_formats:
                     # PDF версия
                     pdf_data = await self.export_to_pdf(data)
                     zip_file.writestr("analytics_report.pdf", pdf_data["content"])
-                    
+
                     # Excel версия
                     excel_data = await self.export_to_excel(data)
                     zip_file.writestr("analytics_report.xlsx", excel_data["content"])
-                
+
                 # README файл
                 readme_content = f"""
                 АНАЛИТИЧЕСКИЙ ОТЧЕТ - ЭКСПОРТ
@@ -180,19 +183,19 @@ class AnalyticsExportService:
                 Дата экспорта: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 Формат данных: Аналитические отчеты клиники
                 """
-                
+
                 zip_file.writestr("README.txt", readme_content)
-            
+
             zip_buffer.seek(0)
             zip_content = zip_buffer.getvalue()
-            
+
             return {
                 "content": zip_content,
                 "filename": filename,
                 "mime_type": "application/zip",
-                "size": len(zip_content)
+                "size": len(zip_content),
             }
-            
+
         except Exception as e:
             logger.error(f"Ошибка экспорта в ZIP: {e}")
             raise
@@ -222,7 +225,7 @@ class AnalyticsExportService:
         Дата создания: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         
         """
-        
+
         # Добавляем основные метрики
         if "kpi_metrics" in data:
             kpi = data["kpi_metrics"]
@@ -243,7 +246,7 @@ class AnalyticsExportService:
         Процент завершения: {kpi.get('completion_rate_percent', 0)}%
         
         """
-        
+
         # Добавляем показатели врачей
         if "doctor_performance" in data:
             doctors = data["doctor_performance"].get("doctor_performance", [])
@@ -262,7 +265,7 @@ class AnalyticsExportService:
         - Оценка эффективности: {doctor.get('performance_score', 0)}
         
         """
-        
+
         # Добавляем аналитику доходов
         if "revenue_analytics" in data:
             revenue = data["revenue_analytics"]
@@ -274,12 +277,12 @@ class AnalyticsExportService:
         Средний дневной доход: {revenue.get('revenue_metrics', {}).get('avg_daily_revenue', 0)} руб.
         
         """
-        
+
         report += f"""
         
         Отчет сгенерирован автоматически системой аналитики клиники.
         """
-        
+
         return report
 
     async def get_export_formats(self) -> List[Dict[str, Any]]:
@@ -290,41 +293,42 @@ class AnalyticsExportService:
                 "name": "JSON",
                 "description": "Структурированные данные в JSON формате",
                 "mime_type": "application/json",
-                "extension": ".json"
+                "extension": ".json",
             },
             {
                 "format": "csv",
                 "name": "CSV",
                 "description": "Табличные данные в CSV формате",
                 "mime_type": "text/csv",
-                "extension": ".csv"
+                "extension": ".csv",
             },
             {
                 "format": "pdf",
                 "name": "PDF",
                 "description": "Отчет в PDF формате для печати",
                 "mime_type": "application/pdf",
-                "extension": ".pdf"
+                "extension": ".pdf",
             },
             {
                 "format": "excel",
                 "name": "Excel",
                 "description": "Табличные данные в Excel формате",
                 "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "extension": ".xlsx"
+                "extension": ".xlsx",
             },
             {
                 "format": "zip",
                 "name": "ZIP",
                 "description": "Архив со всеми форматами",
                 "mime_type": "application/zip",
-                "extension": ".zip"
-            }
+                "extension": ".zip",
+            },
         ]
 
 
 # Глобальный экземпляр сервиса
 analytics_export_service = AnalyticsExportService()
+
 
 async def get_analytics_export_service() -> AnalyticsExportService:
     """Получить экземпляр сервиса экспорта аналитики"""

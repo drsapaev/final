@@ -1,19 +1,21 @@
 """
 Middleware для аутентификации и авторизации
 """
+
 import logging
 from datetime import datetime
-from typing import Optional, List
-from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import List, Optional
+
+from fastapi import HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
 
+from app.crud.authentication import refresh_token, user, user_session
 from app.db.session import get_db
-from app.services.authentication_service import get_authentication_service
-from app.crud.authentication import user, user_session, refresh_token
 from app.models.user import User
 from app.schemas.authentication import TokenValidationResponse
+from app.services.authentication_service import get_authentication_service
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +25,12 @@ security = HTTPBearer(auto_error=False)
 
 class AuthenticationMiddleware:
     """Middleware для аутентификации"""
-    
+
     def __init__(self):
         self.auth_service = get_authentication_service()
         self.excluded_paths = [
             "/docs",
-            "/redoc", 
+            "/redoc",
             "/openapi.json",
             "/health",
             "/auth/login",
@@ -36,7 +38,7 @@ class AuthenticationMiddleware:
             "/auth/password-reset",
             "/auth/email-verification",
             "/2fa/setup",
-            "/2fa/verify-setup"
+            "/2fa/verify-setup",
         ]
         self.public_paths = [
             "/api/v1/health",
@@ -46,7 +48,7 @@ class AuthenticationMiddleware:
             "/api/v1/auth/password-reset",
             "/api/v1/auth/email-verification",
             "/api/v1/2fa/setup",
-            "/api/v1/2fa/verify-setup"
+            "/api/v1/2fa/verify-setup",
         ]
 
     def is_public_path(self, path: str) -> bool:
@@ -58,27 +60,29 @@ class AuthenticationMiddleware:
         authorization = request.headers.get("Authorization")
         if not authorization:
             return None
-        
+
         scheme, token = get_authorization_scheme_param(authorization)
         if scheme.lower() != "bearer":
             return None
-        
+
         return token
 
-    def validate_token(self, token: str, db: Session) -> Optional[TokenValidationResponse]:
+    def validate_token(
+        self, token: str, db: Session
+    ) -> Optional[TokenValidationResponse]:
         """Валидирует JWT токен"""
         try:
             # Проверяем токен
             payload = self.auth_service.verify_token(token, "access")
             if not payload:
                 return None
-            
+
             # Получаем пользователя
             user_id = int(payload.get("sub"))
             user_obj = user.get(db, user_id)
             if not user_obj or not user_obj.is_active:
                 return None
-            
+
             return TokenValidationResponse(
                 valid=True,
                 user_id=user_id,
@@ -86,9 +90,9 @@ class AuthenticationMiddleware:
                 role=user_obj.role,
                 is_active=user_obj.is_active,
                 expires_at=datetime.fromtimestamp(payload.get("exp")),
-                requires_2fa=False  # TODO: проверка 2FA
+                requires_2fa=False,  # TODO: проверка 2FA
             )
-            
+
         except Exception as e:
             logger.error(f"Error validating token: {e}")
             return None
@@ -100,16 +104,16 @@ class AuthenticationMiddleware:
             device_fingerprint = self.get_device_fingerprint(request)
             if not device_fingerprint:
                 return True  # Если нет отпечатка, пропускаем проверку
-            
+
             # Проверяем активную сессию
             session = user_session.get_valid_session(db, device_fingerprint)
             if not session or session.user_id != user_id:
                 return False
-            
+
             # Обновляем активность
             user_session.update_activity(db, session.session_id)
             return True
-            
+
         except Exception as e:
             logger.error(f"Error checking session: {e}")
             return True  # В случае ошибки пропускаем проверку
@@ -119,14 +123,15 @@ class AuthenticationMiddleware:
         try:
             user_agent = request.headers.get("user-agent", "")
             ip_address = request.client.host if request.client else ""
-            
+
             if not user_agent or not ip_address:
                 return None
-            
+
             import hashlib
+
             data = f"{user_agent}:{ip_address}"
             return hashlib.sha256(data.encode()).hexdigest()
-            
+
         except Exception as e:
             logger.error(f"Error getting device fingerprint: {e}")
             return None
@@ -138,7 +143,7 @@ class AuthenticationMiddleware:
             if self.is_public_path(request.url.path):
                 response = await call_next(request)
                 return response
-            
+
             # Извлекаем токен
             token = self.extract_token(request)
             if not token:
@@ -147,7 +152,7 @@ class AuthenticationMiddleware:
                     detail="Токен аутентификации не предоставлен",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             # Получаем сессию БД
             db = next(get_db())
             try:
@@ -159,7 +164,7 @@ class AuthenticationMiddleware:
                         detail="Недействительный токен аутентификации",
                         headers={"WWW-Authenticate": "Bearer"},
                     )
-                
+
                 # Проверяем сессию
                 if not self.check_session(token_validation.user_id, request, db):
                     raise HTTPException(
@@ -167,59 +172,59 @@ class AuthenticationMiddleware:
                         detail="Сессия недействительна или истекла",
                         headers={"WWW-Authenticate": "Bearer"},
                     )
-                
+
                 # Добавляем информацию о пользователе в запрос
                 request.state.user_id = token_validation.user_id
                 request.state.username = token_validation.username
                 request.state.role = token_validation.role
                 request.state.is_active = token_validation.is_active
                 request.state.requires_2fa = token_validation.requires_2fa
-                
+
                 # Продолжаем обработку запроса
                 response = await call_next(request)
                 return response
-                
+
             finally:
                 db.close()
-                
+
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Authentication middleware error: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка аутентификации"
+                detail="Ошибка аутентификации",
             )
 
 
 class AuthorizationMiddleware:
     """Middleware для авторизации"""
-    
+
     def __init__(self):
         self.role_permissions = {
             "Admin": ["*"],  # Все права
             "Doctor": [
-                "patients:read", "patients:write",
-                "appointments:read", "appointments:write",
-                "emr:read", "emr:write",
-                "prescriptions:read", "prescriptions:write"
-            ],
-            "Nurse": [
                 "patients:read",
+                "patients:write",
                 "appointments:read",
-                "emr:read"
+                "appointments:write",
+                "emr:read",
+                "emr:write",
+                "prescriptions:read",
+                "prescriptions:write",
             ],
+            "Nurse": ["patients:read", "appointments:read", "emr:read"],
             "Receptionist": [
-                "patients:read", "patients:write",
-                "appointments:read", "appointments:write",
-                "schedules:read", "schedules:write"
+                "patients:read",
+                "patients:write",
+                "appointments:read",
+                "appointments:write",
+                "schedules:read",
+                "schedules:write",
             ],
-            "Patient": [
-                "profile:read", "profile:write",
-                "appointments:read"
-            ]
+            "Patient": ["profile:read", "profile:write", "appointments:read"],
         }
-        
+
         self.path_permissions = {
             "/api/v1/users": ["Admin"],
             "/api/v1/auth/admin": ["Admin"],
@@ -230,7 +235,7 @@ class AuthorizationMiddleware:
             "/api/v1/schedules": ["Admin", "Receptionist"],
             "/api/v1/analytics": ["Admin", "Doctor"],
             "/api/v1/reports": ["Admin", "Doctor"],
-            "/api/v1/settings": ["Admin"]
+            "/api/v1/settings": ["Admin"],
         }
 
     def get_required_permissions(self, path: str) -> List[str]:
@@ -244,7 +249,7 @@ class AuthorizationMiddleware:
         """Проверяет, есть ли у пользователя нужные разрешения"""
         if not required_roles:
             return True
-        
+
         return user_role in required_roles
 
     async def __call__(self, request: Request, call_next):
@@ -256,38 +261,38 @@ class AuthorizationMiddleware:
                 # Если нет роли, пропускаем проверку (возможно, это публичный путь)
                 response = await call_next(request)
                 return response
-            
+
             # Получаем требуемые разрешения для пути
             required_roles = self.get_required_permissions(request.url.path)
             if not required_roles:
                 # Если нет требований к разрешениям, пропускаем проверку
                 response = await call_next(request)
                 return response
-            
+
             # Проверяем разрешения
             if not self.has_permission(user_role, required_roles):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Недостаточно прав для доступа к ресурсу"
+                    detail="Недостаточно прав для доступа к ресурсу",
                 )
-            
+
             # Продолжаем обработку запроса
             response = await call_next(request)
             return response
-            
+
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Authorization middleware error: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Ошибка авторизации"
+                detail="Ошибка авторизации",
             )
 
 
 class RateLimitMiddleware:
     """Middleware для ограничения скорости запросов"""
-    
+
     def __init__(self):
         self.rate_limits = {
             "login": {"requests": 5, "window": 300},  # 5 попыток за 5 минут
@@ -307,20 +312,21 @@ class RateLimitMiddleware:
         current_time = datetime.utcnow().timestamp()
         window = self.rate_limits[limit_type]["window"]
         max_requests = self.rate_limits[limit_type]["requests"]
-        
+
         if key not in self.request_counts:
             self.request_counts[key] = []
-        
+
         # Очищаем старые записи
         self.request_counts[key] = [
-            timestamp for timestamp in self.request_counts[key]
+            timestamp
+            for timestamp in self.request_counts[key]
             if current_time - timestamp < window
         ]
-        
+
         # Проверяем лимит
         if len(self.request_counts[key]) >= max_requests:
             return True
-        
+
         # Добавляем текущий запрос
         self.request_counts[key].append(current_time)
         return False
@@ -334,21 +340,21 @@ class RateLimitMiddleware:
                 limit_type = "login"
             elif request.url.path.endswith("/password-reset"):
                 limit_type = "password_reset"
-            
+
             # Получаем ключ ограничения
             key = self.get_rate_limit_key(request, limit_type)
-            
+
             # Проверяем лимит
             if self.is_rate_limited(key, limit_type):
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Превышен лимит запросов. Попробуйте позже."
+                    detail="Превышен лимит запросов. Попробуйте позже.",
                 )
-            
+
             # Продолжаем обработку запроса
             response = await call_next(request)
             return response
-            
+
         except HTTPException:
             raise
         except Exception as e:
