@@ -11,10 +11,10 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.api import deps
-
-logger = logging.getLogger(__name__)
 from app.crud import emr as crud_emr
 from app.crud.appointment import appointment as crud_appointment
+
+logger = logging.getLogger(__name__)
 from app.models.appointment import Appointment as AppointmentModel
 from app.models.enums import AppointmentStatus
 from app.models.user import User
