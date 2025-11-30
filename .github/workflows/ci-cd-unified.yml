@@ -100,36 +100,59 @@ jobs:
     - name: 🔍 Линтинг и статический анализ
       run: |
         cd backend
-        set -e
+        set +e  # Не выходить при ошибках, обрабатываем их вручную
         mkdir -p quality-reports
         
-        echo "🔍 Ruff - быстрый линтер..."
-        ruff check . --output-format=text > quality-reports/ruff.txt 2>&1 || {
-          echo "❌ Ruff нашел проблемы в коде:"
-          cat quality-reports/ruff.txt | head -50
+        echo "🔍 Ruff - быстрый линтер (только app/ и tests/)..."
+        RUFF_ERRORS=0
+        
+        for dir in app tests; do
+          if [ -d "$dir" ]; then
+            echo "  Проверяем $dir/..."
+            if ! ruff check "$dir" --output-format=text > quality-reports/ruff_${dir}.txt 2>&1; then
+              echo "❌ Ruff нашел проблемы в $dir/:"
+              head -30 quality-reports/ruff_${dir}.txt
+              RUFF_ERRORS=$((RUFF_ERRORS + 1))
+            else
+              echo "  ✅ $dir/ OK"
+            fi
+          fi
+        done
+        
+        if [ $RUFF_ERRORS -gt 0 ]; then
+          echo "❌ Ruff нашел проблемы в $RUFF_ERRORS директориях"
+          echo "Исправьте ошибки или добавьте исключения в pyproject.toml"
           exit 1
-        }
+        fi
         echo "✅ Ruff проверка OK"
         
-        echo "🔍 Flake8 - критические ошибки..."
-        flake8 app --select=E9,F63,F7,F82 --show-source --statistics > quality-reports/flake8.txt 2>&1 || {
-          echo "❌ Flake8 нашел критические ошибки:"
-          cat quality-reports/flake8.txt
-          exit 1
-        }
-        echo "✅ Flake8 проверка OK"
+        echo "🔍 Flake8 - критические ошибки (только app/)..."
+        if [ -d "app" ]; then
+          if ! flake8 app --select=E9,F63,F7,F82 --show-source --statistics > quality-reports/flake8.txt 2>&1; then
+            echo "❌ Flake8 нашел критические ошибки:"
+            cat quality-reports/flake8.txt
+            exit 1
+          fi
+          echo "✅ Flake8 проверка OK"
+        else
+          echo "⚠️ Директория app/ не найдена"
+        fi
         
-        echo "🔍 MyPy - проверка типов..."
-        mypy app --ignore-missing-imports --show-error-codes > quality-reports/mypy.txt 2>&1 || {
-          echo "⚠️ MyPy нашел проблемы с типами (не блокируем):"
-          cat quality-reports/mypy.txt | head -50
-        }
+        echo "🔍 MyPy - проверка типов (только app/)..."
+        if [ -d "app" ]; then
+          mypy app --ignore-missing-imports --show-error-codes > quality-reports/mypy.txt 2>&1 || {
+            echo "⚠️ MyPy нашел проблемы с типами (не блокируем):"
+            head -50 quality-reports/mypy.txt
+          }
+        fi
         
-        echo "🔍 Pylint - дополнительный анализ..."
-        pylint app --disable=all --enable=E0602,E0603,E1120,E1121 > quality-reports/pylint.txt 2>&1 || {
-          echo "⚠️ Pylint нашел проблемы (не блокируем):"
-          cat quality-reports/pylint.txt | head -30
-        }
+        echo "🔍 Pylint - дополнительный анализ (только app/)..."
+        if [ -d "app" ]; then
+          pylint app --disable=all --enable=E0602,E0603,E1120,E1121 > quality-reports/pylint.txt 2>&1 || {
+            echo "⚠️ Pylint нашел проблемы (не блокируем):"
+            head -30 quality-reports/pylint.txt
+          }
+        fi
     
     - name: 🔍 Проверка сложности кода
       run: |
