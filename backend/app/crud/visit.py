@@ -138,6 +138,7 @@ def create_visit(
         doctor_id=visit_data.get("doctor_id"),
         visit_date=visit_data["visit_date"],
         visit_time=visit_data.get("visit_time"),
+        department=visit_data.get("department"),  # ✅ ДОБАВЛЕНО: строковое поле department
         department_id=department_id_value,  # ✅ ИСПРАВЛЕНО: используем department_id
         discount_mode=visit_data.get("discount_mode", "none"),
         notes=visit_data.get("notes"),

@@ -1179,9 +1179,67 @@ def get_today_queues(
             # ✅ ИСПРАВЛЕНО: Сортируем записи по queue_time (приоритет), иначе по created_at
             # Это формирует правильную очередь: кто раньше зарегистрировался, тот раньше в очереди
             # queue_time - это бизнес-время регистрации, которое не меняется при редактировании
-            entries_list.sort(key=lambda e: (
-                e.get("queue_time") or e.get("created_at") or datetime.now()
-            ))
+            try:
+                def get_sort_key(e):
+                    # Безопасно получаем значения
+                    queue_time = e.get("queue_time")
+                    created_at = e.get("created_at")
+
+                    # Приоритет: queue_time, затем created_at, затем текущий момент
+                    sort_time = None
+
+                    # Обрабатываем queue_time
+                    if queue_time:
+                        if isinstance(queue_time, datetime):
+                            sort_time = queue_time
+                            # ✅ ИСПРАВЛЕНО Bug 3: Нормализуем naive datetime к timezone-aware UTC
+                            if sort_time.tzinfo is None:
+                                from datetime import timezone
+                                sort_time = sort_time.replace(tzinfo=timezone.utc)
+                        elif isinstance(queue_time, str):
+                            try:
+                                # Пробуем разные форматы дат
+                                if 'T' in queue_time:
+                                    sort_time = datetime.fromisoformat(queue_time.replace('Z', '+00:00'))
+                                else:
+                                    # ✅ ИСПРАВЛЕНО Bug 3: strptime возвращает naive datetime, нормализуем к UTC
+                                    from datetime import timezone
+                                    sort_time = datetime.strptime(queue_time, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                            except (ValueError, TypeError):
+                                pass
+
+                    # Если queue_time не сработал, пробуем created_at
+                    if not sort_time and created_at:
+                        if isinstance(created_at, datetime):
+                            sort_time = created_at
+                            # ✅ ИСПРАВЛЕНО Bug 3: Нормализуем naive datetime к timezone-aware UTC
+                            if sort_time.tzinfo is None:
+                                from datetime import timezone
+                                sort_time = sort_time.replace(tzinfo=timezone.utc)
+                        elif isinstance(created_at, str):
+                            try:
+                                if 'T' in created_at:
+                                    sort_time = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                                else:
+                                    # ✅ ИСПРАВЛЕНО Bug 3: strptime возвращает naive datetime, нормализуем к UTC
+                                    from datetime import timezone
+                                    sort_time = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                            except (ValueError, TypeError):
+                                pass
+
+                    # ✅ ИСПРАВЛЕНО Bug 3: Если ничего не сработало, используем timezone-aware UTC datetime
+                    # Это предотвращает TypeError при сравнении timezone-aware и naive datetime
+                    if not sort_time:
+                        from datetime import timezone
+                        sort_time = datetime.now(timezone.utc)
+
+                    return sort_time
+
+                entries_list.sort(key=get_sort_key)
+            except Exception as sort_error:
+                logger.warning(f"Ошибка сортировки записей для {specialty}: {sort_error}")
+                # В случае ошибки сортировки оставляем записи как есть
+                pass
             
             entries = []
             seen_entry_keys = set()  # Для дедупликации записей в одной специальности
@@ -1228,6 +1286,7 @@ def get_today_queues(
                 visit_time = None
                 discount_mode = "none"
                 record_id = None
+                visit_department = None  # ✅ ДОБАВЛЕНО: для хранения department из Visit
                 
                 if entry_type == "visit":
                     # Обработка Visit
@@ -1348,6 +1407,10 @@ def get_today_queues(
                     
                     # Получаем discount_mode для ответа API
                     discount_mode = get_discount_mode_for_visit(db, visit)
+                    
+                    # ✅ ДОБАВЛЕНО: Сохраняем department из модели Visit для использования ниже
+                    # Это нужно для новых записей из сценария 5
+                    visit_department = getattr(visit, 'department', None)
                 
                 elif entry_type == "appointment":
                     # Обработка Appointment
@@ -1538,9 +1601,13 @@ def get_today_queues(
                         logger.debug("get_today_queues: Ошибка получения queue_time: %s", str(e))
                         pass  # Тихая ошибка - порядковые номера достаточно
 
-                # [OK] ДОБАВЛЯЕМ department_key для фронтенда
+                # [OK] ДОБАВЛЯЕМ department_key и department для фронтенда
                 entry_department_key = None
+                entry_department = None
                 if entry_type == "visit":
+                    # Для Visit используем department, который был сохранен выше
+                    entry_department = visit_department
+                    
                     # Для Visit получаем department_key из услуг
                     from app.models.visit import VisitService
                     visit_services_for_dept = db.query(VisitService).filter(VisitService.visit_id == record_id).all()
@@ -1610,7 +1677,8 @@ def get_today_queues(
                     "visit_time": visit_time,
                     "discount_mode": discount_mode,
                     "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment'
-                    "department_key": entry_department_key  # [OK] ДОБАВЛЯЕМ department_key для динамических отделений
+                    "department_key": entry_department_key,  # [OK] ДОБАВЛЯЕМ department_key для динамических отделений
+                    "department": entry_department  # ✅ ДОБАВЛЕНО: department из модели Visit (для новых записей из сценария 5)
                 })
             
             queue_data = {
@@ -1907,4 +1975,60 @@ def create_queue_entries_batch(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка массового создания записей в очереди: {str(e)}"
+        )
+
+
+# ===================== КОНВЕРТАЦИЯ DOCTOR_ID → USER_ID =====================
+
+@router.get("/registrar-integration/doctors/{doctor_id}/user-id")
+def get_doctor_user_id(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar"))
+):
+    """
+    Получить user_id по doctor_id
+    
+    Используется для конвертации doctor_id в user_id при создании записей в очереди,
+    так как DailyQueue.specialist_id требует user_id, а не doctor_id.
+    
+    Args:
+        doctor_id: ID врача из таблицы doctors
+        
+    Returns:
+        user_id: ID пользователя из таблицы users
+        
+    Raises:
+        HTTPException 404: Если врач не найден или у врача нет user_id
+    """
+    try:
+        from app.models.clinic import Doctor
+        
+        doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
+        
+        if not doctor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Врач с ID {doctor_id} не найден"
+            )
+        
+        if not doctor.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"У врача с ID {doctor_id} не установлен user_id"
+            )
+        
+        return {
+            "doctor_id": doctor_id,
+            "user_id": doctor.user_id,
+            "doctor_name": doctor.user.full_name if doctor.user else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения user_id для doctor_id={doctor_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения user_id: {str(e)}"
         )

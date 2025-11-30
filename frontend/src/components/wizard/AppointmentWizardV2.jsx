@@ -25,7 +25,7 @@ import { MacOSInput, MacOSButton, MacOSSelect, MacOSCheckbox } from '../ui/macos
 import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { formatDateDisplay } from '../../utils/dateUtils';
-import { createQueueEntriesBatch } from '../../api/queue';
+import { createQueueEntriesBatch, getDoctorUserId } from '../../api/queue';
 import './AppointmentWizardV2.css';
 
 const API_BASE = '/api/v1';
@@ -169,6 +169,21 @@ const AppointmentWizardV2 = ({
               const items = [];
 
               // ✅ ИСПРАВЛЕНО: Приоритет восстановления услуг
+              // Получаем doctor_id из initialData (может быть в разных полях)
+              // ⚠️ ВАЖНО: Для записей типа visit, doctor_id может быть в queue.specialist_id
+              // Но для отдельных услуг нужен doctor_id из самой услуги или из initialData
+              const doctorId = initialData.doctor_id || 
+                              initialData.specialist_id || 
+                              (initialData.queue_numbers && Array.isArray(initialData.queue_numbers) && initialData.queue_numbers[0]?.specialist_id) ||
+                              null;
+              
+              console.log('🔍 Извлечение doctor_id из initialData:', {
+                doctor_id: initialData.doctor_id,
+                specialist_id: initialData.specialist_id,
+                queue_numbers_specialist: initialData.queue_numbers?.[0]?.specialist_id,
+                result: doctorId
+              });
+              
               // 1. Сначала пробуем из services (массив строк или кодов)
               if (Array.isArray(initialData.services) && initialData.services.length > 0) {
                 console.log('📦 Восстановление услуг из services:', initialData.services);
@@ -180,7 +195,7 @@ const AppointmentWizardV2 = ({
                       service_name: serviceName,
                       service_price: 0,
                       quantity: 1,
-                      doctor_id: null,
+                      doctor_id: doctorId, // ✅ ИСПРАВЛЕНО: Устанавливаем doctor_id из initialData
                       visit_date: initialData.date || new Date().toISOString().split('T')[0],
                       visit_time: null,
                       _temp_name: serviceName
@@ -199,7 +214,7 @@ const AppointmentWizardV2 = ({
                       service_name: serviceCode, // Будет резолвиться позже
                       service_price: 0,
                       quantity: 1,
-                      doctor_id: null,
+                      doctor_id: doctorId, // ✅ ИСПРАВЛЕНО: Устанавливаем doctor_id из initialData
                       visit_date: initialData.date || new Date().toISOString().split('T')[0],
                       visit_time: null,
                       _temp_name: serviceCode
@@ -739,13 +754,19 @@ const AppointmentWizardV2 = ({
               return {
                 ...item,
                 service_name: nextName,
-                service_price: nextPrice
+                service_price: nextPrice,
+                // ✅ ВАЖНО: Сохраняем doctor_id при обновлении
+                doctor_id: item.doctor_id || null
               };
             }
           }
 
           // Если service_id есть и изменений нет — возвращаем элемент без изменений
-          return item;
+          // ✅ ВАЖНО: Убеждаемся, что doctor_id сохранен
+          return {
+            ...item,
+            doctor_id: item.doctor_id || null
+          };
         }
 
         // Ищем услугу по имени или коду (которое мы сохранили в service_name или _temp_name)
@@ -782,7 +803,9 @@ const AppointmentWizardV2 = ({
             service_id: foundService.id,
             service_name: foundService.name, // ✅ SSOT: Сохраняем полное название из servicesData
             service_price: foundService.price || 0,
-            _temp_name: searchName // Сохраняем исходный код для отладки
+            _temp_name: searchName, // Сохраняем исходный код для отладки
+            // ✅ ВАЖНО: Сохраняем doctor_id при резолвинге
+            doctor_id: item.doctor_id || null
           };
         } else {
           // ✅ УЛУЧШЕНО: Пробуем найти по частичному совпадению названия
@@ -800,7 +823,9 @@ const AppointmentWizardV2 = ({
               service_id: foundByName.id,
               service_name: foundByName.name,
               service_price: foundByName.price || 0,
-              _temp_name: searchName
+              _temp_name: searchName,
+              // ✅ ВАЖНО: Сохраняем doctor_id при резолвинге
+              doctor_id: item.doctor_id || null
             };
           }
           
@@ -1114,7 +1139,7 @@ const AppointmentWizardV2 = ({
       }
 
       // ✅ ИСПРАВЛЕНО: Сначала группируем услуги по визитам
-      const visits = groupCartItemsByVisit();
+      let visits = groupCartItemsByVisit();
       if (!visits || visits.length === 0) {
         toast.error('Корзина пуста или содержит невалидные услуги. Пожалуйста, проверьте выбранные услуги.');
         return;
@@ -1383,42 +1408,154 @@ const AppointmentWizardV2 = ({
         return;
       }
 
-      // ✅ НОВОЕ: Проверяем, редактируется ли QR-запись и есть ли новые услуги
-      const isQRQueueEntry = editMode && initialData && (
+      // ✅ НОВОЕ: Проверяем, редактируется ли запись в очереди (QR или desk) и есть ли новые услуги
+      // Расширено для поддержки всех типов записей: online, desk, visit, appointment
+      // ✅ ИСПРАВЛЕНО Bug 1: Добавлены явные скобки для правильного приоритета операторов
+      const hasQueueEntries = editMode && initialData && (
+        (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) ||
         initialData.source === 'online' || 
-        initialData.record_type === 'online_queue'
+        initialData.source === 'desk' ||
+        initialData.record_type === 'online_queue' ||
+        initialData.record_type === 'visit' ||
+        initialData.record_type === 'appointment'
       );
 
-      if (isQRQueueEntry) {
-        // ✅ Сценарий 3: Редактирование QR-записи с добавлением новых услуг
-        console.log('📝 Редактирование QR-записи, проверяем новые услуги...');
+      if (hasQueueEntries) {
+        // ✅ Устанавливаем source по умолчанию для записей типа visit
+        const effectiveSource = initialData.source || 
+          (initialData.record_type === 'visit' || initialData.record_type === 'appointment' ? 'desk' : 'online');
+        
+        // ✅ Сценарий 3: Редактирование записи в очереди (QR или desk) с добавлением новых услуг
+        const recordType = effectiveSource === 'online' ? 'QR-запись' : 'ручная запись';
+        console.log(`📝 Редактирование ${recordType}, проверяем новые услуги...`, {
+          source: initialData.source,
+          effectiveSource,
+          record_type: initialData.record_type,
+          queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length : 
+                        (initialData.queue_numbers ? 1 : 0),
+          service_codes: Array.isArray(initialData.service_codes) ? initialData.service_codes.length : 0,
+          services: Array.isArray(initialData.services) ? initialData.services.length : 0
+        });
         
         // Определяем исходные услуги из initialData
         const originalServiceIds = new Set();
         const originalServiceCodes = new Set();
         const originalServiceNames = new Set();
         
-        // Собираем исходные услуги из разных источников
-        if (Array.isArray(initialData.service_codes)) {
+        // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
+        if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
+          console.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
           initialData.service_codes.forEach(code => {
             if (code) {
-              originalServiceCodes.add(code.toUpperCase().trim());
-              // Также находим service_id по service_codes
-              const service = servicesData.find(s => 
-                s.service_code && s.service_code.toUpperCase().trim() === code.toUpperCase().trim()
-              );
-              if (service) originalServiceIds.add(service.id);
+              const normalizedCode = code.toUpperCase().trim();
+              originalServiceCodes.add(normalizedCode);
+              // Находим service_id по service_code
+              const service = servicesData.find(s => {
+                if (!s.service_code) return false;
+                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                const codeNoZero = normalizedCode.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                return serviceCodeUpper === normalizedCode || serviceCodeNoZero === codeNoZero;
+              });
+              if (service) {
+                originalServiceIds.add(service.id);
+                originalServiceNames.add(service.name.toLowerCase().trim());
+                console.log(`  ✅ Найден service_id=${service.id} для кода "${code}"`);
+              } else {
+                console.warn(`  ⚠️ Услуга с кодом "${code}" не найдена в servicesData`);
+              }
             }
           });
         }
         
-        if (Array.isArray(initialData.services)) {
-          initialData.services.forEach(serviceName => {
-            if (serviceName) {
-              originalServiceNames.add(serviceName.toLowerCase().trim());
-              // Пытаемся найти service_id по имени
+        // ✅ ПРИОРИТЕТ 1.5: services (если service_codes пуст) - может быть кодами
+        // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
+        if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
+          console.log('📋 service_codes пуст, используем services как коды:', initialData.services);
+          initialData.services.forEach(serviceValue => {
+            if (serviceValue) {
+              const normalizedValue = serviceValue.toUpperCase().trim();
+              
+              // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
+              // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
+              let service = servicesData.find(s => {
+                if (!s.service_code) return false;
+                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+                // Убираем ведущие нули для сравнения (k01 = k1)
+                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                
+                // Прямое сравнение
+                if (serviceCodeUpper === normalizedValue) return true;
+                // Сравнение без ведущих нулей
+                if (serviceCodeNoZero === valueNoZero) return true;
+                // Сравнение с учетом возможного формата 'K01: Название'
+                const serviceCodeBase = serviceCodeUpper.split(':')[0].trim();
+                const valueBase = normalizedValue.split(':')[0].trim();
+                if (serviceCodeBase === valueBase) return true;
+                
+                return false;
+              });
+              
+              // Если не нашли по коду, пробуем по имени (fallback)
+              if (!service) {
+                const normalizedName = serviceValue.toLowerCase().trim();
+                service = servicesData.find(s => 
+                  s.name && s.name.toLowerCase().trim() === normalizedName
+                );
+              }
+              
+              if (service) {
+                originalServiceIds.add(service.id);
+                if (service.service_code) {
+                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
+                }
+                originalServiceNames.add(service.name.toLowerCase().trim());
+                console.log(`  ✅ Найден service_id=${service.id} для "${serviceValue}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+              } else {
+                // ✅ УЛУЧШЕНО: Показываем примеры кодов из servicesData для отладки
+                const exampleCodes = servicesData
+                  .filter(s => s.service_code)
+                  .slice(0, 10)
+                  .map(s => `${s.service_code}: ${s.name}`)
+                  .join(', ');
+                console.warn(`  ⚠️ Услуга "${serviceValue}" не найдена в servicesData. Примеры кодов: ${exampleCodes}`);
+              }
+            }
+          });
+        }
+        
+        // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
+        if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
+          console.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
+          initialData.queue_numbers.forEach(q => {
+            if (q && q.service_id) {
+              originalServiceIds.add(q.service_id);
+              // Находим service_code и name по service_id
+              const service = servicesData.find(s => s.id === q.service_id);
+              if (service) {
+                if (service.service_code) {
+                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
+                }
+                originalServiceNames.add(service.name.toLowerCase().trim());
+              }
+            }
+            if (q && q.service_code) {
+              const normalizedCode = q.service_code.toUpperCase().trim();
+              originalServiceCodes.add(normalizedCode);
               const service = servicesData.find(s => 
-                s.name && s.name.toLowerCase().trim() === serviceName.toLowerCase().trim()
+                s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
+              );
+              if (service) {
+                originalServiceIds.add(service.id);
+                originalServiceNames.add(service.name.toLowerCase().trim());
+              }
+            }
+            if (q && q.service_name) {
+              const normalizedName = q.service_name.toLowerCase().trim();
+              originalServiceNames.add(normalizedName);
+              const service = servicesData.find(s => 
+                s.name && s.name.toLowerCase().trim() === normalizedName
               );
               if (service) {
                 originalServiceIds.add(service.id);
@@ -1430,28 +1567,64 @@ const AppointmentWizardV2 = ({
           });
         }
         
-        // Также проверяем queue_numbers
-        if (Array.isArray(initialData.queue_numbers)) {
-          initialData.queue_numbers.forEach(q => {
-            if (q && q.service_id) {
-              originalServiceIds.add(q.service_id);
-            }
-            if (q && q.service_name) {
-              originalServiceNames.add(q.service_name.toLowerCase().trim());
+        // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
+        if (Array.isArray(initialData.services) && initialData.services.length > 0) {
+          console.log('📋 Извлечение услуг из services:', initialData.services);
+          initialData.services.forEach(serviceValue => {
+            if (serviceValue) {
+              const normalizedValue = serviceValue.toUpperCase().trim();
+              const normalizedName = serviceValue.toLowerCase().trim();
+              
+              // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
+              let service = servicesData.find(s => {
+                if (!s.service_code) return false;
+                const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
+                // Убираем ведущие нули для сравнения (k01 = k1)
+                const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
+                return serviceCodeUpper === normalizedValue || serviceCodeNoZero === valueNoZero;
+              });
+              
+              // Если не нашли по коду, пробуем по имени
+              if (!service) {
+                service = servicesData.find(s => 
+                  s.name && s.name.toLowerCase().trim() === normalizedName
+                );
+              }
+              
+              if (service) {
+                originalServiceIds.add(service.id);
+                if (service.service_code) {
+                  originalServiceCodes.add(service.service_code.toUpperCase().trim());
+                }
+                originalServiceNames.add(service.name.toLowerCase().trim());
+                console.log(`  ✅ Найден service_id=${service.id} для "${serviceValue}" (код: ${service.service_code || 'нет'}, имя: ${service.name})`);
+              } else {
+                console.warn(`  ⚠️ Услуга "${serviceValue}" не найдена в servicesData (ни по коду, ни по имени)`);
+              }
             }
           });
         }
+        
+        console.log('📋 Исходные услуги определены:', {
+          serviceIds: Array.from(originalServiceIds),
+          serviceCodes: Array.from(originalServiceCodes),
+          serviceNames: Array.from(originalServiceNames)
+        });
 
         // Определяем новые услуги (которых не было в исходной записи)
-        const newServices = [];
+        // Сначала собираем все новые услуги с doctor_id для последующей конвертации
+        const newServicesWithDoctorId = [];
+        const newServicesWithoutDoctor = [];
         const existingServices = [];
         
-        visits.forEach(visit => {
-          visit.services.forEach(serviceItem => {
+        for (const visit of visits) {
+          console.log(`🔍 Проверка визита: doctor_id=${visit.doctor_id}, services count=${visit.services.length}`);
+          for (const serviceItem of visit.services) {
             const service = servicesData.find(s => s.id === serviceItem.service_id);
             if (!service) {
               console.warn('⚠️ Услуга не найдена в servicesData:', serviceItem.service_id);
-              return;
+              continue;
             }
             
             // Проверяем, является ли услуга новой
@@ -1459,32 +1632,101 @@ const AppointmentWizardV2 = ({
               !originalServiceCodes.has((service.service_code || '').toUpperCase().trim()) &&
               !originalServiceNames.has((service.name || '').toLowerCase().trim());
             
+            console.log(`  🔍 Услуга "${service.name}" (ID: ${serviceItem.service_id}, код: ${service.service_code}):`, {
+              isNewService,
+              inServiceIds: originalServiceIds.has(serviceItem.service_id),
+              inServiceCodes: originalServiceCodes.has((service.service_code || '').toUpperCase().trim()),
+              inServiceNames: originalServiceNames.has((service.name || '').toLowerCase().trim()),
+              hasDoctorId: !!visit.doctor_id
+            });
+            
             if (isNewService) {
               // Новая услуга - нужно добавить через batch endpoint
               // ⚠️ ВАЖНО: batch endpoint требует specialist_id (user_id), а не doctor_id
-              // Для услуг с врачом используем visit.doctor_id (но нужно конвертировать в user_id)
+              // Для услуг с врачом используем visit.doctor_id и конвертируем в user_id
               // Для услуг без врача (лаборатория) пропускаем batch endpoint
               if (visit.doctor_id) {
-                // ⚠️ TODO: Нужно конвертировать doctor_id в user_id (specialist_id)
-                // Пока используем doctor_id напрямую (backend должен обработать)
-                // В будущем нужно добавить API для получения user_id по doctor_id
-                newServices.push({
-                  specialist_id: visit.doctor_id, // ⚠️ Временное решение: используем doctor_id
+                // Сохраняем для последующей конвертации
+                console.log(`  ✅ Новая услуга с врачом: "${service.name}", doctor_id=${visit.doctor_id}`);
+                newServicesWithDoctorId.push({
+                  doctor_id: visit.doctor_id,
                   service_id: serviceItem.service_id,
+                  service_name: service.name,
                   quantity: serviceItem.quantity || 1
                 });
               } else {
                 // Услуга без врача - обработаем через обычный cart endpoint
-                console.log('ℹ️ Услуга без врача, будет обработана через cart endpoint:', service.name);
+                console.log(`  ℹ️ Новая услуга без врача: "${service.name}", будет обработана через cart endpoint`);
+                newServicesWithoutDoctor.push({
+                  service_id: serviceItem.service_id,
+                  quantity: serviceItem.quantity || 1
+                });
               }
             } else {
+              console.log(`  ℹ️ Существующая услуга: "${service.name}"`);
               existingServices.push(serviceItem);
             }
+          }
+        }
+        
+        // ✅ Конвертируем все doctor_id в user_id параллельно
+        const newServices = [];
+        if (newServicesWithDoctorId.length > 0) {
+          console.log(`🔄 Конвертация ${newServicesWithDoctorId.length} doctor_id в user_id...`);
+          const conversionPromises = newServicesWithDoctorId.map(async (item) => {
+            try {
+              const user_id = await getDoctorUserId(item.doctor_id);
+              console.log(`✅ Конвертация успешна: doctor_id=${item.doctor_id} -> user_id=${user_id} для услуги "${item.service_name}"`);
+              return {
+                success: true,
+                service: {
+                  specialist_id: user_id,
+                  service_id: item.service_id,
+                  quantity: item.quantity
+                },
+                failedItem: null
+              };
+            } catch (error) {
+              console.error(`❌ Ошибка конвертации doctor_id=${item.doctor_id} в user_id:`, error);
+              console.warn(`⚠️ Услуга "${item.service_name}" будет обработана через cart endpoint из-за ошибки конвертации`);
+              // ✅ ИСПРАВЛЕНО Bug 1: Возвращаем информацию об ошибке для fallback в cart endpoint
+              return {
+                success: false,
+                service: null,
+                failedItem: {
+                  service_id: item.service_id,
+                  quantity: item.quantity
+                }
+              };
+            }
           });
-        });
+          
+          const conversionResults = await Promise.all(conversionPromises);
+          
+          // Добавляем успешно конвертированные услуги
+          conversionResults.forEach(result => {
+            if (result.success && result.service) {
+              newServices.push(result.service);
+            }
+          });
+          
+          // ✅ ИСПРАВЛЕНО Bug 1: Добавляем услуги с ошибкой конвертации в newServicesWithoutDoctor для fallback
+          conversionResults.forEach(result => {
+            if (!result.success && result.failedItem) {
+              newServicesWithoutDoctor.push(result.failedItem);
+              console.log(`📋 Услуга service_id=${result.failedItem.service_id} добавлена в fallback для cart endpoint`);
+            }
+          });
+        }
 
-        if (newServices.length > 0) {
-          console.log('✅ Найдены новые услуги для QR-записи:', newServices);
+        // ✅ ИСПРАВЛЕНИЕ: Проверяем наличие новых услуг (как с врачами, так и без)
+        const hasNewServices = newServices.length > 0 || newServicesWithoutDoctor.length > 0;
+
+        if (hasNewServices) {
+          console.log(`✅ Найдены новые услуги для ${recordType}:`, {
+            withDoctor: newServices.length,
+            withoutDoctor: newServicesWithoutDoctor.length
+          });
           
           // Фильтруем услуги, которые требуют специалиста (имеют specialist_id)
           const servicesWithSpecialist = newServices.filter(s => s.specialist_id);
@@ -1492,7 +1734,10 @@ const AppointmentWizardV2 = ({
           if (servicesWithSpecialist.length > 0) {
             // Используем batch endpoint для добавления новых услуг с специалистами
             try {
-              const originalSource = initialData.source || 'online';
+              // ✅ Сохраняем оригинальный source (online для QR, desk для ручных записей)
+              const originalSource = effectiveSource; // Используем effectiveSource, установленный выше
+              console.log(`📤 Вызов batch endpoint для ${servicesWithSpecialist.length} новых услуг с source="${originalSource}"...`);
+              
               const batchResult = await createQueueEntriesBatch({
                 patientId: patientId,
                 source: originalSource, // ⭐ Сохраняем оригинальный source
@@ -1503,36 +1748,146 @@ const AppointmentWizardV2 = ({
               toast.success(`Добавлено ${servicesWithSpecialist.length} новых услуг в очередь`);
               
               // Если есть услуги без специалиста, обрабатываем их через обычный cart endpoint
-              const servicesWithoutSpecialist = newServices.filter(s => !s.specialist_id);
-              if (servicesWithoutSpecialist.length > 0) {
+              if (newServicesWithoutDoctor.length > 0) {
                 console.log('ℹ️ Найдены услуги без специалиста, обрабатываем через cart endpoint');
                 // Продолжаем с обычным cart endpoint для услуг без специалиста
               } else {
                 // Все услуги обработаны через batch endpoint
-                if (!editMode) {
-                  localStorage.removeItem(DRAFT_KEY);
+                // Обновляем данные пациента через cart endpoint (если нужно обновить личные данные)
+                // Но не создаем новые визиты, так как новые услуги уже добавлены в очередь
+                console.log('✅ Все новые услуги обработаны через batch endpoint');
+                
+                // Если нужно обновить личные данные пациента, вызываем cart endpoint с существующими услугами
+                // Иначе просто завершаем
+                if (existingServices.length > 0 || Object.keys(wizardData.patient).some(key => {
+                  const initialValue = initialData[`patient_${key}`] || initialData[key];
+                  const currentValue = wizardData.patient[key];
+                  return initialValue !== currentValue;
+                })) {
+                  console.log('ℹ️ Обновляем личные данные пациента через cart endpoint...');
+                  // ✅ ИСПРАВЛЕНО Bug 1: В режиме редактирования, когда все новые услуги обработаны через batch,
+                  // не отправляем существующие визиты в cart endpoint, чтобы избежать дубликатов
+                  // Cart endpoint используется только для обновления данных пациента, не для создания визитов
+                  if (editMode) {
+                    visits = []; // Пустой массив - не создаем новые визиты, только обновляем данные пациента
+                    console.log('📝 Режим редактирования: visits установлен в [] для обновления только данных пациента');
+                  }
+                  // Продолжаем с cart endpoint для обновления данных
+                } else {
+                  // Нет изменений в данных, просто завершаем
+                  if (!editMode) {
+                    localStorage.removeItem(DRAFT_KEY);
+                  }
+                  onComplete?.(batchResult);
+                  onClose();
+                  return;
                 }
-                onComplete?.(batchResult);
-                onClose();
-                return;
               }
             } catch (batchError) {
               console.error('❌ Ошибка batch endpoint:', batchError);
               toast.error(`Ошибка добавления услуг: ${batchError.message || 'Неизвестная ошибка'}`);
-              return;
+              // Продолжаем с обычным cart endpoint как fallback
+              console.log('ℹ️ Продолжаем с cart endpoint как fallback...');
             }
-          } else {
+          }
+
+          // ✅ Обработка услуг без специалиста (лаборатория и т.д.)
+          if (newServicesWithoutDoctor.length > 0) {
             console.log('ℹ️ Новые услуги не требуют специалиста, используем обычный cart endpoint');
+
+            // ✅ ИСПРАВЛЕНИЕ: В режиме редактирования создаем визиты только из НОВЫХ услуг
+            if (editMode) {
+              console.log('📝 Режим редактирования: создаем визиты только из новых услуг');
+
+              // Группируем только новые услуги по визитам
+              const newServiceVisits = {};
+              newServicesWithoutDoctor.forEach(item => {
+                const department = getDepartmentByService(item.service_id);
+                const key = `${department}_no_doctor_${new Date().toISOString().split('T')[0]}_no_time`;
+
+                if (!newServiceVisits[key]) {
+                  newServiceVisits[key] = {
+                    doctor_id: null,
+                    services: [],
+                    visit_date: new Date().toISOString().split('T')[0],
+                    visit_time: null,
+                    department: department,
+                    notes: null
+                  };
+                }
+
+                newServiceVisits[key].services.push({
+                  service_id: item.service_id,
+                  quantity: item.quantity
+                });
+              });
+
+              // ✅ ИСПРАВЛЕНО: Сохраняем существующие визиты и добавляем только новые
+              // По сценарию 5: новые услуги создают новые визиты, существующие не изменяются
+              // Но для cart endpoint нужно отправить только новые визиты (существующие уже в БД)
+              const newVisitsOnly = Object.values(newServiceVisits);
+              visits = newVisitsOnly;
+              console.log('📋 Созданы визиты только из новых услуг:', visits.length);
+              console.log('ℹ️ Существующие визиты не изменяются (остаются в БД)');
+            }
             // Все новые услуги без специалиста - обрабатываем через cart endpoint
           }
         } else {
-          console.log('ℹ️ Новых услуг не найдено, используем обычный cart endpoint');
+          console.log('ℹ️ Новых услуг не найдено, используем обычный cart endpoint для обновления данных');
           // Нет новых услуг, но возможно нужно обновить данные пациента
           // Продолжаем с обычным cart endpoint
         }
       }
 
-      // === ШАГ 2: СОЗДАЁМ КОРЗИНУ ВИЗИТОВ ===
+      // === ШАГ 2: СОЗДАЁМ КОРЗИНУ ВИЗИТОВ ИЛИ ОБНОВЛЯЕМ ДАННЫЕ ПАЦИЕНТА ===
+      
+      // ✅ ИСПРАВЛЕНО Bug 2: Если visits пустой (все услуги обработаны через batch),
+      // используем отдельный endpoint для обновления данных пациента, чтобы не создавать invoice с нулевой суммой
+      if (visits.length === 0 && editMode) {
+        console.log('📝 Режим редактирования: visits пустой, обновляем только данные пациента через patients API');
+        
+        // Обновляем данные пациента через отдельный endpoint
+        const patientUpdateData = {
+          full_name: wizardData.patient.fio || wizardData.patient.name,
+          phone: wizardData.patient.phone,
+          birth_date: wizardData.patient.birth_date || wizardData.patient.birthDate,
+          sex: wizardData.patient.gender === 'male' ? 'M' : wizardData.patient.gender === 'female' ? 'F' : null,
+          address: wizardData.patient.address
+        };
+        
+        // Удаляем undefined значения
+        Object.keys(patientUpdateData).forEach(key => 
+          patientUpdateData[key] === undefined && delete patientUpdateData[key]
+        );
+        
+        try {
+          // ✅ ИСПРАВЛЕНО Bug 1: API_BASE уже содержит '/api/v1', не дублируем префикс
+          const patientResponse = await fetch(`${API_BASE}/patients/${patientId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(patientUpdateData)
+          });
+          
+          if (patientResponse.ok) {
+            console.log('✅ Данные пациента успешно обновлены');
+            toast.success('Данные пациента обновлены');
+            onComplete?.({ success: true, message: 'Данные пациента обновлены' });
+            onClose();
+            return;
+          } else {
+            const errorData = await patientResponse.json().catch(() => ({ detail: 'Ошибка обновления пациента' }));
+            throw new Error(errorData.detail || `Ошибка ${patientResponse.status}`);
+          }
+        } catch (patientError) {
+          console.error('❌ Ошибка обновления данных пациента:', patientError);
+          toast.error(`Ошибка обновления данных пациента: ${patientError.message || 'Неизвестная ошибка'}`);
+          // Продолжаем с обычным flow (хотя visits пустой, это не должно произойти)
+        }
+      }
+      
       const cartData = {
         patient_id: patientId,
         visits: visits,
@@ -1701,9 +2056,26 @@ const AppointmentWizardV2 = ({
       'O': 'procedures'     // Прочие процедуры → вкладка procedures
     };
 
-    // ✅ Нормализация category_code перед использованием
+    // ✅ ИСПРАВЛЕНО Bug 2: Сначала проверяем оригинальный category_code для точного маппинга
+    // Это предотвращает неправильный маппинг дерматологии и стоматологии в кардиологию
+    if (service.category_code && mapping[service.category_code]) {
+      const result = mapping[service.category_code];
+      console.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${service.category_code}, department=${result} (прямой маппинг)`);
+      return result;
+    }
+
+    // ✅ Нормализация category_code как fallback
     const normalizedCategoryCode = service.category_code ? normalizeCategoryCode(service.category_code) : '';
-    const result = mapping[normalizedCategoryCode] || 'general';
+
+    // ✅ ИСПРАВЛЕНИЕ: Маппинг для нормализованных кодов (только для случаев, когда нет прямого маппинга)
+    const normalizedMapping = {
+      'specialists': 'cardiology',    // Консультации специалистов (только если не 'D' или 'S') -> cardiology
+      'laboratory': 'lab',            // ✅ ИСПРАВЛЕНИЕ: Лаборатория -> lab (для соответствия вкладке)
+      'procedures': 'procedures',     // Процедуры -> procedures
+      'other': 'general'              // Прочее -> general
+    };
+
+    const result = normalizedMapping[normalizedCategoryCode] || mapping[service.category_code] || 'general';
     console.log(`🎯 getDepartmentByService результат: serviceId=${serviceId}, category_code=${normalizedCategoryCode}, department=${result}`);
     return result;
   };
@@ -2874,7 +3246,6 @@ const CartStepV2 = ({
                 </button>
               </div>
               );
-            })}
             })}
           </div>
         ) : (
