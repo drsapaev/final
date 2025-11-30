@@ -1,0 +1,296 @@
+name: Role System Integrity Check
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/src/App.jsx'
+      - 'frontend/src/pages/Login.jsx'
+      - 'frontend/src/pages/UserSelect.jsx'
+      - 'backend/app/api/v1/endpoints/*.py'
+      - 'backend/app/core/role_validation.py'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/src/App.jsx'
+      - 'frontend/src/pages/Login.jsx'
+      - 'frontend/src/pages/UserSelect.jsx'
+      - 'backend/app/api/v1/endpoints/*.py'
+      - 'backend/app/core/role_validation.py'
+
+jobs:
+  role-system-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install system packages (for wheels)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libjpeg-dev \
+          zlib1g-dev \
+          libfreetype6-dev \
+          libffi-dev \
+          libssl-dev
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11.1'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+    
+    - name: Validate import & environment
+      run: |
+        set -e  # Exit on error - moved to top
+        cd backend
+        export DATABASE_URL="sqlite:///./clinic.db"
+        export CORS_DISABLE="1"
+        export WS_DEV_ALLOW="1"
+        # Ensure Python can import 'app' package
+        export PYTHONPATH="$GITHUB_WORKSPACE/backend:$PYTHONPATH"
+        
+        echo "🔍 Диагностика окружения..."
+        echo "Python version: $(python --version)"
+        echo "Python path: $(which python)"
+        echo "PYTHONPATH: $PYTHONPATH"
+        echo "Current directory: $(pwd)"
+        echo "Files in current directory:"
+        ls -la || true
+        
+        echo "🔍 Проверка установленных пакетов..."
+        python -c "import sys; print('sys.path[0:3]=', sys.path[0:3])" || true
+        python -c "import fastapi; print('FastAPI version:', fastapi.__version__)" || { echo "❌ FastAPI not installed"; exit 1; }
+        python -c "import uvicorn; print('Uvicorn version:', uvicorn.__version__)" || { echo "❌ Uvicorn not installed"; exit 1; }
+        python -c "import sqlalchemy; print('SQLAlchemy version:', sqlalchemy.__version__)" || { echo "❌ SQLAlchemy not installed"; exit 1; }
+        
+        echo "🔍 Проверка структуры приложения..."
+        echo "Checking app directory structure:"
+        ls -la app/ | head -20 || echo "⚠️ Cannot list app/ directory"
+        echo "Checking app/main.py exists:"
+        if [ ! -f app/main.py ]; then
+          echo "❌ app/main.py not found"
+          exit 1
+        fi
+        echo "✅ app/main.py exists"
+        
+        run: |
+          echo "🔍 Проверка импорта приложения..."
+          echo "Python version: $(python --version)"
+          echo "Current dir: $(pwd)"
+          if ! python -c "import app; print('✅ app package imported')" 2>&1; then
+            echo "❌ Failed to import app package"
+            exit 1
+          fi
+        
+        echo "Step 2: Testing critical imports before app.main..."
+        echo "  - Testing app.core.exception_handlers..."
+        python -c "from app.core.exception_handlers import register_exception_handlers; print('✅ exception_handlers OK')" 2>&1 || echo "⚠️ exception_handlers import failed"
+        echo "  - Testing app.ws.queue_ws..."
+        python -c "from app.ws.queue_ws import router, ws_queue; print('✅ queue_ws OK')" 2>&1 || echo "⚠️ queue_ws import failed"
+        echo "  - Testing app.api.deps..."
+        python -c "from app.api.deps import create_access_token; print('✅ deps OK')" 2>&1 || echo "⚠️ deps import failed (will use fallback)"
+        run: |
+          echo "  - Testing app.api.v1.api..."
+          if ! python -c "from app.api.v1.api import api_router; print('✅ api.v1.api OK')" 2>&1; then
+            echo "❌ Failed to import app.api.v1.api"
+            exit 1
+          fi
+        echo "  - Testing app.graphql..."
+        python -c "from app.graphql import graphql_router; print('✅ graphql OK')" 2>&1 || echo "⚠️ graphql import failed"
+        
+        echo "Step 3: Importing app.main module..."
+        if ! python -c "
+try:
+    import app.main
+    print('✅ app.main module imported')
+except Exception as e:
+    print('❌ Failed to import app.main module:', e)
+    import traceback
+    traceback.print_exc()
+    exit(1)
+" 2>&1; then
+          echo "❌ Failed to import app.main module"
+          exit 1
+        fi
+
+        echo "Step 4: Importing app from app.main..."
+        if ! python -c "
+try:
+    from app.main import app
+    print('✅ app import ok')
+except Exception as e:
+    print('❌ Failed to import app from app.main:', e)
+    import traceback
+    traceback.print_exc()
+    exit(1)
+" 2>&1; then
+          echo "❌ Failed to import app from app.main"
+          exit 1
+        fi
+        
+        echo "✅ All imports successful"
+    
+    - name: Setup test database
+      run: |
+        cd backend
+        export DATABASE_URL="sqlite:///./clinic.db"
+        export CORS_DISABLE="1"
+        export WS_DEV_ALLOW="1"
+        
+        python - << 'PY'
+        import sys
+        import time
+        sys.path.insert(0, '.')
+        
+        from app.db.base import Base
+        from app.db.session import engine, SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        from sqlalchemy import text
+        
+        try:
+            # Создаем таблицы
+            print('Создаем таблицы для тестов ролей...')
+            Base.metadata.create_all(bind=engine)
+            print('OK: База данных создана')
+            
+            # Проверяем, что таблица users действительно создана
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='users'"))
+                if not result.fetchone():
+                    print('ERROR: Таблица users не найдена после создания')
+                    raise Exception("Таблица users не создана")
+                print('OK: Таблица users подтверждена')
+            
+            # Небольшая задержка для стабилизации
+            time.sleep(1)
+            
+            # Создаем тестовых пользователей для всех ролей
+            db = SessionLocal()
+            try:
+                test_users = [
+                    ("admin", "admin123", "Admin"),
+                    ("registrar", "registrar123", "Registrar"),
+                    ("lab", "lab123", "Lab"),
+                    ("doctor", "doctor123", "Doctor"),
+                    ("cashier", "cashier123", "Cashier"),
+                    ("cardio", "cardio123", "cardio"),
+                    ("derma", "derma123", "derma"),
+                    ("dentist", "dentist123", "dentist"),
+                ]
+                
+                for username, password, role in test_users:
+                    existing_user = db.query(User).filter(User.username == username).first()
+                    if not existing_user:
+                        user = User(
+                            username=username,
+                            email=f"{username}@clinic.com",
+                            hashed_password=get_password_hash(password),
+                            role=role,
+                            is_active=True,
+                            is_superuser=(role == "Admin")
+                        )
+                        db.add(user)
+                        print(f'OK: Пользователь {username} создан')
+                    else:
+                        print(f'OK: Пользователь {username} уже существует')
+                
+                db.commit()
+                print('OK: Все тестовые пользователи готовы')
+            finally:
+                db.close()
+        except Exception as e:
+            print('WARNING: Ошибка создания БД для тестов ролей:', e)
+            import traceback
+            traceback.print_exc()
+            raise SystemExit(1)
+        PY
+    
+    - name: Start backend server
+      run: |
+        cd backend
+        export DATABASE_URL="sqlite:///./clinic.db"
+        export CORS_DISABLE="1"
+        export WS_DEV_ALLOW="1"
+        echo "Запуск backend сервера..."
+        
+        # Запускаем сервер в фоне с перенаправлением вывода
+        nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+        SERVER_PID=$!
+        echo "Сервер запущен с PID: $SERVER_PID"
+        
+        # Ждем больше времени для запуска
+        echo "Ожидание запуска сервера..."
+        sleep 15
+        
+        # Проверяем, что процесс еще работает
+        if ! kill -0 $SERVER_PID 2>/dev/null; then
+          echo "❌ Сервер не запустился"
+          echo "Логи сервера:"
+          cat server.log
+          exit 1
+        fi
+        
+        echo "Проверка доступности сервера..."
+        # Пробуем несколько раз с задержкой
+        for i in {1..5}; do
+          echo "Попытка $i/5..."
+          if curl -f http://127.0.0.1:8000/api/v1/health; then
+            echo "✅ Сервер успешно запущен и отвечает"
+            break
+          else
+            echo "Попытка $i неудачна, ждем 3 секунды..."
+            sleep 3
+          fi
+        done
+        
+        # Финальная проверка
+        if ! curl -f http://127.0.0.1:8000/api/v1/health; then
+          echo "❌ Сервер не отвечает после всех попыток"
+          echo "Логи сервера:"
+          cat server.log
+          exit 1
+        fi
+    
+    - name: Run role system tests
+      run: |
+        cd backend
+        echo "Запуск тестов системы ролей..."
+        python test_role_routing.py
+        echo "Тесты системы ролей завершены"
+    
+    - name: Check system integrity
+      run: |
+        cd backend
+        echo "Проверка целостности системы..."
+        python check_system_integrity.py
+        echo "Проверка целостности завершена"
+    
+    - name: Validate role consistency
+      run: |
+        cd backend
+        python -c "
+        from app.core.role_validation import validate_critical_user_roles
+        if not validate_critical_user_roles():
+            exit(1)
+        print('OK: Role validation passed')
+        "
+    
+    - name: Stop backend server
+      if: always()
+      run: |
+        echo "Останавливаем сервер..."
+        # Останавливаем по PID если он сохранен
+        if [ -n "$SERVER_PID" ]; then
+          kill $SERVER_PID 2>/dev/null || true
+        fi
+        # Дополнительная очистка процессов uvicorn
+        pkill -f "uvicorn.*8000" 2>/dev/null || true
+        echo "OK: Сервер остановлен"
