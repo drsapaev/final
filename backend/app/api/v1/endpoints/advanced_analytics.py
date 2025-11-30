@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.services.analytics import AnalyticsService
+from app.services.advanced_analytics import get_advanced_analytics_service
 
 router = APIRouter()
 

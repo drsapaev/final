@@ -2,6 +2,7 @@
 API endpoints для подтверждения визитов через Telegram и PWA
 Публичные эндпоинты без авторизации (используют токены)
 """
+import logging
 from datetime import date, datetime
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +19,8 @@ from app.models.online_queue import DailyQueue
 from app.crud import online_queue as crud_queue
 from app.services.queue_service import queue_service
 from app.services.confirmation_security import ConfirmationSecurityService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

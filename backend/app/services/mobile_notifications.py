@@ -37,6 +37,7 @@ class MobileNotificationService:
             
             # Здесь должна быть интеграция с FCM (Firebase Cloud Messaging)
             # Пока создаем запись в базе данных
+            notification_type = data.get("notification_type", "push") if data else "push"
             notification_data = {
                 "recipient_type": "patient",
                 "recipient_id": user_id,

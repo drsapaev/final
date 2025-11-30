@@ -2,6 +2,7 @@
 API endpoints для AI интеграции в панелях врачей
 Основа: passport.md стр. 3325-3888, detail.md стр. 3889-4282
 """
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.services.ai_service import get_ai_service, AIService
+from app.crud import ai_config as crud_ai
 
 router = APIRouter()
 

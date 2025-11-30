@@ -4,6 +4,7 @@ API endpoints для управления AI в админ панели
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 from app.api.deps import get_db, require_roles
 from app.models.user import User

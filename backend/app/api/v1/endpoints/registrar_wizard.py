@@ -9,6 +9,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import String
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_db, require_roles

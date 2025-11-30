@@ -13,7 +13,7 @@ from jose import JWTError, jwt
 from app.api.deps import get_db, require_roles, get_current_user
 from app.models.user import User
 from app.services.display_websocket import get_display_manager, DisplayWebSocketManager
-from app.models.online_queue import OnlineQueueEntry
+from app.models.online_queue import OnlineQueueEntry, DailyQueue
 from app.crud import display_config as crud_display
 from app.core.config import settings
 from app.crud import user as crud_user

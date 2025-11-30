@@ -1,7 +1,7 @@
 """
 API endpoints для онлайн-очереди согласно detail.md стр. 224-257
 """
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
