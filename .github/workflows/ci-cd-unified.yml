@@ -617,11 +617,19 @@ jobs:
         echo "  - Testing app.core.exception_handlers..."
         python -c "
         import os
+        import sys
         os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
-        from app.core.exception_handlers import register_exception_handlers
-        print('✅ exception_handlers OK')
+        print('Debug: Python version:', sys.version[:5])
+        print('Debug: Current dir:', os.getcwd())
+        try:
+            from app.core.exception_handlers import register_exception_handlers
+            print('✅ exception_handlers OK')
+        except Exception as e:
+            print('❌ exception_handlers failed:', e)
+            import traceback
+            traceback.print_exc()
         " 2>&1 || echo "⚠️ exception_handlers import failed"
         
         echo "  - Testing app.ws.queue_ws..."
@@ -652,12 +660,15 @@ jobs:
         os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
+        print('Debug: Testing api.v1.api import...')
         try:
             from app.api.v1.api import api_router
             print('✅ api.v1.api OK')
         except Exception as e:
             print(f'❌ api.v1.api FAILED: {e}')
+            print('Full traceback:')
             traceback.print_exc()
+            print('sys.path first 3:', sys.path[:3])
             sys.exit(1)
         " 2>&1; then
           echo "❌ Failed to import app.api.v1.api - checking which endpoint module fails..."
@@ -698,19 +709,20 @@ jobs:
         os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
+        print('Debug: Testing app.main import...')
         try:
             import app.main
             print('✅ app.main module imported')
         except Exception as e:
             print(f'❌ Failed to import app.main: {e}')
-            print('Error details:')
+            print('Full traceback:')
             traceback.print_exc()
             sys.exit(1)
         " 2>&1; then
           echo "❌ Не удалось импортировать app.main"
           exit 1
         fi
-        
+
         echo "Step 3: Importing app from app.main..."
         if ! python -c "
         import os
@@ -719,12 +731,13 @@ jobs:
         os.environ['DATABASE_URL'] = 'sqlite:///./test_clinic.db'
         os.environ['CORS_DISABLE'] = '1'
         os.environ['WS_DEV_ALLOW'] = '1'
+        print('Debug: Testing app from app.main import...')
         try:
             from app.main import app
             print('✅ App импортирован успешно')
         except Exception as e:
             print(f'❌ Failed to import app from app.main: {e}')
-            print('Error details:')
+            print('Full traceback:')
             traceback.print_exc()
             sys.exit(1)
         " 2>&1; then

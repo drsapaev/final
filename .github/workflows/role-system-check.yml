@@ -82,9 +82,24 @@ jobs:
         
         echo "🔍 Проверка импорта приложения..."
         echo "Step 1: Importing app package..."
-        if ! python -c "import app; print('✅ app package imported')" 2>&1; then
+        if ! python -c "
+import sys
+import os
+print('Python version:', sys.version)
+print('Current dir:', os.getcwd())
+print('PYTHONPATH:', os.environ.get('PYTHONPATH', 'NOT SET'))
+print('DATABASE_URL:', os.environ.get('DATABASE_URL', 'NOT SET'))
+try:
+    import app
+    print('✅ app package imported')
+except Exception as e:
+    print('❌ Failed to import app package:', e)
+    import traceback
+    traceback.print_exc()
+    print('sys.path:', sys.path)
+    exit(1)
+" 2>&1; then
           echo "❌ Failed to import app package"
-          python -c "import sys; print('sys.path:', sys.path)" || true
           exit 1
         fi
         
@@ -96,7 +111,16 @@ jobs:
         echo "  - Testing app.api.deps..."
         python -c "from app.api.deps import create_access_token; print('✅ deps OK')" 2>&1 || echo "⚠️ deps import failed (will use fallback)"
         echo "  - Testing app.api.v1.api..."
-        if ! python -c "from app.api.v1.api import api_router; print('✅ api.v1.api OK')" 2>&1; then
+        if ! python -c "
+try:
+    from app.api.v1.api import api_router
+    print('✅ api.v1.api OK')
+except Exception as e:
+    print('❌ Failed to import app.api.v1.api:', e)
+    import traceback
+    traceback.print_exc()
+    exit(1)
+" 2>&1; then
           echo "❌ Failed to import app.api.v1.api - checking which endpoint module fails..."
           # Проверяем импорты сервисов, которые мы недавно исправили
           echo "  - Testing recently fixed service imports..."
@@ -146,34 +170,32 @@ jobs:
         python -c "from app.graphql import graphql_router; print('✅ graphql OK')" 2>&1 || echo "⚠️ graphql import failed"
         
         echo "Step 3: Importing app.main module..."
-        if ! python -c "import app.main; print('✅ app.main module imported')" 2>&1; then
+        if ! python -c "
+try:
+    import app.main
+    print('✅ app.main module imported')
+except Exception as e:
+    print('❌ Failed to import app.main module:', e)
+    import traceback
+    traceback.print_exc()
+    exit(1)
+" 2>&1; then
           echo "❌ Failed to import app.main module"
-          python -c "
-          import traceback
-          try:
-              import app.main
-          except Exception as e:
-              print('Error details:')
-              traceback.print_exc()
-              print(f'Error type: {type(e).__name__}')
-              print(f'Error message: {str(e)}')
-          " 2>&1 || true
           exit 1
         fi
-        
+
         echo "Step 4: Importing app from app.main..."
-        if ! python -c "from app.main import app; print('✅ app import ok')" 2>&1; then
+        if ! python -c "
+try:
+    from app.main import app
+    print('✅ app import ok')
+except Exception as e:
+    print('❌ Failed to import app from app.main:', e)
+    import traceback
+    traceback.print_exc()
+    exit(1)
+" 2>&1; then
           echo "❌ Failed to import app from app.main"
-          python -c "
-          import traceback
-          try:
-              from app.main import app
-          except Exception as e:
-              print('Error details:')
-              traceback.print_exc()
-              print(f'Error type: {type(e).__name__}')
-              print(f'Error message: {str(e)}')
-          " 2>&1 || true
           exit 1
         fi
         
