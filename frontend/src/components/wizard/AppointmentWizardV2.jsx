@@ -129,7 +129,8 @@ const AppointmentWizardV2 = ({
   // Эффект для инициализации данных при открытии
   useEffect(() => {
     if (isOpen) {
-      if (editMode && initialData) {
+      // ✅ ИСПРАВЛЕНО: Строгая проверка editMode перед загрузкой данных
+      if (editMode === true && initialData !== null && initialData !== undefined) {
         // 📝 РЕЖИМ РЕДАКТИРОВАНИЯ: Загружаем данные из initialData
         console.log('📝 AppointmentWizardV2: Initializing EDIT MODE', initialData);
 
@@ -266,7 +267,8 @@ const AppointmentWizardV2 = ({
         }
 
       } else {
-        // 🆕 НОВАЯ ЗАПИСЬ: Проверяем черновик
+        // 🆕 НОВАЯ ЗАПИСЬ: Режим создания - игнорируем initialData даже если он есть
+        // Проверяем только draft
         const savedDraft = localStorage.getItem(DRAFT_KEY);
         if (savedDraft) {
           try {
@@ -297,6 +299,20 @@ const AppointmentWizardV2 = ({
       }
     }
   }, [isOpen, editMode, initialData]);
+
+  // ✅ ИСПРАВЛЕНО: Сброс состояния мастера при закрытии
+  useEffect(() => {
+    if (!isOpen) {
+      // Сбрасываем состояние при закрытии
+      setWizardData({
+        patient: { id: null, fio: '', birth_date: '', phone: '', address: '', gender: '' },
+        cart: { items: [], discount_mode: 'none', all_free: false, notes: '' },
+        payment: { method: 'cash', total_amount: 0 }
+      });
+      setCurrentStep(1);
+      setFormattedBirthDate('');
+    }
+  }, [isOpen]);
 
   // Safeguard: Ensure wizardData structure is valid
   useEffect(() => {
@@ -1873,6 +1889,8 @@ const AppointmentWizardV2 = ({
           
           if (patientResponse.ok) {
             console.log('✅ Данные пациента успешно обновлены');
+            // ✅ ИСПРАВЛЕНО: Очищаем draft после успешного обновления
+            localStorage.removeItem(DRAFT_KEY);
             toast.success('Данные пациента обновлены');
             onComplete?.({ success: true, message: 'Данные пациента обновлены' });
             onClose();
