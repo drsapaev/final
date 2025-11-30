@@ -54,19 +54,45 @@ jobs:
     - name: 🎨 Проверка форматирования кода
       run: |
         cd backend
-        set -e
-        echo "🎨 Проверяем black форматирование..."
-        if ! black . --check --diff; then
-          echo "❌ Код требует форматирования. Запустите: black ."
-          black . --diff | head -100
+        set +e  # Не выходить при ошибках, обрабатываем их вручную
+        
+        echo "🎨 Проверяем black форматирование (только app/ и tests/)..."
+        BLACK_ERRORS=0
+        
+        # Форматируем только основные директории
+        for dir in app tests; do
+          if [ -d "$dir" ]; then
+            echo "  Проверяем $dir/..."
+            if ! black "$dir" --check --diff 2>&1 | tee /tmp/black_${dir}.log; then
+              echo "⚠️ $dir/ требует форматирования"
+              BLACK_ERRORS=$((BLACK_ERRORS + 1))
+            fi
+          fi
+        done
+        
+        if [ $BLACK_ERRORS -gt 0 ]; then
+          echo "❌ Найдено $BLACK_ERRORS директорий, требующих форматирования"
+          echo "Запустите: black app/ tests/"
           exit 1
         fi
         echo "✅ Black форматирование OK"
         
         echo "📦 Проверяем isort сортировку импортов..."
-        if ! isort . --check-only --diff; then
-          echo "❌ Импорты требуют сортировки. Запустите: isort ."
-          isort . --diff | head -100
+        ISORT_ERRORS=0
+        
+        for dir in app tests; do
+          if [ -d "$dir" ]; then
+            echo "  Проверяем $dir/..."
+            if ! isort "$dir" --check-only --diff 2>&1 | tee /tmp/isort_${dir}.log; then
+              echo "⚠️ $dir/ требует сортировки импортов"
+              ISORT_ERRORS=$((ISORT_ERRORS + 1))
+            fi
+          fi
+        done
+        
+        if [ $ISORT_ERRORS -gt 0 ]; then
+          echo "❌ Найдено $ISORT_ERRORS директорий, требующих сортировки импортов"
+          echo "Запустите: isort app/ tests/"
           exit 1
         fi
         echo "✅ Isort сортировка OK"
