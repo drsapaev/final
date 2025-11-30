@@ -3445,6 +3445,8 @@ const RegistrarPanel = () => {
                             size="default"
                             onClick={() => {
                               logger.info('Кнопка "Новая запись" нажата');
+                              setWizardEditMode(false);  // ✅ Сброс режима
+                              setWizardInitialData(null); // ✅ Сброс данных
                               setShowWizard(true);
                             }}
                             aria-label="Create new appointment"
@@ -3902,7 +3904,11 @@ const RegistrarPanel = () => {
                           </p>
                           <Button
                             variant="primary"
-                            onClick={() => setShowWizard(true)}
+                            onClick={() => {
+                              setWizardEditMode(false);  // ✅ Сброс режима
+                              setWizardInitialData(null); // ✅ Сброс данных
+                              setShowWizard(true);
+                            }}
                             style={{
                               padding: '12px 24px',
                               fontSize: '14px'

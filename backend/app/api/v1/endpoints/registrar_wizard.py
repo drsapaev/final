@@ -153,7 +153,16 @@ def _create_queue_entries(
                         User.is_active == True
                     ).first()
                     if lab_resource:
-                        doctor_id = lab_resource.id
+                        # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
+                        lab_doctor = db.query(Doctor).filter(
+                            Doctor.user_id == lab_resource.id
+                        ).first()
+                        if lab_doctor:
+                            doctor_id = lab_doctor.id  # Используем doctor_id, а не user_id
+                            logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})")
+                        else:
+                            logger.warning(f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors")
+                            continue
                     else:
                         logger.warning("Лаборатория ресурс-врач не найден для queue_tag=%s", queue_tag)
                         continue
@@ -2115,7 +2124,16 @@ def _assign_queue_numbers_on_confirmation(db: Session, visit: Visit) -> tuple[Di
                 User.is_active == True
             ).first()
             if lab_resource:
-                doctor_id = lab_resource.id
+                # ✅ ИСПРАВЛЕНО: Находим Doctor по user_id для правильного specialist_id
+                lab_doctor = db.query(Doctor).filter(
+                    Doctor.user_id == lab_resource.id
+                ).first()
+                if lab_doctor:
+                    doctor_id = lab_doctor.id  # Используем doctor_id, а не user_id
+                    logger.info(f"Для queue_tag={queue_tag} используется ресурс-врач: lab_resource (Doctor ID: {doctor_id})")
+                else:
+                    logger.warning(f"У ресурс-пользователя lab_resource (User ID: {lab_resource.id}) нет записи в таблице doctors")
+                    continue
             else:
                 continue
         
