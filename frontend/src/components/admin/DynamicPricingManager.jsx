@@ -261,6 +261,30 @@ const DynamicPricingManager = () => {
     }
   };
 
+  const handleDeletePackage = async (packageId) => {
+    if (!confirm('Вы уверены, что хотите удалить этот пакет?')) return;
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/dynamic-pricing/service-packages/${packageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Пакет удален');
+        loadData();
+      } else {
+        toast.error('Ошибка удаления пакета');
+      }
+    } catch (error) {
+      console.error('Ошибка удаления пакета:', error);
+      toast.error('Ошибка удаления пакета');
+    }
+  };
+
   const handleUpdateDynamicPrices = async () => {
     try {
       const token = localStorage.getItem('access_token');
@@ -488,18 +512,42 @@ const DynamicPricingManager = () => {
 
       {/* Форма создания правила */}
       {showCreateRule && (
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-lg font-medium">Создать правило ценообразования</h4>
-            <Button variant="outline" onClick={() => setShowCreateRule(false)}>
-              <X className="w-4 h-4" />
-            </Button>
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '16px' 
+          }}>
+            <h4 style={{ 
+              margin: 0,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
+              Создать правило ценообразования
+            </h4>
+            <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
+              <X size={16} />
+            </MacOSButton>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gap: '16px' 
+          }}>
             <div>
-              <Label>Название</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Название
+              </label>
+              <MacOSInput
                 value={ruleForm.name}
                 onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
                 placeholder="Название правила"
@@ -507,8 +555,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Тип правила</Label>
-              <Select
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Тип правила
+              </label>
+              <MacOSSelect
                 value={ruleForm.rule_type}
                 onChange={(e) => setRuleForm({ ...ruleForm, rule_type: e.target.value })}
               >
@@ -518,12 +574,20 @@ const DynamicPricingManager = () => {
                 <option value="LOYALTY">Лояльность</option>
                 <option value="PACKAGE">Пакетное</option>
                 <option value="DYNAMIC">Динамическое</option>
-              </Select>
+              </MacOSSelect>
             </div>
 
             <div>
-              <Label>Тип скидки</Label>
-              <Select
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Тип скидки
+              </label>
+              <MacOSSelect
                 value={ruleForm.discount_type}
                 onChange={(e) => setRuleForm({ ...ruleForm, discount_type: e.target.value })}
               >
@@ -531,12 +595,20 @@ const DynamicPricingManager = () => {
                 <option value="FIXED_AMOUNT">Фиксированная сумма</option>
                 <option value="BUY_X_GET_Y">Купи X получи Y</option>
                 <option value="TIERED">Ступенчатая</option>
-              </Select>
+              </MacOSSelect>
             </div>
 
             <div>
-              <Label>Размер скидки</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Размер скидки
+              </label>
+              <MacOSInput
                 type="number"
                 value={ruleForm.discount_value}
                 onChange={(e) => setRuleForm({ ...ruleForm, discount_value: parseFloat(e.target.value) })}
@@ -545,8 +617,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Время начала</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Время начала
+              </label>
+              <MacOSInput
                 type="time"
                 value={ruleForm.start_time}
                 onChange={(e) => setRuleForm({ ...ruleForm, start_time: e.target.value + ':00' })}
@@ -554,8 +634,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Время окончания</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Время окончания
+              </label>
+              <MacOSInput
                 type="time"
                 value={ruleForm.end_time}
                 onChange={(e) => setRuleForm({ ...ruleForm, end_time: e.target.value + ':00' })}
@@ -563,8 +651,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Минимальное количество</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Минимальное количество
+              </label>
+              <MacOSInput
                 type="number"
                 value={ruleForm.min_quantity}
                 onChange={(e) => setRuleForm({ ...ruleForm, min_quantity: parseInt(e.target.value) })}
@@ -573,8 +669,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Приоритет</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Приоритет
+              </label>
+              <MacOSInput
                 type="number"
                 value={ruleForm.priority}
                 onChange={(e) => setRuleForm({ ...ruleForm, priority: parseInt(e.target.value) })}
@@ -582,18 +686,34 @@ const DynamicPricingManager = () => {
               />
             </div>
 
-            <div className="col-span-2">
-              <Label>Описание</Label>
-              <Textarea
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Описание
+              </label>
+              <MacOSTextarea
                 value={ruleForm.description}
                 onChange={(e) => setRuleForm({ ...ruleForm, description: e.target.value })}
                 placeholder="Описание правила"
               />
             </div>
 
-            <div className="col-span-2">
-              <Label>Услуги</Label>
-              <Select
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Услуги
+              </label>
+              <MacOSSelect
                 multiple
                 value={ruleForm.service_ids}
                 onChange={(e) => {
@@ -606,20 +726,25 @@ const DynamicPricingManager = () => {
                     {service.name} - {service.price} ₽
                   </option>
                 ))}
-              </Select>
+              </MacOSSelect>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowCreateRule(false)}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: '8px', 
+            marginTop: '16px' 
+          }}>
+            <MacOSButton variant="outline" onClick={() => setShowCreateRule(false)}>
               Отмена
-            </Button>
-            <Button onClick={handleCreateRule}>
-              <Save className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton onClick={handleCreateRule}>
+              <Save size={16} style={{ marginRight: '8px' }} />
               Создать
-            </Button>
+            </MacOSButton>
           </div>
-        </Card>
+        </MacOSCard>
       )}
     </div>
   );
@@ -805,18 +930,42 @@ const DynamicPricingManager = () => {
 
       {/* Форма создания пакета */}
       {showCreatePackage && (
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-lg font-medium">Создать пакет услуг</h4>
-            <Button variant="outline" onClick={() => setShowCreatePackage(false)}>
-              <X className="w-4 h-4" />
-            </Button>
+        <MacOSCard style={{ padding: '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '16px' 
+          }}>
+            <h4 style={{ 
+              margin: 0,
+              color: 'var(--mac-text-primary)',
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)'
+            }}>
+              Создать пакет услуг
+            </h4>
+            <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
+              <X size={16} />
+            </MacOSButton>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gap: '16px' 
+          }}>
             <div>
-              <Label>Название</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Название
+              </label>
+              <MacOSInput
                 value={packageForm.name}
                 onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
                 placeholder="Название пакета"
@@ -824,8 +973,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Цена пакета</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Цена пакета
+              </label>
+              <MacOSInput
                 type="number"
                 value={packageForm.package_price}
                 onChange={(e) => setPackageForm({ ...packageForm, package_price: parseFloat(e.target.value) })}
@@ -834,8 +991,16 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Действует с</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Действует с
+              </label>
+              <MacOSInput
                 type="datetime-local"
                 value={packageForm.valid_from}
                 onChange={(e) => setPackageForm({ ...packageForm, valid_from: e.target.value })}
@@ -843,26 +1008,50 @@ const DynamicPricingManager = () => {
             </div>
 
             <div>
-              <Label>Действует до</Label>
-              <Input
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Действует до
+              </label>
+              <MacOSInput
                 type="datetime-local"
                 value={packageForm.valid_to}
                 onChange={(e) => setPackageForm({ ...packageForm, valid_to: e.target.value })}
               />
             </div>
 
-            <div className="col-span-2">
-              <Label>Описание</Label>
-              <Textarea
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Описание
+              </label>
+              <MacOSTextarea
                 value={packageForm.description}
                 onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
                 placeholder="Описание пакета"
               />
             </div>
 
-            <div className="col-span-2">
-              <Label>Услуги в пакете</Label>
-              <Select
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ 
+                display: 'block',
+                marginBottom: '8px',
+                color: 'var(--mac-text-primary)',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)'
+              }}>
+                Услуги в пакете
+              </label>
+              <MacOSSelect
                 multiple
                 value={packageForm.service_ids}
                 onChange={(e) => {
@@ -875,20 +1064,25 @@ const DynamicPricingManager = () => {
                     {service.name} - {service.price} ₽
                   </option>
                 ))}
-              </Select>
+              </MacOSSelect>
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowCreatePackage(false)}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: '8px', 
+            marginTop: '16px' 
+          }}>
+            <MacOSButton variant="outline" onClick={() => setShowCreatePackage(false)}>
               Отмена
-            </Button>
-            <Button onClick={handleCreatePackage}>
-              <Save className="w-4 h-4 mr-2" />
+            </MacOSButton>
+            <MacOSButton onClick={handleCreatePackage}>
+              <Save size={16} style={{ marginRight: '8px' }} />
               Создать
-            </Button>
+            </MacOSButton>
           </div>
-        </Card>
+        </MacOSCard>
       )}
     </div>
   );
@@ -1027,37 +1221,83 @@ const DynamicPricingManager = () => {
       )}
 
       {analytics?.rules_statistics && (
-        <Card className="p-4">
-          <h4 className="font-medium mb-4">Статистика правил</h4>
-          <div className="space-y-2">
+        <MacOSCard style={{ padding: '16px' }}>
+          <h4 style={{ 
+            margin: '0 0 16px 0',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
+            Статистика правил
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {analytics.rules_statistics.map((rule, index) => (
-              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="font-medium">{rule.name}</span>
-                <div className="flex gap-4 text-sm">
-                  <span>Использований: {rule.uses}</span>
-                  <span className="text-green-600">Экономия: {rule.total_savings?.toLocaleString() || 0} ₽</span>
+              <div key={index} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '8px',
+                backgroundColor: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-md)'
+              }}>
+                <span style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  {rule.name}
+                </span>
+                <div style={{ display: 'flex', gap: '16px', fontSize: 'var(--mac-font-size-sm)' }}>
+                  <span style={{ color: 'var(--mac-text-secondary)' }}>
+                    Использований: {rule.uses}
+                  </span>
+                  <span style={{ color: 'var(--mac-success)' }}>
+                    Экономия: {rule.total_savings?.toLocaleString() || 0} ₽
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
+        </MacOSCard>
       )}
 
       {analytics?.packages_statistics && (
-        <Card className="p-4">
-          <h4 className="font-medium mb-4">Статистика пакетов</h4>
-          <div className="space-y-2">
+        <MacOSCard style={{ padding: '16px' }}>
+          <h4 style={{ 
+            margin: '0 0 16px 0',
+            color: 'var(--mac-text-primary)',
+            fontSize: 'var(--mac-font-size-md)',
+            fontWeight: 'var(--mac-font-weight-semibold)'
+          }}>
+            Статистика пакетов
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {analytics.packages_statistics.map((pkg, index) => (
-              <div key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                <span className="font-medium">{pkg.name}</span>
-                <div className="flex gap-4 text-sm">
-                  <span>Покупок: {pkg.purchases}</span>
-                  <span className="text-green-600">Экономия: {pkg.total_savings?.toLocaleString() || 0} ₽</span>
+              <div key={index} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '8px',
+                backgroundColor: 'var(--mac-bg-secondary)',
+                borderRadius: 'var(--mac-radius-md)'
+              }}>
+                <span style={{ 
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)'
+                }}>
+                  {pkg.name}
+                </span>
+                <div style={{ display: 'flex', gap: '16px', fontSize: 'var(--mac-font-size-sm)' }}>
+                  <span style={{ color: 'var(--mac-text-secondary)' }}>
+                    Покупок: {pkg.purchases}
+                  </span>
+                  <span style={{ color: 'var(--mac-success)' }}>
+                    Экономия: {pkg.total_savings?.toLocaleString() || 0} ₽
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
+        </MacOSCard>
       )}
     </div>
   );

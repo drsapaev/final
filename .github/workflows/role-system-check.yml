@@ -48,6 +48,7 @@ jobs:
     
     - name: Validate import & environment
       run: |
+        set -e  # Exit on error - moved to top
         cd backend
         export DATABASE_URL="sqlite:///./clinic.db"
         export CORS_DISABLE="1"
@@ -61,25 +62,47 @@ jobs:
         echo "PYTHONPATH: $PYTHONPATH"
         echo "Current directory: $(pwd)"
         echo "Files in current directory:"
-        ls -la
+        ls -la || true
         
         echo "🔍 Проверка установленных пакетов..."
-        python -c "import sys; print('sys.path[0:3]=', sys.path[0:3])"
-        python -c "import fastapi; print('FastAPI version:', fastapi.__version__)"
-        python -c "import uvicorn; print('Uvicorn version:', uvicorn.__version__)"
-        python -c "import sqlalchemy; print('SQLAlchemy version:', sqlalchemy.__version__)"
+        python -c "import sys; print('sys.path[0:3]=', sys.path[0:3])" || true
+        python -c "import fastapi; print('FastAPI version:', fastapi.__version__)" || { echo "❌ FastAPI not installed"; exit 1; }
+        python -c "import uvicorn; print('Uvicorn version:', uvicorn.__version__)" || { echo "❌ Uvicorn not installed"; exit 1; }
+        python -c "import sqlalchemy; print('SQLAlchemy version:', sqlalchemy.__version__)" || { echo "❌ SQLAlchemy not installed"; exit 1; }
         
         echo "🔍 Проверка структуры приложения..."
         echo "Checking app directory structure:"
         ls -la app/ | head -20 || echo "⚠️ Cannot list app/ directory"
         echo "Checking app/main.py exists:"
-        test -f app/main.py && echo "✅ app/main.py exists" || { echo "❌ app/main.py not found"; exit 1; }
+        if [ ! -f app/main.py ]; then
+          echo "❌ app/main.py not found"
+          exit 1
+        fi
+        echo "✅ app/main.py exists"
         
         echo "🔍 Проверка импорта приложения..."
-        set -e  # Exit on error
-        python -c "import app; print('✅ app package imported')" || { echo "❌ Failed to import app package"; python -c "import sys; print('sys.path:', sys.path)"; exit 1; }
-        python -c "import app.main; print('✅ app.main module imported')" || { echo "❌ Failed to import app.main module"; python -c "import traceback; traceback.print_exc()"; exit 1; }
-        python -c "from app.main import app; print('✅ app import ok')" || { echo "❌ Failed to import app from app.main"; python -c "import traceback; traceback.print_exc()"; exit 1; }
+        echo "Step 1: Importing app package..."
+        if ! python -c "import app; print('✅ app package imported')" 2>&1; then
+          echo "❌ Failed to import app package"
+          python -c "import sys; print('sys.path:', sys.path)" || true
+          exit 1
+        fi
+        
+        echo "Step 2: Importing app.main module..."
+        if ! python -c "import app.main; print('✅ app.main module imported')" 2>&1; then
+          echo "❌ Failed to import app.main module"
+          python -c "import traceback; traceback.print_exc()" || true
+          exit 1
+        fi
+        
+        echo "Step 3: Importing app from app.main..."
+        if ! python -c "from app.main import app; print('✅ app import ok')" 2>&1; then
+          echo "❌ Failed to import app from app.main"
+          python -c "import traceback; traceback.print_exc()" || true
+          exit 1
+        fi
+        
+        echo "✅ All imports successful"
     
     - name: Setup test database
       run: |
