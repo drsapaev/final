@@ -325,9 +325,18 @@ def check_migration_health(
         health_checks = {}
         
         # 1. Проверяем существование новых таблиц
+        # Безопасно: используем предопределенный whitelist таблиц
         tables_to_check = ['daily_queues', 'queue_entries', 'queue_tokens']
         for table in tables_to_check:
+            # Валидация: проверяем, что имя таблицы в whitelist и содержит только безопасные символы
+            if table not in tables_to_check or not all(c.isalnum() or c == '_' for c in table):
+                health_checks[f"table_{table}"] = {
+                    "exists": False,
+                    "error": "Invalid table name"
+                }
+                continue
             try:
+                # Безопасно: используем предопределенное имя таблицы из whitelist
                 result = db.execute(text(f"SELECT COUNT(*) FROM {table}"))
                 health_checks[f"table_{table}"] = {
                     "exists": True,

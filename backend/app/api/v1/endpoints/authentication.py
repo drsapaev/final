@@ -1,6 +1,7 @@
 """
 API endpoints для системы аутентификации
 """
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -511,7 +512,7 @@ async def get_user_activity(
                 description=activity.description,
                 created_at=activity.created_at,
                 ip_address=activity.ip_address,
-                metadata=eval(activity.metadata) if activity.metadata else None
+                metadata=json.loads(activity.metadata) if activity.metadata else None
             ))
         
         return activity_responses
