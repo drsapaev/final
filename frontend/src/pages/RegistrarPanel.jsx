@@ -16,9 +16,9 @@ import '../styles/dark-theme-visibility-fix.css';
 const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const logger = {
-  info: () => { },
-  warn: () => { },
-  error: () => { },
+  info: (...args) => console.log('[RegistrarPanel]', ...args),
+  warn: (...args) => console.warn('[RegistrarPanel]', ...args),
+  error: (...args) => console.error('[RegistrarPanel]', ...args),
 };
 
 // Современные диалоги
@@ -1055,27 +1055,114 @@ const RegistrarPanel = () => {
         // Обрабатываем формат от эндпоинта registrar_integration.py
         if (data.queues && Array.isArray(data.queues)) {
           logger.info('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+          // ✅ ОТЛАДКА: Логируем структуру данных от сервера
+          data.queues.forEach((q, idx) => {
+            logger.info(`  Очередь ${idx + 1}: specialty=${q.specialty}, entries=${q.entries?.length || 0}`);
+            if (q.entries && q.entries.length > 0) {
+              q.entries.slice(0, 2).forEach((e, eIdx) => {
+                const entryData = e.data || e;
+                logger.info(`    Запись ${eIdx + 1}: type=${e.type}, id=${entryData?.id}, patient_id=${entryData?.patient_id}, patient_name=${entryData?.patient_name}`);
+              });
+            }
+          });
 
           // Ранее здесь был фильтр по activeTab. Убираем серверную фильтрацию —
           // всегда объединяем все очереди, вкладки фильтруют на клиенте.
           // Объединяем все очереди
           logger.info('📊 Объединяем все очереди');
 
-          // ✅ ИСПРАВЛЕНО: Используем Map для дедупликации по ID записи
-          const appointmentsMap = new Map(); // id -> appointment object
+          // ✅ ИСПРАВЛЕНО: Используем Map для дедупликации по patient_id + date (для online_queue) или по ID записи (для других типов)
+          const appointmentsMap = new Map(); // key -> appointment object
 
           data.queues.forEach(queue => {
             logger.info(`📋 Обработка очереди: ${queue.specialty}, записей: ${queue.entries?.length || 0}`);
             if (queue.entries && Array.isArray(queue.entries)) {
               queue.entries.forEach((entry, index) => {
                 try {
-                  const fullEntry = entry;
-                  const entryId = fullEntry.id;
+                  // ✅ ИСПРАВЛЕНО: Backend возвращает плоскую структуру с полем type
+                  // Если есть entry.data (старый формат), используем его, иначе entry напрямую
+                  const fullEntry = entry.data || entry;
+                  const entryId = fullEntry?.id;
+                  // ✅ ИСПРАВЛЕНО: type может быть в entry или в fullEntry
+                  const entryType = entry.type || fullEntry?.type || entry.record_type || 'unknown';
 
-                  // ✅ ИСПРАВЛЕНО: Проверяем, есть ли уже запись с таким ID
-                  if (appointmentsMap.has(entryId)) {
+                  // ✅ ОТЛАДКА: Логируем структуру entry для диагностики
+                  if (!entryId) {
+                    logger.error('❌ Запись без ID:', { entry, fullEntry, entryType });
+                    return; // Пропускаем записи без ID
+                  }
+                  
+                  // ✅ ОТЛАДКА: Логируем структуру для QR-записей
+                  if (entryType === 'online_queue' || entry.source === 'online') {
+                    logger.info(`🔍 QR-запись структура: entry.type=${entry.type}, fullEntry.type=${fullEntry?.type}, entry.record_type=${entry.record_type}, patient_id=${fullEntry?.patient_id || entry?.patient_id}`);
+                  }
+
+                  // ✅ ИСПРАВЛЕНО: Для online_queue записей используем дедупликацию по patient_id/телефону/ФИО + date
+                  // Это позволяет группировать множественные QR-регистрации одного пациента к разным специалистам
+                  let dedupKey = entryId; // По умолчанию дедуплицируем по ID записи
+
+                  // ✅ ИСПРАВЛЕНО: Проверяем все возможные места, где может быть patient_id
+                  const patientId = fullEntry?.patient_id || entry?.patient_id || fullEntry?.patientId || entry?.patientId;
+
+                  // ✅ Дополнительно используем телефон и ФИО, если patient_id отсутствует (анонимные QR-записи)
+                  const rawPhone = fullEntry?.phone || entry?.phone || fullEntry?.patient_phone || entry?.patient_phone || '';
+                  const normalizedPhone = rawPhone.replace(/\D/g, ''); // только цифры
+                  const rawFio = (fullEntry?.patient_name || entry?.patient_name || '').toString().trim().toLowerCase();
+
+                  // ✅ ИСПРАВЛЕНО: Также проверяем source='online' для распознавания QR-записей
+                  const isOnlineQueue = entryType === 'online_queue' || entry.source === 'online' || fullEntry?.source === 'online';
+
+                  if (isOnlineQueue && dateParam) {
+                    let dedupKeyPart = null;
+
+                    // ✅ ИСПРАВЛЕНО: Синхронизировано с backend логикой дедупликации
+                    // Порядок: patient_id → phone (нормализованный) → patient_name (нормализованный) → id
+                    if (patientId) {
+                      dedupKeyPart = `pid_${patientId}`;
+                    } else if (normalizedPhone && normalizedPhone.length > 0) {
+                      // ✅ ИСПРАВЛЕНО: Проверяем, что normalizedPhone не пустой
+                      dedupKeyPart = `phone_${normalizedPhone}`;
+                    } else if (rawFio && rawFio.length > 0) {
+                      // ✅ ИСПРАВЛЕНО: Проверяем, что rawFio не пустой
+                      dedupKeyPart = `fio_${rawFio}`;
+                    } else {
+                      // ✅ ИСПРАВЛЕНО: Используем entryId как последний fallback (совпадает с backend)
+                      dedupKeyPart = `id_${entryId}`;
+                    }
+
+                    if (dedupKeyPart) {
+                      dedupKey = `online_${dedupKeyPart}_${dateParam}`;
+                      logger.info(
+                        `🔑 QR-запись: используем ключ дедупликации ${dedupKey} (patientId=${patientId}, phone=${normalizedPhone}, fio=${rawFio}, entryId=${entryId}, type=${entryType})`
+                      );
+                    } else {
+                      // Совсем нет идентификаторов - оставляем dedupKey = entryId, но логируем
+                      logger.warn(
+                        `⚠️ QR-запись без идентификаторов (patient_id/phone/fio): entryId=${entryId}, entryType=${entryType}`,
+                        {
+                          entry: {
+                            type: entry.type,
+                            source: entry.source,
+                            patient_id: entry.patient_id,
+                            phone: entry.phone,
+                            patient_name: entry.patient_name
+                          },
+                          fullEntry: {
+                            type: fullEntry?.type,
+                            source: fullEntry?.source,
+                            patient_id: fullEntry?.patient_id,
+                            phone: fullEntry?.phone,
+                            patient_name: fullEntry?.patient_name
+                          }
+                        }
+                      );
+                    }
+                  }
+
+                  // ✅ ИСПРАВЛЕНО: Проверяем, есть ли уже запись с таким ключом дедупликации
+                  if (appointmentsMap.has(dedupKey)) {
                     // ✅ ИСПРАВЛЕНО: Если запись уже есть, добавляем номер очереди только если нет очереди с таким queue_tag (нормализованным)
-                    const existingAppointment = appointmentsMap.get(entryId);
+                    const existingAppointment = appointmentsMap.get(dedupKey);
                     const queueNum = fullEntry.number !== undefined && fullEntry.number !== null ? fullEntry.number : (index + 1);
                     const currentQueueTag = (queue.specialty || queue.queue_tag || '').toString().toLowerCase().trim();
 
@@ -1094,9 +1181,9 @@ const RegistrarPanel = () => {
                         queue_name: queue.specialist_name || queue.specialty || 'Очередь',
                         queue_tag: queue.specialty || queue.queue_tag || null
                       });
-                      logger.info(`🔄 Добавлен queue_number ${queueNum} (${queue.specialty}) для существующей записи ${entryId}`);
+                      logger.info(`🔄 Добавлен queue_number ${queueNum} (${queue.specialty}) для существующей записи ${dedupKey}`);
                     } else {
-                      logger.info(`⏭️ Пропущен дубликат очереди ${queue.specialty} (номер ${queueNum}) для записи ${entryId}`);
+                      logger.info(`⏭️ Пропущен дубликат очереди ${queue.specialty} (номер ${queueNum}) для записи ${dedupKey}`);
                     }
                     return; // Пропускаем добавление дубликата
                   }
@@ -1141,7 +1228,7 @@ const RegistrarPanel = () => {
                   }
 
                   const appointment = {
-                    id: entryId,
+                    id: entryId, // ✅ ИСПРАВЛЕНО: Сохраняем оригинальный entryId для API вызовов
                     // основной номер для сортировки по колонке "№"
                     queue_number: queueNum,
                     // совместимость с EnhancedAppointmentsTable: ожидает queue_numbers[]
@@ -1157,8 +1244,8 @@ const RegistrarPanel = () => {
                     // даты для корректного отображения номера и индикаторов вкладок
                     date: dateParam,
                     appointment_date: dateParam,
-                    patient_id: fullEntry.patient_id,
-                    patient_fio: fullEntry.patient_name,
+                    patient_id: patientId || fullEntry?.patient_id,
+                    patient_fio: fullEntry?.patient_name || entry?.patient_name || 'Неизвестный пациент',
                     patient_birth_year: patientBirthYear,
                     patient_phone: patientPhone,
                     address,
@@ -1182,10 +1269,24 @@ const RegistrarPanel = () => {
                   };
 
                   // ✅ Сохраняем в Map для дедупликации
-                  appointmentsMap.set(entryId, appointment);
+                  appointmentsMap.set(dedupKey, appointment);
 
                   // ✅ Отладка: проверяем queue_numbers
-                  logger.info(`✅ Добавлена запись ${entryId} с queue_numbers:`, appointment.queue_numbers);
+                  logger.info(`✅ Добавлена запись ${dedupKey} с queue_numbers:`, appointment.queue_numbers);
+                  // ✅ ОТЛАДКА: Логируем полную структуру для QR-записей
+                  if (isOnlineQueue || source === 'online') {
+                    logger.info(`🔍 QR-запись детали:`, {
+                      id: entryId,
+                      dedupKey,
+                      patient_id: patientId,
+                      patient_name: appointment.patient_fio,
+                      source,
+                      type: entryType,
+                      queue_numbers: appointment.queue_numbers,
+                      specialty: appointment.specialty,
+                      department: appointment.department
+                    });
+                  }
                 } catch (err) {
                   logger.error('❌ Ошибка обработки записи очереди:', err, entry);
                 }
@@ -1195,15 +1296,31 @@ const RegistrarPanel = () => {
 
           // ✅ ИСПРАВЛЕНО: Преобразуем Map в массив
           appointmentsData = Array.from(appointmentsMap.values());
+          logger.info(`📊 После первой дедупликации: ${appointmentsData.length} записей`);
+          
+          // ✅ ОТЛАДКА: Логируем QR-записи
+          const qrAppointments = appointmentsData.filter(a => a.source === 'online');
+          logger.info(`🔍 QR-записей после первой дедупликации: ${qrAppointments.length}`);
+          qrAppointments.forEach(a => {
+            logger.info(`  - ${a.patient_fio}: ${a.queue_numbers?.length || 0} queue_numbers`, a.queue_numbers);
+          });
 
           const mergedByPatientKey = new Map();
 
           const getAppointmentKey = (appointment) => {
             const patientKey = appointment.patient_id || appointment.patient_phone || appointment.patient_fio || appointment.id;
             const dateKey = appointment.date || appointment.appointment_date || appointment.visit_date || '';
+            
+            // ✅ ИСПРАВЛЕНО: Для QR-записей (source='online') НЕ используем specialty в ключе,
+            // чтобы записи с несколькими специальностями оставались объединенными
+            // Для других записей используем specialty для разделения по отделениям
+            if (appointment.source === 'online' && appointment.queue_numbers && appointment.queue_numbers.length > 0) {
+              // Для QR-записей используем только patient_id + date
+              return `online_${patientKey || 'unknown'}__${dateKey}`;
+            }
+            
             const specialtyKey = (appointment.specialty || appointment.department || '').toString().toLowerCase() || 'unknown';
-
-            // ✅ ИСПРАВЛЕНО: Добавляем specialty в ключ, чтобы одна запись пациента на один день
+            // ✅ Для обычных записей добавляем specialty в ключ, чтобы одна запись пациента на один день
             // создавалась отдельно для каждого отделения (cardio, lab, derma и т.д.)
             return `${patientKey || 'unknown'}__${dateKey}__${specialtyKey}`;
           };
@@ -1310,6 +1427,14 @@ const RegistrarPanel = () => {
           });
 
           appointmentsData = Array.from(mergedByPatientKey.values());
+          logger.info(`📊 После второй дедупликации: ${appointmentsData.length} записей`);
+          
+          // ✅ ОТЛАДКА: Логируем QR-записи после второй дедупликации
+          const qrAppointmentsAfter = appointmentsData.filter(a => a.source === 'online');
+          logger.info(`🔍 QR-записей после второй дедупликации: ${qrAppointmentsAfter.length}`);
+          qrAppointmentsAfter.forEach(a => {
+            logger.info(`  - ${a.patient_fio}: ${a.queue_numbers?.length || 0} queue_numbers`, a.queue_numbers);
+          });
         } else {
           // Обрабатываем старый формат для совместимости
           if (activeTab && data[activeTab]) {
@@ -2300,6 +2425,63 @@ const RegistrarPanel = () => {
       return appointmentDeptKey === departmentKey;
     }
 
+    // ✅ ИСПРАВЛЕНО: Проверка по queue_numbers для QR-записей с множественными специальностями
+    // Если в queue_numbers есть запись с нужной specialty, запись должна показываться в этой вкладке
+    if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers) && appointment.queue_numbers.length > 0) {
+      const queueNumberInDepartment = appointment.queue_numbers.some(qn => {
+        const qnSpecialty = (qn.specialty || qn.queue_tag || '').toLowerCase().trim();
+        const qnQueueTag = (qn.queue_tag || '').toLowerCase().trim();
+        
+        // Маппинг специальностей на ключи вкладок
+        const specialtyToDepartmentMapping = {
+          'cardiology': 'cardio',
+          'cardio': 'cardio',
+          'cardiologist': 'cardio',
+          'echokg': 'echokg',
+          'ecg': 'echokg',
+          'dermatology': 'derma',
+          'derma': 'derma',
+          'dermatologist': 'derma',
+          'stomatology': 'dental',
+          'dentist': 'dental',
+          'dental': 'dental',
+          'stomatologist': 'dental',
+          'laboratory': 'lab',
+          'lab': 'lab',
+          'laboratory_test': 'lab',
+          'procedures': 'procedures'
+        };
+        
+        const mappedSpecialty = specialtyToDepartmentMapping[qnSpecialty] || qnSpecialty;
+        const mappedQueueTag = specialtyToDepartmentMapping[qnQueueTag] || qnQueueTag;
+        
+        // Проверяем совпадение с departmentKey
+        const matches = mappedSpecialty === departmentKey || mappedQueueTag === departmentKey || 
+            qnSpecialty === departmentKey || qnQueueTag === departmentKey;
+        
+        // Для динамических отделений проверяем по queue_tag напрямую
+        const matchesDynamic = isDynamicDepartment && (qnQueueTag === departmentKey || qnSpecialty === departmentKey);
+        
+        if (matches || matchesDynamic) {
+          // ✅ ОТЛАДКА: Логируем успешное совпадение
+          if (appointment.source === 'online') {
+            logger.info(`✅ QR-запись ${appointment.patient_fio} проходит фильтр ${departmentKey}: specialty=${qnSpecialty}, queue_tag=${qnQueueTag}`);
+          }
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (queueNumberInDepartment) {
+        return true;
+      } else if (appointment.source === 'online') {
+        // ✅ ОТЛАДКА: Логируем, почему QR-запись не прошла фильтр
+        logger.warn(`⚠️ QR-запись ${appointment.patient_fio} НЕ проходит фильтр ${departmentKey}. Queue_numbers:`, 
+          appointment.queue_numbers.map(qn => ({ specialty: qn.specialty, queue_tag: qn.queue_tag })));
+      }
+    }
+
     // ✅ ДИНАМИЧЕСКИЕ ОТДЕЛЕНИЯ: Проверка по услугам
     // Если хотя бы одна услуга привязана к этому отделению через department_key
     const hasServiceInDepartment = appointment.services.some(service => {
@@ -3002,9 +3184,16 @@ const RegistrarPanel = () => {
           
           if (matchingQueue) {
             queueNumberFromDB = matchingQueue.number;
+            // ✅ ИСПРАВЛЕНО: Сохраняем статус из matchingQueue для правильного отображения цвета
+            appointment.queue_number_status = matchingQueue.status;
+            appointment.queue_number_queue_tag = matchingQueue.queue_tag || matchingQueue.specialty;
           } else {
             // Fallback: используем первый номер, если не нашли совпадение
             queueNumberFromDB = appointment.queue_numbers[0]?.number || null;
+            if (appointment.queue_numbers[0]) {
+              appointment.queue_number_status = appointment.queue_numbers[0].status;
+              appointment.queue_number_queue_tag = appointment.queue_numbers[0].queue_tag || appointment.queue_numbers[0].specialty;
+            }
           }
         }
 
@@ -3057,7 +3246,15 @@ const RegistrarPanel = () => {
       });
 
       // Затем агрегируем пациентов
+      logger.info(`📊 Для вкладки "Все отделения": ${filtered.length} записей до агрегации`);
+      const qrInFiltered = filtered.filter(a => a.source === 'online');
+      logger.info(`🔍 QR-записей в фильтре: ${qrInFiltered.length}`);
+      qrInFiltered.forEach(a => {
+        logger.info(`  - ${a.patient_fio}: ${a.queue_numbers?.length || 0} queue_numbers`, a.queue_numbers);
+      });
+      
       const aggregatedPatients = aggregatePatientsForAllDepartments(filtered);
+      logger.info(`📊 После агрегации: ${aggregatedPatients.length} пациентов`);
 
       // Применяем поиск к агрегированным данным
       if (searchQuery) {

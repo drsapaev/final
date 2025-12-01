@@ -912,64 +912,126 @@ const EnhancedAppointmentsTable = ({
 
     // Если запись на текущий день - показываем номер в очереди
     if (row.date === today || row.appointment_date === today) {
-      // Если есть номера очередей из нового API
-      if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
+      // ✅ ИСПРАВЛЕНО: Используем queue_number (уже выбран для текущей вкладки в RegistrarPanel)
+      // вместо отображения всех номеров из queue_numbers, что вызывало дублирование
+      if (row.queue_number !== undefined && row.queue_number !== null) {
+        // ✅ ИСПРАВЛЕНО: Используем статус из queue_number_status (соответствует текущей вкладке)
+        // или ищем соответствующий queue_number в queue_numbers для получения его статуса
+        let queueStatus = row.queue_number_status;
+        if (!queueStatus && row.queue_numbers && Array.isArray(row.queue_numbers)) {
+          // Ищем queue_number в queue_numbers и берём его статус
+          const matchingQueue = row.queue_numbers.find(q => q.number === row.queue_number);
+          if (matchingQueue) {
+            queueStatus = matchingQueue.status;
+          } else if (row.queue_numbers.length > 0) {
+            // ✅ ИСПРАВЛЕНО: Если не нашли точное совпадение, используем статус из первого queue_number
+            // вместо общего row.status, так как статусы отдельных очередей могут отличаться
+            queueStatus = row.queue_numbers[0].status;
+          }
+        }
+        // Fallback: используем общий статус записи только если queue_numbers отсутствует
+        queueStatus = queueStatus || row.status || 'waiting';
+        const statusConfig = {
+          waiting: {
+            bg: 'var(--mac-warning, #ff9500)',
+            icon: '⏳',
+            text: 'Ожидает',
+            pulse: true
+          },
+          called: {
+            bg: 'var(--mac-accent-blue, #007aff)',
+            icon: '📢',
+            text: 'Вызван',
+            pulse: true
+          },
+          served: {
+            bg: 'var(--mac-success, #34c759)',
+            icon: '✅',
+            text: 'Обслужен',
+            pulse: false
+          },
+          no_show: {
+            bg: 'var(--mac-error, #ff3b30)',
+            icon: '❌',
+            text: 'Не явился',
+            pulse: false
+          }
+        };
+
+        const config = statusConfig[queueStatus] || statusConfig.waiting;
+
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            {row.queue_numbers.map((queue, index) => {
-              // Определяем цвета и иконки для статусов
-              const statusConfig = {
-                waiting: {
-                  bg: 'var(--mac-warning, #ff9500)',
-                  icon: '⏳',
-                  text: 'Ожидает',
-                  pulse: true
-                },
-                called: {
-                  bg: 'var(--mac-accent-blue, #007aff)',
-                  icon: '📢',
-                  text: 'Вызван',
-                  pulse: true
-                },
-                served: {
-                  bg: 'var(--mac-success, #34c759)',
-                  icon: '✅',
-                  text: 'Обслужен',
-                  pulse: false
-                },
-                no_show: {
-                  bg: 'var(--mac-error, #ff3b30)',
-                  icon: '❌',
-                  text: 'Не явился',
-                  pulse: false
-                }
-              };
+          <span 
+            style={{
+              padding: '4px 8px',
+              backgroundColor: config.bg,
+              color: 'var(--mac-text-primary)',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '700',
+              minWidth: '32px',
+              textAlign: 'center',
+              display: 'inline-block',
+              boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
+            }}
+            title={`№${row.queue_number}${row.queue_numbers?.length > 1 ? ` (${row.queue_numbers.length} очередей)` : ''}`}
+          >
+            {row.queue_number}
+          </span>
+        );
+      }
+      
+      // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
+      if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
+        const firstQueue = row.queue_numbers[0];
+        const queueStatus = firstQueue.status || row.status || 'waiting';
+        const statusConfig = {
+          waiting: {
+            bg: 'var(--mac-warning, #ff9500)',
+            icon: '⏳',
+            text: 'Ожидает',
+            pulse: true
+          },
+          called: {
+            bg: 'var(--mac-accent-blue, #007aff)',
+            icon: '📢',
+            text: 'Вызван',
+            pulse: true
+          },
+          served: {
+            bg: 'var(--mac-success, #34c759)',
+            icon: '✅',
+            text: 'Обслужен',
+            pulse: false
+          },
+          no_show: {
+            bg: 'var(--mac-error, #ff3b30)',
+            icon: '❌',
+            text: 'Не явился',
+            pulse: false
+          }
+        };
 
-              const config = statusConfig[queue.status] || statusConfig.waiting;
+        const config = statusConfig[queueStatus] || statusConfig.waiting;
 
-              // ✅ Показываем только номер очереди (без названия и статуса)
-              return (
-                <span 
-                  key={index}
-                  style={{
-                    padding: '4px 8px',
-                    backgroundColor: config.bg,
-                    color: 'var(--mac-text-primary)',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    minWidth: '32px',
-                    textAlign: 'center',
-                    display: 'inline-block',
-                    boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
-                  }}
-                  title={`${queue.queue_name}: №${queue.number}`}
-                >
-                  {queue.number}
-                </span>
-              );
-            })}
-          </div>
+        return (
+          <span 
+            style={{
+              padding: '4px 8px',
+              backgroundColor: config.bg,
+              color: 'var(--mac-text-primary)',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '700',
+              minWidth: '32px',
+              textAlign: 'center',
+              display: 'inline-block',
+              boxShadow: 'var(--mac-shadow-sm, 0 2px 4px rgba(0,0,0,0.1))'
+            }}
+            title={`${firstQueue.queue_name || 'Очередь'}: №${firstQueue.number}${row.queue_numbers.length > 1 ? ` (${row.queue_numbers.length} очередей)` : ''}`}
+          >
+            {firstQueue.number}
+          </span>
         );
       }
 

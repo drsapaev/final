@@ -4,6 +4,7 @@ API endpoints для интеграции регистратуры с админ
 """
 
 import logging
+import re  # ✅ ДОБАВЛЕНО: для нормализации телефонов в дедупликации
 import traceback
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
@@ -1256,10 +1257,16 @@ def get_today_queues(
             )
 
             # [OK] УПРОЩЕНО: Используем getattr вместо try/except (Single Source of Truth)
+            # ✅ ИСПРАВЛЕНО: Для visit записей обновляем doctor_id только если doctor ещё не установлен
+            # Это предотвращает перезапись doctor_id, установленного online_queue записями
             if not queues_by_specialty[specialty]["doctor"]:
                 visit_doctor = getattr(visit, 'doctor', None)
                 if visit_doctor:
                     queues_by_specialty[specialty]["doctor"] = visit_doctor
+                    # ✅ ИСПРАВЛЕНО: Обновляем doctor_id, если doctor найден
+                    queues_by_specialty[specialty]["doctor_id"] = visit_doctor.id
+            # ✅ ИСПРАВЛЕНО: Убрана логика обновления doctor_id для visit записей, если specialty уже существует
+            # Это предотвращает перезапись doctor_id, установленного online_queue записями (которые обрабатываются позже)
 
         # [OK] ДОБАВЛЕНО: Обрабатываем записи из онлайн-очереди (OnlineQueueEntry)
         from app.models.clinic import Doctor
@@ -1274,10 +1281,16 @@ def get_today_queues(
             if not daily_queue:
                 continue
 
-            # Определяем specialty по specialist_id из DailyQueue
+            # ✅ ИСПРАВЛЕНО: daily_queue.specialist_id может хранить как doctor.id, так и user_id
+            # Проверяем оба варианта для совместимости с существующими данными
             doctor = (
                 db.query(Doctor).filter(Doctor.id == daily_queue.specialist_id).first()
             )
+            # Если не нашли по doctor.id, пробуем по user_id (для совместимости со старыми данными)
+            if not doctor:
+                doctor = (
+                    db.query(Doctor).filter(Doctor.user_id == daily_queue.specialist_id).first()
+                )
             if not doctor:
                 continue
 
@@ -1312,8 +1325,17 @@ def get_today_queues(
                 queues_by_specialty[specialty] = {
                     "entries": [],
                     "doctor": doctor,
-                    "doctor_id": daily_queue.specialist_id,
+                    "doctor_id": doctor.id,  # ✅ ИСПРАВЛЕНО: Используем doctor.id вместо user_id
                 }
+            else:
+                # ✅ ИСПРАВЛЕНО: Обновляем doctor_id и doctor, если specialty уже существует
+                # Приоритет у online_queue записей (они обрабатываются после visit и отражают актуальное состояние)
+                # Это важно, когда для одной специальности есть записи от разных врачей
+                if doctor and doctor.id:
+                    # ✅ ИСПРАВЛЕНО: Всегда обновляем doctor_id для online_queue записей
+                    # Это гарантирует, что если есть QR-записи от врача 4, doctor_id будет 4
+                    queues_by_specialty[specialty]["doctor"] = doctor
+                    queues_by_specialty[specialty]["doctor_id"] = doctor.id
 
             # ✅ ИСПРАВЛЕНО: Добавляем queue_time для правильной сортировки
             # Приоритет: queue_time > created_at
@@ -1598,16 +1620,45 @@ def get_today_queues(
                     entry_date = getattr(entry_data, 'visit_date', today)
                 elif entry_type == "online_queue":
                     entry_record_id = entry_data.id
-                    entry_patient_id = entry_data.patient_id
+                    # ⚠️ ВАЖНО: для онлайн-очереди patient_id часто NULL (анонимный пациент).
+                    # Если дедуплицировать только по patient_id, все такие записи сольются в одну
+                    # в рамках specialty+date. Поэтому используем устойчивый идентификатор:
+                    # patient_id → phone (нормализованный) → patient_name (нормализованный) → id.
+                    # ✅ ИСПРАВЛЕНО: Синхронизировано с frontend логикой дедупликации
+                    entry_patient_id = None
+                    if entry_data.patient_id:
+                        entry_patient_id = entry_data.patient_id
+                    elif entry_data.phone:
+                        # Нормализуем телефон (только цифры) для совместимости с frontend
+                        # ✅ ИСПРАВЛЕНО: import re перемещен на уровень модуля
+                        normalized_phone = re.sub(r'\D', '', str(entry_data.phone))
+                        if normalized_phone:
+                            entry_patient_id = normalized_phone
+                    elif entry_data.patient_name:
+                        # Нормализуем ФИО (trim + lowercase) для совместимости с frontend
+                        normalized_name = str(entry_data.patient_name).strip().lower()
+                        if normalized_name:
+                            entry_patient_id = normalized_name
+                    # ✅ ИСПРАВЛЕНО: Используем entry_data.id только если все остальные поля пустые
+                    # Это гарантирует, что backend и frontend используют одинаковые ключи дедупликации
+                    if not entry_patient_id:
+                        entry_patient_id = entry_data.id
                     entry_date = today  # OnlineQueueEntry всегда на сегодня
                 else:  # appointment
                     entry_record_id = entry_data.id
                     entry_patient_id = entry_data.patient_id
                     entry_date = getattr(entry_data, 'appointment_date', today)
 
-                # Создаем уникальный ключ: patient_id + specialty + дата
-                # Это гарантирует, что один пациент показывается только один раз в одной специальности на одну дату
-                entry_key = f"{entry_patient_id}_{specialty}_{entry_date}"
+                # ✅ ИСПРАВЛЕНО: Создаем уникальный ключ дедупликации
+                # Для online_queue записей НЕ включаем specialty (как на frontend),
+                # чтобы записи одного пациента к разным специалистам объединялись
+                # Для других типов записей включаем specialty для разделения по отделениям
+                if entry_type == "online_queue":
+                    # Для QR-записей: только patient_id + date (без specialty)
+                    entry_key = f"{entry_patient_id}_{entry_date}"
+                else:
+                    # Для visit/appointment: patient_id + specialty + date
+                    entry_key = f"{entry_patient_id}_{specialty}_{entry_date}"
 
                 # Пропускаем дубликаты
                 if entry_key in seen_entry_keys:
@@ -2155,7 +2206,8 @@ def get_today_queues(
                         "called_at": None,
                         "visit_time": visit_time,
                         "discount_mode": discount_mode,
-                        "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment'
+                        "type": entry_type,  # ✅ ИСПРАВЛЕНО: Добавляем type для frontend (online_queue, visit, appointment)
+                        "record_type": entry_type,  # Добавляем тип записи: 'visit' или 'appointment' (для совместимости)
                         "department_key": entry_department_key,  # [OK] ДОБАВЛЯЕМ department_key для динамических отделений
                         "department": entry_department,  # ✅ ДОБАВЛЕНО: department из модели Visit (для новых записей из сценария 5)
                     }
@@ -2163,7 +2215,10 @@ def get_today_queues(
 
             queue_data = {
                 "queue_id": queue_number,
-                "specialist_id": data["doctor_id"],
+                # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id для совместимости с frontend
+                # Frontend передает doctor.id в URL параметре ?view=queue&doctor=X
+                # Поэтому в ответе API specialist_id должен быть doctor.id, а не user_id
+                "specialist_id": data["doctor_id"],  # Это уже doctor.id из queues_by_specialty
                 "specialist_name": (
                     doctor.user.full_name if doctor and doctor.user else f"Врач"
                 ),
