@@ -1106,7 +1106,9 @@ const RegistrarPanel = () => {
 
                   // ✅ Дополнительно используем телефон и ФИО, если patient_id отсутствует (анонимные QR-записи)
                   const rawPhone = fullEntry?.phone || entry?.phone || fullEntry?.patient_phone || entry?.patient_phone || '';
-                  const normalizedPhone = rawPhone.replace(/\D/g, ''); // только цифры
+                  // ✅ ИСПРАВЛЕНО: Преобразуем в строку перед replace (как на backend str(entry_data.phone))
+                  // Это предотвращает ошибку "replace is not a function" если phone приходит как число
+                  const normalizedPhone = String(rawPhone).replace(/\D/g, ''); // только цифры
                   const rawFio = (fullEntry?.patient_name || entry?.patient_name || '').toString().trim().toLowerCase();
 
                   // ✅ ИСПРАВЛЕНО: Также проверяем source='online' для распознавания QR-записей
