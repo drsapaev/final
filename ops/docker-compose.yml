@@ -8,6 +8,8 @@ services:
       target: runtime
     container_name: clinic-backend
     restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
     environment:
       # Core
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/app.db}

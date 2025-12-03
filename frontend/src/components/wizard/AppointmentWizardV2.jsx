@@ -1995,7 +1995,7 @@ const AppointmentWizardV2 = ({
     // ✅ ИСПРАВЛЕНО: Фильтруем элементы корзины без service_id
     const validItems = wizardData.cart.items.filter(item => {
       if (!item.service_id) {
-        console.warn(`⚠️ Пропущен элемент корзины без service_id:`, item);
+        console.warn('⚠️ Пропущен элемент корзины без service_id:', item);
         return false;
       }
       return true;
@@ -2043,7 +2043,7 @@ const AppointmentWizardV2 = ({
   const getDepartmentByService = (serviceId) => {
     // ✅ ИСПРАВЛЕНО: Проверка на null/undefined перед поиском
     if (!serviceId || serviceId === null || serviceId === undefined) {
-      console.warn(`⚠️ getDepartmentByService: serviceId is null/undefined`);
+      console.warn('⚠️ getDepartmentByService: serviceId is null/undefined');
       return 'general';
     }
 

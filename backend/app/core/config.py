@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     # Используйте: python -c "import secrets; print(secrets.token_urlsafe(32))" для генерации безопасного ключа
     SECRET_KEY: str = Field(
         ...,
-        description="JWT secret key - MUST be set via environment variable in production"
+        min_length=32,
+        description="JWT secret key - MUST be set via environment variable in production (min 32 chars)"
     )  # ⚠️ REQUIRED: No default value for security
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
@@ -42,6 +43,8 @@ class Settings(BaseSettings):
             "http://127.0.0.1:8080",
         ]
     )
+    CORS_DISABLE: bool = False
+    CORS_ALLOW_ALL: bool = Field(default=False, description="Allow all CORS origins (dev only)")
 
     # --- Frontend URL для QR кодов и ссылок ---
     # Для локальной сети (WiFi): оставьте значение по умолчанию или локальный IP
@@ -62,6 +65,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "Clinic Manager"
     APP_VERSION: str = "0.9.0"
     ENV: str = "dev"
+    
+    # --- Backup Settings ---
+    AUTO_BACKUP_ENABLED: bool = Field(default=False, description="Enable automated daily backups")
+    BACKUP_RETENTION_DAYS: int = Field(default=30, ge=1, le=365, description="Number of days to retain backups")
 
     # --- MCP Settings ---
     MCP_ENABLED: bool = True
@@ -97,10 +104,10 @@ class Settings(BaseSettings):
     SMS_DEFAULT_PROVIDER: str = "mock"  # eskiz, playmobile, mock
 
     # --- Firebase Cloud Messaging (FCM) ---
-    FCM_SERVER_KEY: Optional[str] = None
-    FCM_SENDER_ID: Optional[str] = None
-    FCM_PROJECT_ID: Optional[str] = None
-    FCM_ENABLED: bool = False
+    FCM_SERVER_KEY: Optional[str] = Field(default=None, description="FCM Server Key for push notifications")
+    FCM_SENDER_ID: Optional[str] = Field(default=None, description="FCM Sender ID")
+    FCM_PROJECT_ID: Optional[str] = Field(default=None, description="FCM Project ID")
+    FCM_ENABLED: bool = Field(default=False, description="Enable FCM push notifications")
 
     # --- Email Settings ---
     SMTP_SERVER: Optional[str] = None
