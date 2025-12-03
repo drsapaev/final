@@ -18,25 +18,22 @@ log = logging.getLogger("clinic.main")
 # -----------------------------------------------------------------------------
 # Конфиг
 # -----------------------------------------------------------------------------
+from app.core.config import get_settings
+
+settings = get_settings()
 API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
 
-CORS_DISABLE = os.getenv("CORS_DISABLE", "0") == "1"
-CORS_ALLOW_ALL = os.getenv("CORS_ALLOW_ALL", "0") == "1"
-CORS_ORIGINS = [
-    o.strip()
-    for o in os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:5174,http://localhost:3000,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:3000,http://127.0.0.1:8080",
-    ).split(",")
-    if o.strip()
-]
+# Use settings for CORS configuration
+CORS_DISABLE = settings.CORS_DISABLE
+CORS_ALLOW_ALL = settings.CORS_ALLOW_ALL
+CORS_ORIGINS = settings.BACKEND_CORS_ORIGINS
 
 # -----------------------------------------------------------------------------
 # Приложение
 # -----------------------------------------------------------------------------
 app = FastAPI(
     title="Clinic Manager API",
-    version=os.getenv("APP_VERSION", "0.1.0"),
+    version=settings.APP_VERSION,
     openapi_url="/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -175,7 +172,7 @@ async def _startup_tasks() -> None:
         log.warning("Continuing in development mode despite security warning")
     
     # ✅ SECURITY: Start scheduled backups if enabled
-    backup_enabled = os.getenv("AUTO_BACKUP_ENABLED", "false").lower() == "true"
+    backup_enabled = settings.AUTO_BACKUP_ENABLED
     if backup_enabled:
         try:
             from app.services.scheduled_backup import ScheduledBackupService

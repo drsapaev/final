@@ -1277,7 +1277,7 @@ const RegistrarPanel = () => {
                   logger.info(`✅ Добавлена запись ${dedupKey} с queue_numbers:`, appointment.queue_numbers);
                   // ✅ ОТЛАДКА: Логируем полную структуру для QR-записей
                   if (isOnlineQueue || source === 'online') {
-                    logger.info(`🔍 QR-запись детали:`, {
+                    logger.info('🔍 QR-запись детали:', {
                       id: entryId,
                       dedupKey,
                       patient_id: patientId,

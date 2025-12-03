@@ -255,14 +255,30 @@ const QueueJoin = () => {
         return;
       }
 
-      if (trimmedPhone.length < 5) {
-        setError('Телефон рақами жуда қисқа (камда 5 та белги)');
+      // ✅ ИСПРАВЛЕНО: Валидация узбекского номера (998 + 9 цифр = 12 цифр)
+      const cleanPhone = trimmedPhone.replace(/\D/g, '');
+      let normalizedPhone = cleanPhone;
+      
+      if (normalizedPhone.startsWith('8')) {
+        normalizedPhone = '998' + normalizedPhone.slice(1);
+      }
+      if (!normalizedPhone.startsWith('998') && normalizedPhone.length > 0) {
+        if (normalizedPhone.startsWith('9')) {
+          normalizedPhone = '998' + normalizedPhone;
+        } else {
+          normalizedPhone = '998' + normalizedPhone;
+        }
+      }
+      
+      // Узбекский номер должен быть 12 цифр (998 + 9 цифр)
+      if (normalizedPhone.length < 12) {
+        setError('Телефон рақами тўлиқ эмас (камда 12 та рақам: +998 XX XXX XX XX)');
         setLoading(false);
         return;
       }
-
-      if (trimmedPhone.length > 20) {
-        setError('Телефон рақами жуда узун (максимум 20 та белги)');
+      
+      if (normalizedPhone.length > 12) {
+        setError('Телефон рақами жуда узун (максимум 12 та рақам)');
         setLoading(false);
         return;
       }
@@ -274,10 +290,11 @@ const QueueJoin = () => {
       }
 
       // Подготавливаем данные запроса
+      // ✅ ИСПРАВЛЕНО: Используем уже нормализованный номер из валидации
       const requestBody = {
         session_token: currentSessionToken,
         patient_name: trimmedPatientName,
-        phone: trimmedPhone,
+        phone: normalizedPhone, // ✅ Отправляем нормализованный номер (12 цифр: 998XXXXXXXXX)
         telegram_id: formData.telegramId ? parseInt(formData.telegramId) : null
       };
 
@@ -395,6 +412,51 @@ const QueueJoin = () => {
     setFormData(prev => ({
       ...prev,
       [field]: value
+    }));
+  };
+
+  // ✅ Функция форматирования узбекского номера телефона
+  const formatUzbekPhone = (value) => {
+    // Удаляем все нецифровые символы
+    const numbers = value.replace(/\D/g, '');
+    
+    // Если начинается с 8, заменяем на 998
+    let cleanNumber = numbers;
+    if (cleanNumber.startsWith('8')) {
+      cleanNumber = '998' + cleanNumber.slice(1);
+    }
+    
+    // Если не начинается с 998, добавляем 998
+    if (!cleanNumber.startsWith('998') && cleanNumber.length > 0) {
+      // Если начинается с 9 (без кода страны), добавляем 998
+      if (cleanNumber.startsWith('9')) {
+        cleanNumber = '998' + cleanNumber;
+      } else {
+        cleanNumber = '998' + cleanNumber;
+      }
+    }
+    
+    // Ограничиваем до 12 цифр (998 + 9 цифр)
+    cleanNumber = cleanNumber.slice(0, 12);
+    
+    // Форматируем в маску +998 XX XXX XX XX
+    if (cleanNumber.length === 0) return '';
+    if (cleanNumber.length <= 3) return `+${cleanNumber}`;
+    if (cleanNumber.length <= 5) return `+998 (${cleanNumber.slice(3)}`;
+    if (cleanNumber.length <= 8) return `+998 (${cleanNumber.slice(3, 5)}) ${cleanNumber.slice(5)}`;
+    if (cleanNumber.length <= 10) return `+998 (${cleanNumber.slice(3, 5)}) ${cleanNumber.slice(5, 8)}-${cleanNumber.slice(8)}`;
+    return `+998 (${cleanNumber.slice(3, 5)}) ${cleanNumber.slice(5, 8)}-${cleanNumber.slice(8, 10)}-${cleanNumber.slice(10)}`;
+  };
+
+  // ✅ Обработчик изменения телефона с форматированием
+  const handlePhoneChange = (e) => {
+    const input = e.target.value;
+    const formatted = formatUzbekPhone(input);
+    
+    // Обновляем состояние с отформатированным значением для отображения
+    setFormData(prev => ({
+      ...prev,
+      phone: formatted
     }));
   };
 
@@ -1292,7 +1354,7 @@ const QueueJoin = () => {
                 </div>
               </div>
 
-              {/* Телефон - macOS стиль */}
+              {/* Телефон - macOS стиль с форматированием */}
               <div>
                 <label style={{
                   display: 'block',
@@ -1308,7 +1370,32 @@ const QueueJoin = () => {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    onChange={handlePhoneChange}
+                    onKeyDown={(e) => {
+                      // Разрешаем: цифры, Backspace, Delete, стрелки, Tab, Enter
+                      const allowedKeys = [
+                        'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 
+                        'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End'
+                      ];
+                      
+                      if (allowedKeys.includes(e.key) || e.ctrlKey || e.metaKey) {
+                        return;
+                      }
+                      
+                      // Разрешаем только цифры и + в начале
+                      if (!/\d/.test(e.key) && !(e.key === '+' && e.target.selectionStart === 0)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pastedText = e.clipboardData.getData('text');
+                      const formatted = formatUzbekPhone(pastedText);
+                      setFormData(prev => ({
+                        ...prev,
+                        phone: formatted
+                      }));
+                    }}
                     style={{
                       width: '100%',
                       paddingLeft: '40px',
@@ -1331,9 +1418,12 @@ const QueueJoin = () => {
                       e.target.style.border = '1px solid rgba(60, 60, 67, 0.18)';
                       e.target.style.boxShadow = 'none';
                     }}
-                    placeholder="+998901234567"
+                    placeholder="+998 (90) 123-45-67"
                     required
                   />
+                </div>
+                <div style={{ fontSize: '11px', color: '#8E8E93', marginTop: '4px' }}>
+                  Формат: +998 (XX) XXX-XX-XX
                 </div>
               </div>
 
