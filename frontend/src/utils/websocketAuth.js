@@ -141,8 +141,9 @@ export function sendAuthenticatedMessage(ws, message) {
  */
 export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = {}) {
   const {
-    maxReconnectAttempts = 5,
-    reconnectDelay = 3000,
+    maxReconnectAttempts = 10,
+    initialReconnectDelay = 1000,  // Start with 1 second
+    maxReconnectDelay = 30000,     // Max 30 seconds
     ...wsOptions
   } = options;
 
@@ -150,6 +151,19 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
   let reconnectTimeout = null;
   let reconnectAttempts = 0;
   let isManuallyDisconnected = false;
+  let heartbeatInterval = null;
+  let lastPongTime = null;
+
+  // ✅ SECURITY: Exponential backoff calculation
+  const getReconnectDelay = (attempt) => {
+    const delay = Math.min(
+      initialReconnectDelay * Math.pow(2, attempt),
+      maxReconnectDelay
+    );
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 0.3 * delay; // Up to 30% jitter
+    return delay + jitter;
+  };
 
   const connect = () => {
     if (isManuallyDisconnected) return;
@@ -160,36 +174,104 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
         onConnect: (event) => {
           console.log('✅ Переподключающийся WebSocket подключен');
           reconnectAttempts = 0;
+          lastPongTime = Date.now();
+          
+          // ✅ SECURITY: Start heartbeat monitoring
+          startHeartbeat();
+          
           if (wsOptions.onConnect) wsOptions.onConnect(event);
         },
         onDisconnect: (event) => {
           console.log('❌ Переподключающийся WebSocket отключен');
+          stopHeartbeat();
+          
           if (wsOptions.onDisconnect) wsOptions.onDisconnect(event);
           
-          // Переподключение только если не отключено вручную
+          // ✅ SECURITY: Exponential backoff reconnection
           if (!isManuallyDisconnected && reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
-            console.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts}`);
-            reconnectTimeout = setTimeout(connect, reconnectDelay);
+            const delay = getReconnectDelay(reconnectAttempts - 1);
+            console.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${Math.round(delay)}ms`);
+            reconnectTimeout = setTimeout(connect, delay);
+          } else if (reconnectAttempts >= maxReconnectAttempts) {
+            console.error('❌ Достигнуто максимальное количество попыток переподключения');
+            if (wsOptions.onMaxReconnectAttempts) {
+              wsOptions.onMaxReconnectAttempts();
+            }
           }
         },
         onAuthError: (error) => {
           console.error('❌ Ошибка аутентификации, переподключение остановлено:', error);
           isManuallyDisconnected = true; // Останавливаем переподключение при ошибках аутентификации
+          stopHeartbeat();
           if (wsOptions.onAuthError) wsOptions.onAuthError(error);
+        },
+        onMessage: (event) => {
+          // ✅ SECURITY: Handle heartbeat pong messages
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'ping') {
+              // Respond to ping with pong
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+              }
+            } else if (data.type === 'pong') {
+              lastPongTime = Date.now();
+            }
+          } catch (e) {
+            // Not JSON, ignore
+          }
+          
+          if (wsOptions.onMessage) wsOptions.onMessage(event);
         }
       });
     } catch (error) {
       console.error('❌ Ошибка создания WebSocket:', error);
       if (reconnectAttempts < maxReconnectAttempts) {
         reconnectAttempts++;
-        reconnectTimeout = setTimeout(connect, reconnectDelay);
+        const delay = getReconnectDelay(reconnectAttempts - 1);
+        reconnectTimeout = setTimeout(connect, delay);
       }
     }
   };
 
+  // ✅ SECURITY: Heartbeat monitoring
+  const startHeartbeat = () => {
+    const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+    const HEARTBEAT_TIMEOUT = 120000;  // 2 minutes
+    
+    heartbeatInterval = setInterval(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      
+      // Check if we've received a pong recently
+      if (lastPongTime && (Date.now() - lastPongTime) > HEARTBEAT_TIMEOUT) {
+        console.warn('⚠️ Heartbeat timeout, reconnecting...');
+        ws.close();
+        return;
+      }
+      
+      // Send ping
+      try {
+        ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+      } catch (e) {
+        console.error('Error sending heartbeat ping:', e);
+      }
+    }, HEARTBEAT_INTERVAL);
+  };
+
+  const stopHeartbeat = () => {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+    lastPongTime = null;
+  };
+
   const disconnect = () => {
     isManuallyDisconnected = true;
+    stopHeartbeat();
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;

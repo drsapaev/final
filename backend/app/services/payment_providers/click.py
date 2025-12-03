@@ -249,8 +249,20 @@ class ClickProvider(BasePaymentProvider):
         return hashlib.md5(sign_string.encode()).hexdigest()
 
     def validate_webhook_signature(
-        self, webhook_data: Dict[str, Any], signature: str
+        self, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """Валидация подписи webhook"""
+        if not signature:
+            self.log_error("validate_webhook_signature", "Missing signature", webhook_data)
+            return False
+        
         expected_signature = self._generate_webhook_signature(webhook_data)
-        return signature == expected_signature
+        is_valid = signature == expected_signature
+        
+        if not is_valid:
+            self.log_error("validate_webhook_signature", "Signature mismatch", {
+                "received": signature[:20] if signature else None,
+                "expected": expected_signature[:20] if expected_signature else None
+            })
+        
+        return is_valid

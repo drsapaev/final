@@ -138,7 +138,64 @@ def root():
 # Диагностика подключённых маршрутов
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
-async def _print_routes() -> None:
+async def _startup_tasks() -> None:
+    """Startup event handler - validates security settings and prints routes"""
+    # Validate SECRET_KEY on startup
+    try:
+        from app.core.config import get_settings, _DEFAULT_SECRET_KEY
+        
+        settings = get_settings()
+        env = os.getenv("ENV", "dev").lower()
+        
+        # Critical security check: fail if default SECRET_KEY in production
+        if settings.SECRET_KEY == _DEFAULT_SECRET_KEY and env in ("prod", "production"):
+            log.error("=" * 80)
+            log.error("CRITICAL SECURITY ERROR: Default SECRET_KEY detected in production!")
+            log.error("Set SECRET_KEY environment variable before starting the server.")
+            log.error("Generate secure key: python -c 'import secrets; print(secrets.token_urlsafe(32))'")
+            log.error("=" * 80)
+            raise ValueError(
+                "Cannot start in production with default SECRET_KEY. "
+                "Set SECRET_KEY environment variable."
+            )
+        
+        # Warn if SECRET_KEY is weak
+        if len(settings.SECRET_KEY) < 32:
+            log.warning(
+                "SECRET_KEY is too short (%d chars). Should be at least 32 characters.",
+                len(settings.SECRET_KEY)
+            )
+        
+        log.info("Security validation passed: SECRET_KEY is configured")
+        
+    except Exception as e:
+        log.error("Security validation failed: %s", e)
+        if os.getenv("ENV", "dev").lower() in ("prod", "production"):
+            raise  # Fail fast in production
+        log.warning("Continuing in development mode despite security warning")
+    
+    # ✅ SECURITY: Start scheduled backups if enabled
+    backup_enabled = os.getenv("AUTO_BACKUP_ENABLED", "false").lower() == "true"
+    if backup_enabled:
+        try:
+            from app.services.scheduled_backup import ScheduledBackupService
+            from app.db.session import SessionLocal
+            
+            backup_db = SessionLocal()
+            backup_service = ScheduledBackupService(backup_db)
+            
+            # Get backup time from env (default: 2 AM)
+            backup_hour = int(os.getenv("BACKUP_HOUR", "2"))
+            backup_minute = int(os.getenv("BACKUP_MINUTE", "0"))
+            from datetime import time
+            backup_time = time(backup_hour, backup_minute)
+            
+            await backup_service.start_daily_backups(backup_time)
+            log.info(f"✅ Scheduled backups enabled (daily at {backup_time})")
+        except Exception as e:
+            log.error(f"Failed to start backup scheduler: {e}")
+    
+    # Print routes
     try:
         lines: List[str] = []
         for r in app.router.routes:

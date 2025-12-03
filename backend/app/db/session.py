@@ -4,7 +4,7 @@ import os
 import sys
 from typing import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker as orm_sessionmaker
 
 
@@ -48,7 +48,26 @@ DATABASE_URL = _normalize_sqlite_to_sync(DATABASE_URL)
 print(f"[app.db.session] Using DATABASE_URL = {DATABASE_URL}", file=sys.stderr)
 
 # Создаём СИНХРОННЫЙ движок
-engine = create_engine(DATABASE_URL, future=True, echo=False, pool_pre_ping=True)
+# ✅ SECURITY: Enable foreign key enforcement for SQLite via event listener
+def _enable_sqlite_fk(dbapi_conn, connection_record):
+    """Enable foreign key enforcement for SQLite connections"""
+    if DATABASE_URL.startswith("sqlite"):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+engine = create_engine(
+    DATABASE_URL, 
+    future=True, 
+    echo=False, 
+    pool_pre_ping=True,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+)
+
+# ✅ SECURITY: Register event listener for SQLite FK enforcement
+if DATABASE_URL.startswith("sqlite"):
+    event.listen(engine, "connect", _enable_sqlite_fk)
+    print("[app.db.session] Foreign key enforcement enabled for SQLite via event listener", file=sys.stderr)
 
 # sync session factory
 SessionLocal = orm_sessionmaker(
@@ -62,9 +81,13 @@ sessionmaker = SessionLocal  # type: ignore
 def get_db() -> Generator[Session, None, None]:
     """
     Синхронный dependency — отдаёт обычный Session (как ожидают ваши эндпоинты).
+    ✅ SECURITY: Foreign key enforcement is enabled via event listener for SQLite.
     """
     db = SessionLocal()
     try:
+        # ✅ SECURITY: Ensure foreign keys are enabled for this connection (SQLite)
+        if DATABASE_URL.startswith("sqlite"):
+            db.execute(text("PRAGMA foreign_keys=ON"))  # ✅ Используем text()
         yield db
     finally:
         db.close()

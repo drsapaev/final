@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -74,13 +75,18 @@ class PaymentWebhook(Base):
 
 class PaymentTransaction(Base):
     __tablename__ = "payment_transactions"
+    __table_args__ = (
+        # ✅ SECURITY: Composite unique constraint for idempotency
+        # Prevents duplicate processing of same transaction_id from same provider
+        UniqueConstraint("transaction_id", "provider", name="uq_payment_transactions_transaction_provider"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     # Основная информация
     transaction_id: Mapped[str] = mapped_column(
-        String(100), nullable=False, unique=True, index=True
-    )
+        String(100), nullable=False, index=True
+    )  # Removed unique=True - now part of composite constraint
     provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
 
     # Финансовая информация

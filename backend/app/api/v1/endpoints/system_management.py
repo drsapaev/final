@@ -69,12 +69,13 @@ class MonitoringThresholds(BaseModel):
 async def create_backup(
     request: BackupRequest,
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Создает бэкап системы"""
     try:
-        backup_service = get_backup_service()
+        backup_service = get_backup_service(db)
 
         if request.backup_type == "full":
             # Запускаем создание полного бэкапа в фоне
@@ -88,11 +89,11 @@ async def create_backup(
             )
 
         elif request.backup_type == "database":
-            result = backup_service.create_database_backup()
+            result = backup_service.create_backup(backup_type="database")
             return BackupResponse(
-                success=result.get("status") == "completed",
-                backup_name=result.get("name"),
-                status=result.get("status"),
+                success=True,
+                backup_name=result.get("filename"),
+                status="completed",
                 size=result.get("size"),
                 created_at=result.get("created_at"),
                 error=result.get("error"),
@@ -109,20 +110,23 @@ async def create_backup(
 async def _create_full_backup_task(backup_service: BackupService, include_files: bool):
     """Задача создания полного бэкапа в фоне"""
     try:
-        result = backup_service.create_full_backup(include_files)
-        logger.info(f"Полный бэкап завершен: {result.get('name', 'unknown')}")
+        # ✅ ИСПРАВЛЕНО: Используем create_backup с backup_type="full"
+        # Параметр include_files не поддерживается в текущей версии BackupService
+        result = backup_service.create_backup(backup_type="full")
+        logger.info(f"Полный бэкап завершен: {result.get('filename', 'unknown')}")
     except Exception as e:
         logger.error(f"Ошибка создания полного бэкапа: {e}")
 
 
 @router.get("/backup/list")
 async def list_backups(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
 ):
     """Получает список всех бэкапов"""
     try:
-        backup_service = get_backup_service()
+        backup_service = get_backup_service(db)
         backups = backup_service.list_backups()
 
         return {"success": True, "backups": backups, "total_count": len(backups)}
@@ -135,12 +139,13 @@ async def list_backups(
 @router.get("/backup/{backup_name}")
 async def get_backup_info(
     backup_name: str,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN, Roles.MANAGER])),
 ):
     """Получает информацию о конкретном бэкапе"""
     try:
-        backup_service = get_backup_service()
+        backup_service = get_backup_service(db)
         backup_info = backup_service.get_backup_info(backup_name)
 
         if not backup_info:
@@ -159,6 +164,7 @@ async def get_backup_info(
 async def restore_backup(
     backup_name: str,
     request: RestoreRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN])),
 ):
@@ -170,7 +176,7 @@ async def restore_backup(
                 detail="Для восстановления требуется подтверждение (confirm=true)",
             )
 
-        backup_service = get_backup_service()
+        backup_service = get_backup_service(db)
         result = backup_service.restore_backup(backup_name, request.components)
 
         return {
@@ -193,12 +199,13 @@ async def restore_backup(
 @router.delete("/backup/{backup_name}")
 async def delete_backup(
     backup_name: str,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_roles([Roles.ADMIN])),
 ):
     """Удаляет бэкап"""
     try:
-        backup_service = get_backup_service()
+        backup_service = get_backup_service(db)
         result = backup_service.delete_backup(backup_name)
 
         return result

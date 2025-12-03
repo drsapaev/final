@@ -137,14 +137,15 @@ class BasePaymentProvider(ABC):
         )
 
     def validate_webhook_signature(
-        self, webhook_data: Dict[str, Any], signature: str
+        self, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """
         Валидация подписи webhook (опционально)
 
         Args:
             webhook_data: Данные webhook
-            signature: Подпись от провайдера
+            signature: Подпись от провайдера (для Click, Kaspi)
+            auth_header: Authorization header (для PayMe)
 
         Returns:
             bool: True если подпись валидна
