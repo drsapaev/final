@@ -107,6 +107,8 @@ def create_or_update_emr(
     """
     Создать или обновить EMR
     Может работать как с Appointment ID, так и с Visit ID (создает Appointment из Visit если нужно)
+    
+    ✅ SECURITY: Validates medical data including ICD-10 codes, date ranges, and medical values
     """
     logger.info(
         "[create_or_update_emr] Начало обработки appointment_id=%d, user=%s, role=%s",
@@ -114,6 +116,33 @@ def create_or_update_emr(
         current_user.username,
         getattr(current_user, 'role', 'N/A'),
     )
+    
+    # ✅ SECURITY: Validate medical record data
+    from app.services.medical_validation import MedicalValidationService
+    from fastapi import HTTPException, status
+    
+    validation_service = MedicalValidationService()
+    
+    # Get patient birth date for date validation
+    appointment = crud_appointment.get(db, id=appointment_id)
+    patient_birth_date = None
+    if appointment and appointment.patient_id:
+        from app.crud import patient as crud_patient
+        patient = crud_patient.get(db, id=appointment.patient_id)
+        if patient:
+            patient_birth_date = patient.birth_date
+    
+    # Convert Pydantic model to dict for validation
+    emr_dict = emr_data.model_dump(exclude_unset=True)
+    
+    # Validate medical record
+    is_valid, errors = validation_service.validate_medical_record(emr_dict, patient_birth_date)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Medical record validation errors: {'; '.join(errors)}",
+        )
+    
     appointment = crud_appointment.get(db, id=appointment_id)
 
     # Если Appointment не найден, проверяем, может это Visit ID

@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # подключаем router из каждого модуля
 from app.api.v1.endpoints import admin_departments  # CRUD для управления отделениями
+from app.api.v1.endpoints import backup_management  # Database backup management
 from app.api.v1.endpoints import ai  # Новый AI модуль
 from app.api.v1.endpoints import ai_analytics  # Расширенная аналитика AI
 from app.api.v1.endpoints import billing  # Автоматическое выставление счетов
@@ -23,6 +24,7 @@ from app.api.v1.endpoints import feature_flags  # Фича-флаги
 from app.api.v1.endpoints import group_permissions  # Разрешения групп пользователей
 from app.api.v1.endpoints import medical_equipment  # Медицинское оборудование
 from app.api.v1.endpoints import payment_settings  # Настройки платежных провайдеров
+from app.api.v1.endpoints import payment_reconciliation  # Payment reconciliation
 from app.api.v1.endpoints import qr_queue  # QR очереди
 from app.api.v1.endpoints import (
     queue_cabinet_management,  # Управление кабинетами в очередях
@@ -254,6 +256,7 @@ api_router.include_router(print_ep.router, tags=["print"])
 api_router.include_router(board_ep.router, tags=["board"])
 api_router.include_router(reports_ep.router, tags=["reports"])
 api_router.include_router(payment_webhook.router, tags=["webhooks"])
+api_router.include_router(payment_reconciliation.router, prefix="/payments", tags=["payment-reconciliation"])
 api_router.include_router(admin_ai.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_clinic.router, prefix="/admin", tags=["admin"])
 api_router.include_router(

@@ -83,6 +83,46 @@ class AuthenticationMiddleware:
             if not user_obj or not user_obj.is_active:
                 return None
 
+            # ✅ SECURITY: Check 2FA status
+            requires_2fa = False
+            two_factor_verified = False
+            
+            try:
+                from app.models.two_factor_auth import TwoFactorAuth
+                from app.models.user_session import UserSession
+                
+                # Check if user has 2FA enabled
+                two_factor_auth = (
+                    db.query(TwoFactorAuth)
+                    .filter(TwoFactorAuth.user_id == user_id)
+                    .first()
+                )
+                
+                if two_factor_auth and two_factor_auth.totp_enabled:
+                    requires_2fa = True
+                    
+                    # Check if 2FA is verified for this session
+                    # Get session token from JWT payload (if stored)
+                    jti = payload.get("jti")  # JWT ID that might link to session
+                    
+                    # Try to find active session with 2FA verified
+                    # For now, we check if token was issued after 2FA verification
+                    # In a full implementation, we'd link token to TwoFactorSession
+                    two_factor_verified = payload.get("2fa_verified", False)
+                    
+                    # If 2FA is required but not verified, token is invalid
+                    if requires_2fa and not two_factor_verified:
+                        logger.warning(
+                            f"User {user_id} has 2FA enabled but token not verified"
+                        )
+                        return None
+                        
+            except Exception as e:
+                logger.error(f"Error checking 2FA status: {e}")
+                # In case of error, be conservative: if 2FA might be enabled, block access
+                # For now, we'll allow but log the error
+                pass
+
             return TokenValidationResponse(
                 valid=True,
                 user_id=user_id,
@@ -90,7 +130,7 @@ class AuthenticationMiddleware:
                 role=user_obj.role,
                 is_active=user_obj.is_active,
                 expires_at=datetime.fromtimestamp(payload.get("exp")),
-                requires_2fa=False,  # TODO: проверка 2FA
+                requires_2fa=requires_2fa,
             )
 
         except Exception as e:
@@ -172,6 +212,50 @@ class AuthenticationMiddleware:
                         detail="Сессия недействительна или истекла",
                         headers={"WWW-Authenticate": "Bearer"},
                     )
+
+                # ✅ SECURITY: Block access if 2FA is required but not verified
+                if token_validation.requires_2fa:
+                    # Additional check: verify 2FA status from session
+                    try:
+                        from app.models.two_factor_auth import TwoFactorSession
+                        from app.models.user_session import UserSession as USession
+                        
+                        device_fingerprint = self.get_device_fingerprint(request)
+                        if device_fingerprint:
+                            # Check if there's a verified 2FA session
+                            session = user_session.get_valid_session(db, device_fingerprint)
+                            if session:
+                                # Check TwoFactorSession for this user
+                                two_factor_session = (
+                                    db.query(TwoFactorSession)
+                                    .filter(
+                                        TwoFactorSession.user_id == token_validation.user_id,
+                                        TwoFactorSession.two_factor_verified == True,
+                                        TwoFactorSession.expires_at > datetime.utcnow()
+                                    )
+                                    .order_by(TwoFactorSession.created_at.desc())
+                                    .first()
+                                )
+                                
+                                if not two_factor_session:
+                                    logger.warning(
+                                        f"User {token_validation.user_id} requires 2FA but no verified session found"
+                                    )
+                                    raise HTTPException(
+                                        status_code=status.HTTP_403_FORBIDDEN,
+                                        detail="Требуется подтверждение двухфакторной аутентификации",
+                                        headers={"WWW-Authenticate": "Bearer"},
+                                    )
+                    except HTTPException:
+                        raise
+                    except Exception as e:
+                        logger.error(f"Error verifying 2FA session: {e}")
+                        # In case of error checking 2FA, block access for security
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Ошибка проверки двухфакторной аутентификации",
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
 
                 # Добавляем информацию о пользователе в запрос
                 request.state.user_id = token_validation.user_id

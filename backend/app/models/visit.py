@@ -14,7 +14,14 @@ class Visit(Base):
     __tablename__ = "visits"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    patient_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    # ✅ SECURITY: patient_id is NOT NULL, so we can't use SET NULL
+    # Patient deletion should be prevented if visits exist, or use soft delete
+    patient_id: Mapped[int] = mapped_column(
+        Integer, 
+        ForeignKey("patients.id", ondelete="RESTRICT"),  # Prevent deletion if visits exist
+        nullable=False, 
+        index=True
+    )
 
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="open"

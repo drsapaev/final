@@ -1,625 +1,355 @@
 """
-Сервис для создания и управления бэкапами системы
-"""
+Database Backup Service
 
-import gzip
-import json
+✅ SECURITY: Automated database backup strategy for disaster recovery
+"""
 import logging
 import os
 import shutil
-import sqlite3
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
-from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
-
-from app.core.config import settings
-from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
 
 class BackupService:
-    """Сервис для создания и управления бэкапами"""
+    """Service for automated database backups"""
 
-    def __init__(self):
-        self.backup_dir = Path("backups")
-        self.backup_dir.mkdir(exist_ok=True)
-        self.max_backups = 30  # Максимальное количество бэкапов
+    def __init__(self, db: Session, backup_dir: str = "backups"):
+        self.db = db
+        self.backup_dir = Path(backup_dir)
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Backup retention policy
+        self.retention_days = int(os.getenv("BACKUP_RETENTION_DAYS", "30"))
+        self.max_backups = int(os.getenv("MAX_BACKUPS", "100"))
 
-    # ===================== СОЗДАНИЕ БЭКАПОВ =====================
-
-    def create_full_backup(self, include_files: bool = True) -> Dict[str, Any]:
-        """Создает полный бэкап системы"""
+    def create_backup(self, backup_type: str = "manual") -> Dict[str, any]:
+        """
+        Create a database backup
+        
+        Args:
+            backup_type: Type of backup (manual, scheduled, before_migration)
+        
+        Returns:
+            Backup information dict
+        """
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_name = f"full_backup_{timestamp}"
-            backup_path = self.backup_dir / backup_name
-            backup_path.mkdir(exist_ok=True)
-
-            backup_info = {
-                "name": backup_name,
-                "type": "full",
-                "created_at": datetime.now().isoformat(),
-                "status": "in_progress",
-                "components": {},
-                "size": 0,
-                "path": str(backup_path),
-            }
-
-            # Бэкап базы данных
-            db_backup = self._backup_database(backup_path)
-            backup_info["components"]["database"] = db_backup
-
-            # Бэкап конфигурации
-            config_backup = self._backup_configuration(backup_path)
-            backup_info["components"]["configuration"] = config_backup
-
-            # Бэкап файлов (если требуется)
-            if include_files:
-                files_backup = self._backup_files(backup_path)
-                backup_info["components"]["files"] = files_backup
-
-            # Создание метаданных
-            metadata_backup = self._create_backup_metadata(backup_path, backup_info)
-            backup_info["components"]["metadata"] = metadata_backup
-
-            # Сжатие бэкапа
-            compressed_backup = self._compress_backup(backup_path)
-            if compressed_backup:
-                backup_info["compressed_path"] = compressed_backup
-                backup_info["size"] = os.path.getsize(compressed_backup)
-
-            backup_info["status"] = "completed"
-            backup_info["completed_at"] = datetime.now().isoformat()
-
-            # Сохранение информации о бэкапе
-            self._save_backup_info(backup_info)
-
-            # Очистка старых бэкапов
-            self._cleanup_old_backups()
-
-            logger.info(f"Полный бэкап создан: {backup_name}")
-            return backup_info
-
-        except Exception as e:
-            logger.error(f"Ошибка создания полного бэкапа: {e}")
-            backup_info["status"] = "failed"
-            backup_info["error"] = str(e)
-            return backup_info
-
-    def create_database_backup(self) -> Dict[str, Any]:
-        """Создает бэкап только базы данных"""
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_name = f"db_backup_{timestamp}"
-            backup_path = self.backup_dir / backup_name
-            backup_path.mkdir(exist_ok=True)
-
-            backup_info = {
-                "name": backup_name,
-                "type": "database",
-                "created_at": datetime.now().isoformat(),
-                "status": "in_progress",
-                "path": str(backup_path),
-            }
-
-            # Бэкап базы данных
-            db_backup = self._backup_database(backup_path)
-            backup_info.update(db_backup)
-
-            backup_info["status"] = "completed"
-            backup_info["completed_at"] = datetime.now().isoformat()
-
-            # Сохранение информации о бэкапе
-            self._save_backup_info(backup_info)
-
-            logger.info(f"Бэкап БД создан: {backup_name}")
-            return backup_info
-
-        except Exception as e:
-            logger.error(f"Ошибка создания бэкапа БД: {e}")
-            backup_info["status"] = "failed"
-            backup_info["error"] = str(e)
-            return backup_info
-
-    def _backup_database(self, backup_path: Path) -> Dict[str, Any]:
-        """Создает бэкап базы данных"""
-        try:
-            db_backup_path = backup_path / "database.sql"
-
-            # Для SQLite
-            if "sqlite" in settings.DATABASE_URL:
-                db_file = settings.DATABASE_URL.replace("sqlite:///", "")
-                if os.path.exists(db_file):
-                    shutil.copy2(db_file, backup_path / "database.db")
-
-                    # Также создаем SQL дамп
-                    conn = sqlite3.connect(db_file)
-                    with open(db_backup_path, 'w', encoding='utf-8') as f:
-                        for line in conn.iterdump():
-                            f.write(f"{line}\n")
-                    conn.close()
-
-            # Для PostgreSQL (если используется)
-            elif "postgresql" in settings.DATABASE_URL:
-                # Используем pg_dump для создания бэкапа PostgreSQL
+            # Get database URL
+            from app.core.config import settings
+            db_url = getattr(settings, "DATABASE_URL", "sqlite:///./clinic.db")
+            
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            backup_filename = f"backup_{backup_type}_{timestamp}.db"
+            backup_path = self.backup_dir / backup_filename
+            
+            # Create backup based on database type
+            if db_url.startswith("sqlite"):
+                # SQLite backup
+                source_db = db_url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
+                if not os.path.isabs(source_db):
+                    source_db = os.path.join(os.getcwd(), source_db)
+                
+                # Use SQLite backup API for atomic copy
+                import sqlite3
+                source_conn = sqlite3.connect(source_db)
+                backup_conn = sqlite3.connect(str(backup_path))
+                source_conn.backup(backup_conn)
+                backup_conn.close()
+                source_conn.close()
+                
+            elif db_url.startswith("postgresql"):
+                # PostgreSQL backup using pg_dump
+                import urllib.parse
+                parsed = urllib.parse.urlparse(db_url.replace("postgresql://", "http://"))
+                
+                env = os.environ.copy()
+                env["PGPASSWORD"] = parsed.password or ""
+                
                 cmd = [
                     "pg_dump",
-                    settings.DATABASE_URL,
-                    "-f",
-                    str(db_backup_path),
-                    "--no-password",
+                    "-h", parsed.hostname or "localhost",
+                    "-p", str(parsed.port or 5432),
+                    "-U", parsed.username or "postgres",
+                    "-d", parsed.path.lstrip("/"),
+                    "-F", "c",  # Custom format
+                    "-f", str(backup_path),
                 ]
-                subprocess.run(cmd, check=True)
-
-            size = (
-                os.path.getsize(db_backup_path) if os.path.exists(db_backup_path) else 0
-            )
-
-            return {
-                "success": True,
-                "file": str(db_backup_path),
-                "size": size,
-                "tables_count": self._get_tables_count(),
+                
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise Exception(f"pg_dump failed: {result.stderr}")
+            
+            else:
+                raise ValueError(f"Unsupported database type: {db_url}")
+            
+            # Get backup size
+            backup_size = backup_path.stat().st_size
+            
+            # Compress backup (optional)
+            compressed_path = None
+            if os.getenv("BACKUP_COMPRESS", "true").lower() == "true":
+                compressed_path = self._compress_backup(backup_path)
+                if compressed_path:
+                    backup_path.unlink()  # Remove uncompressed
+                    backup_path = compressed_path
+                    backup_size = backup_path.stat().st_size
+            
+            backup_info = {
+                "filename": backup_path.name,
+                "path": str(backup_path),
+                "size": backup_size,
+                "size_mb": round(backup_size / (1024 * 1024), 2),
+                "type": backup_type,
+                "created_at": datetime.utcnow().isoformat(),
+                "compressed": compressed_path is not None,
             }
-
+            
+            logger.info(f"✅ Backup created: {backup_path.name} ({backup_info['size_mb']} MB)")
+            
+            # Cleanup old backups
+            self._cleanup_old_backups()
+            
+            return backup_info
+            
         except Exception as e:
-            logger.error(f"Ошибка бэкапа БД: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"❌ Backup failed: {e}")
+            raise
 
-    def _backup_configuration(self, backup_path: Path) -> Dict[str, Any]:
-        """Создает бэкап конфигурации"""
+    def _compress_backup(self, backup_path: Path) -> Optional[Path]:
+        """Compress backup file"""
         try:
-            config_backup_path = backup_path / "configuration"
-            config_backup_path.mkdir(exist_ok=True)
-
-            # Бэкап переменных окружения (без секретных данных)
-            env_vars = {
-                key: value
-                for key, value in os.environ.items()
-                if not any(
-                    secret in key.lower()
-                    for secret in ['password', 'secret', 'key', 'token']
-                )
-            }
-
-            with open(
-                config_backup_path / "environment.json", 'w', encoding='utf-8'
-            ) as f:
-                json.dump(env_vars, f, indent=2, ensure_ascii=False)
-
-            # Бэкап настроек приложения
-            app_config = {
-                "database_url": settings.DATABASE_URL.split('@')[0]
-                + '@***',  # Скрываем пароль
-                "debug": getattr(settings, 'DEBUG', False),
-                "project_name": getattr(settings, 'PROJECT_NAME', 'MediLab'),
-                "version": getattr(settings, 'VERSION', '1.0.0'),
-                "api_v1_str": getattr(settings, 'API_V1_STR', '/api/v1'),
-            }
-
-            with open(
-                config_backup_path / "app_config.json", 'w', encoding='utf-8'
-            ) as f:
-                json.dump(app_config, f, indent=2, ensure_ascii=False)
-
-            # Подсчет размера
-            total_size = sum(
-                os.path.getsize(config_backup_path / f)
-                for f in os.listdir(config_backup_path)
-                if os.path.isfile(config_backup_path / f)
-            )
-
-            return {
-                "success": True,
-                "path": str(config_backup_path),
-                "size": total_size,
-                "files_count": len(os.listdir(config_backup_path)),
-            }
-
+            import gzip
+            
+            compressed_path = backup_path.with_suffix(backup_path.suffix + ".gz")
+            
+            with open(backup_path, "rb") as f_in:
+                with gzip.open(compressed_path, "wb") as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            
+            return compressed_path
         except Exception as e:
-            logger.error(f"Ошибка бэкапа конфигурации: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _backup_files(self, backup_path: Path) -> Dict[str, Any]:
-        """Создает бэкап важных файлов"""
-        try:
-            files_backup_path = backup_path / "files"
-            files_backup_path.mkdir(exist_ok=True)
-
-            # Список важных директорий для бэкапа
-            important_dirs = ["reports", "uploads", "logs", "static"]
-
-            total_size = 0
-            files_count = 0
-
-            for dir_name in important_dirs:
-                source_dir = Path(dir_name)
-                if source_dir.exists():
-                    dest_dir = files_backup_path / dir_name
-                    shutil.copytree(source_dir, dest_dir, dirs_exist_ok=True)
-
-                    # Подсчет размера и количества файлов
-                    for root, dirs, files in os.walk(dest_dir):
-                        for file in files:
-                            file_path = os.path.join(root, file)
-                            total_size += os.path.getsize(file_path)
-                            files_count += 1
-
-            return {
-                "success": True,
-                "path": str(files_backup_path),
-                "size": total_size,
-                "files_count": files_count,
-                "directories": important_dirs,
-            }
-
-        except Exception as e:
-            logger.error(f"Ошибка бэкапа файлов: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _create_backup_metadata(
-        self, backup_path: Path, backup_info: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Создает метаданные бэкапа"""
-        try:
-            metadata = {
-                "backup_info": backup_info,
-                "system_info": {
-                    "python_version": subprocess.check_output(["python", "--version"])
-                    .decode()
-                    .strip(),
-                    "os": os.name,
-                    "platform": os.uname() if hasattr(os, 'uname') else "Windows",
-                    "backup_tool_version": "1.0.0",
-                },
-                "database_info": {
-                    "url": settings.DATABASE_URL.split('@')[0] + '@***',
-                    "tables_count": self._get_tables_count(),
-                    "estimated_records": self._get_estimated_records_count(),
-                },
-            }
-
-            metadata_file = backup_path / "metadata.json"
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
-
-            return {
-                "success": True,
-                "file": str(metadata_file),
-                "size": os.path.getsize(metadata_file),
-            }
-
-        except Exception as e:
-            logger.error(f"Ошибка создания метаданных: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _compress_backup(self, backup_path: Path) -> Optional[str]:
-        """Сжимает бэкап в архив"""
-        try:
-            archive_path = f"{backup_path}.tar.gz"
-            shutil.make_archive(str(backup_path), 'gztar', str(backup_path))
-
-            # Удаляем несжатую версию
-            shutil.rmtree(backup_path)
-
-            return archive_path
-
-        except Exception as e:
-            logger.error(f"Ошибка сжатия бэкапа: {e}")
+            logger.warning(f"Compression failed: {e}")
             return None
-
-    # ===================== ВОССТАНОВЛЕНИЕ =====================
-
-    def restore_backup(
-        self, backup_name: str, components: List[str] = None
-    ) -> Dict[str, Any]:
-        """Восстанавливает систему из бэкапа"""
-        try:
-            backup_info = self._get_backup_info(backup_name)
-            if not backup_info:
-                return {"success": False, "error": "Бэкап не найден"}
-
-            # Извлекаем архив если нужно
-            backup_path = self._extract_backup(backup_name)
-            if not backup_path:
-                return {"success": False, "error": "Не удалось извлечь бэкап"}
-
-            components = components or ["database", "configuration"]
-            restore_results = {}
-
-            for component in components:
-                if component == "database":
-                    restore_results["database"] = self._restore_database(backup_path)
-                elif component == "configuration":
-                    restore_results["configuration"] = self._restore_configuration(
-                        backup_path
-                    )
-                elif component == "files":
-                    restore_results["files"] = self._restore_files(backup_path)
-
-            return {
-                "success": True,
-                "backup_name": backup_name,
-                "restored_components": restore_results,
-                "restored_at": datetime.now().isoformat(),
-            }
-
-        except Exception as e:
-            logger.error(f"Ошибка восстановления бэкапа: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _restore_database(self, backup_path: Path) -> Dict[str, Any]:
-        """Восстанавливает базу данных"""
-        try:
-            db_file = backup_path / "database.sql"
-            if not db_file.exists():
-                db_file = backup_path / "database.db"
-
-            if not db_file.exists():
-                return {"success": False, "error": "Файл БД не найден в бэкапе"}
-
-            # Создаем резервную копию текущей БД
-            current_db = settings.DATABASE_URL.replace("sqlite:///", "")
-            if os.path.exists(current_db):
-                backup_current = (
-                    f"{current_db}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                )
-                shutil.copy2(current_db, backup_current)
-
-            # Восстанавливаем БД
-            if db_file.suffix == ".sql":
-                # Восстановление из SQL дампа
-                conn = sqlite3.connect(current_db)
-                with open(db_file, 'r', encoding='utf-8') as f:
-                    conn.executescript(f.read())
-                conn.close()
-            else:
-                # Прямое копирование файла БД
-                shutil.copy2(db_file, current_db)
-
-            return {"success": True, "restored_from": str(db_file)}
-
-        except Exception as e:
-            logger.error(f"Ошибка восстановления БД: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _restore_configuration(self, backup_path: Path) -> Dict[str, Any]:
-        """Восстанавливает конфигурацию"""
-        try:
-            config_path = backup_path / "configuration"
-            if not config_path.exists():
-                return {"success": False, "error": "Конфигурация не найдена в бэкапе"}
-
-            # В реальной системе здесь была бы логика восстановления конфигурации
-            # Пока что просто возвращаем успех
-            return {"success": True, "message": "Конфигурация восстановлена"}
-
-        except Exception as e:
-            logger.error(f"Ошибка восстановления конфигурации: {e}")
-            return {"success": False, "error": str(e)}
-
-    def _restore_files(self, backup_path: Path) -> Dict[str, Any]:
-        """Восстанавливает файлы"""
-        try:
-            files_path = backup_path / "files"
-            if not files_path.exists():
-                return {"success": False, "error": "Файлы не найдены в бэкапе"}
-
-            # Восстанавливаем каждую директорию
-            restored_dirs = []
-            for item in files_path.iterdir():
-                if item.is_dir():
-                    dest_dir = Path(item.name)
-                    if dest_dir.exists():
-                        # Создаем резервную копию
-                        backup_dest = f"{dest_dir}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                        shutil.move(str(dest_dir), backup_dest)
-
-                    shutil.copytree(item, dest_dir)
-                    restored_dirs.append(item.name)
-
-            return {"success": True, "restored_directories": restored_dirs}
-
-        except Exception as e:
-            logger.error(f"Ошибка восстановления файлов: {e}")
-            return {"success": False, "error": str(e)}
-
-    # ===================== УПРАВЛЕНИЕ БЭКАПАМИ =====================
-
-    def list_backups(self) -> List[Dict[str, Any]]:
-        """Возвращает список всех бэкапов"""
-        try:
-            backups = []
-
-            for item in self.backup_dir.iterdir():
-                if item.is_file() and (item.suffix == '.gz' or item.suffix == '.tar'):
-                    backup_info = self._get_backup_info_from_file(item)
-                    if backup_info:
-                        backups.append(backup_info)
-                elif item.is_dir():
-                    backup_info = self._get_backup_info_from_dir(item)
-                    if backup_info:
-                        backups.append(backup_info)
-
-            # Сортируем по дате создания (новые первые)
-            backups.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-
-            return backups
-
-        except Exception as e:
-            logger.error(f"Ошибка получения списка бэкапов: {e}")
-            return []
-
-    def delete_backup(self, backup_name: str) -> Dict[str, Any]:
-        """Удаляет бэкап"""
-        try:
-            backup_path = self.backup_dir / f"{backup_name}.tar.gz"
-            if not backup_path.exists():
-                backup_path = self.backup_dir / backup_name
-
-            if backup_path.exists():
-                if backup_path.is_file():
-                    backup_path.unlink()
-                else:
-                    shutil.rmtree(backup_path)
-
-                # Удаляем информацию о бэкапе
-                info_file = self.backup_dir / f"{backup_name}_info.json"
-                if info_file.exists():
-                    info_file.unlink()
-
-                return {"success": True, "message": f"Бэкап {backup_name} удален"}
-            else:
-                return {"success": False, "error": "Бэкап не найден"}
-
-        except Exception as e:
-            logger.error(f"Ошибка удаления бэкапа: {e}")
-            return {"success": False, "error": str(e)}
-
-    def get_backup_info(self, backup_name: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о бэкапе"""
-        return self._get_backup_info(backup_name)
 
     def _cleanup_old_backups(self):
-        """Удаляет старые бэкапы"""
+        """Remove old backups based on retention policy"""
         try:
-            backups = self.list_backups()
+            backups = sorted(
+                self.backup_dir.glob("backup_*.db*"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True
+            )
+            
+            # Remove backups older than retention period
+            cutoff_date = datetime.utcnow() - timedelta(days=self.retention_days)
+            removed_count = 0
+            
+            for backup in backups:
+                backup_time = datetime.fromtimestamp(backup.stat().st_mtime)
+                if backup_time < cutoff_date:
+                    backup.unlink()
+                    removed_count += 1
+                    logger.info(f"🗑️  Removed old backup: {backup.name}")
+            
+            # Also limit total number of backups
             if len(backups) > self.max_backups:
-                # Удаляем самые старые бэкапы
-                old_backups = backups[self.max_backups :]
-                for backup in old_backups:
-                    self.delete_backup(backup['name'])
-                    logger.info(f"Удален старый бэкап: {backup['name']}")
-
+                for backup in backups[self.max_backups:]:
+                    backup.unlink()
+                    removed_count += 1
+                    logger.info(f"🗑️  Removed backup (max limit): {backup.name}")
+            
+            if removed_count > 0:
+                logger.info(f"✅ Cleaned up {removed_count} old backups")
+                
         except Exception as e:
-            logger.error(f"Ошибка очистки старых бэкапов: {e}")
+            logger.error(f"Error cleaning up backups: {e}")
 
-    # ===================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====================
-
-    def _get_tables_count(self) -> int:
-        """Получает количество таблиц в БД"""
-        try:
-            engine = create_engine(settings.DATABASE_URL)
-            with engine.connect() as conn:
-                if "sqlite" in settings.DATABASE_URL:
-                    result = conn.execute(
-                        text("SELECT COUNT(*) FROM sqlite_master WHERE type='table'")
-                    )
-                else:
-                    result = conn.execute(
-                        text(
-                            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'"
-                        )
-                    )
-                return result.scalar()
-        except:
-            return 0
-
-    def _get_estimated_records_count(self) -> int:
-        """Получает примерное количество записей в БД"""
-        try:
-            engine = create_engine(settings.DATABASE_URL)
-            with engine.connect() as conn:
-                # Подсчитываем записи в основных таблицах
-                # Безопасно: используем предопределенный whitelist таблиц
-                tables = ['patients', 'appointments', 'visits', 'users', 'services']
-                total = 0
-                for table in tables:
-                    # Валидация: проверяем, что имя таблицы в whitelist и содержит только безопасные символы
-                    if table not in tables or not all(
-                        c.isalnum() or c == '_' for c in table
-                    ):
-                        continue
-                    try:
-                        # Безопасно: используем предопределенное имя таблицы из whitelist
-                        result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
-                        total += result.scalar()
-                    except:
-                        continue
-                return total
-        except:
-            return 0
-
-    def _save_backup_info(self, backup_info: Dict[str, Any]):
-        """Сохраняет информацию о бэкапе"""
-        try:
-            info_file = self.backup_dir / f"{backup_info['name']}_info.json"
-            with open(info_file, 'w', encoding='utf-8') as f:
-                json.dump(backup_info, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Ошибка сохранения информации о бэкапе: {e}")
-
-    def _get_backup_info(self, backup_name: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о бэкапе из файла"""
-        try:
-            info_file = self.backup_dir / f"{backup_name}_info.json"
-            if info_file.exists():
-                with open(info_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.error(f"Ошибка чтения информации о бэкапе: {e}")
-        return None
-
-    def _get_backup_info_from_file(self, file_path: Path) -> Optional[Dict[str, Any]]:
-        """Получает информацию о бэкапе из файла архива"""
-        try:
-            stat = file_path.stat()
-            backup_name = file_path.stem.replace('.tar', '')
-
-            return {
-                "name": backup_name,
-                "type": "archive",
+    def list_backups(self) -> List[Dict[str, any]]:
+        """List all available backups"""
+        backups = []
+        
+        for backup_path in sorted(
+            self.backup_dir.glob("backup_*.db*"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        ):
+            stat = backup_path.stat()
+            backups.append({
+                "filename": backup_path.name,
+                "path": str(backup_path),
                 "size": stat.st_size,
-                "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "path": str(file_path),
-            }
-        except:
-            return None
+                "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "compressed": backup_path.suffix == ".gz",
+            })
+        
+        return backups
 
-    def _get_backup_info_from_dir(self, dir_path: Path) -> Optional[Dict[str, Any]]:
-        """Получает информацию о бэкапе из директории"""
+    def restore_backup(self, backup_filename: str) -> Dict[str, any]:
+        """
+        Restore database from backup
+        
+        ⚠️ WARNING: This will overwrite the current database!
+        """
         try:
-            stat = dir_path.stat()
-
+            backup_path = self.backup_dir / backup_filename
+            if not backup_path.exists():
+                raise FileNotFoundError(f"Backup not found: {backup_filename}")
+            
+            # Create a backup before restore
+            logger.warning("⚠️  Creating safety backup before restore...")
+            safety_backup = self.create_backup("before_restore")
+            
+            # Get database URL
+            from app.core.config import settings
+            db_url = getattr(settings, "DATABASE_URL", "sqlite:///./clinic.db")
+            
+            # Decompress if needed
+            if backup_path.suffix == ".gz":
+                import gzip
+                import tempfile
+                
+                temp_path = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
+                with gzip.open(backup_path, "rb") as f_in:
+                    with open(temp_path.name, "wb") as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                restore_source = temp_path.name
+            else:
+                restore_source = str(backup_path)
+            
+            # Restore based on database type
+            if db_url.startswith("sqlite"):
+                target_db = db_url.replace("sqlite:///", "").replace("sqlite+aiosqlite://", "")
+                if not os.path.isabs(target_db):
+                    target_db = os.path.join(os.getcwd(), target_db)
+                
+                # Close all connections first
+                self.db.close()
+                
+                # Copy backup to target
+                shutil.copy(restore_source, target_db)
+                
+            elif db_url.startswith("postgresql"):
+                # PostgreSQL restore using pg_restore
+                import urllib.parse
+                parsed = urllib.parse.urlparse(db_url.replace("postgresql://", "http://"))
+                
+                env = os.environ.copy()
+                env["PGPASSWORD"] = parsed.password or ""
+                
+                cmd = [
+                    "pg_restore",
+                    "-h", parsed.hostname or "localhost",
+                    "-p", str(parsed.port or 5432),
+                    "-U", parsed.username or "postgres",
+                    "-d", parsed.path.lstrip("/"),
+                    "-c",  # Clean (drop) database objects before recreating
+                    restore_source,
+                ]
+                
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise Exception(f"pg_restore failed: {result.stderr}")
+            
+            else:
+                raise ValueError(f"Unsupported database type: {db_url}")
+            
+            # Cleanup temp file if created
+            if backup_path.suffix == ".gz" and os.path.exists(restore_source):
+                os.unlink(restore_source)
+            
+            logger.info(f"✅ Database restored from: {backup_filename}")
+            
             return {
-                "name": dir_path.name,
-                "type": "directory",
-                "size": sum(
-                    f.stat().st_size for f in dir_path.rglob('*') if f.is_file()
-                ),
-                "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-                "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "path": str(dir_path),
+                "success": True,
+                "backup_used": backup_filename,
+                "safety_backup": safety_backup["filename"],
+                "restored_at": datetime.utcnow().isoformat(),
             }
-        except:
-            return None
-
-    def _extract_backup(self, backup_name: str) -> Optional[Path]:
-        """Извлекает архив бэкапа"""
-        try:
-            archive_path = self.backup_dir / f"{backup_name}.tar.gz"
-            if archive_path.exists():
-                extract_path = self.backup_dir / f"{backup_name}_extracted"
-                shutil.unpack_archive(str(archive_path), str(extract_path))
-                return extract_path
-
-            # Если это директория, возвращаем её
-            dir_path = self.backup_dir / backup_name
-            if dir_path.exists():
-                return dir_path
-
+            
         except Exception as e:
-            logger.error(f"Ошибка извлечения бэкапа: {e}")
+            logger.error(f"❌ Restore failed: {e}")
+            raise
 
-        return None
+    def verify_backup(self, backup_filename: str) -> Dict[str, any]:
+        """Verify backup integrity"""
+        try:
+            backup_path = self.backup_dir / backup_filename
+            if not backup_path.exists():
+                raise FileNotFoundError(f"Backup not found: {backup_filename}")
+            
+            # Basic checks
+            stat = backup_path.stat()
+            size = stat.st_size
+            
+            if size == 0:
+                return {
+                    "valid": False,
+                    "error": "Backup file is empty",
+                }
+            
+            # For SQLite, try to open and check integrity
+            if backup_path.suffix == ".db" or (backup_path.suffix == ".gz" and backup_path.stem.endswith(".db")):
+                import sqlite3
+                import tempfile
+                import gzip
+                
+                # Extract if compressed
+                if backup_path.suffix == ".gz":
+                    temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
+                    with gzip.open(backup_path, "rb") as f_in:
+                        with open(temp_db.name, "wb") as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    check_path = temp_db.name
+                else:
+                    check_path = str(backup_path)
+                
+                # Check SQLite integrity
+                conn = sqlite3.connect(check_path)
+                try:
+                    result = conn.execute("PRAGMA integrity_check").fetchone()
+                    is_valid = result[0] == "ok"
+                finally:
+                    conn.close()
+                    if backup_path.suffix == ".gz":
+                        os.unlink(check_path)
+                
+                return {
+                    "valid": is_valid,
+                    "size": size,
+                    "size_mb": round(size / (1024 * 1024), 2),
+                    "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                }
+            
+            # For other formats, just check size
+            return {
+                "valid": size > 0,
+                "size": size,
+                "size_mb": round(size / (1024 * 1024), 2),
+                "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            }
+            
+        except Exception as e:
+            return {
+                "valid": False,
+                "error": str(e),
+            }
 
 
-def get_backup_service() -> BackupService:
-    """Получить экземпляр сервиса бэкапов"""
-    return BackupService()
+def get_backup_service(db: Session, backup_dir: str = "backups") -> BackupService:
+    """
+    Get BackupService instance
+    
+    Args:
+        db: Database session
+        backup_dir: Backup directory path
+    
+    Returns:
+        BackupService instance
+    """
+    return BackupService(db, backup_dir)

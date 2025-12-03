@@ -225,8 +225,14 @@ class MorningAssignmentService:
                     queue_assignments.append(assignment)
             except Exception as e:
                 logger.error(
-                    f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}"
+                    f"Ошибка присвоения очереди {queue_tag} для визита {visit.id}: {e}",
+                    exc_info=True
                 )
+                # ✅ SECURITY: Rollback session при ошибке foreign key
+                try:
+                    self.db.rollback()
+                except Exception as rollback_error:
+                    logger.error(f"Ошибка при rollback: {rollback_error}")
 
         return queue_assignments
 
@@ -297,23 +303,21 @@ class MorningAssignmentService:
             )
             return None
 
-        # ⭐ ВАЖНО: Конвертируем doctor_id → user_id для DailyQueue.specialist_id
-        # DailyQueue.specialist_id - это ForeignKey на users.id, а не doctors.id
+        # ✅ ИСПРАВЛЕНО: DailyQueue.specialist_id - это ForeignKey на doctors.id, а не users.id
+        # Проверяем, что врач существует
         doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
-        if not doctor or not doctor.user_id:
+        if not doctor:
             logger.warning(
-                f"У врача {doctor_id} нет user_id для queue_tag={queue_tag}, visit_id={visit.id}"
+                f"Врач с ID {doctor_id} не найден для queue_tag={queue_tag}, visit_id={visit.id}"
             )
             return None
 
-        user_id = doctor.user_id
         logger.info(
-            f"Конвертация: doctor_id={doctor_id} → user_id={user_id} для queue_tag={queue_tag}"
+            f"Используем doctor_id={doctor_id} для queue_tag={queue_tag}, visit_id={visit.id}"
         )
 
         # ✅ ИСПРАВЛЕНО: Используем SSOT queue_service для получения/создания очереди
         # Получаем информацию о враче для defaults
-        doctor = self.db.query(Doctor).filter(Doctor.id == doctor_id).first()
         defaults = {}
         if doctor:
             defaults = {
@@ -325,10 +329,11 @@ class MorningAssignmentService:
                 ),
             }
 
+        # ✅ ИСПРАВЛЕНО: specialist_id должен быть doctor.id (ForeignKey на doctors.id)
         daily_queue = queue_service.get_or_create_daily_queue(
             self.db,
             day=target_date,
-            specialist_id=user_id,
+            specialist_id=doctor_id,  # ✅ Используем doctor_id, а не user_id
             queue_tag=queue_tag,
             defaults=defaults,
         )

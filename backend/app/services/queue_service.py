@@ -342,10 +342,53 @@ class QueueBusinessService:
         queue_tag: Optional[str] = None,
         defaults: Optional[Dict[str, Any]] = None,
     ) -> DailyQueue:
+        """
+        Получить или создать ежедневную очередь
+        
+        Args:
+            db: Database session
+            day: Дата очереди
+            specialist_id: ID врача (ForeignKey на doctors.id)
+            queue_tag: Тег очереди (опционально)
+            defaults: Значения по умолчанию
+        
+        Returns:
+            DailyQueue instance
+        
+        Raises:
+            IntegrityError: Если врач с specialist_id не существует
+        """
         defaults = defaults or {}
+        
+        # ✅ SECURITY: Проверяем существование врача перед созданием очереди
+        # ✅ ИСПРАВЛЕНО: Используем правильный импорт Doctor из app.models.clinic
+        # ✅ ИСПРАВЛЕНО: Проверяем как по doctor.id, так и по doctor.user_id (для совместимости)
+        doctor = (
+            db.query(Doctor)
+            .filter(
+                or_(
+                    Doctor.id == specialist_id,
+                    Doctor.user_id == specialist_id,
+                )
+            )
+            .first()
+        )
+        if not doctor:
+            logger.error(
+                f"Cannot create DailyQueue: Doctor with ID or user_id={specialist_id} does not exist"
+            )
+            raise ValueError(
+                f"Врач с ID {specialist_id} не найден. Невозможно создать очередь."
+            )
+        
+        # ✅ ИСПРАВЛЕНО: Используем doctor.id для specialist_id (ForeignKey на doctors.id)
+        # DailyQueue.specialist_id должен быть doctor.id, а не doctor.user_id
+        actual_specialist_id = doctor.id
+        
+        # ✅ ИСПРАВЛЕНО: Используем actual_specialist_id (doctor.id) для ForeignKey
         query = db.query(DailyQueue).filter(
             DailyQueue.day == day,
-            DailyQueue.specialist_id == specialist_id,
+            DailyQueue.specialist_id == actual_specialist_id,
         )
         if queue_tag:
             query = query.filter(DailyQueue.queue_tag == queue_tag)
@@ -359,7 +402,7 @@ class QueueBusinessService:
 
         daily_queue = DailyQueue(
             day=day,
-            specialist_id=specialist_id,
+            specialist_id=actual_specialist_id,  # ✅ Используем doctor.id для ForeignKey
             queue_tag=queue_tag,
             active=True,
             online_start_time=f"{int(queue_start_hour):02d}:00",
@@ -370,15 +413,23 @@ class QueueBusinessService:
             cabinet_building=defaults.get("cabinet_building"),
         )
         db.add(daily_queue)
-        db.flush()
-        logger.info(
-            "Created DailyQueue id=%s day=%s specialist=%s queue_tag=%s",
-            daily_queue.id,
-            day,
-            specialist_id,
-            queue_tag,
-        )
-        return daily_queue
+        try:
+            db.flush()
+            logger.info(
+                "Created DailyQueue id=%s day=%s specialist=%s queue_tag=%s",
+                daily_queue.id,
+                day,
+                actual_specialist_id,
+                queue_tag,
+            )
+            return daily_queue
+        except Exception as e:
+            db.rollback()
+            logger.error(
+                f"Failed to create DailyQueue: day={day}, specialist_id={actual_specialist_id}, "
+                f"queue_tag={queue_tag}, error={e}"
+            )
+            raise
 
     def get_next_queue_number(
         self,

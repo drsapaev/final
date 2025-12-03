@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.crud import user as crud_user
 from app.db.session import SessionLocal
+from app.middleware.websocket_rate_limit import websocket_rate_limiter
 from app.models.user import User
 from app.ws.queue_ws import ws_manager
 
@@ -56,10 +57,22 @@ async def ws_queue_authenticated(
     """
     Аутентифицированное WebSocket соединение для очереди
     Требует обязательный JWT токен
+    ✅ SECURITY: Authentication and rate limiting enforced
     """
     db = SessionLocal()
+    ip_address = websocket.client.host if websocket.client else "unknown"
 
     try:
+        # ✅ SECURITY: Rate limiting check
+        allowed, reason = websocket_rate_limiter.check_rate_limit(ip_address)
+        if not allowed:
+            logger.warning(f"WebSocket rate limit exceeded for IP {ip_address}: {reason}")
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason=f"Rate limit exceeded: {reason}"
+            )
+            return
+
         # Обязательная аутентификация
         authenticated_user = await authenticate_websocket_token(token, db)
         if not authenticated_user:
@@ -76,6 +89,9 @@ async def ws_queue_authenticated(
             )
             return
 
+        # ✅ SECURITY: Record connection after successful auth
+        websocket_rate_limiter.record_connection(ip_address)
+
         await websocket.accept()
 
         room = f"{department}:{date}"
@@ -85,15 +101,65 @@ async def ws_queue_authenticated(
             f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}, дата {date}"
         )
 
+        # ✅ SECURITY: Heartbeat configuration
+        HEARTBEAT_INTERVAL = 30  # seconds
+        CONNECTION_TIMEOUT = 120  # seconds
+        # ✅ BUGFIX: Use list to allow mutation from nested scopes (nonlocal doesn't work in nested try blocks)
+        last_pong = [asyncio.get_event_loop().time()]
+        
+        async def send_heartbeat():
+            """Send periodic ping to detect dead connections"""
+            while True:
+                try:
+                    await asyncio.sleep(HEARTBEAT_INTERVAL)
+                    await websocket.send_json({
+                        "type": "ping",
+                        "timestamp": asyncio.get_event_loop().time()
+                    })
+                    logger.debug(f"Sent heartbeat ping to user {authenticated_user.username}")
+                except Exception as e:
+                    logger.error(f"Error sending heartbeat: {e}")
+                    break
+
+        heartbeat_task = asyncio.create_task(send_heartbeat())
+
         try:
             while True:
-                data = await websocket.receive_text()
-                message = json.loads(data)
+                try:
+                    # ✅ SECURITY: Set receive timeout
+                    data = await asyncio.wait_for(
+                        websocket.receive_text(),
+                        timeout=CONNECTION_TIMEOUT
+                    )
+                    message = json.loads(data)
+                    
+                    # Handle pong response
+                    if message.get("type") == "pong":
+                        # ✅ BUGFIX: Update list element to modify outer scope variable
+                        last_pong[0] = asyncio.get_event_loop().time()
+                        logger.debug(f"Received pong from user {authenticated_user.username}")
+                        continue
 
-                # Обрабатываем сообщения от аутентифицированного клиента
-                await _handle_authenticated_message(
-                    websocket, message, authenticated_user, department, date, db
-                )
+                    # Обрабатываем сообщения от аутентифицированного клиента
+                    await _handle_authenticated_message(
+                        websocket, message, authenticated_user, department, date, db
+                    )
+
+                except asyncio.TimeoutError:
+                    # Check if connection is still alive
+                    # ✅ BUGFIX: Access list element to get current value
+                    time_since_pong = asyncio.get_event_loop().time() - last_pong[0]
+                    if time_since_pong > CONNECTION_TIMEOUT:
+                        logger.warning(f"Connection timeout for user {authenticated_user.username}, closing...")
+                        break
+                    # Send ping to check connection
+                    try:
+                        await websocket.send_json({
+                            "type": "ping",
+                            "timestamp": asyncio.get_event_loop().time()
+                        })
+                    except Exception:
+                        break  # Connection is dead
 
         except WebSocketDisconnect:
             logger.info(
@@ -101,6 +167,13 @@ async def ws_queue_authenticated(
             )
         except Exception as e:
             logger.error(f"Ошибка в аутентифицированном WebSocket: {e}")
+        finally:
+            # Cancel heartbeat task
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
 
     except Exception as e:
         logger.error(f"Ошибка аутентификации WebSocket: {e}")
@@ -111,6 +184,8 @@ async def ws_queue_authenticated(
         except:
             pass
     finally:
+        # ✅ SECURITY: Remove connection from rate limiter
+        websocket_rate_limiter.remove_connection(ip_address)
         if 'room' in locals():
             ws_manager.disconnect(websocket, room)
         db.close()
@@ -121,50 +196,55 @@ async def ws_queue_optional_auth(
     websocket: WebSocket, department: str, date: str, token: Optional[str] = None
 ):
     """
-    WebSocket соединение для очереди с опциональной аутентификацией
-    Анонимные пользователи получают ограниченный доступ
+    ⚠️ DEPRECATED: WebSocket соединение с опциональной аутентификацией
+    
+    ✅ SECURITY: This endpoint is deprecated. Use /ws/queue/auth instead.
+    Authentication is now REQUIRED for all WebSocket connections.
     """
+    # ✅ SECURITY: Require authentication - reject anonymous connections
+    if not token:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Authentication required. Use /ws/queue/auth endpoint."
+        )
+        return
+    
     db = SessionLocal()
     authenticated_user = None
 
     try:
-        # Опциональная аутентификация
-        if token:
-            authenticated_user = await authenticate_websocket_token(token, db)
-            if not authenticated_user:
-                logger.warning(
-                    "Недействительный токен в WebSocket, продолжаем как анонимный"
-                )
+        # ✅ SECURITY: Require valid authentication
+        authenticated_user = await authenticate_websocket_token(token, db)
+        if not authenticated_user:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="Invalid or missing token"
+            )
+            return
 
         await websocket.accept()
 
         room = f"{department}:{date}"
         ws_manager.connect(websocket, room)
 
-        if authenticated_user:
-            logger.info(
-                f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}"
-            )
-        else:
-            logger.info(f"Анонимное WebSocket подключение: отделение {department}")
+        logger.info(
+            f"Аутентифицированное WebSocket подключение: пользователь {authenticated_user.username}, отделение {department}"
+        )
 
         try:
             while True:
                 data = await websocket.receive_text()
                 message = json.loads(data)
 
-                # Обрабатываем сообщения с учетом уровня доступа
-                await _handle_message_with_auth_level(
+                # Обрабатываем сообщения (только для аутентифицированных пользователей)
+                await _handle_authenticated_message(
                     websocket, message, authenticated_user, department, date, db
                 )
 
         except WebSocketDisconnect:
-            if authenticated_user:
-                logger.info(
-                    f"Аутентифицированное WebSocket отключено: пользователь {authenticated_user.username}"
-                )
-            else:
-                logger.info("Анонимное WebSocket отключено")
+            logger.info(
+                f"Аутентифицированное WebSocket отключено: пользователь {authenticated_user.username}"
+            )
         except Exception as e:
             logger.error(f"Ошибка в WebSocket: {e}")
 

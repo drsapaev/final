@@ -1,12 +1,15 @@
 # app/core/config.py
 from __future__ import annotations
 
+import logging
 import secrets
 from functools import lru_cache
 from typing import Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -24,8 +27,9 @@ class Settings(BaseSettings):
     # SECURITY WARNING: В продакшене ОБЯЗАТЕЛЬНО установите SECRET_KEY через переменную окружения!
     # Используйте: python -c "import secrets; print(secrets.token_urlsafe(32))" для генерации безопасного ключа
     SECRET_KEY: str = Field(
-        default="dev-secret-key-for-clinic-management-system-change-in-production"
-    )  # ⚠️ DEV ONLY: замените в продакшене!
+        ...,
+        description="JWT secret key - MUST be set via environment variable in production"
+    )  # ⚠️ REQUIRED: No default value for security
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
 
@@ -131,12 +135,95 @@ class Settings(BaseSettings):
         return v
 
 
+# Default SECRET_KEY for development only (will be validated on startup)
+_DEFAULT_SECRET_KEY = "dev-secret-key-for-clinic-management-system-change-in-production"
+
+
 @lru_cache(1)
 def get_settings() -> Settings:
-    s = Settings()
-    # на всякий случай гарантируем нормальный ключ в dev
-    if not s.SECRET_KEY or len(s.SECRET_KEY) < 16:
-        s.SECRET_KEY = secrets.token_urlsafe(32)
+    """Get application settings with validation"""
+    # ✅ ИСПРАВЛЕНО: Сначала проверяем env var, затем создаем Settings с аргументами
+    import os
+    secret_key = os.getenv("SECRET_KEY")
+    
+    # Если SECRET_KEY в env - используем его
+    if secret_key:
+        s = Settings(SECRET_KEY=secret_key)
+    else:
+        # Fallback для dev mode - используем default или persistent key
+        s = Settings(SECRET_KEY=_DEFAULT_SECRET_KEY)
+    
+    # Validate SECRET_KEY on load
+    if not s.SECRET_KEY or s.SECRET_KEY == _DEFAULT_SECRET_KEY:
+        # In production, this should fail - but for dev we allow it with warning
+        import os
+        env = os.getenv("ENV", "dev").lower()
+        if env in ("prod", "production"):
+            raise ValueError(
+                "SECRET_KEY must be set via environment variable in production. "
+                "Generate with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
+        # ✅ BUGFIX: In dev, use persistent key from file or generate once and save
+        if s.SECRET_KEY == _DEFAULT_SECRET_KEY:
+            import warnings
+            import pathlib
+            
+            # Try to load persistent key from .secret_key file (dev only)
+            secret_key_file = pathlib.Path(".secret_key")
+            if secret_key_file.exists():
+                try:
+                    persistent_key = secret_key_file.read_text(encoding="utf-8").strip()
+                    if len(persistent_key) >= 32:
+                        s.SECRET_KEY = persistent_key
+                        logger.info("Loaded persistent SECRET_KEY from .secret_key file (dev mode)")
+                    else:
+                        # Invalid key in file, regenerate
+                        persistent_key = secrets.token_urlsafe(32)
+                        secret_key_file.write_text(persistent_key, encoding="utf-8")
+                        s.SECRET_KEY = persistent_key
+                        logger.warning("Regenerated SECRET_KEY in .secret_key file (was too short)")
+                except Exception as e:
+                    logger.warning(f"Error reading .secret_key file: {e}, generating new key")
+                    persistent_key = secrets.token_urlsafe(32)
+                    try:
+                        secret_key_file.write_text(persistent_key, encoding="utf-8")
+                        s.SECRET_KEY = persistent_key
+                    except Exception as write_error:
+                        logger.error(f"Error writing .secret_key file: {write_error}")
+                        # Fallback to in-memory key (will change on restart)
+                        s.SECRET_KEY = secrets.token_urlsafe(32)
+                        warnings.warn(
+                            "Using temporary SECRET_KEY in development (will invalidate tokens on restart). "
+                            "Set SECRET_KEY env var or ensure .secret_key file is writable!",
+                            UserWarning
+                        )
+            else:
+                # No persistent key file, generate and save
+                persistent_key = secrets.token_urlsafe(32)
+                try:
+                    secret_key_file.write_text(persistent_key, encoding="utf-8")
+                    s.SECRET_KEY = persistent_key
+                    logger.info("Generated and saved persistent SECRET_KEY to .secret_key file (dev mode)")
+                    warnings.warn(
+                        "Generated SECRET_KEY for development. Set SECRET_KEY env var for production!",
+                        UserWarning
+                    )
+                except Exception as e:
+                    logger.error(f"Error writing .secret_key file: {e}")
+                    # Fallback to in-memory key (will change on restart)
+                    s.SECRET_KEY = persistent_key
+                    warnings.warn(
+                        "Using temporary SECRET_KEY in development (will invalidate tokens on restart). "
+                        "Set SECRET_KEY env var or ensure .secret_key file is writable!",
+                        UserWarning
+                    )
+    
+    # Additional validation: SECRET_KEY must be at least 32 characters
+    if len(s.SECRET_KEY) < 32:
+        raise ValueError(
+            f"SECRET_KEY must be at least 32 characters long. Current length: {len(s.SECRET_KEY)}"
+        )
+    
     return s
 
 

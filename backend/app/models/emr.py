@@ -98,12 +98,12 @@ class Prescription(Base):
     __tablename__ = "prescriptions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    appointment_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("appointments.id"), nullable=False, index=True
-    )
-    emr_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("emr.id"), nullable=False, index=True
-    )
+    appointment_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # ✅ SECURITY: SET NULL to preserve prescriptions
+    emr_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("emr.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # ✅ SECURITY: SET NULL to preserve prescriptions
 
     # Препараты (JSON массив)
     medications: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

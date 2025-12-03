@@ -135,13 +135,28 @@ def _auth_ok(headers, token_qs: Optional[str]) -> bool:
 
 
 # -----------------------------------------------------------------------------
-# DEBUG: полностью безусловный сокет для диагностики
+# ⚠️ DEPRECATED: DEBUG endpoint - DISABLED in production
 # -----------------------------------------------------------------------------
 @router.websocket("/ws/noauth")
 async def ws_noauth(websocket: WebSocket):
-    # принимаем рукопожатие сразу и шлём привет
+    """
+    ⚠️ SECURITY WARNING: This endpoint is for development only.
+    Disabled in production for security.
+    """
+    env = os.getenv("ENV", "dev").lower()
+    is_production = env in ("prod", "production")
+    
+    if is_production:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="This endpoint is disabled in production for security"
+        )
+        return
+    
+    # Only allow in development
+    log.warning("⚠️  DEV mode: /ws/noauth endpoint enabled (NOT for production!)")
     await websocket.accept()
-    await websocket.send_json({"type": "connected", "room": "noauth"})
+    await websocket.send_json({"type": "connected", "room": "noauth", "warning": "DEV ONLY"})
     try:
         while True:
             await websocket.receive_text()
@@ -164,13 +179,26 @@ async def ws_queue(
         websocket.url.query,
     )
 
-    # ✅ DEV shortcut: если разрешён DEV-режим, сразу принимаем
-    if os.getenv("WS_DEV_ALLOW", "0") == "1":
+    # ✅ SECURITY: Check environment - only allow DEV bypass in development
+    env = os.getenv("ENV", "dev").lower()
+    is_production = env in ("prod", "production")
+    
+    # ✅ DEV shortcut: только в development режиме
+    if not is_production and os.getenv("WS_DEV_ALLOW", "0") == "1":
+        log.warning("⚠️  DEV mode: WebSocket auth bypass enabled (NOT for production!)")
         await websocket.accept()
         await websocket.send_json(
             {"type": "dev.accepted", "room": f"{department}::{date}"}
         )
         return
+
+    # ✅ SECURITY: In production, require authentication
+    if is_production:
+        if not _auth_ok(websocket.headers, token):
+            await websocket.accept()
+            await websocket.send_json({"type": "error", "reason": "Authentication required in production"})
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
 
     # Origin
     if not _origin_allowed(origin):
@@ -179,7 +207,7 @@ async def ws_queue(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # Auth
+    # Auth (required in production, optional in dev)
     if not _auth_ok(websocket.headers, token):
         await websocket.accept()
         await websocket.send_json({"type": "error", "reason": "auth required"})
@@ -192,14 +220,67 @@ async def ws_queue(
     room = f"{department.strip()}::{date.strip()}"
     await ws_manager.connect(websocket, room)
 
+    # ✅ SECURITY: Heartbeat configuration
+    HEARTBEAT_INTERVAL = 30  # seconds
+    CONNECTION_TIMEOUT = 120  # seconds (2 minutes of inactivity)
+    # ✅ BUGFIX: Use list to allow mutation from nested scopes (nonlocal doesn't work in nested try blocks)
+    last_pong = [asyncio.get_event_loop().time()]
+    
+    async def send_heartbeat():
+        """Send periodic ping to detect dead connections"""
+        while True:
+            try:
+                await asyncio.sleep(HEARTBEAT_INTERVAL)
+                await websocket.send_json({"type": "ping", "timestamp": asyncio.get_event_loop().time()})
+                log.debug(f"Sent heartbeat ping to {room}")
+            except Exception as e:
+                log.error(f"Error sending heartbeat: {e}")
+                break
+
+    heartbeat_task = asyncio.create_task(send_heartbeat())
+
     try:
         await websocket.send_json({"type": "queue.connected", "room": room})
         while True:
             try:
-                await websocket.receive_text()
-            except Exception:
+                # ✅ SECURITY: Set receive timeout
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=CONNECTION_TIMEOUT)
+                
+                # Parse message
+                try:
+                    import json
+                    message = json.loads(data)
+                    
+                    # Handle pong response
+                    if message.get("type") == "pong":
+                        # ✅ BUGFIX: Update list element to modify outer scope variable
+                        last_pong[0] = asyncio.get_event_loop().time()
+                        log.debug(f"Received pong from {room}")
+                        continue
+                except (json.JSONDecodeError, KeyError):
+                    pass  # Not a JSON message or missing type
+                
+            except asyncio.TimeoutError:
+                # Check if connection is still alive
+                # ✅ BUGFIX: Access list element to get current value
+                time_since_pong = asyncio.get_event_loop().time() - last_pong[0]
+                if time_since_pong > CONNECTION_TIMEOUT:
+                    log.warning(f"Connection timeout for {room}, closing...")
+                    break
+                # Send ping to check connection
+                try:
+                    await websocket.send_json({"type": "ping", "timestamp": asyncio.get_event_loop().time()})
+                except Exception:
+                    break  # Connection is dead
+            except Exception as e:
+                log.error(f"Error receiving message: {e}")
                 await asyncio.sleep(0.05)
     except WebSocketDisconnect:
-        pass
+        log.info(f"WebSocket disconnected: {room}")
     finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
         ws_manager.disconnect(websocket, room)

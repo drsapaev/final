@@ -224,7 +224,7 @@ class PaymentProviderManager:
         return provider.refund_payment(payment_id, amount)
 
     def validate_webhook_signature(
-        self, provider_name: str, webhook_data: Dict[str, Any], signature: str
+        self, provider_name: str, webhook_data: Dict[str, Any], signature: str = None, auth_header: str = None
     ) -> bool:
         """
         Валидация подписи webhook
@@ -232,7 +232,8 @@ class PaymentProviderManager:
         Args:
             provider_name: Имя провайдера
             webhook_data: Данные webhook
-            signature: Подпись от провайдера
+            signature: Подпись от провайдера (для Click, Kaspi)
+            auth_header: Authorization header (для PayMe)
 
         Returns:
             bool: True если подпись валидна
@@ -243,7 +244,11 @@ class PaymentProviderManager:
             logger.error(f"Провайдер {provider_name} не найден для валидации подписи")
             return False
 
-        return provider.validate_webhook_signature(webhook_data, signature)
+        # PayMe uses auth_header, others use signature
+        if provider_name.lower() == "payme":
+            return provider.validate_webhook_signature(webhook_data, signature, auth_header)
+        else:
+            return provider.validate_webhook_signature(webhook_data, signature)
 
     def get_provider_info(self) -> Dict[str, Dict[str, Any]]:
         """

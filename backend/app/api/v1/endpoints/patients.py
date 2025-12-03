@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,6 +8,8 @@ from app.api import deps
 from app.crud.patient import patient as patient_crud
 from app.models.user import User
 from app.schemas import patient as patient_schemas
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -68,11 +71,9 @@ def create_patient(
             status_code=422,
             detail="Необходимо указать либо полное ФИО (full_name), либо фамилию и имя (last_name, first_name)",
         )
-
-    # ✅ ИСПРАВЛЕНО: Всегда передаем ВСЕ доступные данные в normalize_patient_name
-    # Функция сама определит приоритет: отдельные поля > full_name
-    # Это гарантирует, что если full_name передан, но отдельные поля пустые, используется full_name
-    # ВАЖНО: Передаем None для пустых строк, чтобы normalize_patient_name правильно обработал их
+    
+    # ✅ ИСПРАВЛЕНО: Нормализуем имя ПЕРЕД валидацией, чтобы валидация работала с разобранными полями
+    # Это позволяет использовать full_name, который будет разобран на last_name, first_name, middle_name
     name_parts = normalize_patient_name(
         full_name=patient_in.full_name.strip() if has_full_name else None,
         last_name=(
@@ -91,16 +92,56 @@ def create_patient(
             else None
         ),
     )
+    
+    # Обновляем patient_in с нормализованными именами
+    patient_in.last_name = name_parts["last_name"] or ""
+    patient_in.first_name = name_parts["first_name"] or ""
+    patient_in.middle_name = name_parts.get("middle_name") or None
+    if name_parts.get("full_name"):
+        patient_in.full_name = name_parts["full_name"]
+    
+    # ✅ SECURITY: Comprehensive validation and sanitization
+    from app.services.patient_validation import PatientValidationService
+    
+    validation_service = PatientValidationService()
+    
+    # Convert Pydantic model to dict for validation (после нормализации)
+    patient_dict = patient_in.model_dump(exclude_unset=True)
+    
+    # Sanitize data first
+    patient_dict = validation_service.sanitize_patient_data(patient_dict)
+    
+    # Validate data (теперь с нормализованными именами)
+    is_valid, errors = validation_service.validate_patient_data(patient_dict)
+    if not is_valid:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Validation errors: {'; '.join(errors)}",
+        )
+    
+    # Update patient_in with sanitized data
+    for key, value in patient_dict.items():
+        if hasattr(patient_in, key):
+            setattr(patient_in, key, value)
+
+    # ✅ ИСПРАВЛЕНО: Используем результаты первого вызова normalize_patient_name (строки 74-91)
+    # Второй вызов был избыточным, так как данные уже нормализованы и обновлены в patient_in
+    # Используем уже нормализованные значения из name_parts (первый вызов)
     normalized_last_name = name_parts["last_name"]
     normalized_first_name = name_parts["first_name"]
     normalized_middle_name = name_parts.get("middle_name")
 
-    # ✅ ОТЛАДКА: Логируем результат нормализации для диагностики
-    print(
-        f"[create_patient] Нормализация: full_name={patient_in.full_name}, last_name={patient_in.last_name}, first_name={patient_in.first_name}"
+    # ✅ DEBUG: Логируем результат нормализации для диагностики (используем logger вместо print)
+    logger.debug(
+        "Нормализация имени пациента: full_name=%s, last_name=%s, first_name=%s",
+        patient_in.full_name,
+        patient_in.last_name,
+        patient_in.first_name,
     )
-    print(
-        f"[create_patient] Результат нормализации: last_name='{normalized_last_name}', first_name='{normalized_first_name}'"
+    logger.debug(
+        "Результат нормализации: last_name='%s', first_name='%s'",
+        normalized_last_name,
+        normalized_first_name,
     )
 
     # ✅ СТРОГАЯ ВАЛИДАЦИЯ: Проверяем, что после нормализации обязательные поля не пустые
