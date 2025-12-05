@@ -86,15 +86,36 @@ class File(Base):
     file_metadata = Column(Text, nullable=True)  # JSON с дополнительными данными
 
     # Связи с другими сущностями
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True, index=True)
+    owner_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="RESTRICT"), 
+        nullable=False, 
+        index=True
+    )  # ✅ FIX: Files must always have an owner for access control and audit (domain requirement)
+    patient_id = Column(
+        Integer, 
+        ForeignKey("patients.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve medical files
     appointment_id = Column(
-        Integer, ForeignKey("appointments.id"), nullable=True, index=True
-    )
-    emr_id = Column(Integer, ForeignKey("emr.id"), nullable=True, index=True)
+        Integer, 
+        ForeignKey("appointments.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve files
+    emr_id = Column(
+        Integer, 
+        ForeignKey("emr.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve files
     folder_id = Column(
-        Integer, ForeignKey("file_folders.id"), nullable=True, index=True
-    )
+        Integer, 
+        ForeignKey("file_folders.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to allow orphaned folders
 
     # Временные метки
     created_at = Column(
@@ -128,13 +149,22 @@ class FileVersion(Base):
     __tablename__ = "file_versions"
 
     id = Column(Integer, primary_key=True, index=True)
-    file_id = Column(Integer, ForeignKey("files.id"), nullable=False, index=True)
+    file_id = Column(
+        Integer, 
+        ForeignKey("files.id", ondelete="CASCADE"), 
+        nullable=False, 
+        index=True
+    )  # ✅ SECURITY: CASCADE (versions die with file)
     version_number = Column(Integer, nullable=False)
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=False)
     file_hash = Column(String(64), nullable=True)
     change_description = Column(Text, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -150,16 +180,28 @@ class FileShare(Base):
     __tablename__ = "file_shares"
 
     id = Column(Integer, primary_key=True, index=True)
-    file_id = Column(Integer, ForeignKey("files.id"), nullable=False, index=True)
+    file_id = Column(
+        Integer, 
+        ForeignKey("files.id", ondelete="CASCADE"), 
+        nullable=False, 
+        index=True
+    )  # ✅ SECURITY: CASCADE (shares die with file)
     shared_with_user_id = Column(
-        Integer, ForeignKey("users.id"), nullable=True, index=True
-    )
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve share record
     shared_with_email = Column(String(255), nullable=True, index=True)
     permission = Column(Enum(FilePermission), nullable=False)
     access_token = Column(String(64), nullable=True, unique=True, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_by = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -179,9 +221,17 @@ class FileFolder(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     parent_id = Column(
-        Integer, ForeignKey("file_folders.id"), nullable=True, index=True
-    )
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+        Integer, 
+        ForeignKey("file_folders.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to allow orphaned folders
+    owner_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve folders if user deleted
     is_system = Column(Boolean, default=False, nullable=False)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -206,8 +256,18 @@ class FileAccessLog(Base):
     __tablename__ = "file_access_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    file_id = Column(Integer, ForeignKey("files.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    file_id = Column(
+        Integer, 
+        ForeignKey("files.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve audit log
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve audit log
     action = Column(String(50), nullable=False)  # view, download, edit, delete, share
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)

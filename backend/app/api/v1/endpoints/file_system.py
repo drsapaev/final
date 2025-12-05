@@ -17,6 +17,7 @@ from fastapi import (
     Form,
     HTTPException,
     Query,
+    Request,
     status,
     UploadFile,
 )
@@ -25,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_roles
 from app.models.user import User
+from app.core.audit import log_critical_change, extract_model_changes
 from app.schemas.file_system import (
     FileExportRequest,
     FileExportResponse,
@@ -52,6 +54,7 @@ router = APIRouter()
 
 @router.post("/upload", response_model=FileOut)
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -95,6 +98,22 @@ async def upload_file(
 
         # Загружаем файл
         uploaded_file = service.upload_file(db, file, file_data, current_user.id)
+        
+        # ✅ AUDIT LOG: Логируем загрузку файла
+        db.refresh(uploaded_file)
+        _, new_data = extract_model_changes(None, uploaded_file)
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="CREATE",
+            table_name="files",
+            row_id=uploaded_file.id,
+            old_data=None,
+            new_data=new_data,
+            request=request,
+            description=f"Загружен файл: {uploaded_file.filename} (ID={uploaded_file.id})",
+        )
+        db.commit()
 
         return FileOut.from_orm(uploaded_file)
 
@@ -335,6 +354,7 @@ async def get_files(
 
 @router.put("/{file_id}", response_model=FileOut)
 async def update_file(
+    request: Request,
     file_id: int,
     title: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -381,8 +401,27 @@ async def update_file(
             expires_at=expires_at,
         )
 
+        # ✅ AUDIT LOG: Сохраняем старые данные перед обновлением
+        old_data, _ = extract_model_changes(db_file, None)
+        
         # Обновляем файл
         updated_file = file.update(db, db_obj=db_file, obj_in=update_data)
+        
+        # ✅ AUDIT LOG: Логируем обновление файла
+        db.refresh(updated_file)
+        _, new_data = extract_model_changes(None, updated_file)
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="UPDATE",
+            table_name="files",
+            row_id=file_id,
+            old_data=old_data,
+            new_data=new_data,
+            request=request,
+            description=f"Обновлен файл ID={file_id}: {updated_file.filename}",
+        )
+        db.commit()
 
         return FileOut.from_orm(updated_file)
 
@@ -397,6 +436,7 @@ async def update_file(
 
 @router.delete("/{file_id}")
 async def delete_file(
+    request: Request,
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
@@ -405,6 +445,19 @@ async def delete_file(
 ):
     """Удалить файл"""
     try:
+        # ✅ Получаем файл перед удалением для логирования
+        from app.crud.file_system import file as file_crud
+        db_file = file_crud.get(db, id=file_id)
+        if not db_file:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
+            )
+        
+        # Сохраняем данные для аудита перед удалением
+        old_data, _ = extract_model_changes(db_file, None)
+        filename = db_file.filename
+        
+        # ✅ FIX: Выполняем удаление ПЕРЕД логированием аудита
         service = get_file_system_service()
         success = service.delete_file(db, file_id, current_user.id)
 
@@ -413,6 +466,20 @@ async def delete_file(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Файл не найден или нет прав для удаления",
             )
+        
+        # ✅ AUDIT LOG: Логируем удаление файла ПОСЛЕ успешного удаления
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="DELETE",
+            table_name="files",
+            row_id=file_id,
+            old_data=old_data,
+            new_data=None,
+            request=request,
+            description=f"Удален файл ID={file_id}: {filename}",
+        )
+        db.commit()
 
         return {"success": True, "message": "Файл удален"}
 

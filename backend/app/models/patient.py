@@ -13,9 +13,12 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True, unique=True
-    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True, 
+        unique=True
+    )  # ✅ SECURITY: SET NULL (patient can exist without user account)
     last_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     middle_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)

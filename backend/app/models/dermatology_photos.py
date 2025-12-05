@@ -26,8 +26,10 @@ class DermatologyPhoto(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(
-        Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
-    )
+        Integer, 
+        ForeignKey("patients.id", ondelete="RESTRICT"), 
+        nullable=False
+    )  # ✅ FIX: Medical photos must always belong to a patient (clinical documentation requirement)
 
     # Категория фото
     category = Column(String(20), nullable=False)  # before, after, progress

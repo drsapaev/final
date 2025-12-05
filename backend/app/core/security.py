@@ -58,21 +58,28 @@ def create_access_token(
 
 def require_roles(*roles: str):
     """
-    Dependency factory для проверки ролей (SSOT).
+    Dependency factory для проверки ролей (SSOT) с автоматическим логированием 403.
 
     Использование:
         @router.get("/secret")
         def secret(user=Depends(require_roles("Admin"))):
             ...
 
-    Если роль пользователя не в списке roles и is_superuser=False -> 403.
+    Если роль пользователя не в списке roles и is_superuser=False -> 403 + audit log.
     """
     from fastapi import Depends, HTTPException, status
 
-    from app.api.deps import get_current_user
+    from app.api.deps import get_current_user, get_db
+    from app.middleware.audit_middleware import get_current_request
     from app.models.user import User
 
-    def _dep(current_user: User = Depends(get_current_user)) -> User:
+    def _dep(
+        current_user: User = Depends(get_current_user),
+        db = Depends(get_db),
+    ) -> User:
+        # Получаем Request из contextvar (установлен в AuditMiddleware)
+        request = get_current_request()
+        
         if not roles:
             return current_user
 
@@ -87,6 +94,57 @@ def require_roles(*roles: str):
         allowed_roles_lower = [r.lower() for r in roles]
 
         if role_lower not in allowed_roles_lower:
+            # ✅ AUDIT LOG: Логируем попытку несанкционированного доступа
+            from app.core.audit import log_critical_change
+            
+            # Извлекаем resource_type из пути (если Request доступен)
+            resource_type = None
+            resource_id = None
+            path_str = "unknown"
+            method_str = "UNKNOWN"
+            
+            if request:
+                path_parts = [p for p in request.url.path.split("/") if p]  # Убираем пустые части
+                path_str = request.url.path
+                method_str = request.method
+                # Ищем /api/v1/{resource_type} или /api/v1/{resource_type}/{id}
+                if len(path_parts) >= 3 and path_parts[0] == "api" and path_parts[1] == "v1":
+                    resource_type = path_parts[2]  # /api/v1/{resource_type}
+                if len(path_parts) >= 4 and path_parts[3].isdigit():
+                    resource_id = int(path_parts[3])
+            else:
+                # ✅ FIX: Если request недоступен, логируем с предупреждением
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"SECURITY: require_roles: request context unavailable for user_id={current_user.id}, "
+                    f"roles={roles}, user_role={role}. Audit log may be incomplete."
+                )
+            
+            # ✅ FIX: Всегда логируем 403, даже если request недоступен (для безопасности)
+            try:
+                log_critical_change(
+                    db=db,
+                    user_id=current_user.id,
+                    action="ACCESS_DENIED",
+                    table_name=resource_type or "unknown",
+                    row_id=resource_id,
+                    old_data=None,
+                    new_data={
+                        "required_roles": list(roles), 
+                        "user_role": role,
+                        "request_available": request is not None,
+                    },
+                    request=request,  # Может быть None
+                    description=f"403 Forbidden: {method_str} {path_str} - требуется роль: {', '.join(roles)}, текущая роль: {role}",
+                )
+                db.commit()
+            except Exception as e:
+                # ✅ FIX: Если логирование не удалось, все равно выбрасываем 403
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to log ACCESS_DENIED audit: {e}", exc_info=True)
+            
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Доступ запрещен. Требуются роли: {', '.join(roles)}",

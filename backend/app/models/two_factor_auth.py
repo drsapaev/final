@@ -15,7 +15,12 @@ class TwoFactorAuth(Base):
     __tablename__ = "two_factor_auth"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        unique=True, 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (2FA dies with user)
 
     # TOTP настройки
     totp_secret = Column(String(32), nullable=True)  # Base32 encoded secret
@@ -57,8 +62,10 @@ class TwoFactorBackupCode(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     two_factor_auth_id = Column(
-        Integer, ForeignKey("two_factor_auth.id"), nullable=False
-    )
+        Integer, 
+        ForeignKey("two_factor_auth.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (backup codes die with 2FA)
 
     # Код и его статус
     code = Column(String(10), nullable=False)  # 8-символьный код
@@ -79,8 +86,10 @@ class TwoFactorRecovery(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     two_factor_auth_id = Column(
-        Integer, ForeignKey("two_factor_auth.id"), nullable=False
-    )
+        Integer, 
+        ForeignKey("two_factor_auth.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (backup codes die with 2FA)
 
     # Данные восстановления
     recovery_type = Column(
@@ -111,7 +120,11 @@ class TwoFactorSession(Base):
     __tablename__ = "two_factor_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (sessions/devices die with user)
 
     # Сессия
     session_token = Column(String(64), unique=True, nullable=False)
@@ -143,7 +156,11 @@ class TwoFactorDevice(Base):
     __tablename__ = "two_factor_devices"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (sessions/devices die with user)
 
     # Устройство
     device_name = Column(String(100), nullable=False)

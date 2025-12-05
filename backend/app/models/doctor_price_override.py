@@ -21,14 +21,23 @@ class DoctorPriceOverride(Base):
 
     # Связи
     visit_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("visits.id"), nullable=False, index=True
-    )
+        Integer, 
+        ForeignKey("visits.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve override record
     doctor_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("doctors.id"), nullable=False, index=True
-    )
+        Integer, 
+        ForeignKey("doctors.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve override record
     service_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("services.id"), nullable=False, index=True
-    )
+        Integer, 
+        ForeignKey("services.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve override record
 
     # Цены
     original_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -47,8 +56,10 @@ class DoctorPriceOverride(Base):
 
     # Кто и когда одобрил/отклонил (регистратура)
     approved_by: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     approved_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

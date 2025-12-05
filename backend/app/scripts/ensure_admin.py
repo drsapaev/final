@@ -36,14 +36,26 @@ def ensure_admin() -> dict:
     full_name = os.getenv("ADMIN_FULL_NAME", "Administrator").strip()
 
     with SessionLocal() as db:  # type: ignore # type: Session
+        # Check by username first
         row = (
             db.execute(select(User).where(User.username == username)).scalars().first()
         )
+        
+        # If not found by username, check by email
+        if not row and email:
+            row = (
+                db.execute(select(User).where(User.email == email)).scalars().first()
+            )
+        
         if row:
             changed = False
+            # Only update email if it's different and doesn't conflict
             if email and row.email != email:
-                row.email = email
-                changed = True
+                # Check if new email already exists
+                existing = db.execute(select(User).where(User.email == email, User.id != row.id)).scalars().first()
+                if not existing:
+                    row.email = email
+                    changed = True
             if full_name and row.full_name != full_name:
                 row.full_name = full_name
                 changed = True
@@ -61,9 +73,9 @@ def ensure_admin() -> dict:
                 row.is_active = True
                 changed = True
             if changed:
-                db.flush()
+                db.commit()
             return {
-                "updated": True,
+                "updated": changed,
                 "id": row.id,
                 "username": row.username,
                 "email": row.email,
@@ -71,6 +83,25 @@ def ensure_admin() -> dict:
                 "role": row.role,
             }
 
+        # Check if email already exists
+        existing_email = db.execute(select(User).where(User.email == email)).scalars().first()
+        if existing_email:
+            # Update existing user to admin
+            existing_email.username = username
+            existing_email.role = "Admin"
+            existing_email.is_active = True
+            existing_email.hashed_password = _hash_or_plain(password)
+            existing_email.full_name = full_name
+            db.commit()
+            return {
+                "updated": True,
+                "id": existing_email.id,
+                "username": existing_email.username,
+                "email": existing_email.email,
+                "full_name": existing_email.full_name,
+                "role": existing_email.role,
+            }
+        
         row = User(
             username=username,
             full_name=full_name,
@@ -80,7 +111,7 @@ def ensure_admin() -> dict:
             hashed_password=_hash_or_plain(password),
         )
         db.add(row)
-        db.flush()
+        db.commit()
         return {
             "created": True,
             "id": row.id,

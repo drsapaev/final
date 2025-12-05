@@ -13,6 +13,7 @@ from app.models import (  # noqa: F401, E402; queue as _m_queue,  # Времен
     activation as _m_activation,
     appointment as _m_appointment,
     audit as _m_audit,
+    billing as _m_billing,  # ✅ FIX: Import billing models for Alembic and tests
     clinic as _m_clinic,
     department as _m_department,
     doctor_price_override as _m_doctor_price_override,
@@ -30,5 +31,6 @@ from app.models import (  # noqa: F401, E402; queue as _m_queue,  # Времен
     service as _m_service,
     setting as _m_setting,
     user as _m_user,
+    user_profile as _m_user_profile,  # ✅ FIX: Import user_profile models for Alembic and production
     visit as _m_visit,
 )

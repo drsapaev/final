@@ -98,7 +98,7 @@ class BackupService:
                     backup_path.unlink()  # Remove uncompressed
                     backup_path = compressed_path
                     backup_size = backup_path.stat().st_size
-            
+
             backup_info = {
                 "filename": backup_path.name,
                 "path": str(backup_path),
@@ -115,7 +115,7 @@ class BackupService:
             self._cleanup_old_backups()
             
             return backup_info
-            
+
         except Exception as e:
             logger.error(f"❌ Backup failed: {e}")
             raise
@@ -165,7 +165,7 @@ class BackupService:
             
             if removed_count > 0:
                 logger.info(f"✅ Cleaned up {removed_count} old backups")
-                
+
         except Exception as e:
             logger.error(f"Error cleaning up backups: {e}")
 
@@ -264,14 +264,14 @@ class BackupService:
                 os.unlink(restore_source)
             
             logger.info(f"✅ Database restored from: {backup_filename}")
-            
+
             return {
                 "success": True,
                 "backup_used": backup_filename,
                 "safety_backup": safety_backup["filename"],
                 "restored_at": datetime.utcnow().isoformat(),
             }
-            
+
         except Exception as e:
             logger.error(f"❌ Restore failed: {e}")
             raise
@@ -318,8 +318,8 @@ class BackupService:
                     conn.close()
                     if backup_path.suffix == ".gz":
                         os.unlink(check_path)
-                
-                return {
+
+            return {
                     "valid": is_valid,
                     "size": size,
                     "size_mb": round(size / (1024 * 1024), 2),
@@ -333,7 +333,7 @@ class BackupService:
                 "size_mb": round(size / (1024 * 1024), 2),
                 "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
             }
-            
+
         except Exception as e:
             return {
                 "valid": False,

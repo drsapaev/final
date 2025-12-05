@@ -101,11 +101,17 @@ class PaymentTransaction(Base):
 
     # Связи
     payment_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("payments.id"), nullable=True, index=True
-    )
+        Integer, 
+        ForeignKey("payments.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve webhook for audit
     webhook_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("payment_webhooks.id"), nullable=True, index=True
-    )
+        Integer, 
+        ForeignKey("payment_webhooks.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve transaction for audit
     visit_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
 
     # Дополнительные данные

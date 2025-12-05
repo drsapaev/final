@@ -96,7 +96,11 @@ class OnlineQueueEntry(Base):
     number = Column(Integer, nullable=False, index=True)  # Номер в очереди (1..N)
 
     # Идентификация пациента
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
+    patient_id = Column(
+        Integer, 
+        ForeignKey("patients.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve queue history for analytics and audit
     patient_name = Column(String(200), nullable=True)  # Если пациент не зарегистрирован
     phone = Column(String(20), nullable=True, index=True)  # Для уникальности
     telegram_id = Column(BigInteger, nullable=True, index=True)  # Для уникальности
@@ -104,7 +108,12 @@ class OnlineQueueEntry(Base):
     address = Column(String(500), nullable=True)  # Адрес пациента
 
     # Связь с визитом (для подтвержденных визитов)
-    visit_id = Column(Integer, ForeignKey("visits.id"), nullable=True, index=True)
+    visit_id = Column(
+        Integer, 
+        ForeignKey("visits.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve queue history for analytics and audit
 
     # Тип визита и услуги
     visit_type = Column(
@@ -156,15 +165,21 @@ class QueueToken(Base):
     # Параметры токена
     day = Column(Date, nullable=False, index=True)
     specialist_id = Column(
-        Integer, ForeignKey("doctors.id"), nullable=True
-    )  # NULL для общего QR клиники
+        Integer, 
+        ForeignKey("doctors.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve queue tokens
     department = Column(String(50), nullable=True, index=True)  # Отделение
     is_clinic_wide = Column(
         Boolean, default=False, nullable=False
     )  # True для общего QR клиники
 
     # Метаданные
-    generated_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    generated_by_user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     usage_count = Column(Integer, default=0, nullable=False)  # Сколько раз использован
 
     # Срок действия
@@ -190,8 +205,11 @@ class QueueJoinSession(Base):
 
     # QR токен, по которому присоединились
     qr_token = Column(
-        String(64), ForeignKey("queue_tokens.token"), nullable=False, index=True
-    )
+        String(64), 
+        ForeignKey("queue_tokens.token", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve session history
 
     # Данные пациента
     patient_name = Column(String(200), nullable=False)
@@ -204,7 +222,11 @@ class QueueJoinSession(Base):
     )  # pending, joined, expired, cancelled
 
     # Результат присоединения
-    queue_entry_id = Column(Integer, ForeignKey("queue_entries.id"), nullable=True)
+    queue_entry_id = Column(
+        Integer, 
+        ForeignKey("queue_entries.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve session history
     queue_number = Column(Integer, nullable=True)
 
     # Метаданные

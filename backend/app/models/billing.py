@@ -1,6 +1,12 @@
 """
-Модели для автоматического выставления счетов
+Модели для автоматического выставления счетов и биллинга.
+
+ВНИМАНИЕ: Устаревшая модель BillingPayment, конфликтовавшая с Payment из
+`app.models.payment`, полностью удалена. Единственным источником истины
+для таблицы `payments` является модель `Payment`.
 """
+
+from __future__ import annotations
 
 import enum
 from datetime import datetime
@@ -117,7 +123,7 @@ class Invoice(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     created_by = Column(Integer, ForeignKey("users.id"))
 
-    # Связи
+    # Связи (без прямой связи c payments: используйте Payment через Visit)
     patient = relationship("Patient")
     visit = relationship("Visit")
     appointment = relationship("Appointment")
@@ -127,8 +133,6 @@ class Invoice(Base):
     invoice_items = relationship(
         "InvoiceItem", back_populates="invoice", cascade="all, delete-orphan"
     )
-    payments = relationship("BillingPayment", back_populates="invoice")
-    # invoice_templates = relationship("InvoiceTemplate", back_populates="invoices")  # Временно отключено
     payment_reminders = relationship("PaymentReminder", back_populates="invoice")
 
 
@@ -158,65 +162,6 @@ class InvoiceItem(Base):
     # Связи
     invoice = relationship("Invoice", back_populates="invoice_items")
     service = relationship("Service")
-
-
-class BillingPayment(Base):
-    """Платежи (устаревшая модель - используйте Payment из app.models.payment)"""
-
-    __tablename__ = "payments"
-    __table_args__ = {'extend_existing': True}
-    # ✅ ИСПРАВЛЕНО: Явно указываем только нужные поля для BillingPayment, чтобы избежать конфликта с Payment
-    __mapper_args__ = {
-        'include_properties': [
-            'id',
-            'payment_number',
-            'invoice_id',
-            'patient_id',
-            'amount',
-            'payment_method',
-            'payment_date',
-            'reference_number',
-            'description',
-            'notes',
-            'is_confirmed',
-            'confirmed_at',
-            'confirmed_by',
-            'created_at',
-            'created_by',
-        ]
-    }
-
-    id = Column(Integer, primary_key=True, index=True)
-    payment_number = Column(String(50), unique=True, nullable=False, index=True)
-
-    # Связи
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-
-    # Информация о платеже
-    amount = Column(Float, nullable=False)  # Сумма платежа
-    payment_method = Column(Enum(PaymentMethod), nullable=False)
-    payment_date = Column(DateTime, server_default=func.now())
-
-    # Дополнительная информация
-    reference_number = Column(String(100))  # Номер ссылки/транзакции
-    description = Column(Text)  # Описание платежа
-    notes = Column(Text)  # Примечания
-
-    # Статус
-    is_confirmed = Column(Boolean, default=False)  # Подтвержден
-    confirmed_at = Column(DateTime)  # Дата подтверждения
-    confirmed_by = Column(Integer, ForeignKey("users.id"))  # Кто подтвердил
-
-    # Метаданные
-    created_at = Column(DateTime, server_default=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
-
-    # Связи
-    invoice = relationship("Invoice", back_populates="payments")
-    patient = relationship("Patient")
-    creator = relationship("User", foreign_keys=[created_by])
-    confirmer = relationship("User", foreign_keys=[confirmed_by])
 
 
 class InvoiceTemplate(Base):
@@ -255,7 +200,6 @@ class InvoiceTemplate(Base):
 
     # Связи
     creator = relationship("User", foreign_keys=[created_by])
-    # invoices = relationship("Invoice", back_populates="invoice_templates")  # Временно отключено
     billing_rules = relationship("BillingRule", back_populates="template")
 
 
@@ -299,7 +243,6 @@ class BillingRule(Base):
     created_by = Column(Integer, ForeignKey("users.id"))
 
     # Связи
-    template = relationship("InvoiceTemplate", back_populates="billing_rules")
     creator = relationship("User", foreign_keys=[created_by])
 
 
@@ -392,3 +335,5 @@ class BillingSettings(Base):
 
     # Связи
     updater = relationship("User", foreign_keys=[updated_by])
+
+

@@ -29,7 +29,11 @@ class RefreshToken(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Токен и его данные
     token = Column(String(255), unique=True, nullable=False, index=True)
@@ -61,7 +65,11 @@ class UserSession(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Сессия (соответствует реальной схеме БД)
     refresh_token = Column(String(128), nullable=True)  # Соответствует БД
@@ -88,7 +96,11 @@ class PasswordResetToken(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Токен
     token = Column(String(64), unique=True, nullable=False, index=True)
@@ -118,7 +130,11 @@ class EmailVerificationToken(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Токен
     token = Column(String(64), unique=True, nullable=False, index=True)
@@ -149,8 +165,10 @@ class LoginAttempt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )  # Может быть null для неудачных попыток
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve failed attempts even if user deleted
 
     # Данные попытки
     username = Column(String(50), nullable=True)  # Для неудачных попыток
@@ -182,7 +200,11 @@ class UserActivity(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False
+    )  # ✅ SECURITY: CASCADE (tokens die with user)
 
     # Активность
     activity_type = Column(
@@ -214,8 +236,10 @@ class SecurityEvent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )  # Может быть null для системных событий
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve security events
 
     # Событие
     event_type = Column(
@@ -233,7 +257,11 @@ class SecurityEvent(Base):
     extra_data = Column(Text, nullable=True)  # JSON строка с дополнительными данными
     resolved = Column(Boolean, default=False)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
-    resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolved_by = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
 
     # Связи
     user = relationship(
