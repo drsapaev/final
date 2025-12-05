@@ -5,7 +5,7 @@ import sys
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, pool  # create_engine добавлен
+from sqlalchemy import create_engine, event, pool, text  # create_engine добавлен
 
 # --- ensure backend root on sys.path (so `import app` works) ---
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -61,9 +61,49 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode'."""
     # FIX: создаём engine напрямую, чтобы не споткнуться о ключ 'url'
-    connectable = create_engine(get_url(), poolclass=pool.NullPool)
+    url = get_url()
+    connectable = create_engine(url, poolclass=pool.NullPool)
+    
+    # ✅ SECURITY: Enable foreign key enforcement for SQLite in Alembic migrations
+    # ✅ FIX: Передаем url как параметр через замыкание, чтобы избежать проблем с областью видимости
+    def _make_fk_enabler(database_url: str):
+        """Factory function to create FK enabler with captured URL"""
+        def _enable_sqlite_fk_for_alembic(dbapi_conn, connection_record):
+            """Enable foreign key enforcement for SQLite connections in Alembic"""
+            if database_url.startswith("sqlite"):
+                try:
+                    cursor = dbapi_conn.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    # Verify
+                    cursor.execute("PRAGMA foreign_keys")
+                    fk_status = cursor.fetchone()
+                    if fk_status and fk_status[0] == 1:
+                        print("[alembic.env] ✅ Foreign keys enabled for migration connection", file=sys.stderr)
+                    else:
+                        print(f"[alembic.env] ⚠️  WARNING: Foreign keys NOT enabled (status: {fk_status})", file=sys.stderr)
+                    cursor.close()
+                except Exception as e:
+                    print(f"[alembic.env] ❌ ERROR enabling foreign keys: {e}", file=sys.stderr)
+                    raise
+        return _enable_sqlite_fk_for_alembic
+    
+    # Register event listener for FK enforcement
+    if url.startswith("sqlite"):
+        event.listen(connectable, "connect", _make_fk_enabler(url))
 
     with connectable.connect() as connection:
+        # ✅ SECURITY: Ensure FK is enabled for this migration connection
+        if url.startswith("sqlite"):
+            connection.execute(text("PRAGMA foreign_keys=ON"))
+            # Verify
+            fk_status = connection.execute(text("PRAGMA foreign_keys")).scalar()
+            if fk_status != 1:
+                raise RuntimeError(
+                    f"CRITICAL: Foreign key enforcement failed during migration. "
+                    f"PRAGMA foreign_keys returned {fk_status} instead of 1. "
+                    f"Aborting migration to prevent data corruption."
+                )
+        
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

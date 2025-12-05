@@ -51,7 +51,7 @@ role_permissions_table = Table(
         primary_key=True,
     ),
     Column("granted_at", DateTime(timezone=True), server_default=func.now()),
-    Column("granted_by", Integer, ForeignKey("users.id"), nullable=True),
+    Column("granted_by", Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
     extend_existing=True,
 )
 
@@ -69,7 +69,7 @@ user_groups_table = Table(
         primary_key=True,
     ),
     Column("joined_at", DateTime(timezone=True), server_default=func.now()),
-    Column("added_by", Integer, ForeignKey("users.id"), nullable=True),
+    Column("added_by", Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
     extend_existing=True,
 )
 
@@ -200,8 +200,10 @@ class UserGroup(Base):
     # Метаданные
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_by: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -255,8 +257,10 @@ class UserPermissionOverride(Base):
     # Метаданные
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     granted_by: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -292,8 +296,10 @@ class RoleHierarchy(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     created_by: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
 
     # Связи
     parent_role: Mapped["Role"] = relationship("Role", foreign_keys=[parent_role_id])
@@ -307,9 +313,12 @@ class PermissionAuditLog(Base):
     __tablename__ = "permission_audit_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False, index=True
-    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve audit (user may be deleted but audit must remain)
     action: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
     )  # grant, revoke, override

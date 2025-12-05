@@ -27,7 +27,7 @@ class PaymentVisit(Base):
     )
     visit_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("visits.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    )  # ✅ FIX: Junction table requires both FKs to be NOT NULL for referential integrity
     amount: Mapped[Decimal] = mapped_column(
         Numeric(12, 2),
         nullable=False,
@@ -47,31 +47,14 @@ class PaymentVisit(Base):
 
 class Payment(Base):
     __tablename__ = "payments"
-    # ✅ ИСПРАВЛЕНО: Явно указываем только нужные поля, чтобы избежать конфликта с BillingPayment
-    __mapper_args__ = {
-        'include_properties': [
-            'id',
-            'visit_id',
-            'amount',
-            'currency',
-            'method',
-            'status',
-            'receipt_no',
-            'note',
-            'provider',
-            'provider_payment_id',
-            'provider_transaction_id',
-            'payment_url',
-            'provider_data',
-            'commission',
-            'created_at',
-            'updated_at',
-            'paid_at',
-        ]
-    }
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    visit_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    visit_id: Mapped[int] = mapped_column(
+        Integer, 
+        ForeignKey("visits.id", ondelete="RESTRICT"), 
+        nullable=False, 
+        index=True
+    )  # ✅ SECURITY: RESTRICT to prevent visit deletion if payment exists (financial integrity)
 
     # Финансовая информация
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)

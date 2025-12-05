@@ -6,7 +6,7 @@ import logging
 from datetime import date, datetime
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.crud.appointment import appointment as crud_appointment
 from app.models.appointment import Appointment as AppointmentModel
 from app.models.enums import AppointmentStatus
 from app.models.user import User
+from app.core.audit import log_critical_change, extract_model_changes
 from app.schemas.appointment import Appointment
 from app.schemas.emr import (
     EMR,
@@ -83,6 +84,7 @@ def start_visit(
 
 @router.post("/{appointment_id}/emr", response_model=EMR)
 def create_or_update_emr(
+    request: Request,
     appointment_id: int,
     emr_data: EMRCreate,
     db: Session = Depends(deps.get_db),
@@ -301,6 +303,9 @@ def create_or_update_emr(
                 )
 
             # Обновляем существующий EMR
+            # ✅ AUDIT LOG: Сохраняем старые данные перед обновлением
+            old_data, _ = extract_model_changes(existing_emr, None)
+            
             emr_update_dict = emr_data.dict(exclude={"appointment_id"})
             logger.info(
                 "[create_or_update_emr] Данные для обновления: %s",
@@ -310,6 +315,23 @@ def create_or_update_emr(
             updated_emr = crud_emr.emr.update(
                 db, db_obj=existing_emr, obj_in=emr_update
             )
+            
+            # ✅ AUDIT LOG: Логируем обновление EMR
+            db.refresh(updated_emr)
+            _, new_data = extract_model_changes(None, updated_emr)
+            log_critical_change(
+                db=db,
+                user_id=current_user.id,
+                action="UPDATE",
+                table_name="emr",
+                row_id=updated_emr.id,
+                old_data=old_data,
+                new_data=new_data,
+                request=request,
+                description=f"Обновлен EMR ID={updated_emr.id} для записи {appointment_id}",
+            )
+            db.commit()
+            
             logger.info("[create_or_update_emr] EMR обновлен успешно")
             return updated_emr
         else:
@@ -331,6 +353,22 @@ def create_or_update_emr(
             try:
                 new_emr = crud_emr.emr.create(db, obj_in=emr_data)
                 logger.info("[create_or_update_emr] EMR создан, id=%d", new_emr.id)
+                
+                # ✅ AUDIT LOG: Логируем создание EMR
+                db.refresh(new_emr)
+                _, new_data = extract_model_changes(None, new_emr)
+                log_critical_change(
+                    db=db,
+                    user_id=current_user.id,
+                    action="CREATE",
+                    table_name="emr",
+                    row_id=new_emr.id,
+                    old_data=None,
+                    new_data=new_data,
+                    request=request,
+                    description=f"Создан EMR ID={new_emr.id} для записи {appointment_id}",
+                )
+                db.commit()
             except Exception as create_error:
                 logger.error(
                     "[create_or_update_emr] Ошибка при создании EMR: %s: %s",

@@ -13,8 +13,18 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    patient_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    doctor_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    patient_id: Mapped[int] = mapped_column(
+        Integer, 
+        ForeignKey("patients.id", ondelete="RESTRICT"), 
+        nullable=False, 
+        index=True
+    )  # ✅ FIX: Appointments must always reference a patient (medical domain requirement)
+    doctor_id: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        ForeignKey("doctors.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve appointment if doctor deleted
     department_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("departments.id", ondelete="SET NULL"),

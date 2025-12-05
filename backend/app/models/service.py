@@ -49,14 +49,18 @@ class Service(Base):
 
     # Новые поля для админ панели
     category_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("service_categories.id"), nullable=True
-    )
+        Integer, 
+        ForeignKey("service_categories.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve service if category deleted
     duration_minutes: Mapped[Optional[int]] = mapped_column(
         Integer, default=30, nullable=True
     )
     doctor_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("doctors.id"), nullable=True
-    )
+        Integer, 
+        ForeignKey("doctors.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve service if doctor deleted
 
     # ✅ ПОЛЯ ДЛЯ МАСТЕРА РЕГИСТРАЦИИ
     requires_doctor: Mapped[bool] = mapped_column(

@@ -88,8 +88,15 @@ class PaymentProviderManager:
             "USD": [],  # Пока не поддерживается
         }
 
-        supported_providers = currency_providers.get(currency.upper(), [])
-        return [p for p in supported_providers if p in self.providers]
+        # ВАЖНО: для тестового/дев-окружения считаем провайдера "поддерживаемым"
+        # по валюте, даже если он не инициализировался из-за конфигурации.
+        # Фактическая доступность будет проверена далее в create_payment()
+        # через get_provider(), где при отсутствии провайдера вернётся
+        # PaymentResult(success=False, error_message=...).
+        #
+        # Это позволяет /payments/init всегда создавать запись Payment
+        # и аудит, даже если внешний провайдер недоступен.
+        return currency_providers.get(currency.upper(), [])
 
     def create_payment(
         self,

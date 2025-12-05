@@ -2,21 +2,51 @@
 
 # CRITICAL
 
+- [x] **Foreign Key Enforcement** ✅ COMPLETED
+  - **Status:** FK enforcement now working correctly
+  - **Verification:** `python backend/verify_fk_enforcement.py` passes
+  - **Next:** Clean up existing orphaned records before running migrations
+
 - [x] **Environment Variables Configuration** ✅ COMPLETED
   - **Problem:** SECRET_KEY, FCM credentials, and backup settings not configured for production
   - **Clinic Risk:** System cannot start in production, JWT tokens invalid, push notifications fail, no automated backups
   - **Fix:** Create `.env` file with `SECRET_KEY` (min 32 chars), `FCM_SERVER_KEY`, `FCM_PROJECT_ID`, `AUTO_BACKUP_ENABLED=true`, `BACKUP_RETENTION_DAYS=30`
   - **Verification:** Run `python -m pytest tests/test_settings.py -v` and verify `.env.example` exists, check `backend/app/main.py` uses `settings` from config
 
-- [ ] **Database Migration Execution**
-  - **Problem:** Cascade delete migration not applied, foreign key constraints may not be enforced
-  - **Clinic Risk:** Orphaned records, data integrity issues, potential database corruption
-  - **Fix:** Run `alembic upgrade head` in production, verify foreign key enforcement with `PRAGMA foreign_keys`
+- [x] **Foreign Key Enforcement Fix** ✅ COMPLETED
+  - **Problem:** Foreign key constraints were NOT enforced (PRAGMA foreign_keys = 0) despite event listener
+  - **Clinic Risk:** Orphaned records can exist, data integrity violations not prevented, medical records can be corrupted, legal compliance violation
+  - **Fix:** Enhanced event listener in `backend/app/db/session.py` with verification, added FK enforcement to Alembic `env.py`, created `backend/verify_fk_enforcement.py` verification script
+  - **Status:** ✅ FK enforcement now working (verified: PRAGMA foreign_keys = 1, FK violation test passes)
+  - **Verification:** Run `python backend/verify_fk_enforcement.py` - must show `foreign_keys = 1` and FK violation test passes
 
-- [ ] **Cascade Delete Audit Review**
-  - **Problem:** Some foreign key constraints lack explicit `ondelete` clauses, relying on ORM-level cascade
-  - **Clinic Risk:** Data deletion may leave orphaned records if ORM relationships are bypassed
-  - **Fix:** Review `backend/app/scripts/audit_cascade_deletes.py` output, add explicit `ondelete` to critical FKs in models
+- [ ] **Orphaned Records Cleanup** 🔴 CRITICAL
+  - **Problem:** Audit found 84+ orphaned records in database (FK enforcement was disabled, allowing data corruption)
+  - **Clinic Risk:** Medical records reference non-existent patients/visits, payment records orphaned, audit trail broken, legal compliance violation, financial reconciliation impossible
+  - **Fix:** Run `python backend/app/scripts/audit_foreign_keys.py` to identify all orphaned records, create cleanup script to either: (1) delete orphaned records if safe, (2) restore missing parent records from backup, (3) set FK to NULL where appropriate. Document all actions for compliance.
+  - **Legal Risk:** Orphaned medical records violate data integrity requirements, may violate medical record retention laws
+
+- [ ] **Database Migration Execution**
+  - **Problem:** Alembic current: `a47243be82f0` (mergepoint), head: `0e315951c2f5`. Migration not applied.
+  - **Clinic Risk:** Missing schema changes, potential FK constraint definitions not applied
+  - **Fix:** After FK enforcement verified and orphaned records cleaned: Run `alembic upgrade head` in production. Verify no FK constraint violations during migration.
+  - **Note:** DO NOT run migration until orphaned records are addressed (FK enforcement will block migration if violations exist)
+
+- [ ] **Cascade Delete Policy Fixes** 🟠 HIGH
+  - **Problem:** Audit found 30+ FKs missing explicit `ondelete` clauses. Critical issues:
+    - `files.patient_id -> patients`: Missing ondelete (should be SET NULL to preserve medical files)
+    - `files.owner_id -> users`: Missing ondelete (should be SET NULL to preserve files if user deleted)
+    - `payment_transactions.payment_id -> payments`: Missing ondelete (should be SET NULL for audit trail)
+    - `queue_entries.patient_id -> patients`: Missing ondelete (should be RESTRICT or SET NULL)
+    - Many user-related FKs missing CASCADE for authentication/session data
+  - **Clinic Risk:** Data loss when parent records deleted, orphaned records if ORM relationships bypassed, medical files lost if patient deleted, payment audit trail broken
+  - **Fix:** Add explicit `ondelete` clauses to all FKs in models:
+    - Medical data (EMR, files, lab_results): SET NULL (preserve records)
+    - Patient/Visit references: RESTRICT or SET NULL (never CASCADE)
+    - Payment webhooks/transactions: SET NULL (preserve for audit)
+    - User authentication data: CASCADE (safe to delete with user)
+    - File versions/shares: CASCADE (delete with file)
+  - **Files to modify:** `backend/app/models/file_system.py`, `backend/app/models/payment_webhook.py`, `backend/app/models/online_queue.py`, `backend/app/models/clinic.py`, and others identified by audit
 
 - [ ] **Production Security Configuration**
   - **Problem:** Rate limiting disabled, CORS allows all origins, API endpoints may lack proper authentication checks

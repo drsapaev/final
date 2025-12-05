@@ -261,7 +261,8 @@ class PayMeProvider(BasePaymentProvider):
                 provider_data={
                     "method": method,
                     "transaction_id": transaction_id,
-                    "amount": amount_decimal,
+                    # Храним сумму в JSON‑совместимом виде (без Decimal)
+                    "amount": float(amount_decimal),
                     "params": params,
                 },
             )

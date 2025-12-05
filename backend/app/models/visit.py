@@ -41,8 +41,8 @@ class Visit(Base):
     )  # none|pending|approved|rejected
     doctor_price_override: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     doctor_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("doctors.id"), nullable=True, index=True
-    )
+        Integer, ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # ✅ SECURITY: SET NULL to preserve visit if doctor deleted
     visit_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     visit_time: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     department: Mapped[Optional[str]] = mapped_column(

@@ -5,13 +5,14 @@ import os
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import MetaData, select, Table
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.services.service_mapping import normalize_service_code
+from app.core.audit import log_critical_change, extract_model_changes
 
 router = APIRouter()
 
@@ -98,7 +99,12 @@ def list_visits(
     dependencies=[Depends(require_roles("Admin", "Registrar", "Doctor"))],
     summary="Создать визит",
 )
-def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
+def create_visit(
+    request: Request,
+    payload: VisitCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_roles("Admin", "Registrar", "Doctor")),
+):
     """
     Создать визит.
 
@@ -123,6 +129,21 @@ def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
             notify=False,
             log=True,
         )
+        
+        # ✅ AUDIT LOG: Логируем создание визита (CRUD путь)
+        _, new_data = extract_model_changes(None, visit)
+        log_critical_change(
+            db=db,
+            user_id=getattr(current_user, 'id', None) or 0,
+            action="CREATE",
+            table_name="visits",
+            row_id=visit.id,
+            old_data=None,
+            new_data=new_data,
+            request=request,
+            description=f"Создан визит ID={visit.id}",
+        )
+        db.commit()
 
         return VisitOut(
             id=visit.id,
@@ -143,6 +164,9 @@ def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
             "doctor_id": payload.doctor_id,
             "status": "open",
             "notes": payload.notes,
+            "created_at": datetime.utcnow(),  # ✅ FIX: Add created_at for Table API
+            "discount_mode": "none",  # ✅ FIX: Add discount_mode default (from Visit model)
+            "approval_status": "none",  # ✅ FIX: Add approval_status default (from Visit model)
         }
         # если передали planned_date — добавим в insert (если колонка есть)
         if hasattr(t.c, "planned_date") and payload.planned_date is not None:
@@ -150,8 +174,34 @@ def create_visit(payload: VisitCreate, db: Session = Depends(get_db)):
 
         ins = t.insert().values(**ins_values).returning(t)
         row = db.execute(ins).mappings().first()
-        db.commit()
         assert row is not None
+        
+        # ✅ AUDIT LOG: Log visit creation for Table API path (BEFORE commit for atomicity)
+        visit_id = row["id"]
+        # Convert row to dict and serialize datetime objects to strings for JSON
+        new_data = {}
+        for key, value in dict(row).items():
+            if isinstance(value, datetime):
+                new_data[key] = value.isoformat()
+            elif isinstance(value, date):
+                new_data[key] = value.isoformat()
+            else:
+                new_data[key] = value
+        log_critical_change(
+            db=db,
+            user_id=getattr(current_user, 'id', None) or 0,  # ✅ FIX: Consistent with CRUD path
+            action="CREATE",
+            table_name="visits",
+            row_id=visit_id,
+            old_data=None,
+            new_data=new_data,
+            request=request,
+            description=f"Создан визит ID={visit_id}",
+        )
+        # ✅ FIX: Single commit after both visit creation and audit log for atomicity
+        # If audit log fails, the entire transaction (including visit) will be rolled back
+        db.commit()
+        
         return VisitOut(**row)  # type: ignore[arg-type]
 
 

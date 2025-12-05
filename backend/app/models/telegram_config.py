@@ -95,8 +95,16 @@ class TelegramUser(Base):
     __tablename__ = "telegram_users"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Для персонала
+    patient_id = Column(
+        Integer, 
+        ForeignKey("patients.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve Telegram link
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve Telegram link
 
     # Telegram данные
     chat_id = Column(BigInteger, unique=True, nullable=False, index=True)
@@ -145,7 +153,11 @@ class TelegramMessage(Base):
     error_message = Column(Text, nullable=True)
 
     # Метаданные
-    sent_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    sent_by_user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve message log
     related_entity_type = Column(
         String(50), nullable=True
     )  # appointment, visit, payment

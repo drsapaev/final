@@ -30,7 +30,12 @@ class ScheduleTemplate(Base):
         nullable=True,
         index=True,
     )
-    doctor_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    doctor_id: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        ForeignKey("doctors.id", ondelete="SET NULL"), 
+        nullable=True, 
+        index=True
+    )  # ✅ SECURITY: SET NULL to preserve schedule if doctor deleted
     weekday: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     start_time: Mapped[str] = mapped_column(String(5), nullable=False)
     end_time: Mapped[str] = mapped_column(String(5), nullable=False)

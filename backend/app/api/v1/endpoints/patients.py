@@ -1,13 +1,14 @@
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.crud.patient import patient as patient_crud
 from app.models.user import User
 from app.schemas import patient as patient_schemas
+from app.core.audit import log_critical_change, extract_model_changes
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ def list_patients(
     limit: int = Query(100, ge=1, le=1000),
     q: Optional[str] = Query(None, description="Поиск по ФИО, телефону или документу"),
     phone: Optional[str] = Query(None, description="Точный поиск по номеру телефона"),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "Nurse")),
 ):
     """
     Получить список пациентов с возможностью поиска и пагинации
@@ -38,9 +39,10 @@ def list_patients(
 @router.post("/", response_model=patient_schemas.Patient)
 def create_patient(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_in: patient_schemas.PatientCreate,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar")),
 ):
     """
     Создать нового пациента.
@@ -203,6 +205,21 @@ def create_patient(
             status_code=500, detail="Ошибка сохранения: имя пациента не было сохранено"
         )
 
+    # ✅ AUDIT LOG: Логируем создание пациента (юридически обязательное)
+    _, new_data = extract_model_changes(None, patient)
+    log_critical_change(
+        db=db,
+        user_id=current_user.id,
+        action="CREATE",
+        table_name="patients",
+        row_id=patient.id,
+        old_data=None,
+        new_data=new_data,
+        request=request,
+        description=f"Создан пациент: {patient.last_name} {patient.first_name}",
+    )
+    db.commit()
+
     return patient
 
 
@@ -211,7 +228,7 @@ def get_patient(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Lab", "Cashier", "Nurse", "Patient")),
 ):
     """
     Получить пациента по ID
@@ -225,10 +242,11 @@ def get_patient(
 @router.put("/{patient_id}", response_model=patient_schemas.Patient)
 def update_patient(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_id: int,
     patient_in: patient_schemas.PatientUpdate,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar")),
 ):
     """
     Обновить данные пациента
@@ -246,16 +264,37 @@ def update_patient(
                 detail="Пациент с таким номером телефона уже существует",
             )
 
+    # Сохраняем старые данные для аудит-лога
+    old_data, _ = extract_model_changes(patient, None)
+    
     patient = patient_crud.update(db=db, db_obj=patient, obj_in=patient_in)
+    
+    # ✅ AUDIT LOG: Логируем обновление пациента
+    db.refresh(patient)
+    _, new_data = extract_model_changes(None, patient)
+    log_critical_change(
+        db=db,
+        user_id=current_user.id,
+        action="UPDATE",
+        table_name="patients",
+        row_id=patient.id,
+        old_data=old_data,
+        new_data=new_data,
+        request=request,
+        description=f"Обновлен пациент: {patient.last_name} {patient.first_name}",
+    )
+    db.commit()
+    
     return patient
 
 
 @router.delete("/{patient_id}")
 def delete_patient(
     *,
+    request: Request,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin")),
 ):
     """
     Удалить пациента
@@ -270,7 +309,36 @@ def delete_patient(
             status_code=400, detail="Нельзя удалить пациента с активными записями"
         )
 
-    patient_crud.remove(db=db, id=patient_id)
+    # ✅ Сохраняем данные для аудита перед удалением
+    old_data, _ = extract_model_changes(patient, None)
+    patient_name = f"{patient.last_name} {patient.first_name}"
+    
+    # ✅ FIX: Выполняем удаление и логирование в одной транзакции для атомарности
+    try:
+        patient_crud.remove(db=db, id=patient_id)
+        
+        # ✅ AUDIT LOG: Логируем удаление пациента в той же транзакции
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="DELETE",
+            table_name="patients",
+            row_id=patient_id,
+            old_data=old_data,
+            new_data=None,
+            request=request,
+            description=f"Удален пациент: {patient_name}",
+        )
+        
+        # ✅ FIX: Один commit для атомарности - если аудит не запишется, удаление откатится
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка удаления пациента: {str(e)}",
+        )
+    
     return {"message": "Пациент успешно удален"}
 
 
@@ -279,7 +347,7 @@ def get_patient_appointments(
     *,
     db: Session = Depends(deps.get_db),
     patient_id: int,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_roles("Admin", "Registrar", "Doctor", "Patient")),
 ):
     """
     Получить все записи пациента

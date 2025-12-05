@@ -276,7 +276,7 @@ const QueueJoin = () => {
         setLoading(false);
         return;
       }
-      
+
       if (normalizedPhone.length > 12) {
         setError('Телефон рақами жуда узун (максимум 12 та рақам)');
         setLoading(false);

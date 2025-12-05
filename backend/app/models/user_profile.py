@@ -38,7 +38,12 @@ class UserProfile(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, 
+        unique=True
+    )  # ✅ SECURITY: CASCADE (profile dies with user)
 
     # Основная информация
     full_name = Column(String(100), nullable=True)
@@ -116,7 +121,12 @@ class UserPreferences(Base):
     __tablename__ = "user_preferences"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, 
+        unique=True
+    )  # ✅ SECURITY: CASCADE (profile dies with user)
     profile_id = Column(
         Integer, ForeignKey("user_profiles.id"), nullable=False, unique=True
     )
@@ -168,7 +178,12 @@ class UserNotificationSettings(Base):
     __tablename__ = "user_notification_settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, 
+        unique=True
+    )  # ✅ SECURITY: CASCADE (profile dies with user)
     profile_id = Column(
         Integer, ForeignKey("user_profiles.id"), nullable=False, unique=True
     )
@@ -221,34 +236,41 @@ class UserNotificationSettings(Base):
 
 
 class UserAuditLog(Base):
-    """Аудит действий пользователей"""
+    """Аудит действий пользователей - юридически обязательное логирование"""
 
     __tablename__ = "user_audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True,
+        index=True
+    )  # ✅ FIX: SET NULL to preserve audit logs for compliance (legal requirement)
 
     # Действие
     action = Column(
-        String(50), nullable=False
-    )  # create, update, delete, login, logout, etc.
+        String(50), nullable=False, index=True
+    )  # CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
     resource_type = Column(
-        String(50), nullable=True
-    )  # user, patient, appointment, etc.
-    resource_id = Column(Integer, nullable=True)
+        String(50), nullable=True, index=True
+    )  # patients, visits, payments, emr, files, appointments, etc. (table_name)
+    resource_id = Column(Integer, nullable=True, index=True)  # row_id
 
-    # Детали
+    # Детали изменений
     description = Column(Text, nullable=True)
-    old_values = Column(JSON, nullable=True)
-    new_values = Column(JSON, nullable=True)
+    old_values = Column(JSON, nullable=True)  # Старые значения (для UPDATE/DELETE)
+    new_values = Column(JSON, nullable=True)  # Новые значения (для CREATE/UPDATE)
+    diff_hash = Column(String(32), nullable=True)  # Хеш различий для быстрого сравнения
 
-    # Контекст
-    ip_address = Column(String(45), nullable=True)
+    # Контекст запроса
+    ip_address = Column(String(45), nullable=True, index=True)
     user_agent = Column(Text, nullable=True)
-    session_id = Column(String(64), nullable=True)
+    session_id = Column(String(64), nullable=True, index=True)  # Используется для request_id
+    request_id = Column(String(64), nullable=True, index=True)  # UUID запроса для трассировки
 
     # Метаданные
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
     user = relationship("User", back_populates="audit_logs")

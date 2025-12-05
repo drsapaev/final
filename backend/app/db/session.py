@@ -50,11 +50,26 @@ print(f"[app.db.session] Using DATABASE_URL = {DATABASE_URL}", file=sys.stderr)
 # Создаём СИНХРОННЫЙ движок
 # ✅ SECURITY: Enable foreign key enforcement for SQLite via event listener
 def _enable_sqlite_fk(dbapi_conn, connection_record):
-    """Enable foreign key enforcement for SQLite connections"""
+    """
+    Enable foreign key enforcement for SQLite connections.
+    This is called automatically when a new connection is created.
+    SQLite requires PRAGMA foreign_keys=ON on EACH connection.
+    """
     if DATABASE_URL.startswith("sqlite"):
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+        try:
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            # Verify it was set (for debugging)
+            cursor.execute("PRAGMA foreign_keys")
+            fk_status = cursor.fetchone()
+            if fk_status and fk_status[0] == 1:
+                print(f"[app.db.session] ✅ Foreign keys enabled on connection (verified: {fk_status[0]})", file=sys.stderr)
+            else:
+                print(f"[app.db.session] ⚠️  WARNING: Foreign keys NOT enabled on connection (status: {fk_status})", file=sys.stderr)
+            cursor.close()
+        except Exception as e:
+            print(f"[app.db.session] ❌ ERROR enabling foreign keys: {e}", file=sys.stderr)
+            raise
 
 engine = create_engine(
     DATABASE_URL, 
@@ -82,12 +97,22 @@ def get_db() -> Generator[Session, None, None]:
     """
     Синхронный dependency — отдаёт обычный Session (как ожидают ваши эндпоинты).
     ✅ SECURITY: Foreign key enforcement is enabled via event listener for SQLite.
+    Additional PRAGMA execution here ensures FK is enabled even if event listener fails.
     """
     db = SessionLocal()
     try:
         # ✅ SECURITY: Ensure foreign keys are enabled for this connection (SQLite)
+        # Event listener should have already enabled it, but we verify/ensure here as well
         if DATABASE_URL.startswith("sqlite"):
             db.execute(text("PRAGMA foreign_keys=ON"))  # ✅ Используем text()
+            # Verify FK is enabled (for safety)
+            result = db.execute(text("PRAGMA foreign_keys")).scalar()
+            if result != 1:
+                raise RuntimeError(
+                    f"CRITICAL: Foreign key enforcement failed to enable. "
+                    f"PRAGMA foreign_keys returned {result} instead of 1. "
+                    f"This is a security risk for medical data integrity."
+                )
         yield db
     finally:
         db.close()

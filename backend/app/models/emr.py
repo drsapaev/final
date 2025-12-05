@@ -16,8 +16,11 @@ class EMR(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     appointment_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("appointments.id"), nullable=False, index=True
-    )
+        Integer, 
+        ForeignKey("appointments.id", ondelete="RESTRICT"), 
+        nullable=False, 
+        index=True
+    )  # ✅ FIX: EMR must always reference an appointment (medical documentation requirement)
 
     # Основные поля EMR
     complaints: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Жалобы

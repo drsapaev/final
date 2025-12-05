@@ -56,6 +56,14 @@ app.include_router(queue_ws_router)  # /ws/queue
 app.add_api_websocket_route("/ws/dev-queue", ws_queue)
 
 # -----------------------------------------------------------------------------
+# Audit Middleware (должен быть ДО CORS для установки request_id)
+# -----------------------------------------------------------------------------
+from app.middleware.audit_middleware import AuditMiddleware  # noqa: E402
+
+app.add_middleware(AuditMiddleware)
+log.info("Audit middleware registered")
+
+# -----------------------------------------------------------------------------
 # CORS
 # -----------------------------------------------------------------------------
 if not CORS_DISABLE:

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.core.config import settings
 from app.db.session import get_db
+from app.core.audit import log_critical_change, extract_model_changes
 from app.models.enums import (
     PaymentStatus,  # ✅ SSOT: Используем enum из app.models.enums
 )
@@ -197,9 +198,10 @@ def get_available_providers(db: Session = Depends(get_db)) -> ProvidersResponse:
 
 @router.post("/init", response_model=PaymentInitResponse)
 def init_payment(
+    request: Request,
     payment_request: PaymentInitRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Registrar", "Cashier")),
 ) -> PaymentInitResponse:
     """Инициализация платежа"""
 
@@ -235,6 +237,22 @@ def init_payment(
             provider=payment_request.provider,
             commit=False,  # Не коммитим сразу, обновим после получения данных от провайдера
         )
+        
+        # ✅ AUDIT LOG: Логируем инициализацию платежа (BEFORE provider call for atomicity)
+        db.flush()  # Получаем ID платежа
+        _, new_data = extract_model_changes(None, payment)
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="CREATE",
+            table_name="payments",
+            row_id=payment.id,
+            old_data=None,
+            new_data=new_data,
+            request=request,
+            description=f"Инициализирован платеж ID={payment.id}, провайдер={payment_request.provider}",
+        )
+        # ✅ FIX: Не коммитим здесь - сделаем один commit после всех операций с провайдером
 
         # Генерируем order_id
         # ✅ SSOT: Используем get_local_timestamp() вместо datetime.now()
@@ -272,12 +290,18 @@ def init_payment(
             payment.provider_data = result.provider_data
 
             # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
+            # ✅ FIX: commit=False для атомарности - закоммитим все вместе в конце
             billing_service = BillingService(db)
             billing_service.update_payment_status(
                 payment_id=payment.id,
                 new_status=result.status or "pending",
                 meta=result.provider_data,
+                commit=False,  # Не коммитим здесь
             )
+
+            # ✅ FIX: Один commit для всех операций (payment creation + audit + status update)
+            db.commit()
+            db.refresh(payment)
 
             return PaymentInitResponse(
                 success=True,
@@ -288,12 +312,18 @@ def init_payment(
             )
         else:
             # ✅ SSOT: Используем update_payment_status() вместо прямого изменения
+            # ✅ FIX: commit=False для атомарности - закоммитим все вместе в конце
             billing_service = BillingService(db)
             billing_service.update_payment_status(
                 payment_id=payment.id,
                 new_status="failed",
                 meta={"error": result.error_message},
+                commit=False,  # Не коммитим здесь
             )
+
+            # ✅ FIX: Один commit для всех операций (payment creation + audit + status update)
+            db.commit()
+            db.refresh(payment)
 
             return PaymentInitResponse(
                 success=False, payment_id=payment.id, error_message=result.error_message
@@ -302,6 +332,16 @@ def init_payment(
     except HTTPException:
         raise
     except Exception as e:
+        # ✅ КРИТИЧНО: если платеж уже создан — всегда возвращаем его ID,
+        # даже если произошла ошибка при обращении к провайдеру.
+        if "payment" in locals() and payment is not None and getattr(payment, "id", None):
+            return PaymentInitResponse(
+                success=False,
+                payment_id=payment.id,
+                error_message=f"Ошибка инициализации платежа: {str(e)}",
+            )
+
+        # Если ошибка произошла ДО создания платежа
         return PaymentInitResponse(
             success=False, error_message=f"Ошибка инициализации платежа: {str(e)}"
         )
@@ -320,9 +360,10 @@ class PaymentCreateRequest(BaseModel):
 
 @router.post("/", response_model=Dict[str, Any])
 def create_payment(
+    request: Request,
     payment_request: PaymentCreateRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier")),
 ) -> Dict[str, Any]:
     """Создание платежа (для кассы)"""
     try:
@@ -449,7 +490,7 @@ def list_payments(
     date_to: Optional[str] = Query(None, description="Дата окончания (YYYY-MM-DD)"),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение списка платежей с фильтрацией (использует SSOT)"""
     import logging
@@ -481,7 +522,7 @@ def list_payments(
 def get_payment_status(
     payment_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor", "Patient")),
 ) -> PaymentStatusResponse:
     """Получение статуса платежа"""
 
@@ -530,7 +571,7 @@ def get_payment_status(
 def get_visit_payments(
     visit_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier", "Registrar", "Doctor")),
 ) -> PaymentListResponse:
     """Получение всех платежей по визиту"""
 
@@ -561,7 +602,7 @@ def get_visit_payments(
 def cancel_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
+    current_user=Depends(deps.require_roles("Admin", "Cashier")),
 ) -> Dict[str, Any]:
     """Отмена платежа"""
 

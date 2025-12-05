@@ -761,6 +761,7 @@ class BillingService:
         payment_id: int,
         new_status: str,
         meta: Optional[Dict[str, Any]] = None,
+        commit: bool = True,
     ) -> Payment:
         """
         Обновление статуса платежа (SSOT).
@@ -832,8 +833,11 @@ class BillingService:
             else:
                 payment.provider_data = meta
 
-        self.db.commit()
-        self.db.refresh(payment)
+        if commit:
+            self.db.commit()
+            self.db.refresh(payment)
+        else:
+            self.db.flush()
 
         return payment
 
@@ -880,36 +884,56 @@ class BillingService:
         reference_number: str = None,
         description: str = None,
         created_by: int = None,
-    ):
+    ) -> Payment:
         """
-        Записать платеж (устаревший метод - используйте create_payment вместо этого).
+        Записать платеж для счета.
 
-        ⚠️ ВНИМАНИЕ: Этот метод использует BillingPayment, который конфликтует с Payment.
-        Рекомендуется использовать create_payment() для создания платежей через SSOT.
+        Устаревший метод-обертка, теперь использует Payment (SSOT) вместо BillingPayment.
+        Платеж привязывается к визиту, связанному с инвойсом (invoice.visit_id).
+
+        Returns:
+            Payment - созданный платеж
         """
-        # ✅ ИСПРАВЛЕНО: Импортируем BillingPayment локально, чтобы избежать конфликта
-        from app.models.billing import BillingPayment
-
         invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
         if not invoice:
             raise ValueError("Счет не найден")
 
-        # Генерируем номер платежа
+        if not invoice.visit_id:
+            raise ValueError(
+                "Невозможно записать платеж: у счета нет связанного визита (invoice.visit_id)"
+            )
+
+        # Генерируем номер платежа (используем как receipt_no)
         payment_number = self._generate_payment_number()
 
-        # Создаем платеж
-        payment = BillingPayment(
-            payment_number=payment_number,
-            invoice_id=invoice_id,
-            patient_id=invoice.patient_id,
-            amount=amount,
-            payment_method=payment_method,
-            reference_number=reference_number,
-            description=description,
-            created_by=created_by,
-        )
+        # Определяем валюту из настроек биллинга
+        settings = self.get_billing_settings()
+        currency = settings.currency_code or "UZS"
 
-        self.db.add(payment)
+        # ✅ FIX: Обрабатываем payment_method как enum или строку
+        # Если это enum, извлекаем значение; если строка, используем как есть
+        if hasattr(payment_method, 'value'):
+            method_str = payment_method.value
+        elif isinstance(payment_method, str):
+            method_str = payment_method
+        else:
+            raise ValueError(
+                f"payment_method must be PaymentMethod enum or string, got {type(payment_method)}"
+            )
+
+        # Создаем платеж через SSOT Payment
+        payment = self.create_payment(
+            visit_id=invoice.visit_id,
+            amount=amount,
+            currency=currency,
+            method=method_str,
+            status=PaymentStatus.PAID.value,
+            receipt_no=payment_number,
+            note=description,
+            provider=None,
+            provider_payment_id=reference_number,
+            commit=False,
+        )
 
         # Обновляем статус счета
         invoice.paid_amount += amount

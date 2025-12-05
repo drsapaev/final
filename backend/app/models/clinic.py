@@ -36,7 +36,11 @@ class ClinicSettings(Base):
         String(50), nullable=True, index=True
     )  # clinic, queue, ai, print, telegram
     description = Column(Text, nullable=True)
-    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_by = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -52,7 +56,11 @@ class Doctor(Base):
     __tablename__ = "doctors"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve doctor record
     department_id = Column(
         Integer,
         ForeignKey("departments.id", ondelete="SET NULL"),
@@ -145,7 +153,11 @@ class Branch(Base):
     address = Column(Text, nullable=True)
     phone = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
-    manager_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    manager_id = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve branch record
     status = Column(Enum(BranchStatus), default=BranchStatus.ACTIVE, nullable=False)
     timezone = Column(String(50), default="Asia/Tashkent", nullable=False)
     working_hours = Column(
@@ -305,7 +317,11 @@ class LicenseActivation(Base):
     license_id = Column(
         Integer, ForeignKey("licenses.id", ondelete="CASCADE"), nullable=False
     )
-    activated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    activated_by = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     activation_date = Column(DateTime(timezone=True), server_default=func.now())
     machine_id = Column(String(100), nullable=True)  # Уникальный ID машины
     ip_address = Column(String(45), nullable=True)
@@ -350,7 +366,11 @@ class Backup(Base):
     status = Column(Enum(BackupStatus), default=BackupStatus.PENDING, nullable=False)
     file_path = Column(String(500), nullable=True)
     file_size = Column(Integer, nullable=True)  # Размер в байтах
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(
+        Integer, 
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )  # ✅ SECURITY: SET NULL to preserve audit trail
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
