@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Безопасный логгер с автоматической санитизацией PHI
  * Предотвращает случайное логирование Protected Health Information

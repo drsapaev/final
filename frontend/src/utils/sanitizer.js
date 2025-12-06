@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex, no-useless-escape */
 /**
  * Утилиты для санитизации пользовательского ввода
  * XSS Protection для медицинской системы
@@ -166,7 +167,7 @@ export function escapeHTML(str) {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    "'": '&#x27;',
+    '\'': '&#x27;',
     '/': '&#x2F;'
   };
 
