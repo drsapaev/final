@@ -206,13 +206,40 @@ class AuthenticationService:
             logger.debug("Authentication failed, returning error")
             return {"success": False, "message": message, "user": None, "tokens": None}
 
-        # Проверяем, требуется ли 2FA до выдачи токенов
+        # ✅ SECURITY: Проверяем, требуется ли 2FA до выдачи токенов
         requires_2fa = False
         two_factor_method = None
-        # Временно отключено из-за проблем с БД
-        # if user.two_factor_auth and user.two_factor_auth.totp_enabled:
-        #     requires_2fa = True
-        #     two_factor_method = "totp"
+        
+        # ✅ CERTIFICATION: Принудительное 2FA для критичных ролей (Admin, Cashier)
+        from app.core.roles import Roles
+        
+        CRITICAL_2FA_ROLES = {Roles.ADMIN, Roles.CASHIER}
+        user_role = getattr(user, "role", None)
+        is_critical_role = user_role in CRITICAL_2FA_ROLES
+        
+        # Проверяем, настроена ли 2FA у пользователя
+        has_2fa_enabled = (
+            user.two_factor_auth 
+            and user.two_factor_auth.totp_enabled 
+            and user.two_factor_auth.totp_verified
+        )
+        
+        # Если роль критичная (Admin/Cashier), но 2FA не настроена - блокируем вход
+        if is_critical_role and not has_2fa_enabled:
+            return {
+                "success": False,
+                "message": f"Для роли {user_role} требуется настройка двухфакторной аутентификации (2FA). Пожалуйста, настройте 2FA перед входом.",
+                "user": None,
+                "tokens": None,
+                "requires_2fa": False,
+                "requires_2fa_setup": True,  # ✅ Новый флаг: требуется настройка 2FA
+                "two_factor_method": None,
+            }
+        
+        # Если 2FA настроена, требуем верификацию
+        if has_2fa_enabled:
+            requires_2fa = True
+            two_factor_method = "totp"
 
         # Если 2FA требуется — НЕ выдаём основные токены. Создаём временный pending_2fa_token
         if requires_2fa:

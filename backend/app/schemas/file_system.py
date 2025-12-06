@@ -61,6 +61,7 @@ class FileBase(BaseModel):
 
 
 class FileCreate(FileBase):
+    file_path: str = Field(..., max_length=500)  # ✅ CERTIFICATION: Обязательное поле для file_path
     file_size: int = Field(..., gt=0)
     file_hash: Optional[str] = Field(None, max_length=64)
     file_metadata: Optional[Dict[str, Any]] = None
@@ -81,13 +82,59 @@ class FileOut(FileBase):
     file_size: int
     file_hash: Optional[str]
     status: FileStatusEnum
-    metadata: Optional[Dict[str, Any]]
+    metadata: Optional[Dict[str, Any]] = None
     owner_id: int
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def from_orm(cls, obj):
+        """Кастомная сериализация для преобразования JSON строк в Python объекты"""
+        import json
+        data = {
+            "id": obj.id,
+            "filename": obj.filename,
+            "original_filename": obj.original_filename,
+            "file_type": obj.file_type.value if hasattr(obj.file_type, 'value') else obj.file_type,
+            "mime_type": obj.mime_type,
+            "title": obj.title,
+            "description": obj.description,
+            "permission": obj.permission.value if hasattr(obj.permission, 'value') else obj.permission,
+            "patient_id": obj.patient_id,
+            "appointment_id": obj.appointment_id,
+            "emr_id": obj.emr_id,
+            "expires_at": obj.expires_at,
+            "file_path": obj.file_path,
+            "file_size": obj.file_size,
+            "file_hash": obj.file_hash,
+            "status": obj.status.value if hasattr(obj.status, 'value') else obj.status,
+            "owner_id": obj.owner_id,
+            "created_at": obj.created_at,
+            "updated_at": obj.updated_at,
+        }
+        
+        # Преобразуем tags из JSON строки в список
+        if obj.tags:
+            try:
+                data["tags"] = json.loads(obj.tags) if isinstance(obj.tags, str) else obj.tags
+            except (json.JSONDecodeError, TypeError):
+                data["tags"] = []
+        else:
+            data["tags"] = None
+        
+        # Преобразуем file_metadata из JSON строки в словарь (и переименовываем в metadata)
+        if obj.file_metadata:
+            try:
+                data["metadata"] = json.loads(obj.file_metadata) if isinstance(obj.file_metadata, str) else obj.file_metadata
+            except (json.JSONDecodeError, TypeError):
+                data["metadata"] = {}
+        else:
+            data["metadata"] = None
+        
+        return cls(**data)
 
 
 class FileList(BaseModel):

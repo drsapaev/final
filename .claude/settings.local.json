@@ -8,7 +8,8 @@
       "Bash(python:*)",
       "Bash(cmd //c \"taskkill /PID 2764 /F\")",
       "Bash(timeout /t 3 /nobreak)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(npm audit:*)"
     ],
     "deny": [],
     "ask": []

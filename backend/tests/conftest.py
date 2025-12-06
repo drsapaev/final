@@ -9,7 +9,7 @@ from datetime import date, datetime
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.deps import get_db
 from app.core.security import get_password_hash
@@ -298,6 +298,43 @@ def test_daily_queue(db_session, cardio_user):
     db_session.commit()
     db_session.refresh(queue)
     return queue
+
+
+@pytest.fixture
+def registrar_token(client: TestClient, registrar_user: User) -> str:
+    """Токен регистратора"""
+    response = client.post(
+        "/api/v1/auth/minimal-login",
+        json={"username": registrar_user.username, "password": "registrar123"},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+@pytest.fixture
+def patient_token(client: TestClient, db_session: Session) -> str:
+    """Токен пациента"""
+    # Создаём пациента если нет
+    patient_user = db_session.query(User).filter(User.username == "patient_test").first()
+    if not patient_user:
+        patient_user = User(
+            username="patient_test",
+            email="patient@test.com",
+            hashed_password=get_password_hash("patient123"),
+            role="Patient",
+            is_active=True,
+            is_superuser=False,
+        )
+        db_session.add(patient_user)
+        db_session.commit()
+        db_session.refresh(patient_user)
+    
+    response = client.post(
+        "/api/v1/auth/minimal-login",
+        json={"username": patient_user.username, "password": "patient123"},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
 
 
 @pytest.fixture(scope="function")

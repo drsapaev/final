@@ -434,6 +434,56 @@ async def update_file(
         )
 
 
+@router.put("/{file_id}/content", response_model=FileOut)
+async def replace_file_content(
+    request: Request,
+    file_id: int,
+    file: UploadFile = File(...),
+    change_description: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles("Admin", "Doctor", "Nurse", "Receptionist")
+    ),
+):
+    """
+    ✅ CERTIFICATION: Заменить содержимое файла с версионированием.
+    Создает версию старого файла перед заменой и сохраняет SHA256 хеш.
+    """
+    try:
+        service = get_file_system_service()
+        
+        # Заменяем содержимое файла (создает версию автоматически)
+        updated_file = service.replace_file_content(
+            db, file_id, file, current_user.id, change_description
+        )
+        
+        # ✅ AUDIT LOG: Логируем замену содержимого
+        db.refresh(updated_file)
+        _, new_data = extract_model_changes(None, updated_file)
+        log_critical_change(
+            db=db,
+            user_id=current_user.id,
+            action="UPDATE",
+            table_name="files",
+            row_id=file_id,
+            old_data=None,  # Старая версия сохранена в FileVersion
+            new_data=new_data,
+            request=request,
+            description=f"Заменено содержимое файла ID={file_id}: {updated_file.filename} (хеш: {updated_file.file_hash[:8]}...)",
+        )
+        db.commit()
+        
+        return FileOut.from_orm(updated_file)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка замены содержимого файла: {str(e)}",
+        )
+
+
 @router.delete("/{file_id}")
 async def delete_file(
     request: Request,

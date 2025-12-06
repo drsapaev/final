@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -140,7 +140,6 @@ async def verify_two_factor(
     request_data: TwoFactorVerifyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """Верифицировать 2FA код"""
     try:
@@ -160,10 +159,46 @@ async def verify_two_factor(
                 detail="At least one verification method must be provided",
             )
 
+        # ✅ CERTIFICATION: Получаем пользователя из access_token или pending_2fa_token
+        user: Optional[User] = None
+        
+        # Пробуем получить из access_token (если передан в заголовке)
+        try:
+            from fastapi.security import HTTPBearer
+            security = HTTPBearer(auto_error=False)
+            token_result = await security(request)
+            if token_result and token_result.credentials:
+                try:
+                    user = await get_current_user(token_result.credentials, db)
+                except HTTPException:
+                    pass  # Не JWT токен, пробуем pending_2fa_token
+        except Exception:
+            pass
+        
+        # Если access_token не сработал, пробуем pending_2fa_token
+        if not user and request_data.pending_2fa_token:
+            pending_session = (
+                db.query(UserSession)
+                .filter(
+                    UserSession.refresh_token == request_data.pending_2fa_token,
+                    UserSession.revoked == False,
+                    UserSession.expires_at > datetime.utcnow(),
+                )
+                .first()
+            )
+            if pending_session:
+                user = db.query(User).filter(User.id == pending_session.user_id).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Provide either access_token or valid pending_2fa_token",
+            )
+
         # Верифицируем 2FA
         success, message, session_token = service.verify_two_factor(
             db=db,
-            user_id=current_user.id,
+            user_id=user.id,
             totp_code=request_data.totp_code,
             backup_code=request_data.backup_code,
             recovery_token=request_data.recovery_token,
@@ -177,7 +212,7 @@ async def verify_two_factor(
             backup_codes_remaining = None
             if request_data.backup_code:
                 two_factor_auth_obj = two_factor_auth.get_by_user_id(
-                    db, current_user.id
+                    db, user.id
                 )
                 if two_factor_auth_obj:
                     backup_codes_remaining = two_factor_backup_code.get_unused_count(
@@ -192,7 +227,7 @@ async def verify_two_factor(
                 pending_session = (
                     db.query(UserSession)
                     .filter(
-                        UserSession.user_id == current_user.id,
+                        UserSession.user_id == user.id,
                         UserSession.refresh_token == pending,
                         UserSession.revoked == False,
                         UserSession.expires_at > datetime.utcnow(),
@@ -205,18 +240,18 @@ async def verify_two_factor(
                     jti = str(uuid.uuid4())
                     access_token = auth.create_access_token(
                         {
-                            "sub": str(current_user.id),
-                            "username": current_user.username,
-                            "role": current_user.role,
-                            "is_active": current_user.is_active,
-                            "is_superuser": current_user.is_superuser,
+                            "sub": str(user.id),
+                            "username": user.username,
+                            "role": user.role,
+                            "is_active": user.is_active,
+                            "is_superuser": user.is_superuser,
                         }
                     )
-                    refresh_token = auth.create_refresh_token(current_user.id, jti)
+                    refresh_token = auth.create_refresh_token(user.id, jti)
                     # Сохраняем refresh
                     db.add(
                         RefreshToken(
-                            user_id=current_user.id,
+                            user_id=user.id,
                             token=refresh_token,
                             jti=jti,
                             expires_at=datetime.utcnow()
