@@ -6,7 +6,33 @@ import { AI_ANALYSIS_TYPES, MCP_PROVIDERS, AI_ERROR_MESSAGES, ATTACHMENT_CATEGOR
 import { AIButton, AISuggestions, AIAssistant } from '../ai';
 import { useEMRAI } from '../../hooks/useEMRAI';
 import { useDebounce } from '../../utils/debounce';
+import { useBlobURL } from '../../hooks/useBlobURL';
+import { validateFile, validateFiles, getAllowedTypesDescription } from '../../utils/fileValidator';
 import TeethChart from '../dental/TeethChart';
+import logger from '../../utils/logger';
+
+/**
+ * Компонент для безопасного отображения изображений с автоматической очисткой памяти
+ */
+const AttachmentImage = ({ file, alt, style }) => {
+  const blobURL = useBlobURL(file);
+
+  if (!blobURL) {
+    return (
+      <div style={{
+        ...style,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--mac-background-secondary)'
+      }}>
+        <CircularProgress size={24} />
+      </div>
+    );
+  }
+
+  return <img src={blobURL} alt={alt} style={style} />;
+};
 
 const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
   // Используем AI хук для работы с искусственным интеллектом через MCP
@@ -193,7 +219,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
           }
         }
       } catch (error) {
-        console.error('AI analysis error:', error);
+        logger.error('AI analysis error:', error);
       }
     }, [analyzeComplaints, appointment?.status, appointment?.patient?.age, appointment?.patient?.gender, complaintsAnalysisCache]),
     1000 // 1 секунда задержка
@@ -212,9 +238,9 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
 
       await onSave(emrToSave);
       setLastAutoSave(new Date());
-      console.log('EMR: Auto-saved draft');
+      logger.log('EMR: Auto-saved draft');
     } catch (error) {
-      console.error('EMR: Auto-save error:', error);
+      logger.error('EMR: Auto-save error:', error);
     }
   };
 
@@ -339,22 +365,65 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
     setHasUnsavedChanges(true);
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
-    const newAttachments = files.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      file: file,
-      category: selectedCategory
-    }));
 
-    setEmrData(prev => ({
-      ...prev,
-      attachments: [...prev.attachments, ...newAttachments]
-    }));
-    setHasUnsavedChanges(true);
+    if (files.length === 0) return;
+
+    // Валидация файлов
+    const validationOptions = {
+      allowedCategories: ['images', 'documents', 'medical'],
+      maxSize: 50 * 1024 * 1024, // 50MB
+      strictMagicNumber: true
+    };
+
+    const validationResult = await validateFiles(files, validationOptions);
+
+    // Фильтруем только валидные файлы
+    const validFiles = validationResult.results
+      .filter(r => r.validation.valid)
+      .map(r => r.file);
+
+    // Показываем ошибки для невалидных файлов
+    const invalidResults = validationResult.results.filter(r => !r.validation.valid);
+    if (invalidResults.length > 0) {
+      const errorMessages = invalidResults.map(r =>
+        `${r.file.name}: ${r.validation.errors.join(', ')}`
+      ).join('\n');
+
+      alert(`Следующие файлы не прошли валидацию:\n\n${errorMessages}\n\nРазрешены: ${getAllowedTypesDescription(['images', 'documents', 'medical'])}`);
+    }
+
+    // Добавляем только валидные файлы
+    if (validFiles.length > 0) {
+      const newAttachments = validFiles.map(file => ({
+        id: Date.now() + Math.random(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file: file,
+        category: selectedCategory
+      }));
+
+      setEmrData(prev => ({
+        ...prev,
+        attachments: [...prev.attachments, ...newAttachments]
+      }));
+      setHasUnsavedChanges(true);
+
+      // Показываем предупреждения если есть
+      const warnings = validationResult.results
+        .filter(r => r.validation.valid && r.validation.warnings.length > 0)
+        .map(r => `${r.file.name}: ${r.validation.warnings.join(', ')}`)
+        .join('\n');
+
+      if (warnings) {
+        logger.warn('Предупреждения валидации файлов:', warnings);
+      }
+    }
+
+    // Сбрасываем input для возможности загрузки тех же файлов
+    event.target.value = '';
   };
 
   const handleRemoveAttachment = (attachmentId) => {
@@ -377,14 +446,44 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
     setIsDragOver(false);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = async (e) => {
     e.preventDefault();
     setIsDragOver(false);
-    
+
     if (!canSaveEMR) return;
-    
+
     const files = Array.from(e.dataTransfer.files);
-    const newAttachments = files.map(file => ({
+
+    if (files.length === 0) return;
+
+    // Валидация файлов
+    const validationOptions = {
+      allowedCategories: ['images', 'documents', 'medical'],
+      maxSize: 50 * 1024 * 1024, // 50MB
+      strictMagicNumber: true
+    };
+
+    const validationResult = await validateFiles(files, validationOptions);
+
+    // Фильтруем только валидные файлы
+    const validFiles = validationResult.results
+      .filter(r => r.validation.valid)
+      .map(r => r.file);
+
+    // Показываем ошибки для невалидных файлов
+    const invalidResults = validationResult.results.filter(r => !r.validation.valid);
+    if (invalidResults.length > 0) {
+      const errorMessages = invalidResults.map(r =>
+        `${r.file.name}: ${r.validation.errors.join(', ')}`
+      ).join('\n');
+
+      alert(`Следующие файлы не прошли валидацию:\n\n${errorMessages}\n\nРазрешены: ${getAllowedTypesDescription(['images', 'documents', 'medical'])}`);
+    }
+
+    // Добавляем только валидные файлы
+    if (validFiles.length === 0) return;
+
+    const newAttachments = validFiles.map(file => ({
       id: Date.now() + Math.random(),
       name: file.name,
       type: file.type,
@@ -414,7 +513,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
       setEmrData(prev => ({ ...prev, isDraft: false }));
       setHasUnsavedChanges(false);
     } catch (error) {
-      console.error('EMR: Save error:', error);
+      logger.error('EMR: Save error:', error);
     } finally {
       setIsSaving(false);
     }
@@ -440,9 +539,9 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
       if (window.showToast) {
         window.showToast('Черновик сохранен', 'success');
       }
-      console.log('EMR: Draft saved manually');
+      logger.log('EMR: Draft saved manually');
     } catch (error) {
-      console.error('EMR: Manual save error:', error);
+      logger.error('EMR: Manual save error:', error);
       if (window.showToast) {
         window.showToast('Ошибка сохранения черновика', 'error');
       }
@@ -453,7 +552,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
     if (!emrData.isDraft && onComplete && typeof onComplete === 'function') {
       await onComplete();
     } else if (!onComplete) {
-      console.warn('[EMRSystem] onComplete не передан, завершение приема недоступно');
+      logger.warn('[EMRSystem] onComplete не передан, завершение приема недоступно');
     }
   };
 
@@ -720,7 +819,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
             <TeethChart
               initialData={emrData.dentalData?.toothStatus || {}}
               onToothClick={(toothNumber, toothData) => {
-                console.log(`[Dental EMR] Tooth ${toothNumber} clicked:`, toothData);
+                logger.log(`[Dental EMR] Tooth ${toothNumber} clicked:`, toothData);
                 // Синхронизируем изменение зуба с emrData
                 const updatedToothStatus = {
                   ...emrData.dentalData?.toothStatus,
@@ -1098,8 +1197,8 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
                 {/* Миниатюра изображения */}
                 {attachment.type?.startsWith('image/') ? (
                   <div style={{ marginBottom: 8 }}>
-                    <img
-                      src={URL.createObjectURL(attachment.file)}
+                    <AttachmentImage
+                      file={attachment.file}
                       alt={attachment.name}
                       style={{
                         width: '100%',
@@ -1158,7 +1257,7 @@ const EMRSystem = ({ appointment, emr, onSave, onComplete }) => {
                           handleFieldChange('examination', emrData.examination + aiAnalysis);
                         }
                       } catch (err) {
-                        console.error('Image AI analysis error:', err);
+                        logger.error('Image AI analysis error:', err);
                       }
                     }}
                     loading={aiLoading && selectedImageForAI?.id === attachment.id}

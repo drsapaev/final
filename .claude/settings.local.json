@@ -9,7 +9,8 @@
       "Bash(cmd //c \"taskkill /PID 2764 /F\")",
       "Bash(timeout /t 3 /nobreak)",
       "Bash(netstat:*)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -39,6 +39,7 @@ import {
   Heart,
   Delete
 } from 'lucide-react';
+import logger from '../../utils/logger';
 
 const EMRInterface = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -104,37 +105,45 @@ const EMRInterface = () => {
         const patientsData = await patientsRes.json();
         setPatients(patientsData.patients || patientsData || []);
       } else {
-        // Fallback данные для демонстрации
-        setPatients([
-          { id: 1, full_name: 'Иванов Иван Иванович', phone: '+7 (999) 123-45-67', email: 'ivanov@example.com', date_of_birth: '1985-05-15' },
-          { id: 2, full_name: 'Петрова Анна Сергеевна', phone: '+7 (999) 234-56-78', email: 'petrova@example.com', date_of_birth: '1990-08-22' },
-          { id: 3, full_name: 'Сидоров Петр Александрович', phone: '+7 (999) 345-67-89', email: 'sidorov@example.com', date_of_birth: '1978-12-03' }
-        ]);
+        // Fallback: пустой массив или тестовые данные только для разработки
+        const mockPatients = import.meta.env.MODE === 'development'
+          ? Array.from({ length: 3 }, (_, i) => ({
+              id: i + 1,
+              full_name: `Пациент ${i + 1}`,
+              phone: `+7 (900) ${String(i + 1).padStart(7, '0')}`,
+              email: `patient${i + 1}@test.local`,
+              date_of_birth: `198${i}-0${i + 1}-15`
+            }))
+          : [];
+        setPatients(mockPatients);
       }
 
       if (recordsRes.ok) {
         const recordsData = await recordsRes.json();
         setMedicalRecords(recordsData.records || recordsData || []);
       } else {
-        // Fallback данные для демонстрации
-        setMedicalRecords([
-          { 
-            id: 1, 
-            patient_id: 1, 
-            patient: { full_name: 'Иванов Иван Иванович' },
-            record_type: 'general',
-            chief_complaint: 'Головная боль',
-            created_at: '2024-01-15T10:30:00Z'
-          },
-          { 
-            id: 2, 
-            patient_id: 2, 
-            patient: { full_name: 'Петрова Анна Сергеевна' },
-            record_type: 'consultation',
-            chief_complaint: 'Консультация по результатам анализов',
-            created_at: '2024-01-14T14:20:00Z'
-          }
-        ]);
+        // Fallback: пустой массив или тестовые данные только для разработки
+        const mockRecords = import.meta.env.MODE === 'development'
+          ? [
+              {
+                id: 1,
+                patient_id: 1,
+                patient: { full_name: 'Пациент 1' },
+                record_type: 'general',
+                chief_complaint: 'Тестовая жалоба 1',
+                created_at: new Date().toISOString()
+              },
+              {
+                id: 2,
+                patient_id: 2,
+                patient: { full_name: 'Пациент 2' },
+                record_type: 'consultation',
+                chief_complaint: 'Тестовая жалоба 2',
+                created_at: new Date().toISOString()
+              }
+            ]
+          : [];
+        setMedicalRecords(mockRecords);
       }
 
       if (templatesRes.ok) {
@@ -238,7 +247,7 @@ const EMRInterface = () => {
 
   const handleEditTemplate = (template) => {
     // TODO: Реализовать редактирование шаблона
-    console.log('Edit template:', template);
+    logger.log('Edit template:', template);
   };
 
   const handleDeleteTemplate = async (template) => {

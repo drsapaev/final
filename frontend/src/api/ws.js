@@ -1,3 +1,5 @@
+import { tokenManager } from '../utils/tokenManager';
+
 // Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
 function wsEnabled() {
   const v = (import.meta?.env?.VITE_ENABLE_WS ?? '0').toString().trim();
@@ -64,7 +66,7 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
   function connect() {
     try {
       const base = buildWsBase();
-      const token = localStorage.getItem('access_token');
+      const token = tokenManager.getAccessToken();
       const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
       const url = `${base}/api/v1/display/ws/board/${encodeURIComponent(boardId)}${tokenParam}`;
       
