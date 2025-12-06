@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 import { 
   Building2, 
   MapPin, 
@@ -68,7 +69,7 @@ const ClinicSettings = () => {
       
       setSettings(prev => ({ ...prev, ...settingsObj }));
     } catch (error) {
-      console.error('Ошибка загрузки настроек:', error);
+      logger.error('Ошибка загрузки настроек:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки настроек' });
     } finally {
       setLoading(false);
@@ -120,7 +121,7 @@ const ClinicSettings = () => {
 
       return response.data.logo_url;
     } catch (error) {
-      console.error('Ошибка загрузки логотипа:', error);
+      logger.error('Ошибка загрузки логотипа:', error);
       throw error;
     }
   };
@@ -155,7 +156,7 @@ const ClinicSettings = () => {
         setSettings(prev => ({ ...prev, logo_url: logoUrl }));
       }
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек' });
     } finally {
       setSaving(false);

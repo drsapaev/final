@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 /**
  * Утилиты для аутентифицированных WebSocket соединений
  */
@@ -36,21 +38,21 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
   }
 
   const wsUrl = `${baseUrl}?${urlParams.toString()}`;
-  console.log(`🔌 Создаем аутентифицированное WebSocket соединение: ${wsUrl}`);
+  logger.log(`🔌 Создаем аутентифицированное WebSocket соединение: ${wsUrl}`);
 
   const ws = new WebSocket(wsUrl);
 
   ws.onopen = (event) => {
-    console.log('✅ Аутентифицированное WebSocket подключено');
+    logger.log('✅ Аутентифицированное WebSocket подключено');
     if (onConnect) onConnect(event);
   };
 
   ws.onclose = (event) => {
-    console.log('❌ Аутентифицированное WebSocket отключено', event.code, event.reason);
+    logger.log('❌ Аутентифицированное WebSocket отключено', event.code, event.reason);
     
     // Обрабатываем ошибки аутентификации
     if (event.code === 1008) { // WS_1008_POLICY_VIOLATION
-      console.error('❌ Ошибка аутентификации WebSocket:', event.reason);
+      logger.error('❌ Ошибка аутентификации WebSocket:', event.reason);
       if (onAuthError) {
         onAuthError(event.reason || 'Authentication failed');
       }
@@ -62,7 +64,7 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log('📨 Получено сообщение WebSocket:', data);
+      logger.log('📨 Получено сообщение WebSocket:', data);
       
       // Обрабатываем ошибки аутентификации в сообщениях
       if (data.type === 'error' && data.message && data.message.includes('аутентификация')) {
@@ -73,12 +75,12 @@ export function createAuthenticatedWebSocket(baseUrl, params = {}, options = {})
       
       if (onMessage) onMessage(data);
     } catch (error) {
-      console.warn('⚠️ Ошибка парсинга WebSocket сообщения:', error);
+      logger.warn('⚠️ Ошибка парсинга WebSocket сообщения:', error);
     }
   };
 
   ws.onerror = (error) => {
-    console.error('❌ Ошибка WebSocket:', error);
+    logger.error('❌ Ошибка WebSocket:', error);
     if (onError) onError(error);
   };
 
@@ -126,9 +128,9 @@ export function sendAuthenticatedMessage(ws, message) {
     };
     
     ws.send(JSON.stringify(messageWithAuth));
-    console.log('📤 Отправлено аутентифицированное сообщение:', messageWithAuth);
+    logger.log('📤 Отправлено аутентифицированное сообщение:', messageWithAuth);
   } else {
-    console.warn('⚠️ WebSocket не готов для отправки сообщения');
+    logger.warn('⚠️ WebSocket не готов для отправки сообщения');
   }
 }
 
@@ -172,7 +174,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
       ws = createAuthenticatedWebSocket(baseUrl, params, {
         ...wsOptions,
         onConnect: (event) => {
-          console.log('✅ Переподключающийся WebSocket подключен');
+          logger.log('✅ Переподключающийся WebSocket подключен');
           reconnectAttempts = 0;
           lastPongTime = Date.now();
           
@@ -182,7 +184,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
           if (wsOptions.onConnect) wsOptions.onConnect(event);
         },
         onDisconnect: (event) => {
-          console.log('❌ Переподключающийся WebSocket отключен');
+          logger.log('❌ Переподключающийся WebSocket отключен');
           stopHeartbeat();
           
           if (wsOptions.onDisconnect) wsOptions.onDisconnect(event);
@@ -191,17 +193,17 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
           if (!isManuallyDisconnected && reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
             const delay = getReconnectDelay(reconnectAttempts - 1);
-            console.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${Math.round(delay)}ms`);
+            logger.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${Math.round(delay)}ms`);
             reconnectTimeout = setTimeout(connect, delay);
           } else if (reconnectAttempts >= maxReconnectAttempts) {
-            console.error('❌ Достигнуто максимальное количество попыток переподключения');
+            logger.error('❌ Достигнуто максимальное количество попыток переподключения');
             if (wsOptions.onMaxReconnectAttempts) {
               wsOptions.onMaxReconnectAttempts();
             }
           }
         },
         onAuthError: (error) => {
-          console.error('❌ Ошибка аутентификации, переподключение остановлено:', error);
+          logger.error('❌ Ошибка аутентификации, переподключение остановлено:', error);
           isManuallyDisconnected = true; // Останавливаем переподключение при ошибках аутентификации
           stopHeartbeat();
           if (wsOptions.onAuthError) wsOptions.onAuthError(error);
@@ -226,7 +228,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
         }
       });
     } catch (error) {
-      console.error('❌ Ошибка создания WebSocket:', error);
+      logger.error('❌ Ошибка создания WebSocket:', error);
       if (reconnectAttempts < maxReconnectAttempts) {
         reconnectAttempts++;
         const delay = getReconnectDelay(reconnectAttempts - 1);
@@ -247,7 +249,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
       
       // Check if we've received a pong recently
       if (lastPongTime && (Date.now() - lastPongTime) > HEARTBEAT_TIMEOUT) {
-        console.warn('⚠️ Heartbeat timeout, reconnecting...');
+        logger.warn('⚠️ Heartbeat timeout, reconnecting...');
         ws.close();
         return;
       }
@@ -256,7 +258,7 @@ export function createReconnectingAuthWebSocket(baseUrl, params = {}, options = 
       try {
         ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
       } catch (e) {
-        console.error('Error sending heartbeat ping:', e);
+        logger.error('Error sending heartbeat ping:', e);
       }
     }, HEARTBEAT_INTERVAL);
   };

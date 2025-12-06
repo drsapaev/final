@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, User, Mail, Lock, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 
+import logger from '../../utils/logger';
 const UserModal = ({ 
   isOpen, 
   onClose, 
@@ -102,7 +103,7 @@ const UserModal = ({
       await onSave(userData);
       onClose();
     } catch (error) {
-      console.error('Ошибка сохранения пользователя:', error);
+      logger.error('Ошибка сохранения пользователя:', error);
     } finally {
       setIsSubmitting(false);
     }

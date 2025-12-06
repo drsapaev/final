@@ -14,6 +14,7 @@ import {
 import ModernDialog from '../dialogs/ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
+import logger from '../../utils/logger';
 import './AppointmentWizard.css';
 
 const AppointmentWizard = ({ 
@@ -27,7 +28,7 @@ const AppointmentWizard = ({
   const { theme, getColor } = useTheme();
   
   // Отладка (отключена для избежания спама)
-  // console.log('AppointmentWizard render:', { isOpen, doctors: doctors.length, services: Object.keys(services).length });
+  // logger.log('AppointmentWizard render:', { isOpen, doctors: doctors.length, services: Object.keys(services).length });
   const [currentStep, setCurrentStep] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -238,7 +239,7 @@ const AppointmentWizard = ({
       setPatientSuggestions(filtered);
       setShowSuggestions(filtered.length > 0);
     } catch (error) {
-      console.error('Error searching patients:', error);
+      logger.error('Error searching patients:', error);
     }
   };
 
@@ -363,7 +364,7 @@ const AppointmentWizard = ({
       toast.success('Запись успешно создана!');
       onClose();
     } catch (error) {
-      console.error('Error completing wizard:', error);
+      logger.error('Error completing wizard:', error);
       toast.error('Ошибка при создании записи: ' + error.message);
     } finally {
       setIsProcessing(false);

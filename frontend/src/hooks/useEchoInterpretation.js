@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { api } from '../api/client.js';
 
+import logger from '../utils/logger';
 /**
  * Хук для AI интерпретации эхокардиографии
  * @param {string} visitId - ID визита
@@ -44,7 +45,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
       
       return result;
     } catch (err) {
-      console.error('Ошибка AI анализа ЭхоКГ:', err);
+      logger.error('Ошибка AI анализа ЭхоКГ:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка AI анализа';
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -68,7 +69,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка получения рекомендаций:', err);
+      logger.error('Ошибка получения рекомендаций:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения рекомендаций';
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -92,7 +93,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка оценки риска:', err);
+      logger.error('Ошибка оценки риска:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка оценки риска';
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -115,7 +116,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка сравнения с предыдущими исследованиями:', err);
+      logger.error('Ошибка сравнения с предыдущими исследованиями:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка сравнения';
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -139,7 +140,7 @@ export const useEchoInterpretation = (visitId, patientId) => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка генерации отчета:', err);
+      logger.error('Ошибка генерации отчета:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка генерации отчета';
       setError(errorMessage);
       throw new Error(errorMessage);

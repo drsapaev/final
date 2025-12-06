@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSTable, MacOSCheckbox } from '../ui/macos';
 
+import logger from '../../utils/logger';
 const ActivationSystem = () => {
   const [loading, setLoading] = useState(true);
   const [activations, setActivations] = useState([]);
@@ -77,7 +78,7 @@ const ActivationSystem = () => {
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки данных активации:', error);
+      logger.error('Ошибка загрузки данных активации:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки данных активации' });
     } finally {
       setLoading(false);
@@ -106,7 +107,7 @@ const ActivationSystem = () => {
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка создания ключа:', error);
+      logger.error('Ошибка создания ключа:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
@@ -129,7 +130,7 @@ const ActivationSystem = () => {
         throw new Error('Ошибка отзыва активации');
       }
     } catch (error) {
-      console.error('Ошибка отзыва:', error);
+      logger.error('Ошибка отзыва:', error);
       setMessage({ type: 'error', text: 'Ошибка отзыва активации' });
     }
   };

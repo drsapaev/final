@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Card, CardContent, Typography, Box } from './ui/macos';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 
+import logger from '../utils/logger';
 const PWAInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
@@ -43,9 +44,9 @@ const PWAInstallPrompt = () => {
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
-      console.log('Пользователь принял установку PWA');
+      logger.log('Пользователь принял установку PWA');
     } else {
-      console.log('Пользователь отклонил установку PWA');
+      logger.log('Пользователь отклонил установку PWA');
     }
     
     setDeferredPrompt(null);

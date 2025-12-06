@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 /**
  * Система проверки дизайна для панелей
  * Проверяет соответствие компонентов унифицированной дизайн-системе
@@ -240,7 +242,7 @@ export const validateFile = async (filePath) => {
     const response = await fetch(`/api/validate-design?file=${filePath}`);
     return await response.json();
   } catch (error) {
-    console.error('Ошибка при валидации файла:', error);
+    logger.error('Ошибка при валидации файла:', error);
     return null;
   }
 };

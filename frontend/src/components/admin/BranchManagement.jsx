@@ -26,6 +26,7 @@ import {
 } from '../ui/macos';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const BranchManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -77,7 +78,7 @@ const BranchManagement = () => {
       const response = await api.get('/branches');
       setBranches(response.data.branches || []);
     } catch (error) {
-      console.error('Ошибка загрузки филиалов:', error);
+      logger.error('Ошибка загрузки филиалов:', error);
       // Fallback данные
       setBranches([
         {
@@ -113,7 +114,7 @@ const BranchManagement = () => {
       const response = await api.get('/branches/stats');
       setStats(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
       // Fallback данные
       setStats({
         total_branches: 2,

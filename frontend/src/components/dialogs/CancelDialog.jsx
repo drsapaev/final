@@ -4,6 +4,7 @@ import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const CancelDialog = ({ 
   isOpen, 
   onClose, 
@@ -60,7 +61,7 @@ const CancelDialog = ({
       toast.success('Запись успешно отменена');
       onClose();
     } catch (error) {
-      console.error('Cancel error:', error);
+      logger.error('Cancel error:', error);
       toast.error('Ошибка при отмене записи: ' + error.message);
     } finally {
       setIsProcessing(false);

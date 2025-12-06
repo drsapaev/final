@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   Users, 
   Phone, 
@@ -63,7 +64,7 @@ const DoctorQueuePanel = ({
                       window.location.hostname === 'localhost' && 
                       window.location.port === '5173';
     
-    console.log('DoctorQueuePanel useEffect:', {
+    logger.log('DoctorQueuePanel useEffect:', {
       pathname: window.location.pathname,
       isDemoMode,
       specialty
@@ -71,7 +72,7 @@ const DoctorQueuePanel = ({
     
   if (isDemoMode) {
     // В демо-режиме используем моковые данные
-    console.log('Setting demo data for DoctorQueuePanel');
+    logger.log('Setting demo data for DoctorQueuePanel');
     setDoctorInfo({
       id: 1,
       name: 'Dr. Demo',
@@ -113,7 +114,7 @@ const DoctorQueuePanel = ({
       ]
     });
   } else {
-      console.log('Loading real data for DoctorQueuePanel');
+      logger.log('Loading real data for DoctorQueuePanel');
       loadDoctorData();
       loadQueueData();
       
@@ -133,7 +134,7 @@ const DoctorQueuePanel = ({
                       window.location.port === '5173';
     
     if (isDemoMode) {
-      console.log('Skipping loadDoctorData in demo mode');
+      logger.log('Skipping loadDoctorData in demo mode');
       return;
     }
     
@@ -147,7 +148,7 @@ const DoctorQueuePanel = ({
         setDoctorInfo(data);
       }
     } catch (error) {
-      console.error('Ошибка загрузки информации врача:', error);
+      logger.error('Ошибка загрузки информации врача:', error);
     }
   };
 
@@ -158,7 +159,7 @@ const DoctorQueuePanel = ({
                       window.location.port === '5173';
     
     if (isDemoMode) {
-      console.log('Skipping loadQueueData in demo mode');
+      logger.log('Skipping loadQueueData in demo mode');
       return;
     }
     
@@ -177,7 +178,7 @@ const DoctorQueuePanel = ({
         setMessage({ type: 'error', text: error.detail });
       }
     } catch (error) {
-      console.error('Ошибка загрузки очереди:', error);
+      logger.error('Ошибка загрузки очереди:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки очереди' });
     } finally {
       setLoading(false);
@@ -210,7 +211,7 @@ const DoctorQueuePanel = ({
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка вызова пациента:', error);
+      logger.error('Ошибка вызова пациента:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
@@ -241,7 +242,7 @@ const DoctorQueuePanel = ({
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка начала приема:', error);
+      logger.error('Ошибка начала приема:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
@@ -279,7 +280,7 @@ const DoctorQueuePanel = ({
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка завершения приема:', error);
+      logger.error('Ошибка завершения приема:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };

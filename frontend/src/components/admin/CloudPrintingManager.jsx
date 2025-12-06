@@ -23,6 +23,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const CloudPrintingManager = () => {
   const [activeTab, setActiveTab] = useState('printers');
   const [printers, setPrinters] = useState([]);
@@ -75,7 +76,7 @@ const CloudPrintingManager = () => {
       const response = await api.get('/cloud-printing/printers');
       setPrinters(response.data?.printers || []);
     } catch (error) {
-      console.error('Ошибка загрузки принтеров:', error);
+      logger.error('Ошибка загрузки принтеров:', error);
       // Fallback данные для демонстрации
       setPrinters([
         {
@@ -106,7 +107,7 @@ const CloudPrintingManager = () => {
       const response = await api.get('/cloud-printing/statistics');
       setStatistics(response.data?.statistics);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
       // Fallback данные для демонстрации
       setStatistics({
         total_printers: 2,
@@ -126,7 +127,7 @@ const CloudPrintingManager = () => {
         toast.error(response.data?.message || 'Ошибка тестовой печати');
       }
     } catch (error) {
-      console.error('Ошибка тестовой печати:', error);
+      logger.error('Ошибка тестовой печати:', error);
       toast.error(error.response?.data?.detail || 'Ошибка тестовой печати');
     }
   };
@@ -150,7 +151,7 @@ const CloudPrintingManager = () => {
         toast.error(response.data?.message || 'Ошибка печати');
       }
     } catch (error) {
-      console.error('Ошибка печати:', error);
+      logger.error('Ошибка печати:', error);
       toast.error(error.response?.data?.detail || 'Ошибка печати медицинского документа');
     }
   };
@@ -169,7 +170,7 @@ const CloudPrintingManager = () => {
         toast.error(response.data?.message || 'Ошибка печати');
       }
     } catch (error) {
-      console.error('Ошибка печати медицинского документа:', error);
+      logger.error('Ошибка печати медицинского документа:', error);
       toast.error('Ошибка печати медицинского документа');
     }
   };

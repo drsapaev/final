@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
   const [templates, setTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -172,7 +173,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
       // Для демо используем предустановленные
       setTemplates(defaultTemplates);
     } catch (error) {
-      console.error('Ошибка загрузки шаблонов:', error);
+      logger.error('Ошибка загрузки шаблонов:', error);
     }
   };
 
@@ -234,7 +235,7 @@ const ProcedureTemplates = ({ visitId, onSelectProcedure }) => {
       loadTemplates();
       setDialogOpen(false);
     } catch (error) {
-      console.error('Ошибка сохранения шаблона:', error);
+      logger.error('Ошибка сохранения шаблона:', error);
     }
   };
 

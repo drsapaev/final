@@ -14,6 +14,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
 
 /**
@@ -46,7 +47,7 @@ const PriceOverrideApproval = () => {
         toast.error('Ошибка загрузки изменений цен');
       }
     } catch (error) {
-      console.error('Error loading price overrides:', error);
+      logger.error('Error loading price overrides:', error);
       toast.error('Ошибка загрузки изменений цен');
     } finally {
       setLoading(false);
@@ -82,7 +83,7 @@ const PriceOverrideApproval = () => {
         toast.error(errorData.detail || 'Ошибка обработки запроса');
       }
     } catch (error) {
-      console.error('Error processing approval:', error);
+      logger.error('Error processing approval:', error);
       toast.error('Ошибка обработки запроса');
     } finally {
       setIsProcessing(false);

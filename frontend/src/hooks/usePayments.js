@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 
+import logger from '../utils/logger';
 const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export const usePayments = () => {
@@ -52,7 +53,7 @@ export const usePayments = () => {
                 data: data || []
             };
         } catch (err) {
-            console.error('Error fetching pending payments:', err);
+            logger.error('Error fetching pending payments:', err);
             setError(err.message);
             setLoading(false);
 
@@ -93,7 +94,7 @@ export const usePayments = () => {
                 data: data || []
             };
         } catch (err) {
-            console.error('Error fetching payments:', err);
+            logger.error('Error fetching payments:', err);
             setError(err.message);
             setLoading(false);
 
@@ -132,7 +133,7 @@ export const usePayments = () => {
                 data
             };
         } catch (err) {
-            console.error('Error creating payment:', err);
+            logger.error('Error creating payment:', err);
             setError(err.message);
             setLoading(false);
 
@@ -169,7 +170,7 @@ export const usePayments = () => {
                 data
             };
         } catch (err) {
-            console.error('Error marking visit as paid:', err);
+            logger.error('Error marking visit as paid:', err);
             setError(err.message);
             setLoading(false);
 
@@ -204,7 +205,7 @@ export const usePayments = () => {
                 data
             };
         } catch (err) {
-            console.error('Error fetching payment:', err);
+            logger.error('Error fetching payment:', err);
             setError(err.message);
             setLoading(false);
 
@@ -242,7 +243,7 @@ export const usePayments = () => {
                 data
             };
         } catch (err) {
-            console.error('Error canceling payment:', err);
+            logger.error('Error canceling payment:', err);
             setError(err.message);
             setLoading(false);
 

@@ -1,4 +1,5 @@
 import { tokenManager } from '../utils/tokenManager';
+import logger from '../utils/logger';
 
 // Helper для WS с прокси. Управление — VITE_ENABLE_WS=0/1
 function wsEnabled() {
@@ -70,12 +71,12 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
       const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
       const url = `${base}/api/v1/display/ws/board/${encodeURIComponent(boardId)}${tokenParam}`;
       
-      console.log(`🔌 Подключаемся к WebSocket: ${url}`);
+      logger.log(`🔌 Подключаемся к WebSocket: ${url}`);
       
       ws = new WebSocket(url);
       
       ws.onopen = () => {
-        console.log(`✅ WebSocket подключен к табло ${boardId}`);
+        logger.log(`✅ WebSocket подключен к табло ${boardId}`);
         reconnectAttempts = 0;
         onConnect && onConnect();
         
@@ -92,25 +93,25 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
       ws.onmessage = (ev) => {
         try {
           const obj = JSON.parse(ev.data);
-          console.log('📨 Получено WebSocket сообщение:', obj);
+          logger.log('📨 Получено WebSocket сообщение:', obj);
           onMessage && onMessage(obj);
         } catch (e) {
-          console.warn('Ошибка парсинга WebSocket сообщения:', e);
+          logger.warn('Ошибка парсинга WebSocket сообщения:', e);
         }
       };
       
       ws.onerror = (error) => {
-        console.error(`❌ Ошибка WebSocket для табло ${boardId}:`, error);
+        logger.error(`❌ Ошибка WebSocket для табло ${boardId}:`, error);
       };
       
       ws.onclose = (event) => {
-        console.log(`🔌 WebSocket закрыт для табло ${boardId}. Код: ${event.code}`);
+        logger.log(`🔌 WebSocket закрыт для табло ${boardId}. Код: ${event.code}`);
         onDisconnect && onDisconnect();
         
         // Автоматическое переподключение
         if (reconnectAttempts < maxReconnectAttempts && event.code !== 1000) {
           reconnectAttempts++;
-          console.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${reconnectDelay}ms`);
+          logger.log(`🔄 Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${reconnectDelay}ms`);
           
           reconnectTimeout = setTimeout(() => {
             connect();
@@ -119,7 +120,7 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
       };
       
     } catch (error) {
-      console.error('Ошибка создания WebSocket:', error);
+      logger.error('Ошибка создания WebSocket:', error);
     }
   }
 
@@ -138,7 +139,7 @@ export function openDisplayBoardWS(boardId, onMessage, onConnect, onDisconnect) 
         ws = null;
       }
     } catch (error) {
-      console.warn('Ошибка закрытия WebSocket:', error);
+      logger.warn('Ошибка закрытия WebSocket:', error);
     }
   };
 }

@@ -6,6 +6,7 @@ import TwoFactorManager from '../components/security/TwoFactorManager';
 import TwoFactorSetupWizard from '../components/security/TwoFactorSetupWizard';
 import PhoneVerification from '../components/auth/PhoneVerification';
 
+import logger from '../utils/logger';
 function TabButton({ active, onClick, children }) {
   // Используем CSS переменные вместо хардкод стилей
   const st = {
@@ -89,7 +90,7 @@ export default function Settings() {
       const response = await api.get('/admin/providers');
       setProviders(response || []);
     } catch (error) {
-      console.error('Ошибка загрузки провайдеров:', error);
+      logger.error('Ошибка загрузки провайдеров:', error);
     } finally {
       setLoadingProviders(false);
     }
@@ -101,7 +102,7 @@ export default function Settings() {
       await loadProviders();
       setShowAddProvider(false);
     } catch (error) {
-      console.error('Ошибка создания провайдера:', error);
+      logger.error('Ошибка создания провайдера:', error);
       throw error;
     }
   }
@@ -112,7 +113,7 @@ export default function Settings() {
       await loadProviders();
       setEditingProvider(null);
     } catch (error) {
-      console.error('Ошибка обновления провайдера:', error);
+      logger.error('Ошибка обновления провайдера:', error);
       throw error;
     }
   }
@@ -125,7 +126,7 @@ export default function Settings() {
       await api.delete(`/admin/providers/${providerId}`);
       await loadProviders();
     } catch (error) {
-      console.error('Ошибка удаления провайдера:', error);
+      logger.error('Ошибка удаления провайдера:', error);
     }
   }
 

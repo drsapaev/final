@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Индикатор офлайн/онлайн статуса для мобильных устройств
  */
@@ -60,7 +61,7 @@ const OfflineIndicator = () => {
         notifications: cachedNotifications ? JSON.parse(cachedNotifications).length : 0
       });
     } catch (error) {
-      console.error('Ошибка загрузки кэшированных данных:', error);
+      logger.error('Ошибка загрузки кэшированных данных:', error);
     }
   };
 
@@ -103,7 +104,7 @@ const OfflineIndicator = () => {
       }, 2000);
       
     } catch (error) {
-      console.error('Ошибка синхронизации:', error);
+      logger.error('Ошибка синхронизации:', error);
       setSyncStatus('error');
       
       setTimeout(() => {

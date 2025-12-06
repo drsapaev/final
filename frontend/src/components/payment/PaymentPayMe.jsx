@@ -13,6 +13,7 @@ import MultipleTicketsPrinter from '../tickets/MultipleTicketsPrinter';
 import { toast } from 'react-toastify';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 import ModernDialog from '../dialogs/ModernDialog';
+import logger from '../../utils/logger';
 import './PaymentPayMe.css';
 
 const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
@@ -147,7 +148,7 @@ const PaymentPayMe = ({
       try {
         await checkPaymentStatus();
       } catch (error) {
-        console.error('Polling error:', error);
+        logger.error('Polling error:', error);
       }
       
       // Останавливаем polling после максимального количества попыток
@@ -194,7 +195,7 @@ const PaymentPayMe = ({
       }
       // Если статус pending/processing - продолжаем polling
     } else {
-      console.error('Error checking payment status:', response.statusText);
+      logger.error('Error checking payment status:', response.statusText);
     }
   };
   
@@ -236,7 +237,7 @@ const PaymentPayMe = ({
       
       setPrintTickets(mockTickets);
     } catch (error) {
-      console.error('Error loading print tickets:', error);
+      logger.error('Error loading print tickets:', error);
     }
   };
   

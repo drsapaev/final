@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const MedicalEquipmentManager = () => {
   const [activeTab, setActiveTab] = useState('devices');
   const [devices, setDevices] = useState([]);
@@ -76,7 +77,7 @@ const MedicalEquipmentManager = () => {
         const data = await response.json();
         setDevices(data.devices || []);
       } else {
-        console.error('Ошибка загрузки устройств:', response.status);
+        logger.error('Ошибка загрузки устройств:', response.status);
         // Fallback данные для демонстрации
         setDevices([
           {
@@ -102,7 +103,7 @@ const MedicalEquipmentManager = () => {
         ]);
       }
     } catch (error) {
-      console.error('Ошибка загрузки устройств:', error);
+      logger.error('Ошибка загрузки устройств:', error);
       // Fallback данные при ошибке сети
       setDevices([
         {
@@ -145,7 +146,7 @@ const MedicalEquipmentManager = () => {
         const data = await response.json();
         setOverview(data.overview);
       } else {
-        console.error('Ошибка загрузки обзора:', response.status);
+        logger.error('Ошибка загрузки обзора:', response.status);
         // Fallback данные для обзора
         setOverview({
           total_devices: 2,
@@ -159,7 +160,7 @@ const MedicalEquipmentManager = () => {
         });
       }
     } catch (error) {
-      console.error('Ошибка загрузки обзора:', error);
+      logger.error('Ошибка загрузки обзора:', error);
       // Fallback данные при ошибке сети
       setOverview({
         total_devices: 2,
@@ -192,7 +193,7 @@ const MedicalEquipmentManager = () => {
         const data = await response.json();
         setMeasurements(data.measurements || []);
       } else {
-        console.error('Ошибка загрузки измерений:', response.status);
+        logger.error('Ошибка загрузки измерений:', response.status);
         // Fallback данные для измерений
         setMeasurements([
           {
@@ -216,7 +217,7 @@ const MedicalEquipmentManager = () => {
         ]);
       }
     } catch (error) {
-      console.error('Ошибка загрузки измерений:', error);
+      logger.error('Ошибка загрузки измерений:', error);
       // Fallback данные при ошибке сети
       setMeasurements([
         {
@@ -262,7 +263,7 @@ const MedicalEquipmentManager = () => {
         toast.error(data.message || 'Ошибка подключения');
       }
     } catch (error) {
-      console.error('Ошибка подключения устройства:', error);
+      logger.error('Ошибка подключения устройства:', error);
       toast.error('Ошибка подключения устройства');
     }
   };
@@ -286,7 +287,7 @@ const MedicalEquipmentManager = () => {
         toast.error(data.message || 'Ошибка отключения');
       }
     } catch (error) {
-      console.error('Ошибка отключения устройства:', error);
+      logger.error('Ошибка отключения устройства:', error);
       toast.error('Ошибка отключения устройства');
     }
   };
@@ -320,7 +321,7 @@ const MedicalEquipmentManager = () => {
         toast.error(errorData.detail || 'Ошибка измерения');
       }
     } catch (error) {
-      console.error('Ошибка измерения:', error);
+      logger.error('Ошибка измерения:', error);
       toast.error('Ошибка измерения');
     }
   };
@@ -344,7 +345,7 @@ const MedicalEquipmentManager = () => {
         toast.error(data.message || 'Ошибка калибровки');
       }
     } catch (error) {
-      console.error('Ошибка калибровки:', error);
+      logger.error('Ошибка калибровки:', error);
       toast.error('Ошибка калибровки');
     }
   };
@@ -368,7 +369,7 @@ const MedicalEquipmentManager = () => {
         toast.error('Ошибка диагностики');
       }
     } catch (error) {
-      console.error('Ошибка диагностики:', error);
+      logger.error('Ошибка диагностики:', error);
       toast.error('Ошибка диагностики');
     }
   };

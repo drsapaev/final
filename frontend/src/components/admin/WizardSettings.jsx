@@ -17,6 +17,7 @@ import { Settings, ToggleLeft, ToggleRight, Save, AlertCircle, CheckCircle, Refr
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const WizardSettings = () => {
   const [settings, setSettings] = useState({
     use_new_wizard: false,
@@ -40,7 +41,7 @@ const WizardSettings = () => {
       setSettings(response.data);
       setHasChanges(false);
     } catch (error) {
-      console.error('Error fetching wizard settings:', error);
+      logger.error('Error fetching wizard settings:', error);
       setError('Не удалось загрузить настройки мастера. Проверьте подключение к серверу.');
       // Fallback данные при ошибке
       setSettings({
@@ -82,7 +83,7 @@ const WizardSettings = () => {
         throw new Error(response.data.message || 'Ошибка сохранения');
       }
     } catch (error) {
-      console.error('Error saving wizard settings:', error);
+      logger.error('Error saving wizard settings:', error);
       toast.error('Ошибка сохранения настроек');
     } finally {
       setSaving(false);

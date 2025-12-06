@@ -35,6 +35,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const VoiceToText = () => {
   const [activeTab, setActiveTab] = useState('transcription');
   const [loading, setLoading] = useState(false);
@@ -115,7 +116,7 @@ const VoiceToText = () => {
       
       toast.success('Запись началась');
     } catch (error) {
-      console.error('Ошибка доступа к микрофону:', error);
+      logger.error('Ошибка доступа к микрофону:', error);
       toast.error('Не удалось получить доступ к микрофону');
     }
   }, []);
@@ -210,7 +211,7 @@ const VoiceToText = () => {
       setEditableResult(response.data.text || '');
       toast.success('Транскрипция завершена!');
     } catch (error) {
-      console.error('Ошибка транскрипции:', error);
+      logger.error('Ошибка транскрипции:', error);
       toast.error(error.response?.data?.detail || 'Ошибка при транскрипции');
     } finally {
       setLoading(false);
@@ -226,7 +227,7 @@ const VoiceToText = () => {
       setResult(response.data);
       toast.success('Обработка завершена!');
     } catch (error) {
-      console.error('Ошибка обработки:', error);
+      logger.error('Ошибка обработки:', error);
       toast.error(error.response?.data?.detail || 'Ошибка при обработке текста');
     } finally {
       setLoading(false);

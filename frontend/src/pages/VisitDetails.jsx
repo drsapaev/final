@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { getVisit, rescheduleVisit } from '../api';
 import RescheduleDialog from '../components/RescheduleDialog';
 
+import logger from '../utils/logger';
 /**
  * VisitDetails page
  * - Shows visit information
@@ -31,7 +32,7 @@ function VisitDetails() {
         setVisit(data || null);
       })
       .catch((err) => {
-        console.error('getVisit error:', err);
+        logger.error('getVisit error:', err);
         setError((err && err.data && (err.data.detail || err.data.message)) || err.message || 'Ошибка загрузки приёма');
       })
       .finally(() => {
@@ -59,7 +60,7 @@ function VisitDetails() {
       const res = await rescheduleVisit(visit.id, iso);
       setVisit((prev) => ({ ...(prev || {}), scheduled_at: iso, ...(res || {}) }));
     } catch (err) {
-      console.error('rescheduleTomorrow error:', err);
+      logger.error('rescheduleTomorrow error:', err);
       setError((err && err.data && (err.data.detail || err.data.message)) || err.message || 'Ошибка переноса');
     } finally {
       setLoading(false);

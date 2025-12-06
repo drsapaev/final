@@ -33,6 +33,7 @@ import LicenseManagement from './LicenseManagement';
 import BackupManagement from './BackupManagement';
 import ClinicSettings from './ClinicSettings';
 
+import logger from '../../utils/logger';
 const ClinicManagement = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [systemHealth, setSystemHealth] = useState(null);
@@ -70,7 +71,7 @@ const ClinicManagement = () => {
       if (statsResponse.status === 'fulfilled') {
         setStats(statsResponse.value.data);
       } else {
-        console.error('Ошибка загрузки статистики:', statsResponse.reason);
+        logger.error('Ошибка загрузки статистики:', statsResponse.reason);
         // Fallback данные для статистики
         setStats({
           total_branches: 3,
@@ -87,7 +88,7 @@ const ClinicManagement = () => {
       if (healthResponse.status === 'fulfilled') {
         setSystemHealth(healthResponse.value.data);
       } else {
-        console.error('Ошибка загрузки состояния системы:', healthResponse.reason);
+        logger.error('Ошибка загрузки состояния системы:', healthResponse.reason);
         // Fallback данные для состояния системы
         setSystemHealth({
           status: 'healthy',
@@ -95,7 +96,7 @@ const ClinicManagement = () => {
         });
       }
     } catch (error) {
-      console.error('Ошибка загрузки данных системы:', error);
+      logger.error('Ошибка загрузки данных системы:', error);
       // Fallback данные при ошибке
       setStats({
         total_branches: 3,

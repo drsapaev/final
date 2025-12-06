@@ -4,6 +4,32 @@ import { ChevronDown, ChevronUp, Brain, AlertTriangle, CheckCircle, Info, Copy, 
 import { useSnackbar } from 'notistack';
 import { apiClient } from '../../api/client';
 import { mcpAPI } from '../../api/mcpClient';
+import { sanitizeAIContent, sanitizeText } from '../../utils/sanitizer';
+import logger from '../../utils/logger';
+
+/**
+ * Рекурсивная санитизация AI-generated контента
+ * Защита от AI prompt injection attacks
+ */
+function sanitizeAIResponse(obj) {
+  if (typeof obj === 'string') {
+    return sanitizeAIContent(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeAIResponse(item));
+  }
+
+  if (obj && typeof obj === 'object') {
+    const sanitized = {};
+    for (const [key, value] of Object.entries(obj)) {
+      sanitized[key] = sanitizeAIResponse(value);
+    }
+    return sanitized;
+  }
+
+  return obj;
+}
 
 const AIAssistant = ({ 
   analysisType, 
@@ -148,9 +174,12 @@ const AIAssistant = ({
           throw new Error('Неизвестный тип анализа');
       }
 
-      setResult(response.data);
-      if (onResult) onResult(response.data);
+      // Санитизируем AI-generated контент перед отображением (XSS защита)
+      const sanitizedData = sanitizeAIResponse(response.data);
+      setResult(sanitizedData);
+      if (onResult) onResult(sanitizedData);
       enqueueSnackbar('AI анализ завершен', { variant: 'success' });
+      logger.log('AI response sanitized and validated');
       setRetryCount(0);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message;

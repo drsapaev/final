@@ -4,6 +4,7 @@
  * ВАЖНО: Использовать ТОЛЬКО этот модуль для работы с токенами!
  * Единственный источник истины для ключей токенов.
  */
+import logger from './logger';
 
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -21,7 +22,7 @@ export const tokenManager = {
     try {
       return localStorage.getItem(TOKEN_KEY);
     } catch (error) {
-      console.error('Error reading access token:', error);
+      logger.error('Error reading access token:', error);
       return null;
     }
   },
@@ -38,7 +39,7 @@ export const tokenManager = {
         localStorage.removeItem(TOKEN_KEY);
       }
     } catch (error) {
-      console.error('Error setting access token:', error);
+      logger.error('Error setting access token:', error);
     }
   },
 
@@ -50,7 +51,7 @@ export const tokenManager = {
     try {
       return localStorage.getItem(REFRESH_TOKEN_KEY);
     } catch (error) {
-      console.error('Error reading refresh token:', error);
+      logger.error('Error reading refresh token:', error);
       return null;
     }
   },
@@ -67,7 +68,7 @@ export const tokenManager = {
         localStorage.removeItem(REFRESH_TOKEN_KEY);
       }
     } catch (error) {
-      console.error('Error setting refresh token:', error);
+      logger.error('Error setting refresh token:', error);
     }
   },
 
@@ -80,7 +81,7 @@ export const tokenManager = {
       const data = localStorage.getItem(USER_KEY);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error reading user data:', error);
+      logger.error('Error reading user data:', error);
       return null;
     }
   },
@@ -97,7 +98,7 @@ export const tokenManager = {
         localStorage.removeItem(USER_KEY);
       }
     } catch (error) {
-      console.error('Error setting user data:', error);
+      logger.error('Error setting user data:', error);
     }
   },
 
@@ -110,7 +111,7 @@ export const tokenManager = {
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
     } catch (error) {
-      console.error('Error clearing tokens:', error);
+      logger.error('Error clearing tokens:', error);
     }
   },
 

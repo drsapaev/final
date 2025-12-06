@@ -4,6 +4,7 @@
 
 import { toast } from 'react-toastify';
 
+import logger from '../utils/logger';
 /**
  * Типы ошибок
  */
@@ -157,7 +158,7 @@ export function handleError(error, options = {}) {
 
   // Логирование
   if (logError) {
-    console.error(`[${context}] ${errorType.toUpperCase()} Error:`, {
+    logger.error(`[${context}] ${errorType.toUpperCase()} Error:`, {
       message: errorMessage,
       status: error.response?.status,
       data: error.response?.data,

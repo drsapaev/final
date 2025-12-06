@@ -3,6 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { MacOSButton, MacOSCard, MacOSSelect } from '../ui/macos';
 import { Palette, Sun, Moon, Monitor, Sparkles, Rainbow, Layers } from 'lucide-react';
 
+import logger from '../../utils/logger';
 const ColorSchemeSelector = () => {
   const { theme, setTheme, isDark, isLight } = useTheme();
   // Initialize with saved scheme or current theme
@@ -215,7 +216,7 @@ const ColorSchemeSelector = () => {
     try {
       localStorage.setItem('colorScheme', schemeId);
     } catch (e) {
-      console.warn('Failed to save color scheme:', e);
+      logger.warn('Failed to save color scheme:', e);
     }
   };
   

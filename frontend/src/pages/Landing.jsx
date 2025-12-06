@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import AppActivation from '../components/activation/AppActivation';
 
+import logger from '../utils/logger';
 // Компонент для карточки возможности
 const FeatureCard = ({ icon, title, description, color, bgColor }) => {
   const [isHovered, setIsHovered] = React.useState(false);
@@ -46,7 +47,7 @@ const FeatureCard = ({ icon, title, description, color, bgColor }) => {
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => {
         // Можно добавить логику для показа деталей или перехода
-        console.log(`Clicked on ${title}`);
+        logger.log(`Clicked on ${title}`);
       }}
     >
       <div style={{

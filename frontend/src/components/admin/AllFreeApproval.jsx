@@ -20,6 +20,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 /**
  * Компонент для одобрения/отклонения заявок All Free в админке
  */
@@ -49,7 +50,7 @@ const AllFreeApproval = () => {
       const data = response.data;
       setAllRequestsForStats(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('[AllFreeApproval] Ошибка загрузки всех заявок для статистики:', error);
+      logger.error('[AllFreeApproval] Ошибка загрузки всех заявок для статистики:', error);
     }
   };
 
@@ -58,10 +59,10 @@ const AllFreeApproval = () => {
     try {
       const response = await api.get(`/admin/all-free-requests?status_filter=${statusFilter}&limit=100`);
       const data = response.data;
-      console.log('[AllFreeApproval] Получено заявок:', data.length, data);
+      logger.log('[AllFreeApproval] Получено заявок:', data.length, data);
       setAllFreeRequests(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('[AllFreeApproval] Ошибка при загрузке заявок All Free:', error);
+      logger.error('[AllFreeApproval] Ошибка при загрузке заявок All Free:', error);
       toast.error(error.response?.data?.detail || 'Ошибка загрузки заявок All Free');
     } finally {
       setLoading(false);
@@ -88,7 +89,7 @@ const AllFreeApproval = () => {
       setSelectedRequest(null);
       setRejectionReason('');
     } catch (error) {
-      console.error('Error processing approval:', error);
+      logger.error('Error processing approval:', error);
       toast.error(error.response?.data?.detail || 'Ошибка обработки запроса');
     } finally {
       setIsProcessing(false);

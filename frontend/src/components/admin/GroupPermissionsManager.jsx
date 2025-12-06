@@ -24,6 +24,7 @@ import { Card, Button, Badge, MacOSInput, MacOSSelect, Skeleton } from '../ui/ma
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const GroupPermissionsManager = () => {
   // Состояние
   const [activeTab, setActiveTab] = useState('users');
@@ -62,7 +63,7 @@ const GroupPermissionsManager = () => {
       setPermissions(permissionsRes.data);
       setCacheStats(cacheRes.data.cache_stats);
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -77,7 +78,7 @@ const GroupPermissionsManager = () => {
       const response = await api.get(`/admin/permissions/users/${userId}/permissions`);
       setUserPermissions(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки разрешений пользователя:', error);
+      logger.error('Ошибка загрузки разрешений пользователя:', error);
       toast.error('Ошибка загрузки разрешений пользователя');
     } finally {
       setLoading(false);
@@ -92,7 +93,7 @@ const GroupPermissionsManager = () => {
       const response = await api.get(`/admin/permissions/groups/${groupId}/permissions`);
       setGroupSummary(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки сводки группы:', error);
+      logger.error('Ошибка загрузки сводки группы:', error);
       toast.error('Ошибка загрузки сводки группы');
     } finally {
       setLoading(false);
@@ -112,7 +113,7 @@ const GroupPermissionsManager = () => {
           : `❌ У пользователя нет разрешения "${permission}"`
       );
     } catch (error) {
-      console.error('Ошибка проверки разрешения:', error);
+      logger.error('Ошибка проверки разрешения:', error);
       toast.error('Ошибка проверки разрешения');
     }
   };
@@ -126,7 +127,7 @@ const GroupPermissionsManager = () => {
       toast.success(response.data.message);
       await loadGroupSummary(groupId);
     } catch (error) {
-      console.error('Ошибка назначения роли:', error);
+      logger.error('Ошибка назначения роли:', error);
       toast.error(error.response?.data?.detail || 'Ошибка назначения роли');
     }
   };
@@ -138,7 +139,7 @@ const GroupPermissionsManager = () => {
       toast.success(response.data.message);
       await loadGroupSummary(groupId);
     } catch (error) {
-      console.error('Ошибка отзыва роли:', error);
+      logger.error('Ошибка отзыва роли:', error);
       toast.error(error.response?.data?.detail || 'Ошибка отзыва роли');
     }
   };
@@ -152,7 +153,7 @@ const GroupPermissionsManager = () => {
       toast.success(response.data.message);
       await loadGroupSummary(groupId);
     } catch (error) {
-      console.error('Ошибка добавления пользователя:', error);
+      logger.error('Ошибка добавления пользователя:', error);
       toast.error(error.response?.data?.detail || 'Ошибка добавления пользователя');
     }
   };
@@ -164,7 +165,7 @@ const GroupPermissionsManager = () => {
       toast.success(response.data.message);
       await loadGroupSummary(groupId);
     } catch (error) {
-      console.error('Ошибка удаления пользователя:', error);
+      logger.error('Ошибка удаления пользователя:', error);
       toast.error(error.response?.data?.detail || 'Ошибка удаления пользователя');
     }
   };
@@ -182,7 +183,7 @@ const GroupPermissionsManager = () => {
       toast.success(response.data.message);
       await loadUserPermissions(userId);
     } catch (error) {
-      console.error('Ошибка создания переопределения:', error);
+      logger.error('Ошибка создания переопределения:', error);
       toast.error(error.response?.data?.detail || 'Ошибка создания переопределения');
     }
   };
@@ -196,7 +197,7 @@ const GroupPermissionsManager = () => {
       const cacheRes = await api.get('/admin/permissions/cache/stats');
       setCacheStats(cacheRes.data.cache_stats);
     } catch (error) {
-      console.error('Ошибка очистки кэша:', error);
+      logger.error('Ошибка очистки кэша:', error);
       toast.error('Ошибка очистки кэша');
     }
   };

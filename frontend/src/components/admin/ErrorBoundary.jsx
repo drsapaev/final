@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 
+import logger from '../../utils/logger';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -19,7 +20,7 @@ class ErrorBoundary extends React.Component {
     });
     
     // Логируем ошибку в консоль для разработки
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
   handleRetry = () => {

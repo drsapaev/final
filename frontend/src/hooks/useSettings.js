@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import logger from '../utils/logger';
 const useSettings = () => {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(false);
@@ -108,7 +109,7 @@ const useSettings = () => {
       setSettings(prev => ({ ...prev, ...newSettings }));
       
       // Имитация успешного сохранения
-      console.log('Settings saved:', newSettings);
+      logger.log('Settings saved:', newSettings);
       
       return newSettings;
     } catch (err) {

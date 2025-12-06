@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Интегрированный селектор врачей для регистратуры
  * Использует данные врачей и расписаний из админ панели
@@ -81,7 +82,7 @@ const IntegratedDoctorSelector = ({
       }
 
     } catch (err) {
-      console.error('Ошибка загрузки данных врачей:', err);
+      logger.error('Ошибка загрузки данных врачей:', err);
       setError('Ошибка загрузки данных врачей');
     } finally {
       setLoading(false);

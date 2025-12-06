@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 /**
  * Утилиты для тестирования мастера регистрации
  * Можно использовать в консоли браузера для быстрой проверки функций
@@ -19,7 +21,7 @@ class WizardTester {
 
   // Тест 1: Проверка настроек мастера
   async testWizardSettings() {
-    console.log('🧪 Тестирование настроек мастера...');
+    logger.log('🧪 Тестирование настроек мастера...');
     
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/wizard-settings`, {
@@ -27,17 +29,17 @@ class WizardTester {
       });
       
       const data = await response.json();
-      console.log('✅ Настройки мастера:', data);
+      logger.log('✅ Настройки мастера:', data);
       return data;
     } catch (error) {
-      console.error('❌ Ошибка получения настроек:', error);
+      logger.error('❌ Ошибка получения настроек:', error);
       return null;
     }
   }
 
   // Тест 2: Проверка создания корзины
   async testCartCreation(testData = null) {
-    console.log('🧪 Тестирование создания корзины...');
+    logger.log('🧪 Тестирование создания корзины...');
     
     const defaultTestData = {
       patient: {
@@ -73,21 +75,21 @@ class WizardTester {
       const result = await response.json();
       
       if (response.ok) {
-        console.log('✅ Корзина создана успешно:', result);
+        logger.log('✅ Корзина создана успешно:', result);
         return result;
       } else {
-        console.error('❌ Ошибка создания корзины:', result);
+        logger.error('❌ Ошибка создания корзины:', result);
         return null;
       }
     } catch (error) {
-      console.error('❌ Ошибка запроса:', error);
+      logger.error('❌ Ошибка запроса:', error);
       return null;
     }
   }
 
   // Тест 3: Проверка льготных настроек
   async testBenefitSettings() {
-    console.log('🧪 Тестирование настроек льгот...');
+    logger.log('🧪 Тестирование настроек льгот...');
     
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/benefit-settings`, {
@@ -95,17 +97,17 @@ class WizardTester {
       });
       
       const data = await response.json();
-      console.log('✅ Настройки льгот:', data);
+      logger.log('✅ Настройки льгот:', data);
       return data;
     } catch (error) {
-      console.error('❌ Ошибка получения настроек льгот:', error);
+      logger.error('❌ Ошибка получения настроек льгот:', error);
       return null;
     }
   }
 
   // Тест 4: Проверка заявок All Free
   async testAllFreeRequests() {
-    console.log('🧪 Тестирование заявок All Free...');
+    logger.log('🧪 Тестирование заявок All Free...');
     
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/admin/all-free-requests`, {
@@ -113,17 +115,17 @@ class WizardTester {
       });
       
       const data = await response.json();
-      console.log('✅ Заявки All Free:', data);
+      logger.log('✅ Заявки All Free:', data);
       return data;
     } catch (error) {
-      console.error('❌ Ошибка получения заявок All Free:', error);
+      logger.error('❌ Ошибка получения заявок All Free:', error);
       return null;
     }
   }
 
   // Тест 5: Проверка изменений цен
   async testPriceOverrides() {
-    console.log('🧪 Тестирование изменений цен...');
+    logger.log('🧪 Тестирование изменений цен...');
     
     try {
       const response = await fetch(`${this.API_BASE}/api/v1/registrar-wizard/registrar/price-overrides`, {
@@ -131,17 +133,17 @@ class WizardTester {
       });
       
       const data = await response.json();
-      console.log('✅ Изменения цен:', data);
+      logger.log('✅ Изменения цен:', data);
       return data;
     } catch (error) {
-      console.error('❌ Ошибка получения изменений цен:', error);
+      logger.error('❌ Ошибка получения изменений цен:', error);
       return null;
     }
   }
 
   // Тест 6: Проверка автосохранения
   testAutosave() {
-    console.log('🧪 Тестирование автосохранения...');
+    logger.log('🧪 Тестирование автосохранения...');
     
     const testData = {
       step: 2,
@@ -152,23 +154,23 @@ class WizardTester {
 
     // Сохраняем тестовые данные
     localStorage.setItem('wizard_draft', JSON.stringify(testData));
-    console.log('✅ Данные сохранены в localStorage');
+    logger.log('✅ Данные сохранены в localStorage');
 
     // Проверяем восстановление
     const restored = JSON.parse(localStorage.getItem('wizard_draft'));
     
     if (JSON.stringify(restored) === JSON.stringify(testData)) {
-      console.log('✅ Автосохранение работает корректно');
+      logger.log('✅ Автосохранение работает корректно');
       return true;
     } else {
-      console.error('❌ Ошибка автосохранения');
+      logger.error('❌ Ошибка автосохранения');
       return false;
     }
   }
 
   // Тест 7: Проверка валидации данных
   validateWizardData(data) {
-    console.log('🧪 Валидация данных мастера...');
+    logger.log('🧪 Валидация данных мастера...');
     
     const errors = [];
 
@@ -202,18 +204,18 @@ class WizardTester {
     }
 
     if (errors.length === 0) {
-      console.log('✅ Данные валидны');
+      logger.log('✅ Данные валидны');
       return { valid: true, errors: [] };
     } else {
-      console.error('❌ Найдены ошибки валидации:', errors);
+      logger.error('❌ Найдены ошибки валидации:', errors);
       return { valid: false, errors };
     }
   }
 
   // Запуск всех тестов
   async runAllTests() {
-    console.log('🚀 Запуск всех тестов мастера регистрации...');
-    console.log('=' .repeat(50));
+    logger.log('🚀 Запуск всех тестов мастера регистрации...');
+    logger.log('=' .repeat(50));
 
     const results = {};
 
@@ -233,15 +235,15 @@ class WizardTester {
     results.autosave = this.testAutosave();
 
     // Тест создания корзины (только если есть тестовые данные)
-    console.log('ℹ️ Тест создания корзины пропущен (требует реальные service_id)');
+    logger.log('ℹ️ Тест создания корзины пропущен (требует реальные service_id)');
 
-    console.log('=' .repeat(50));
-    console.log('📊 Результаты тестирования:', results);
+    logger.log('=' .repeat(50));
+    logger.log('📊 Результаты тестирования:', results);
     
     const passedTests = Object.values(results).filter(result => result !== null && result !== false).length;
     const totalTests = Object.keys(results).length;
     
-    console.log(`✅ Пройдено тестов: ${passedTests}/${totalTests}`);
+    logger.log(`✅ Пройдено тестов: ${passedTests}/${totalTests}`);
     
     return results;
   }
@@ -359,9 +361,9 @@ if (typeof window !== 'undefined') {
   window.WizardTester = WizardTester;
   window.wizardTester = new WizardTester();
   
-  console.log('🧪 WizardTester загружен!');
-  console.log('Используйте: wizardTester.runAllTests() для запуска всех тестов');
-  console.log('Или: wizardTester.testCartCreation(wizardTester.generateTestData("cart")) для тестирования корзины');
+  logger.log('🧪 WizardTester загружен!');
+  logger.log('Используйте: wizardTester.runAllTests() для запуска всех тестов');
+  logger.log('Или: wizardTester.testCartCreation(wizardTester.generateTestData("cart")) для тестирования корзины');
 }
 
 export default WizardTester;

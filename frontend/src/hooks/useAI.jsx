@@ -6,7 +6,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 import { mcpAPI } from '../utils/mcp';
+import { validateAIChatMessage, detectPromptInjection } from '../utils/aiValidator';
 
+import logger from '../utils/logger';
 // Основные настройки ИИ
 const AI_CONFIG = {
   defaultProvider: 'mcp',
@@ -36,6 +38,13 @@ export const useAIAssistant = (options = {}) => {
   const sendMessage = useCallback(async (message, options = {}) => {
     if (!message || message.trim() === '') return;
 
+    // Detect prompt injection attempts
+    if (detectPromptInjection(message)) {
+      logger.warn('[AI Security] Potential prompt injection detected in user message');
+      setError('Обнаружена подозрительная активность. Сообщение заблокировано.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -61,22 +70,27 @@ export const useAIAssistant = (options = {}) => {
       });
 
       if (response.status === 'success') {
-        const assistantMessage = {
+        // Validate and sanitize AI response
+        const validatedMessage = validateAIChatMessage({
           id: Date.now() + 1,
           role: 'assistant',
           content: response.data.message,
           timestamp: new Date(),
           type: 'text',
           metadata: response.data.metadata
-        };
+        });
 
-        setMessages(prev => [...prev, assistantMessage]);
-        return assistantMessage;
+        if (!validatedMessage) {
+          throw new Error('AI response validation failed');
+        }
+
+        setMessages(prev => [...prev, validatedMessage]);
+        return validatedMessage;
       } else {
         throw new Error(response.error || 'AI request failed');
       }
     } catch (err) {
-      console.error('AI assistant error:', err);
+      logger.error('AI assistant error:', err);
       setError(err.message);
 
       const errorMessage = {
@@ -188,7 +202,7 @@ export const useAISuggestions = (options = {}) => {
         throw new Error(response.error || 'Failed to generate suggestions');
       }
     } catch (err) {
-      console.error('AI suggestions error:', err);
+      logger.error('AI suggestions error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -280,7 +294,7 @@ export const useAITranslation = (options = {}) => {
         throw new Error(response.error || 'Translation failed');
       }
     } catch (err) {
-      console.error('AI translation error:', err);
+      logger.error('AI translation error:', err);
       setError(err.message);
       return text; // Возвращаем оригинальный текст при ошибке
     } finally {
@@ -354,7 +368,7 @@ export const useAIImageAnalysis = (options = {}) => {
         throw new Error('Image analysis requires MCP mode');
       }
     } catch (err) {
-      console.error('AI image analysis error:', err);
+      logger.error('AI image analysis error:', err);
       setError(err.message);
       throw err;
     } finally {

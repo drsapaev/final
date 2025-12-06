@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, BellOff, Settings, Check, X } from 'lucide-react';
 import { Button, Card, Badge } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Компонент для управления мобильными уведомлениями
  */
@@ -42,7 +43,7 @@ const MobileNotifications = () => {
         setUnreadCount(data.filter(n => !n.is_read).length);
       }
     } catch (error) {
-      console.error('Ошибка загрузки уведомлений:', error);
+      logger.error('Ошибка загрузки уведомлений:', error);
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ const MobileNotifications = () => {
         await subscribeToPushNotifications();
       }
     } catch (error) {
-      console.error('Ошибка запроса разрешения:', error);
+      logger.error('Ошибка запроса разрешения:', error);
     }
   };
 
@@ -92,9 +93,9 @@ const MobileNotifications = () => {
         body: JSON.stringify(subscription)
       });
 
-      console.log('Подписка на push уведомления создана');
+      logger.log('Подписка на push уведомления создана');
     } catch (error) {
-      console.error('Ошибка подписки на push уведомления:', error);
+      logger.error('Ошибка подписки на push уведомления:', error);
     }
   };
 
@@ -115,7 +116,7 @@ const MobileNotifications = () => {
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Ошибка отметки уведомления как прочитанного:', error);
+      logger.error('Ошибка отметки уведомления как прочитанного:', error);
     }
   };
 
@@ -133,7 +134,7 @@ const MobileNotifications = () => {
       );
       setUnreadCount(0);
     } catch (error) {
-      console.error('Ошибка отметки всех уведомлений как прочитанных:', error);
+      logger.error('Ошибка отметки всех уведомлений как прочитанных:', error);
     }
   };
 

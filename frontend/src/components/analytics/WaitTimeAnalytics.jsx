@@ -29,6 +29,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const WaitTimeAnalytics = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -85,7 +86,7 @@ const WaitTimeAnalytics = () => {
       const response = await api.get(`/analytics/wait-time/wait-time-analytics?${params}`);
       setAnalytics(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки аналитики времени ожидания:', error);
+      logger.error('Ошибка загрузки аналитики времени ожидания:', error);
       toast.error('Ошибка загрузки аналитики');
     } finally {
       setLoading(false);
@@ -100,7 +101,7 @@ const WaitTimeAnalytics = () => {
       const response = await api.get(`/analytics/wait-time/real-time-wait-estimates?${params}`);
       setRealTimeEstimates(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки real-time оценок:', error);
+      logger.error('Ошибка загрузки real-time оценок:', error);
     }
   };
 
@@ -115,7 +116,7 @@ const WaitTimeAnalytics = () => {
       const response = await api.get(`/analytics/wait-time/service-wait-analytics?${params}`);
       setServiceAnalytics(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки аналитики по услугам:', error);
+      logger.error('Ошибка загрузки аналитики по услугам:', error);
       toast.error('Ошибка загрузки аналитики по услугам');
     } finally {
       setLoading(false);
@@ -130,7 +131,7 @@ const WaitTimeAnalytics = () => {
       const response = await api.get(`/analytics/wait-time/wait-time-summary?${params}`);
       setSummary(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки сводки:', error);
+      logger.error('Ошибка загрузки сводки:', error);
     }
   };
 
@@ -147,7 +148,7 @@ const WaitTimeAnalytics = () => {
       const response = await api.get(`/analytics/wait-time/wait-time-heatmap?${params}`);
       setHeatmapData(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки тепловой карты:', error);
+      logger.error('Ошибка загрузки тепловой карты:', error);
       toast.error('Ошибка загрузки тепловой карты');
     } finally {
       setLoading(false);

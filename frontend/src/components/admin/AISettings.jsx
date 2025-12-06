@@ -23,6 +23,7 @@ import {
 import { Card, Button, Badge, MacOSInput, MacOSCheckbox } from '../ui/macos';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const AISettings = () => {
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState([]);
@@ -98,7 +99,7 @@ const AISettings = () => {
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки AI данных:', error);
+      logger.error('Ошибка загрузки AI данных:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки AI данных' });
     } finally {
       setLoading(false);
@@ -121,7 +122,7 @@ const AISettings = () => {
       setShowAddForm(false);
       await loadData();
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: error.response?.data?.detail || error.message || 'Ошибка сохранения провайдера' });
     }
   };
@@ -138,7 +139,7 @@ const AISettings = () => {
       setTestResults(prev => ({ ...prev, [providerId]: response.data }));
       setMessage({ type: 'success', text: 'Тест провайдера выполнен успешно' });
     } catch (error) {
-      console.error('Ошибка тестирования:', error);
+      logger.error('Ошибка тестирования:', error);
       setTestResults(prev => ({ 
         ...prev, 
         [providerId]: { 
@@ -532,7 +533,7 @@ const AISettings = () => {
           settings={systemSettings}
           onSave={(settings) => {
             // Сохранение системных настроек
-            console.log('Сохранение системных настроек:', settings);
+            logger.log('Сохранение системных настроек:', settings);
           }}
         />
       </Card>

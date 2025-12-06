@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
   const [echoData, setEchoData] = useState({
     // Левый желудочек
@@ -135,7 +136,7 @@ const EchoForm = ({ patientId, visitId, onSave, initialData = null }) => {
       }
     } catch (err) {
       setError('Ошибка при сохранении результатов ЭхоКГ');
-      console.error('Echo form save error:', err);
+      logger.error('Echo form save error:', err);
     } finally {
       setLoading(false);
     }

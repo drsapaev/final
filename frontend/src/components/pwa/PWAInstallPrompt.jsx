@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
 
+import logger from '../../utils/logger';
 const PWAInstallPrompt = ({ onClose }) => {
   const {
     isInstallable,
@@ -44,7 +45,7 @@ const PWAInstallPrompt = ({ onClose }) => {
         setTimeout(onClose, 1000);
       }
     } catch (error) {
-      console.error('Installation failed:', error);
+      logger.error('Installation failed:', error);
     } finally {
       setIsInstalling(false);
     }

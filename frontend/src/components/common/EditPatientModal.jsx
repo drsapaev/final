@@ -4,9 +4,10 @@
 
 import React from 'react';
 
+import logger from '../../utils/logger';
 const EditPatientModal = ({ isOpen, onClose, patient, onSave, theme }) => {
     // This is a stub - the actual functionality is now in AppointmentWizardV2
-    console.warn('EditPatientModal is deprecated. Use AppointmentWizardV2 instead.');
+    logger.warn('EditPatientModal is deprecated. Use AppointmentWizardV2 instead.');
 
     if (!isOpen) return null;
 

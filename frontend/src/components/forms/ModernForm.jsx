@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import logger from '../../utils/logger';
 import './ModernForm.css';
 
 const ModernForm = ({
@@ -107,7 +108,7 @@ const ModernForm = ({
     try {
       await onSubmit?.(values);
     } catch (error) {
-      console.error('Form submission error:', error);
+      logger.error('Form submission error:', error);
     } finally {
       setIsSubmitting(false);
     }

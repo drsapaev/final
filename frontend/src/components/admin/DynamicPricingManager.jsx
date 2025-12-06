@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const DynamicPricingManager = () => {
   const [activeTab, setActiveTab] = useState('rules');
   const [pricingRules, setPricingRules] = useState([]);
@@ -126,7 +127,7 @@ const DynamicPricingManager = () => {
         }
       }
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -172,7 +173,7 @@ const DynamicPricingManager = () => {
         toast.error(error.detail || 'Ошибка создания правила');
       }
     } catch (error) {
-      console.error('Ошибка создания правила:', error);
+      logger.error('Ошибка создания правила:', error);
       toast.error('Ошибка создания правила');
     }
   };
@@ -208,7 +209,7 @@ const DynamicPricingManager = () => {
         toast.error(error.detail || 'Ошибка создания пакета');
       }
     } catch (error) {
-      console.error('Ошибка создания пакета:', error);
+      logger.error('Ошибка создания пакета:', error);
       toast.error('Ошибка создания пакета');
     }
   };
@@ -232,7 +233,7 @@ const DynamicPricingManager = () => {
         toast.error('Ошибка изменения статуса правила');
       }
     } catch (error) {
-      console.error('Ошибка изменения статуса правила:', error);
+      logger.error('Ошибка изменения статуса правила:', error);
       toast.error('Ошибка изменения статуса правила');
     }
   };
@@ -256,7 +257,7 @@ const DynamicPricingManager = () => {
         toast.error('Ошибка удаления правила');
       }
     } catch (error) {
-      console.error('Ошибка удаления правила:', error);
+      logger.error('Ошибка удаления правила:', error);
       toast.error('Ошибка удаления правила');
     }
   };
@@ -280,7 +281,7 @@ const DynamicPricingManager = () => {
         toast.error('Ошибка удаления пакета');
       }
     } catch (error) {
-      console.error('Ошибка удаления пакета:', error);
+      logger.error('Ошибка удаления пакета:', error);
       toast.error('Ошибка удаления пакета');
     }
   };
@@ -302,7 +303,7 @@ const DynamicPricingManager = () => {
         toast.error('Ошибка обновления цен');
       }
     } catch (error) {
-      console.error('Ошибка обновления цен:', error);
+      logger.error('Ошибка обновления цен:', error);
       toast.error('Ошибка обновления цен');
     }
   };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Monitor } from 'lucide-react';
 import { Button, Card } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Компонент для предложения установки PWA
  */
@@ -29,7 +30,7 @@ const PWAInstallPrompt = () => {
 
     // Слушаем событие appinstalled
     const handleAppInstalled = () => {
-      console.log('PWA установлено');
+      logger.log('PWA установлено');
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
@@ -61,16 +62,16 @@ const PWAInstallPrompt = () => {
       const { outcome } = await deferredPrompt.userChoice;
       
       if (outcome === 'accepted') {
-        console.log('Пользователь принял установку PWA');
+        logger.log('Пользователь принял установку PWA');
       } else {
-        console.log('Пользователь отклонил установку PWA');
+        logger.log('Пользователь отклонил установку PWA');
       }
       
       // Очищаем промпт
       setDeferredPrompt(null);
       setShowInstallPrompt(false);
     } catch (error) {
-      console.error('Ошибка при установке PWA:', error);
+      logger.error('Ошибка при установке PWA:', error);
     }
   };
 

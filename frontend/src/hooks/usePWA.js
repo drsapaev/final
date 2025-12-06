@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import logger from '../utils/logger';
 /**
  * Hook для работы с PWA функциональностью
  * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлены SSR checks
@@ -96,7 +97,7 @@ export const usePWA = () => {
       // Если регистрация уже идет или завершена, просто проверяем состояние
       navigator.serviceWorker.ready.then((registration) => {
         setIsServiceWorkerReady(true);
-        console.log('Service Worker already registered:', registration);
+        logger.log('Service Worker already registered:', registration);
       }).catch(() => {
         // Если регистрация не прошла, попробуем снова
         window.__sw_registration_pending = false;
@@ -112,7 +113,7 @@ export const usePWA = () => {
       .then((registration) => {
         window.__sw_registration_pending = false;
         window.__sw_registered = true;
-        console.log('Service Worker registered:', registration);
+        logger.log('Service Worker registered:', registration);
         setIsServiceWorkerReady(true);
 
         // Проверка обновлений
@@ -129,14 +130,14 @@ export const usePWA = () => {
       .catch((error) => {
         window.__sw_registration_pending = false;
         window.__sw_registered = false;
-        console.error('Service Worker registration failed:', error);
+        logger.error('Service Worker registration failed:', error);
       });
 
     // Слушаем сообщения от Service Worker (только один раз)
     if (!window.__sw_message_listener_added) {
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'SYNC_COMPLETE') {
-          console.log('Background sync completed');
+          logger.log('Background sync completed');
         }
       });
       window.__sw_message_listener_added = true;
@@ -152,16 +153,16 @@ export const usePWA = () => {
       const { outcome } = await deferredPrompt.userChoice;
       
       if (outcome === 'accepted') {
-        console.log('PWA installation accepted');
+        logger.log('PWA installation accepted');
         setIsInstallable(false);
         setDeferredPrompt(null);
         return true;
       } else {
-        console.log('PWA installation declined');
+        logger.log('PWA installation declined');
         return false;
       }
     } catch (error) {
-      console.error('PWA installation error:', error);
+      logger.error('PWA installation error:', error);
       return false;
     }
   }, [deferredPrompt]);

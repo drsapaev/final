@@ -30,6 +30,7 @@ import {
 import './EnhancedAppointmentsTable.css';
 import { colors } from '../../theme/tokens';
 
+import logger from '../../utils/logger';
 const EnhancedAppointmentsTable = ({ 
   data = [], 
   loading = false, 
@@ -1981,7 +1982,7 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          console.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
+                          logger.log('[EnhancedAppointmentsTable] Кнопка Просмотр нажата:', row);
                           if (onActionClick) {
                             onActionClick('view', row, e);
                           }
@@ -2016,7 +2017,7 @@ const EnhancedAppointmentsTable = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          console.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
+                          logger.log('[EnhancedAppointmentsTable] Кнопка Редактировать нажата:', row);
                           if (onActionClick) {
                             onActionClick('edit', row, e);
                           }

@@ -29,6 +29,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const LabReportGenerator = ({ 
   results = [], 
   patient = {}, 
@@ -152,7 +153,7 @@ const LabReportGenerator = ({
       doc.save(`lab_results_${patient.name}_${new Date().toISOString().split('T')[0]}.pdf`);
       
     } catch (error) {
-      console.error('Ошибка генерации PDF:', error);
+      logger.error('Ошибка генерации PDF:', error);
     } finally {
       setGenerating(false);
     }
@@ -171,7 +172,7 @@ const LabReportGenerator = ({
       });
       alert('Отчет отправлен на email пациента');
     } catch (error) {
-      console.error('Ошибка отправки email:', error);
+      logger.error('Ошибка отправки email:', error);
     }
   };
 

@@ -19,6 +19,7 @@ import { api } from '../api/client';
 import { openQueueWS, openDisplayBoardWS } from '../api/ws';
 import { useTheme } from '../contexts/ThemeContext';
 
+import logger from '../utils/logger';
 /**
  * Объединенное табло очереди с полным функционалом
  * Объединяет функции из DisplayBoard.jsx и QueueBoard.jsx
@@ -236,14 +237,14 @@ export default function DisplayBoardUnified({
       wsRef.current = closeWS;
       
     } catch (error) {
-      console.error('Ошибка создания WebSocket:', error);
+      logger.error('Ошибка создания WebSocket:', error);
       setConnected(false);
     }
   };
 
   // Обработка WebSocket сообщений (новое)
   const handleWebSocketMessage = (message) => {
-    console.log('Получено WebSocket сообщение:', message);
+    logger.log('Получено WebSocket сообщение:', message);
     
     switch (message.type) {
       case 'initial_state':
@@ -268,7 +269,7 @@ export default function DisplayBoardUnified({
         if (message.event_type === 'queue.created') {
           // Добавляем новую запись в очередь
           setQueueData(prev => [...prev, message.data]);
-          console.log(`➕ Новая запись в очереди: №${message.data.number}`);
+          logger.log(`➕ Новая запись в очереди: №${message.data.number}`);
         } else {
           // Обновляем всю очередь
           setQueueData(message.data.queue_entries || []);
@@ -287,7 +288,7 @@ export default function DisplayBoardUnified({
         break;
         
       default:
-        console.log('Неизвестный тип сообщения:', message.type);
+        logger.log('Неизвестный тип сообщения:', message.type);
     }
   };
 
@@ -318,7 +319,7 @@ export default function DisplayBoardUnified({
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.4);
       
-      console.log(`🔊 Звуковой сигнал для пациента №${message.data.number}`);
+      logger.log(`🔊 Звуковой сигнал для пациента №${message.data.number}`);
       
       // Голосовое объявление
       if (boardSettings.voiceEnabled) {
@@ -326,7 +327,7 @@ export default function DisplayBoardUnified({
         playVoiceAnnouncement(text);
       }
     } catch (error) {
-      console.error('Ошибка воспроизведения звука:', error);
+      logger.error('Ошибка воспроизведения звука:', error);
     }
   };
 
@@ -351,7 +352,7 @@ export default function DisplayBoardUnified({
         playVoiceAnnouncement(message.voice_text);
       }
     } catch (error) {
-      console.error('Ошибка воспроизведения звука объявления:', error);
+      logger.error('Ошибка воспроизведения звука объявления:', error);
     }
   };
 
@@ -367,7 +368,7 @@ export default function DisplayBoardUnified({
       
       speechSynthesis.speak(utterance);
     } catch (error) {
-      console.error('Ошибка голосового объявления:', error);
+      logger.error('Ошибка голосового объявления:', error);
     }
   };
 
@@ -471,7 +472,7 @@ export default function DisplayBoardUnified({
       audio.volume = 0.5;
       audio.play().catch(console.error);
     } catch (error) {
-      console.error('Ошибка воспроизведения звука:', error);
+      logger.error('Ошибка воспроизведения звука:', error);
     }
   }
 

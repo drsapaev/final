@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -66,7 +67,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
       onAnalysisComplete && onAnalysisComplete(response.data);
       
     } catch (error) {
-      console.error('Ошибка AI анализа:', error);
+      logger.error('Ошибка AI анализа:', error);
       setAnalysisResult({
         error: 'Не удалось проанализировать изображение',
       });
@@ -96,7 +97,7 @@ const SkinAnalysis = ({ photos, visitId, patientId, onAnalysisComplete }) => {
       onAnalysisComplete && onAnalysisComplete(response.data);
       
     } catch (error) {
-      console.error('Ошибка сравнительного анализа:', error);
+      logger.error('Ошибка сравнительного анализа:', error);
       setAnalysisResult({
         error: 'Не удалось выполнить сравнительный анализ',
       });

@@ -34,6 +34,7 @@ import {
 } from '../ui/macos';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const BackupManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,7 +91,7 @@ const BackupManagement = () => {
       const response = await api.get('/backups');
       setBackups(response.data.backups || []);
     } catch (error) {
-      console.error('Ошибка загрузки резервных копий:', error);
+      logger.error('Ошибка загрузки резервных копий:', error);
       // Fallback данные
       setBackups([
         {
@@ -126,7 +127,7 @@ const BackupManagement = () => {
       const response = await api.get('/backups/stats');
       setStats(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
       setStats({
         total_backups: 2,
         completed_backups: 2,

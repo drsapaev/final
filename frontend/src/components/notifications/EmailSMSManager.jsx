@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import logger from '../../utils/logger';
 import { 
   Mail, 
   MessageSquare, 
@@ -81,7 +82,7 @@ const EmailSMSManager = () => {
         setStatistics(data.statistics);
       }
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
     } finally {
       setLoading(false);
     }
@@ -97,7 +98,7 @@ const EmailSMSManager = () => {
         setTemplates(data.templates);
       }
     } catch (error) {
-      console.error('Ошибка загрузки шаблонов:', error);
+      logger.error('Ошибка загрузки шаблонов:', error);
     }
   };
 
@@ -119,7 +120,7 @@ const EmailSMSManager = () => {
       const data = await response.json();
       setTestResults({ type: 'email', ...data });
     } catch (error) {
-      console.error('Ошибка отправки тестового email:', error);
+      logger.error('Ошибка отправки тестового email:', error);
       setTestResults({ type: 'email', success: false, message: 'Ошибка отправки' });
     } finally {
       setLoading(false);
@@ -143,7 +144,7 @@ const EmailSMSManager = () => {
       const data = await response.json();
       setTestResults({ type: 'sms', ...data });
     } catch (error) {
-      console.error('Ошибка отправки тестового SMS:', error);
+      logger.error('Ошибка отправки тестового SMS:', error);
       setTestResults({ type: 'sms', success: false, message: 'Ошибка отправки' });
     } finally {
       setLoading(false);
@@ -172,7 +173,7 @@ const EmailSMSManager = () => {
       const data = await response.json();
       setTestResults({ type: 'bulk', ...data });
     } catch (error) {
-      console.error('Ошибка массовой рассылки:', error);
+      logger.error('Ошибка массовой рассылки:', error);
       setTestResults({ type: 'bulk', success: false, message: 'Ошибка рассылки' });
     } finally {
       setLoading(false);
@@ -191,7 +192,7 @@ const EmailSMSManager = () => {
         await loadStatistics();
       }
     } catch (error) {
-      console.error('Ошибка сброса статистики:', error);
+      logger.error('Ошибка сброса статистики:', error);
     } finally {
       setLoading(false);
     }

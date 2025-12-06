@@ -35,6 +35,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const SmartScheduling = () => {
   const [activeTab, setActiveTab] = useState('schedule-optimization');
   const [loading, setLoading] = useState(false);
@@ -166,7 +167,7 @@ const SmartScheduling = () => {
       toast.success('AI анализ успешно выполнен!');
     } catch (err) {
       toast.error('Ошибка при выполнении AI анализа.');
-      console.error('AI analysis error:', err);
+      logger.error('AI analysis error:', err);
       setError(err.response?.data?.detail || err.message);
     } finally {
       setLoading(false);

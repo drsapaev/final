@@ -7,6 +7,7 @@ import { useTheme } from '../../contexts/ThemeContext.jsx';
 import CompactConnectionStatus from '../pwa/CompactConnectionStatus';
 import { Button, Icon } from '../ui/macos';
 
+import logger from '../../utils/logger';
 /**
  * Новый компактный и предсказуемый хедер.
  * Цели:
@@ -46,7 +47,7 @@ export default function HeaderNew() {
       const inRef = themeMenuRef.current && (path.includes(themeMenuRef.current) || themeMenuRef.current.contains(event.target));
       const inMenu = !!(event.target && event.target.closest && event.target.closest('[data-theme-menu="true"]'));
       const inside = inRef || inMenu;
-      console.log('🖱️ Click detected:', event.target, 'inside:', inside);
+      logger.log('🖱️ Click detected:', event.target, 'inside:', inside);
       if (!inside) {
         setShowThemeMenu(false);
       }
@@ -132,11 +133,11 @@ export default function HeaderNew() {
   };
   
   const handleThemeClick = (schemeId) => {
-    console.log('🔥 Theme clicked:', schemeId);
-    console.log('Current theme state:', theme);
+    logger.log('🔥 Theme clicked:', schemeId);
+    logger.log('Current theme state:', theme);
     
     if (schemeId === 'vibrant' || schemeId === 'glass' || schemeId === 'gradient') {
-      console.log('Applying custom scheme:', schemeId);
+      logger.log('Applying custom scheme:', schemeId);
       // Set flags BEFORE applying to prevent ThemeContext override
       localStorage.setItem('customColorScheme', 'true');
       localStorage.setItem('activeColorSchemeId', schemeId);
@@ -146,10 +147,10 @@ export default function HeaderNew() {
       // Broadcast to other tabs/components
       window.dispatchEvent(new CustomEvent('colorSchemeChanged', { detail: schemeId }));
     } else {
-      console.log('Applying standard theme:', schemeId);
+      logger.log('Applying standard theme:', schemeId);
       
       // Clear custom schemes FIRST
-      console.log('Clearing custom scheme flags');
+      logger.log('Clearing custom scheme flags');
       localStorage.removeItem('customColorScheme');
       localStorage.removeItem('activeColorSchemeId');
       
@@ -159,16 +160,16 @@ export default function HeaderNew() {
       if (schemeId === 'auto') {
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         targetTheme = prefersDark ? 'dark' : 'light';
-        console.log('Auto theme detected:', targetTheme);
+        logger.log('Auto theme detected:', targetTheme);
       }
       
-      console.log('Setting theme to:', targetTheme);
+      logger.log('Setting theme to:', targetTheme);
       localStorage.setItem('ui_theme', targetTheme);
       localStorage.setItem('theme', targetTheme);
       localStorage.setItem('colorScheme', schemeId);
       
       // Force update DOM immediately BEFORE setTheme to prevent race condition
-      console.log('Updating DOM attributes');
+      logger.log('Updating DOM attributes');
       document.body.classList.remove('light-theme', 'dark-theme');
       document.body.classList.add(`${targetTheme}-theme`);
       document.documentElement.setAttribute('data-theme', targetTheme);
@@ -181,7 +182,7 @@ export default function HeaderNew() {
     }
     
     setShowThemeMenu(false);
-    console.log('Theme change completed');
+    logger.log('Theme change completed');
   };
 
   const renderSchemeIcon = (schemeId) => {
@@ -408,7 +409,7 @@ export default function HeaderNew() {
           variant="ghost"
           size="small"
           onClick={(e) => {
-            console.log('Theme button clicked, current state:', showThemeMenu);
+            logger.log('Theme button clicked, current state:', showThemeMenu);
             // Вычисляем позицию для фиксированного меню
             try {
               const btn = themeButtonRef.current;

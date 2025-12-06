@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import logger from '../utils/logger';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -123,7 +124,7 @@ function shouldMigrateFile(filePath) {
  * Мигрирует содержимое файла
  */
 function migrateFile(filePath) {
-  console.log(`Мигрируем: ${filePath}`);
+  logger.log(`Мигрируем: ${filePath}`);
 
   let content = fs.readFileSync(filePath, 'utf8');
   let modified = false;
@@ -182,9 +183,9 @@ function migrateFile(filePath) {
 
   if (modified) {
     fs.writeFileSync(filePath, content, 'utf8');
-    console.log(`✅ Успешно мигрирован: ${filePath}`);
+    logger.log(`✅ Успешно мигрирован: ${filePath}`);
   } else {
-    console.log(`⚠️  Нет изменений: ${filePath}`);
+    logger.log(`⚠️  Нет изменений: ${filePath}`);
   }
 
   return modified;
@@ -197,7 +198,7 @@ function createBackup(filePath) {
   const backupPath = filePath + '.backup';
   if (!fs.existsSync(backupPath)) {
     fs.copyFileSync(filePath, backupPath);
-    console.log(`📦 Создана резервная копия: ${backupPath}`);
+    logger.log(`📦 Создана резервная копия: ${backupPath}`);
   }
 }
 
@@ -205,12 +206,12 @@ function createBackup(filePath) {
  * Основная функция миграции
  */
 function runMigration() {
-  console.log('🚀 Запуск миграции дизайн-системы...\n');
+  logger.log('🚀 Запуск миграции дизайн-системы...\n');
 
   // Находим все файлы для миграции
   const filesToMigrate = findFiles(path.join(__dirname, '../../src')).filter(shouldMigrateFile);
 
-  console.log(`📋 Найдено файлов для миграции: ${filesToMigrate.length}\n`);
+  logger.log(`📋 Найдено файлов для миграции: ${filesToMigrate.length}\n`);
 
   let migratedCount = 0;
   let errorCount = 0;
@@ -225,22 +226,22 @@ function runMigration() {
         migratedCount++;
       }
     } catch (error) {
-      console.error(`❌ Ошибка миграции ${filePath}:`, error.message);
+      logger.error(`❌ Ошибка миграции ${filePath}:`, error.message);
       errorCount++;
     }
   }
 
   // Выводим статистику
-  console.log('\n📊 Статистика миграции:');
-  console.log(`✅ Успешно мигрировано: ${migratedCount}`);
-  console.log(`❌ Ошибок: ${errorCount}`);
-  console.log(`📦 Резервных копий создано: ${filesToMigrate.length}`);
+  logger.log('\n📊 Статистика миграции:');
+  logger.log(`✅ Успешно мигрировано: ${migratedCount}`);
+  logger.log(`❌ Ошибок: ${errorCount}`);
+  logger.log(`📦 Резервных копий создано: ${filesToMigrate.length}`);
 
   if (migratedCount > 0) {
-    console.log('\n🎉 Миграция завершена! Не забудьте:');
-    console.log('1. Протестировать обновленные компоненты');
-    console.log('2. Проверить визуальное соответствие');
-    console.log('3. Запустить линтер для проверки ошибок');
+    logger.log('\n🎉 Миграция завершена! Не забудьте:');
+    logger.log('1. Протестировать обновленные компоненты');
+    logger.log('2. Проверить визуальное соответствие');
+    logger.log('3. Запустить линтер для проверки ошибок');
   }
 }
 

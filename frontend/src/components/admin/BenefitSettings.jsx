@@ -27,6 +27,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 /**
  * Компонент для управления настройками льгот в админке
  */
@@ -57,7 +58,7 @@ const BenefitSettings = () => {
       setOriginalSettings(data);
       setLastUpdated(new Date(data.updated_at));
     } catch (error) {
-      console.error('Error loading benefit settings:', error);
+      logger.error('Error loading benefit settings:', error);
       setError(error.response?.data?.detail || 'Не удалось загрузить настройки льгот. Проверьте подключение к серверу.');
       // Fallback данные при ошибке
       const fallbackData = {
@@ -89,7 +90,7 @@ const BenefitSettings = () => {
       setOriginalSettings(settings);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error saving benefit settings:', error);
+      logger.error('Error saving benefit settings:', error);
       toast.error(error.response?.data?.detail || 'Ошибка сохранения настроек');
     } finally {
       setSaving(false);

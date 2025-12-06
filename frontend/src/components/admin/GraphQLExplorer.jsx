@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const GraphQLExplorer = () => {
   const [activeTab, setActiveTab] = useState('explorer');
   const [query, setQuery] = useState('');
@@ -309,7 +310,7 @@ const GraphQLExplorer = () => {
         setSchema(data.data.__schema);
       }
     } catch (error) {
-      console.error('Ошибка загрузки схемы GraphQL:', error);
+      logger.error('Ошибка загрузки схемы GraphQL:', error);
     }
   };
 
@@ -352,7 +353,7 @@ const GraphQLExplorer = () => {
         setError('GraphQL запрос выполнен с ошибками');
       }
     } catch (error) {
-      console.error('Ошибка выполнения GraphQL запроса:', error);
+      logger.error('Ошибка выполнения GraphQL запроса:', error);
       setError('Ошибка выполнения запроса: ' + error.message);
       setResult({ error: error.message });
     } finally {

@@ -12,14 +12,9 @@ import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
+import logger from '../utils/logger';
 
 const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
-const logger = {
-  info: (...args) => console.log('[RegistrarPanel]', ...args),
-  warn: (...args) => console.warn('[RegistrarPanel]', ...args),
-  error: (...args) => console.error('[RegistrarPanel]', ...args),
-};
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -1649,7 +1644,7 @@ const RegistrarPanel = () => {
         logger.info('✅ Загружены динамические отделения:', departmentsArray.map(d => d.key));
       }
     } catch (error) {
-      console.error('Ошибка загрузки отделений:', error);
+      logger.error('Ошибка загрузки отделений:', error);
     }
   }, []);
 

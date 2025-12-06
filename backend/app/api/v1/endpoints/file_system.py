@@ -48,6 +48,7 @@ from app.schemas.file_system import (
     FileUploadResponse,
 )
 from app.services.file_system_service import get_file_system_service
+from app.utils.file_validator import validate_upload_file
 
 router = APIRouter()
 
@@ -73,6 +74,15 @@ async def upload_file(
 ):
     """Загрузить файл"""
     try:
+        # ✅ SECURITY: Validate file (magic number, size, type)
+        is_valid, error_msg, file_info = await validate_upload_file(file)
+
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File validation failed: {error_msg}"
+            )
+
         # Парсим теги
         tags_list = []
         if tags:

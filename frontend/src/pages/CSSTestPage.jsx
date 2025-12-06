@@ -3,6 +3,7 @@ import { Card, Button, Badge } from '../components/ui/macos';
 import ModernTabs from '../components/navigation/ModernTabs';
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 
+import logger from '../utils/logger';
 const CSSTestPage = () => {
   const [activeTab, setActiveTab] = useState('cardio');
   const [testResults, setTestResults] = useState([]);

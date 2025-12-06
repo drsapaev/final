@@ -13,6 +13,7 @@ import {
 import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
   const [step, setStep] = useState('method'); // method, phone-verify, email-verify, reset-password
   const [method, setMethod] = useState('phone'); // phone, email
@@ -158,7 +159,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         setStep('phone-verify');
       }
     } catch (error) {
-      console.error('Error sending phone reset:', error);
+      logger.error('Error sending phone reset:', error);
       toast.error('Ошибка отправки SMS для сброса пароля');
     } finally {
       setLoading(false);
@@ -177,7 +178,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         setStep('email-verify');
       }
     } catch (error) {
-      console.error('Error sending email reset:', error);
+      logger.error('Error sending email reset:', error);
       toast.error('Ошибка отправки email для сброса пароля');
     } finally {
       setLoading(false);
@@ -205,7 +206,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         toast.success('Телефон подтвержден. Теперь введите новый пароль');
       }
     } catch (error) {
-      console.error('Error verifying phone code:', error);
+      logger.error('Error verifying phone code:', error);
       toast.error('Неверный код или код истек');
     } finally {
       setLoading(false);
@@ -242,7 +243,7 @@ const ForgotPassword = ({ onBack, onSuccess, language = 'RU' }) => {
         }, 3000);
       }
     } catch (error) {
-      console.error('Error resetting password:', error);
+      logger.error('Error resetting password:', error);
       toast.error('Ошибка сброса пароля');
     } finally {
       setLoading(false);

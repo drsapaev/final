@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User, Mail, Phone, MapPin, Calendar, IdCard, AlertCircle, Heart } from 'lucide-react';
+import logger from '../../utils/logger';
 import {
   MacOSCard,
   MacOSButton,
@@ -160,7 +161,7 @@ const PatientModal = ({
       await onSave(patientData);
       onClose();
     } catch (error) {
-      console.error('Ошибка сохранения пациента:', error);
+      logger.error('Ошибка сохранения пациента:', error);
     } finally {
       setIsSubmitting(false);
     }

@@ -10,6 +10,7 @@
 
 import axios from 'axios';
 import { tokenManager } from '../utils/tokenManager';
+import logger from '../utils/logger';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
@@ -22,7 +23,7 @@ const api = axios.create({
 // Ensure Authorization header is attached for every request from localStorage
 api.interceptors.request.use((config) => {
   const token = tokenManager.getAccessToken();
-  console.log('🔍 [api/client.js] Request interceptor:', {
+  logger.log('🔍 [api/client.js] Request interceptor:', {
     url: config.url,
     hasToken: !!token,
     tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',

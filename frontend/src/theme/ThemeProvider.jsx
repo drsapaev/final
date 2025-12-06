@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getTheme, applyCSSVariables, lightTheme, darkTheme } from './themes';
 import { tokens } from './tokens';
+import logger from '../utils/logger';
 import '../theme/macos-tokens.css';
 
 // Утилиты для работы с токенами дизайна
@@ -94,7 +95,7 @@ export const ThemeProvider = ({ children, defaultTheme = 'light' }) => {
   // Функция для смены темы
   const setTheme = useCallback((newThemeName) => {
     if (!['light', 'dark'].includes(newThemeName)) {
-      console.warn(`Invalid theme name: ${newThemeName}. Using 'light' instead.`);
+      logger.warn(`Invalid theme name: ${newThemeName}. Using 'light' instead.`);
       newThemeName = 'light';
     }
     

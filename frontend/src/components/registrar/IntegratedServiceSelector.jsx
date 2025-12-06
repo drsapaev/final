@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Интегрированный селектор услуг для регистратуры
  * Использует справочник из админ панели согласно detail.md стр. 112
@@ -115,7 +116,7 @@ const IntegratedServiceSelector = ({
       setError('');
 
       // Сначала устанавливаем fallback данные
-      console.log('IntegratedServiceSelector: Setting fallback data');
+      logger.log('IntegratedServiceSelector: Setting fallback data');
       setServices(DEMO_SERVICES);
       setCategories(DEMO_CATEGORIES);
       setLoading(false);
@@ -123,7 +124,7 @@ const IntegratedServiceSelector = ({
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.warn('Токен не найден, используем демо-данные');
+        logger.warn('Токен не найден, используем демо-данные');
         return;
       }
 
@@ -141,12 +142,12 @@ const IntegratedServiceSelector = ({
 
         if (response.ok) {
           const data = await response.json();
-          console.log('IntegratedServiceSelector: API response:', data);
+          logger.log('IntegratedServiceSelector: API response:', data);
           
           // Проверяем структуру ответа более детально
           if (data.services_by_group) {
             const groupKeys = Object.keys(data.services_by_group);
-            console.log('IntegratedServiceSelector: Groups in API response:', groupKeys);
+            logger.log('IntegratedServiceSelector: Groups in API response:', groupKeys);
             
             // Проверяем, есть ли реальные услуги в группах
             let hasServices = false;
@@ -154,30 +155,30 @@ const IntegratedServiceSelector = ({
               const groupServices = data.services_by_group[group];
               if (Array.isArray(groupServices) && groupServices.length > 0) {
                 hasServices = true;
-                console.log(`IntegratedServiceSelector: Group ${group} has ${groupServices.length} services`);
+                logger.log(`IntegratedServiceSelector: Group ${group} has ${groupServices.length} services`);
               }
             }
             
             if (hasServices) {
               setServices(data.services_by_group);
               setCategories(data.categories || DEMO_CATEGORIES);
-              console.log('IntegratedServiceSelector: Loaded data from API with services');
+              logger.log('IntegratedServiceSelector: Loaded data from API with services');
             } else {
-              console.log('IntegratedServiceSelector: API groups are empty, keeping fallback');
+              logger.log('IntegratedServiceSelector: API groups are empty, keeping fallback');
               // Не перезаписываем fallback пустыми данными
             }
           } else {
-            console.log('IntegratedServiceSelector: No services_by_group in API response, keeping fallback');
+            logger.log('IntegratedServiceSelector: No services_by_group in API response, keeping fallback');
           }
           setRetryCount(0);
         } else {
-          console.warn('IntegratedServiceSelector: API request failed, keeping fallback data');
+          logger.warn('IntegratedServiceSelector: API request failed, keeping fallback data');
         }
       } catch (apiError) {
-        console.warn('IntegratedServiceSelector: API error, keeping fallback data:', apiError);
+        logger.warn('IntegratedServiceSelector: API error, keeping fallback data:', apiError);
       }
     } catch (err) {
-      console.error('IntegratedServiceSelector: Critical error:', err);
+      logger.error('IntegratedServiceSelector: Critical error:', err);
       // Fallback данные уже установлены выше, просто показываем ошибку
       if (retryCount > 0) {
         setError(`Ошибка загрузки справочника услуг: ${err.message}`);

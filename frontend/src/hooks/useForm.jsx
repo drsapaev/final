@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAnimation } from './useAnimation';
 import { useReducedMotion } from './useEnhancedMediaQuery';
 
+import logger from '../utils/logger';
 // Валидаторы для медицинских форм
 export const validators = {
   required: (value) => {
@@ -208,7 +209,7 @@ export const useForm = (initialValues = {}, options = {}) => {
         reset();
       }
     } catch (error) {
-      console.error('Form submission error:', error);
+      logger.error('Form submission error:', error);
     } finally {
       setIsSubmitting(false);
     }

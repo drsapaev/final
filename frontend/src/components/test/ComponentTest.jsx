@@ -1,6 +1,7 @@
 // Тестовый компонент для проверки работоспособности всех созданных компонентов
 import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import logger from '../../utils/logger';
 import { 
   ErrorBoundary, 
   ToastProvider, 
@@ -111,7 +112,7 @@ function ComponentTestInner() {
   };
 
   const handleFormSubmit = (values) => {
-    console.log('Form submitted:', values);
+    logger.log('Form submitted:', values);
     addToast({
       type: 'success',
       title: 'Форма отправлена',

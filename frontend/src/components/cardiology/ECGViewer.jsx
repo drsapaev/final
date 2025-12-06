@@ -38,6 +38,7 @@ import { useDropzone } from 'react-dropzone';
 import { api } from '../../api/client';
 import { parseECGFile, analyzeECGParameters } from './ECGParser';
 
+import logger from '../../utils/logger';
 const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
   const [ecgFiles, setEcgFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -98,7 +99,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
         onDataUpdate && onDataUpdate();
         
       } catch (error) {
-        console.error('Ошибка загрузки ЭКГ:', error);
+        logger.error('Ошибка загрузки ЭКГ:', error);
         setUploadProgress(0);
       }
     }
@@ -139,11 +140,11 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
             parameters: enrichedParams,
           });
         } catch (error) {
-          console.error('Ошибка сохранения параметров на сервере:', error);
+          logger.error('Ошибка сохранения параметров на сервере:', error);
         }
       }
     } catch (error) {
-      console.error('Ошибка парсинга ЭКГ:', error);
+      logger.error('Ошибка парсинга ЭКГ:', error);
     }
   };
 
@@ -163,7 +164,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       onDataUpdate && onDataUpdate();
       
     } catch (error) {
-      console.error('Ошибка AI анализа:', error);
+      logger.error('Ошибка AI анализа:', error);
       setAnalysisResult({
         error: 'Не удалось проанализировать ЭКГ',
       });
@@ -189,7 +190,7 @@ const ECGViewer = ({ visitId, patientId, onDataUpdate }) => {
       setEcgFiles(prev => prev.filter(f => f.id !== fileId));
       onDataUpdate && onDataUpdate();
     } catch (error) {
-      console.error('Ошибка удаления файла:', error);
+      logger.error('Ошибка удаления файла:', error);
     }
   };
 

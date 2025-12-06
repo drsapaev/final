@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
+import logger from '../../utils/logger';
 import { 
   MacOSCard, 
   MacOSButton, 
@@ -125,7 +126,7 @@ const MedicalImageAnalyzer = () => {
       setResult(response.data);
       toast.success('Анализ завершен!');
     } catch (error) {
-      console.error('Ошибка анализа:', error);
+      logger.error('Ошибка анализа:', error);
       toast.error(error.response?.data?.detail || 'Ошибка при анализе изображения');
     } finally {
       setAnalyzing(false);

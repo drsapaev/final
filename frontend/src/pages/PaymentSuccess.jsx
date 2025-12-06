@@ -15,6 +15,7 @@ import { CheckCircle as CheckIcon, Download as DownloadIcon, Home as HomeIcon, R
 // API клиент
 import { api as apiClient } from '../api/client';
 
+import logger from '../utils/logger';
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -56,7 +57,7 @@ const PaymentSuccess = () => {
         setError('Данные платежа не найдены');
       }
     } catch (err) {
-      console.error('Ошибка загрузки платежа:', err);
+      logger.error('Ошибка загрузки платежа:', err);
       setError('Не удалось загрузить информацию о платеже');
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ const PaymentSuccess = () => {
         setReceiptUrl(response.data.receipt_url);
       }
     } catch (err) {
-      console.warn('Не удалось сгенерировать квитанцию:', err);
+      logger.warn('Не удалось сгенерировать квитанцию:', err);
     }
   };
 
@@ -142,7 +143,7 @@ const PaymentSuccess = () => {
           url: window.location.href
         });
       } catch (err) {
-        console.log('Ошибка при шаринге:', err);
+        logger.log('Ошибка при шаринге:', err);
       }
     } else {
       // Fallback - копируем в буфер обмена

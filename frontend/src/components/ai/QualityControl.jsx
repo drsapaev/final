@@ -31,6 +31,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const QualityControl = () => {
   const [activeTab, setActiveTab] = useState('quality-analysis');
   const [loading, setLoading] = useState(false);
@@ -156,7 +157,7 @@ const QualityControl = () => {
       toast.success('AI анализ качества успешно выполнен!');
     } catch (err) {
       toast.error('Ошибка при выполнении AI анализа качества.');
-      console.error('AI quality control error:', err);
+      logger.error('AI quality control error:', err);
       setError(err.response?.data?.detail || err.message);
     } finally {
       setLoading(false);

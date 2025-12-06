@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   Shield, 
   Lock, 
@@ -191,7 +192,7 @@ const SecuritySettings = ({
     try {
       await onSave(formData);
     } catch (error) {
-      console.error('Ошибка сохранения настроек безопасности:', error);
+      logger.error('Ошибка сохранения настроек безопасности:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -210,12 +211,12 @@ const SecuritySettings = ({
 
   const terminateSession = (sessionId) => {
     // Логика завершения сессии
-    console.log('Terminating session:', sessionId);
+    logger.log('Terminating session:', sessionId);
   };
 
   const terminateAllOtherSessions = () => {
     // Логика завершения всех других сессий
-    console.log('Terminating all other sessions');
+    logger.log('Terminating all other sessions');
   };
 
   const getStatusIcon = (status) => {
