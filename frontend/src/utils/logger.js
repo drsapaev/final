@@ -45,6 +45,12 @@ const PHI_FIELDS = [
 const isDevelopment = import.meta.env.MODE === 'development';
 
 /**
+ * Быстрая проверка - нужна ли санитизация
+ * В development режиме можно отключить для производительности
+ */
+const ENABLE_SANITIZATION = import.meta.env.VITE_ENABLE_PHI_SANITIZATION !== 'false';
+
+/**
  * Санитизация объекта - замена PHI на [REDACTED]
  * @param {any} data - Данные для санитизации
  * @param {number} depth - Текущая глубина рекурсии (защита от циклических ссылок)
@@ -53,7 +59,7 @@ const isDevelopment = import.meta.env.MODE === 'development';
  */
 function sanitize(data, depth = 0, seen = new WeakSet()) {
   // Защита от глубокой рекурсии
-  if (depth > 5) {
+  if (depth > 3) {
     return '[MAX_DEPTH]';
   }
 
@@ -77,32 +83,53 @@ function sanitize(data, depth = 0, seen = new WeakSet()) {
     return '[DOM_OR_REACT_ELEMENT]';
   }
 
+  // Защита от больших объектов - пропускаем без обработки
+  if (data.constructor && data.constructor.name &&
+      (data.constructor.name.includes('Fiber') ||
+       data.constructor.name.includes('Synthetic') ||
+       data.constructor.name.includes('Event'))) {
+    return `[${data.constructor.name}]`;
+  }
+
   // Добавляем объект в seen
   seen.add(data);
 
   try {
-    // Массивы - ограничиваем до 10 элементов
+    // Массивы - ограничиваем до 5 элементов для скорости
     if (Array.isArray(data)) {
-      return data.slice(0, 10).map(item => sanitize(item, depth + 1, seen));
+      if (data.length > 5) {
+        return `[Array(${data.length}) - showing first 5]`;
+      }
+      return data.map(item => sanitize(item, depth + 1, seen));
+    }
+
+    // Объекты - быстрая проверка размера
+    const keys = Object.keys(data);
+    if (keys.length > 15) {
+      return `[Object with ${keys.length} fields]`;
     }
 
     // Объекты - ограничиваем количество полей
     const sanitized = {};
     let count = 0;
-    const maxFields = 20;
+    const maxFields = 15;
 
     for (const [key, value] of Object.entries(data)) {
       if (count >= maxFields) {
-        sanitized['...'] = `[${Object.keys(data).length - maxFields} more fields]`;
+        sanitized['...'] = `[${keys.length - maxFields} more]`;
         break;
       }
 
       const lowerKey = key.toLowerCase();
 
-      // Проверяем, содержит ли ключ PHI
-      const isPHI = PHI_FIELDS.some(phiField =>
-        lowerKey.includes(phiField.toLowerCase())
-      );
+      // Быстрая проверка PHI (без toLowerCase в цикле)
+      let isPHI = false;
+      for (let i = 0; i < PHI_FIELDS.length; i++) {
+        if (lowerKey.includes(PHI_FIELDS[i].toLowerCase())) {
+          isPHI = true;
+          break;
+        }
+      }
 
       if (isPHI) {
         sanitized[key] = '[REDACTED]';
@@ -127,11 +154,25 @@ function sanitize(data, depth = 0, seen = new WeakSet()) {
  * @returns {Array} Санитизированные аргументы
  */
 function formatArgs(args) {
+  // Если санитизация отключена, возвращаем как есть
+  if (!ENABLE_SANITIZATION) {
+    return args;
+  }
+
   try {
     return args.map(arg => {
       // Пропускаем примитивы как есть
       if (arg === null || arg === undefined || typeof arg !== 'object') {
         return arg;
+      }
+
+      // Error объекты - показываем только message
+      if (arg instanceof Error) {
+        return {
+          name: arg.name,
+          message: arg.message,
+          stack: arg.stack?.split('\n').slice(0, 3).join('\n')
+        };
       }
 
       // Для объектов применяем санитизацию
