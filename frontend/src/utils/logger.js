@@ -48,11 +48,12 @@ const isDevelopment = import.meta.env.MODE === 'development';
  * Санитизация объекта - замена PHI на [REDACTED]
  * @param {any} data - Данные для санитизации
  * @param {number} depth - Текущая глубина рекурсии (защита от циклических ссылок)
+ * @param {WeakSet} seen - Set для отслеживания циклических ссылок
  * @returns {any} Санитизированные данные
  */
-function sanitize(data, depth = 0) {
+function sanitize(data, depth = 0, seen = new WeakSet()) {
   // Защита от глубокой рекурсии
-  if (depth > 10) {
+  if (depth > 5) {
     return '[MAX_DEPTH]';
   }
 
@@ -66,31 +67,58 @@ function sanitize(data, depth = 0) {
     return data;
   }
 
-  // Массивы
-  if (Array.isArray(data)) {
-    return data.map(item => sanitize(item, depth + 1));
+  // Защита от циклических ссылок
+  if (seen.has(data)) {
+    return '[CIRCULAR]';
   }
 
-  // Объекты
-  const sanitized = {};
-  for (const [key, value] of Object.entries(data)) {
-    const lowerKey = key.toLowerCase();
+  // Защита от DOM элементов и React элементов
+  if (data instanceof Element || data instanceof Node || data.$$typeof) {
+    return '[DOM_OR_REACT_ELEMENT]';
+  }
 
-    // Проверяем, содержит ли ключ PHI
-    const isPHI = PHI_FIELDS.some(phiField =>
-      lowerKey.includes(phiField.toLowerCase())
-    );
+  // Добавляем объект в seen
+  seen.add(data);
 
-    if (isPHI) {
-      sanitized[key] = '[REDACTED]';
-    } else if (typeof value === 'object' && value !== null) {
-      sanitized[key] = sanitize(value, depth + 1);
-    } else {
-      sanitized[key] = value;
+  try {
+    // Массивы - ограничиваем до 10 элементов
+    if (Array.isArray(data)) {
+      return data.slice(0, 10).map(item => sanitize(item, depth + 1, seen));
     }
-  }
 
-  return sanitized;
+    // Объекты - ограничиваем количество полей
+    const sanitized = {};
+    let count = 0;
+    const maxFields = 20;
+
+    for (const [key, value] of Object.entries(data)) {
+      if (count >= maxFields) {
+        sanitized['...'] = `[${Object.keys(data).length - maxFields} more fields]`;
+        break;
+      }
+
+      const lowerKey = key.toLowerCase();
+
+      // Проверяем, содержит ли ключ PHI
+      const isPHI = PHI_FIELDS.some(phiField =>
+        lowerKey.includes(phiField.toLowerCase())
+      );
+
+      if (isPHI) {
+        sanitized[key] = '[REDACTED]';
+      } else if (typeof value === 'object' && value !== null) {
+        sanitized[key] = sanitize(value, depth + 1, seen);
+      } else {
+        sanitized[key] = value;
+      }
+
+      count++;
+    }
+
+    return sanitized;
+  } catch (error) {
+    return '[SANITIZATION_ERROR]';
+  }
 }
 
 /**
@@ -99,12 +127,24 @@ function sanitize(data, depth = 0) {
  * @returns {Array} Санитизированные аргументы
  */
 function formatArgs(args) {
-  return args.map(arg => {
-    if (typeof arg === 'object' && arg !== null) {
-      return sanitize(arg);
-    }
-    return arg;
-  });
+  try {
+    return args.map(arg => {
+      // Пропускаем примитивы как есть
+      if (arg === null || arg === undefined || typeof arg !== 'object') {
+        return arg;
+      }
+
+      // Для объектов применяем санитизацию
+      try {
+        return sanitize(arg);
+      } catch (error) {
+        return '[OBJECT - SANITIZATION FAILED]';
+      }
+    });
+  } catch (error) {
+    // Если даже formatArgs упал, возвращаем безопасное значение
+    return ['[LOGGING ERROR]'];
+  }
 }
 
 /**
