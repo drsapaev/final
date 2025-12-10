@@ -31,7 +31,10 @@
       "Bash(git cherry-pick:*)",
       "Bash(sqlite3:*)",
       "Bash(cmd //c \"taskkill /F /PID 11484\")",
-      "Bash(cmd //c \"taskkill /F /IM uvicorn.exe\")"
+      "Bash(cmd //c \"taskkill /F /IM uvicorn.exe\")",
+      "Bash(cmd //c \"taskkill /F /PID 7216\")",
+      "Bash(cmd //c \"taskkill /F /IM python.exe\")",
+      "Bash(cmd //c \"tasklist | findstr python\")"
     ],
     "deny": [],
     "ask": []
