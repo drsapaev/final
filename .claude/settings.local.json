@@ -30,7 +30,8 @@
       "Bash(git add:*)",
       "Bash(git cherry-pick:*)",
       "Bash(sqlite3:*)",
-      "Bash(cmd //c \"taskkill /F /PID 11484\")"
+      "Bash(cmd //c \"taskkill /F /PID 11484\")",
+      "Bash(cmd //c \"taskkill /F /IM uvicorn.exe\")"
     ],
     "deny": [],
     "ask": []
