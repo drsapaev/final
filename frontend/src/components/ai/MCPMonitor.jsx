@@ -24,6 +24,7 @@ import {
 import { mcpAPI } from '../../api/mcpClient';
 import { useSnackbar } from 'notistack';
 
+import logger from '../../utils/logger';
 const MCPMonitor = () => {
   const [loading, setLoading] = useState(true);
   const [mcpStatus, setMcpStatus] = useState(null);
@@ -49,7 +50,7 @@ const MCPMonitor = () => {
       
     } catch (error) {
       enqueueSnackbar('Ошибка загрузки статуса MCP', { variant: 'error' });
-      console.error('MCP status error:', error);
+      logger.error('MCP status error:', error);
     } finally {
       setLoading(false);
     }

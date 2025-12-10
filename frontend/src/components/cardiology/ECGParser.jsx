@@ -5,6 +5,7 @@
  */
 import React from 'react';
 
+import logger from '../../utils/logger';
 // Парсер для SCP формата
 export const parseSCPFile = async (file) => {
   // SCP (Standard Communications Protocol for ECG) парсер
@@ -56,7 +57,7 @@ export const parseSCPFile = async (file) => {
     };
     
   } catch (error) {
-    console.error('Ошибка парсинга SCP:', error);
+    logger.error('Ошибка парсинга SCP:', error);
     return {
       success: false,
       error: 'Не удалось распарсить SCP файл',
@@ -114,7 +115,7 @@ export const parseXMLFile = async (file) => {
     };
     
   } catch (error) {
-    console.error('Ошибка парсинга XML:', error);
+    logger.error('Ошибка парсинга XML:', error);
     return {
       success: false,
       error: 'Не удалось распарсить XML файл',

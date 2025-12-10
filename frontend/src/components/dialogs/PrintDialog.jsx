@@ -4,6 +4,7 @@ import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const PrintDialog = ({ 
   isOpen, 
   onClose, 
@@ -60,7 +61,7 @@ const PrintDialog = ({
         setSelectedPrinter(onlinePrinter.id);
       }
     } catch (error) {
-      console.error('Error loading printers:', error);
+      logger.error('Error loading printers:', error);
       setError('Не удалось загрузить список принтеров');
     } finally {
       setIsLoading(false);
@@ -92,7 +93,7 @@ const PrintDialog = ({
       toast.success('Документ отправлен на печать');
       onClose();
     } catch (error) {
-      console.error('Print error:', error);
+      logger.error('Print error:', error);
       toast.error('Ошибка при печати: ' + error.message);
     } finally {
       setIsPrinting(false);

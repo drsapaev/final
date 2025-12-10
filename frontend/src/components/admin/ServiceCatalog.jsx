@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 import {
   Package,
   Plus,
@@ -90,30 +91,30 @@ const ServiceCatalog = () => {
       if (servicesRes.status === 'fulfilled') {
         setServices(servicesRes.value.data);
       } else {
-        console.error('Ошибка загрузки услуг:', servicesRes.reason);
+        logger.error('Ошибка загрузки услуг:', servicesRes.reason);
       }
 
       if (categoriesRes.status === 'fulfilled') {
         setCategories(categoriesRes.value.data);
       } else {
-        console.error('Ошибка загрузки категорий:', categoriesRes.reason);
+        logger.error('Ошибка загрузки категорий:', categoriesRes.reason);
       }
 
       if (doctorsRes.status === 'fulfilled') {
         setDoctors(doctorsRes.value.data);
       } else {
-        console.error('Ошибка загрузки врачей:', doctorsRes.reason);
+        logger.error('Ошибка загрузки врачей:', doctorsRes.reason);
       }
 
       if (departmentsRes.status === 'fulfilled') {
         // Backend returns {success: true, data: [...], count: N}
         setDepartments(departmentsRes.value.data?.data || []);
       } else {
-        console.error('Ошибка загрузки отделений:', departmentsRes.reason);
+        logger.error('Ошибка загрузки отделений:', departmentsRes.reason);
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки данных' });
     } finally {
       setLoading(false);
@@ -132,7 +133,7 @@ const ServiceCatalog = () => {
 
   const handleSaveService = async (serviceData) => {
     try {
-      console.log('🔄 Отправляем данные услуги:', serviceData);
+      logger.log('🔄 Отправляем данные услуги:', serviceData);
 
       if (editingService) {
         await api.put(`/services/${editingService.id}`, serviceData);
@@ -148,7 +149,7 @@ const ServiceCatalog = () => {
       setShowAddForm(false);
       await loadData();
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       
       // ✅ ПАРСИНГ ДЕТАЛЬНЫХ ОШИБОК ОТ BACKEND
       let errorMessage = 'Ошибка сохранения услуги';
@@ -187,7 +188,7 @@ const ServiceCatalog = () => {
       setMessage({ type: 'success', text: 'Услуга удалена' });
       await loadData();
     } catch (error) {
-      console.error('Ошибка удаления:', error);
+      logger.error('Ошибка удаления:', error);
       setMessage({ type: 'error', text: error.response?.data?.detail || 'Ошибка удаления услуги' });
     }
   };
@@ -687,7 +688,7 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
           setCodeWarning('');
         }
       } catch (error) {
-        console.error('Ошибка проверки дубликатов:', error);
+        logger.error('Ошибка проверки дубликатов:', error);
       } finally {
         setCheckingDuplicates(false);
       }
@@ -723,7 +724,7 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
           setServiceCodeWarning('');
         }
       } catch (error) {
-        console.error('Ошибка проверки дубликатов:', error);
+        logger.error('Ошибка проверки дубликатов:', error);
       } finally {
         setCheckingDuplicates(false);
       }
@@ -761,7 +762,7 @@ const ServiceForm = ({ service, categories, doctors, departments, onSave, onCanc
       }
     });
 
-    console.log('📝 Подготовленные данные для API:', apiData);
+    logger.log('📝 Подготовленные данные для API:', apiData);
     onSave(apiData);
   };
 

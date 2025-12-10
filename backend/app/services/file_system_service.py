@@ -175,26 +175,13 @@ class FileSystemService:
 
             # Проверяем, не загружен ли уже такой файл
             existing_file = file.get_by_hash(db, file_hash=file_hash)
-            if existing_file:
-                # Создаем ссылку на существующий файл
-                file_create_data = FileCreate(
-                    filename=file_data.filename,
-                    original_filename=upload_file.filename,
-                    file_path=existing_file.file_path,
-                    file_type=file_data.file_type,
-                    mime_type=mime_type,
-                    file_size=file_size,
-                    file_hash=file_hash,
-                    title=file_data.title,
-                    description=file_data.description,
-                    tags=file_data.tags,
-                    permission=file_data.permission,
-                    patient_id=file_data.patient_id,
-                    appointment_id=file_data.appointment_id,
-                    emr_id=file_data.emr_id,
-                    expires_at=file_data.expires_at,
-                    file_metadata=file_data.file_metadata,
-                )
+            
+            # ✅ CERTIFICATION: Всегда генерируем file_path для нового файла
+            # Используем существующий путь только если файл физически существует
+            if existing_file and existing_file.file_path and os.path.exists(existing_file.file_path):
+                # Дедупликация: используем существующий файл
+                file_path = existing_file.file_path
+                logger.info(f"Используется существующий файл по хешу: {file_hash[:8]}... (путь: {file_path})")
             else:
                 # Генерируем путь для нового файла
                 file_path = self._generate_file_path(upload_file.filename, file_hash)
@@ -205,28 +192,46 @@ class FileSystemService:
                 # Сохраняем файл
                 with open(file_path, 'wb') as f:
                     f.write(file_content)
+                logger.info(f"Создан новый файл: {file_path}")
 
-                file_create_data = FileCreate(
-                    filename=file_data.filename,
-                    original_filename=upload_file.filename,
-                    file_path=file_path,
-                    file_type=file_data.file_type,
-                    mime_type=mime_type,
-                    file_size=file_size,
-                    file_hash=file_hash,
-                    title=file_data.title,
-                    description=file_data.description,
-                    tags=file_data.tags,
-                    permission=file_data.permission,
-                    patient_id=file_data.patient_id,
-                    appointment_id=file_data.appointment_id,
-                    emr_id=file_data.emr_id,
-                    expires_at=file_data.expires_at,
-                    file_metadata=file_data.file_metadata,
-                )
+            # ✅ CERTIFICATION: file_path всегда установлен перед созданием FileCreate
+            assert file_path is not None and file_path != "", "file_path должен быть установлен"
+            
+            # Преобразуем file_type из FileType (модель) в FileTypeEnum (схема), если нужно
+            file_type_value = file_data.file_type
+            if isinstance(file_type_value, FileType):
+                # Преобразуем FileType enum в строку для FileTypeEnum
+                file_type_value = FileTypeEnum(file_type_value.value)
+            elif isinstance(file_type_value, str):
+                # Если строка, преобразуем в FileTypeEnum
+                file_type_value = FileTypeEnum(file_type_value)
+            
+            file_create_data = FileCreate(
+                filename=file_data.filename,
+                original_filename=upload_file.filename,
+                file_path=file_path,  # ✅ Всегда установлен
+                file_type=file_type_value,
+                mime_type=mime_type,
+                file_size=file_size,
+                file_hash=file_hash,
+                title=file_data.title,
+                description=file_data.description,
+                tags=file_data.tags,
+                permission=file_data.permission,
+                patient_id=file_data.patient_id,
+                appointment_id=file_data.appointment_id,
+                emr_id=file_data.emr_id,
+                expires_at=file_data.expires_at,
+                file_metadata=file_data.file_metadata,
+            )
 
             # Создаем запись в БД
             db_file = file.create(db, obj_in=file_create_data, owner_id=user_id)
+
+            # ✅ CERTIFICATION: Убеждаемся, что file_hash установлен
+            if not db_file.file_hash:
+                db_file.file_hash = file_hash
+                db.add(db_file)
 
             # Обновляем статус на READY
             db_file.status = FileStatusEnum.READY
@@ -350,6 +355,101 @@ class FileSystemService:
 
         user = db.query(User).filter(User.id == user_id).first()
         return user and user.role == "Admin"
+
+    def replace_file_content(
+        self,
+        db: Session,
+        file_id: int,
+        new_file: UploadFile,
+        user_id: int,
+        change_description: Optional[str] = None,
+    ) -> File:
+        """
+        ✅ CERTIFICATION: Заменить содержимое файла с версионированием.
+        Создает версию старого файла перед заменой.
+        """
+        from app.models.file_system import FileVersion
+
+        # Получаем текущий файл
+        db_file = file.get(db, id=file_id)
+        if not db_file:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Файл не найден"
+            )
+
+        # Проверяем права доступа
+        if db_file.owner_id != user_id and not self._is_admin(db, user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет прав для замены содержимого файла",
+            )
+
+        # Читаем новое содержимое
+        new_content = new_file.file.read()
+        new_size = len(new_content)
+
+        # Проверяем размер
+        if new_size > self.max_file_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Файл слишком большой. Максимальный размер: {self.max_file_size} байт",
+            )
+
+        # Вычисляем хеш нового содержимого
+        new_hash = self._generate_file_hash(new_content)
+
+        # Если хеш совпадает, файл не изменился
+        if db_file.file_hash == new_hash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Новое содержимое идентично текущему",
+            )
+
+        # ✅ CERTIFICATION: Создаем версию старого файла перед заменой
+        old_version_data = {
+            "file_path": db_file.file_path,
+            "file_size": db_file.file_size,
+            "file_hash": db_file.file_hash or "",  # ✅ Обязательный хеш для версии (может быть пустым для старых файлов)
+            "change_description": change_description or "Автоматическая версия перед заменой содержимого",
+        }
+        file_version.create(
+            db, file_id=file_id, version_data=old_version_data, created_by=user_id
+        )
+
+        # Генерируем путь для нового файла
+        new_file_path = self._generate_file_path(new_file.filename or db_file.filename, new_hash)
+
+        # Создаем директорию если нужно
+        os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+
+        # Сохраняем новый файл
+        with open(new_file_path, 'wb') as f:
+            f.write(new_content)
+
+        # Обновляем запись файла
+        old_size = db_file.file_size
+        db_file.file_path = new_file_path
+        db_file.file_size = new_size
+        db_file.file_hash = new_hash  # ✅ Обязательный хеш
+        db_file.mime_type = (
+            new_file.content_type
+            or mimetypes.guess_type(new_file.filename)[0]
+            or db_file.mime_type
+        )
+        db.add(db_file)
+        db.commit()
+        db.refresh(db_file)
+
+        # Обновляем квоту (разница в размере)
+        size_delta = new_size - old_size
+        file_quota.update_usage(db, user_id=user_id, size_delta=size_delta, files_delta=0)
+
+        # Логируем замену
+        file_access_log.create(
+            db, file_id=file_id, user_id=user_id, action="replace_content"
+        )
+
+        return db_file
 
     def delete_file(self, db: Session, file_id: int, user_id: int) -> bool:
         """Удалить файл"""

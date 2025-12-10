@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import logger from '../utils/logger';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -81,20 +82,20 @@ function fixImportPaths(filePath) {
     
     if (changed) {
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`✅ Fixed paths in: ${filePath}`);
+      logger.log(`✅ Fixed paths in: ${filePath}`);
       return true;
     }
     
     return false;
   } catch (error) {
-    console.error(`❌ Error fixing ${filePath}:`, error.message);
+    logger.error(`❌ Error fixing ${filePath}:`, error.message);
     return false;
   }
 }
 
 // Основная функция
 function main() {
-  console.log('🔧 Fixing import paths...\n');
+  logger.log('🔧 Fixing import paths...\n');
   
   const srcDir = path.join(__dirname, '../');
   const files = findFiles(srcDir, '.jsx').concat(findFiles(srcDir, '.js'));
@@ -114,15 +115,15 @@ function main() {
     }
   });
   
-  console.log('\n📊 Path Fix Summary:');
-  console.log(`   Total files checked: ${totalFiles}`);
-  console.log(`   Files fixed: ${fixedCount}`);
-  console.log(`   Files unchanged: ${totalFiles - fixedCount}`);
+  logger.log('\n📊 Path Fix Summary:');
+  logger.log(`   Total files checked: ${totalFiles}`);
+  logger.log(`   Files fixed: ${fixedCount}`);
+  logger.log(`   Files unchanged: ${totalFiles - fixedCount}`);
   
   if (fixedCount > 0) {
-    console.log('\n✨ Path fixes completed successfully!');
+    logger.log('\n✨ Path fixes completed successfully!');
   } else {
-    console.log('\n💡 No files needed path fixes.');
+    logger.log('\n💡 No files needed path fixes.');
   }
 }
 

@@ -3,6 +3,7 @@ import React from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Button } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Error Boundary компонент для перехвата и обработки ошибок React
  */
@@ -19,7 +20,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     // Логируем ошибку
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary caught an error:', error, errorInfo);
     
     this.setState({
       error: error,
@@ -176,14 +177,14 @@ export function useErrorHandler() {
   }, []);
 
   const handleError = React.useCallback((error) => {
-    console.error('Error caught by useErrorHandler:', error);
+    logger.error('Error caught by useErrorHandler:', error);
     setError(error);
   }, []);
 
   React.useEffect(() => {
     if (error) {
       // Можно добавить отправку ошибки в систему мониторинга
-      console.error('Unhandled error:', error);
+      logger.error('Unhandled error:', error);
     }
   }, [error]);
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   Calendar, 
   Clock, 
@@ -109,7 +110,7 @@ const ScheduleNextModal = ({
         setPatients(data);
       }
     } catch (err) {
-      console.error('Ошибка загрузки пациентов:', err);
+      logger.error('Ошибка загрузки пациентов:', err);
     }
   };
 
@@ -128,7 +129,7 @@ const ScheduleNextModal = ({
         setServices(data);
       }
     } catch (err) {
-      console.error('Ошибка загрузки услуг:', err);
+      logger.error('Ошибка загрузки услуг:', err);
     }
   };
 

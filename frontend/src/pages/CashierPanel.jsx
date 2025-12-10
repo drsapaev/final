@@ -11,6 +11,7 @@ import Input from '../components/ui/macos/Input';
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import useModal from '../hooks/useModal.jsx';
 import { usePayments } from '../hooks/usePayments';
+import logger from '../utils/logger';
 import { 
   Dialog, 
   DialogTitle, 
@@ -86,7 +87,7 @@ const CashierPanel = () => {
       const { date_from, date_to } = getDateParams();
       const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
       
-      console.log('📅 Параметры даты для запроса:', { date_from, date_to, dateMode, selectedDate, dateFrom, dateTo });
+      logger.log('📅 Параметры даты для запроса:', { date_from, date_to, dateMode, selectedDate, dateFrom, dateTo });
       
       // Загружаем записи ожидающие оплаты через SSOT hook
       try {
@@ -98,15 +99,15 @@ const CashierPanel = () => {
         if (pendingResult.success) {
           // Данные уже включают и appointments, и visits с правильными услугами и суммами
           const appointmentsData = Array.isArray(pendingResult.data) ? pendingResult.data : [];
-          console.log('📋 Загружено записей ожидающих оплаты:', appointmentsData.length);
-          console.log('📋 Первая запись (пример):', appointmentsData[0]);
+          logger.log('📋 Загружено записей ожидающих оплаты:', appointmentsData.length);
+          logger.log('📋 Первая запись (пример):', appointmentsData[0]);
           setAppointments(appointmentsData);
         } else {
-          console.warn('⚠️ Ошибка загрузки записей:', pendingResult.error);
+          logger.warn('⚠️ Ошибка загрузки записей:', pendingResult.error);
           setAppointments([]);
         }
       } catch (error) {
-        console.error('Ошибка загрузки записей:', error);
+        logger.error('Ошибка загрузки записей:', error);
       }
 
       // Загружаем историю платежей через SSOT hook
@@ -118,19 +119,19 @@ const CashierPanel = () => {
         });
         if (paymentsResult.success) {
           const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
-          console.log('💰 Загружено платежей:', paymentsData.length);
-          console.log('💰 Первый платеж (пример):', paymentsData[0]);
+          logger.log('💰 Загружено платежей:', paymentsData.length);
+          logger.log('💰 Первый платеж (пример):', paymentsData[0]);
           
           // Данные уже отформатированы на backend (SSOT)
           // Используем данные как есть, без дополнительного форматирования
           setPayments(paymentsData);
         } else {
-          console.warn('⚠️ Ошибка загрузки платежей:', paymentsResult.error);
+          logger.warn('⚠️ Ошибка загрузки платежей:', paymentsResult.error);
           // ✅ УЛУЧШЕНИЕ: Убраны демо данные (согласно плану - только реальные данные с backend)
           setPayments([]);
         }
       } catch (error) {
-        console.error('Ошибка загрузки платежей:', error);
+        logger.error('Ошибка загрузки платежей:', error);
         // ✅ УЛУЧШЕНИЕ: Убраны демо данные (согласно плану - только реальные данные с backend)
         setPayments([]);
       }
@@ -168,7 +169,7 @@ const CashierPanel = () => {
 
   const handlePaymentError = (error) => {
     setPaymentError(error);
-    console.error('Ошибка платежа:', error);
+    logger.error('Ошибка платежа:', error);
   };
 
   const handlePaymentCancel = () => {
@@ -230,7 +231,7 @@ const CashierPanel = () => {
         if (paymentsResult.success) {
           const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
           setPayments(paymentsData);
-          console.log('💰 История платежей перезагружена после создания платежа:', paymentsData.length);
+          logger.log('💰 История платежей перезагружена после создания платежа:', paymentsData.length);
         }
         
         paymentModal.closeModal();
@@ -275,14 +276,14 @@ const CashierPanel = () => {
         if (paymentsResult.success) {
           const paymentsData = Array.isArray(paymentsResult.data) ? paymentsResult.data : [];
           setPayments(paymentsData);
-          console.log('💰 История платежей перезагружена после создания платежа:', paymentsData.length);
+          logger.log('💰 История платежей перезагружена после создания платежа:', paymentsData.length);
         }
         
         paymentModal.closeModal();
         alert('Оплата успешно обработана!');
       }
     } catch (error) {
-      console.error('Ошибка обработки платежа:', error);
+      logger.error('Ошибка обработки платежа:', error);
       setPaymentError(error.message || 'Ошибка обработки платежа. Попробуйте позже.');
       // ✅ УЛУЧШЕНИЕ: Убран демо режим (согласно плану - только реальные данные с backend)
       // Показываем ошибку пользователю, не создаем локальные данные
@@ -426,8 +427,8 @@ const CashierPanel = () => {
   // Группируем платежи
   const filtered = groupPaymentsByPatientAndTime(filteredBeforeGrouping);
 
-  console.log('💰 Отфильтровано платежей (UI фильтр):', filteredBeforeGrouping.length, 'из', payments.length);
-  console.log('💰 После группировки:', filtered.length, 'строк');
+  logger.log('💰 Отфильтровано платежей (UI фильтр):', filteredBeforeGrouping.length, 'из', payments.length);
+  logger.log('💰 После группировки:', filtered.length, 'строк');
 
   // ✅ УЛУЧШЕНИЕ: Убрана клиентская фильтрация по датам (данные уже отфильтрованы на backend согласно SSOT)
   // Фильтрация только по текстовому запросу и статусу (UI логика)
@@ -445,9 +446,9 @@ const CashierPanel = () => {
     return true;
   });
   
-  console.log('🔍 Отфильтровано записей (UI фильтр):', filteredAppointments.length, 'из', appointments.length);
-  console.log('🔍 filteredAppointments[0]:', filteredAppointments[0]);
-  console.log('🔍 isLoading:', isLoading, 'activeTab:', activeTab);
+  logger.log('🔍 Отфильтровано записей (UI фильтр):', filteredAppointments.length, 'из', appointments.length);
+  logger.log('🔍 filteredAppointments[0]:', filteredAppointments[0]);
+  logger.log('🔍 isLoading:', isLoading, 'activeTab:', activeTab);
 
   return (
     <div style={{ 

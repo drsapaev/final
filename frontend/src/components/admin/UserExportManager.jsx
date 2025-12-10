@@ -20,6 +20,7 @@ import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSCheckbox, Skeleton }
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const UserExportManager = () => {
   // Состояние
   const [activeTab, setActiveTab] = useState('export');
@@ -84,7 +85,7 @@ const UserExportManager = () => {
       const response = await api.get('/user-management/users/export/files');
       setExportFiles(response.data.files || []);
     } catch (error) {
-      console.error('Ошибка загрузки файлов экспорта:', error);
+      logger.error('Ошибка загрузки файлов экспорта:', error);
       toast.error('Ошибка загрузки файлов экспорта');
     } finally {
       setLoading(false);
@@ -123,7 +124,7 @@ const UserExportManager = () => {
         toast.error(response.data.message);
       }
     } catch (error) {
-      console.error('Ошибка экспорта:', error);
+      logger.error('Ошибка экспорта:', error);
       toast.error(error.response?.data?.detail || 'Ошибка экспорта пользователей');
     } finally {
       setLoading(false);
@@ -148,7 +149,7 @@ const UserExportManager = () => {
       
       toast.success(`Файл ${filename} скачан`);
     } catch (error) {
-      console.error('Ошибка скачивания:', error);
+      logger.error('Ошибка скачивания:', error);
       toast.error('Ошибка скачивания файла');
     }
   };
@@ -161,7 +162,7 @@ const UserExportManager = () => {
       toast.success(`Файл ${filename} удален`);
       loadExportFiles();
     } catch (error) {
-      console.error('Ошибка удаления:', error);
+      logger.error('Ошибка удаления:', error);
       toast.error('Ошибка удаления файла');
     }
   };

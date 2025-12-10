@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 
+import logger from '../utils/logger';
 /**
  * Хук для управления горячими клавишами в админ панели
  * Основан на документации: Ctrl+P - печать, Ctrl+K - поиск, Ctrl+S - сохранить
@@ -46,29 +47,29 @@ export const useHotkeys = (shortcuts = {}) => {
 export const useAdminHotkeys = (handlers = {}) => {
   const shortcuts = {
     // Основные действия
-    'ctrl+s': handlers.save || (() => console.log('Сохранить')),
-    'ctrl+k': handlers.search || (() => console.log('Поиск')),
-    'ctrl+p': handlers.print || (() => console.log('Печать')),
-    'ctrl+r': handlers.refresh || (() => console.log('Обновить')),
+    'ctrl+s': handlers.save || (() => logger.log('Сохранить')),
+    'ctrl+k': handlers.search || (() => logger.log('Поиск')),
+    'ctrl+p': handlers.print || (() => logger.log('Печать')),
+    'ctrl+r': handlers.refresh || (() => logger.log('Обновить')),
     
     // Навигация
-    'ctrl+1': handlers.dashboard || (() => console.log('Дашборд')),
-    'ctrl+2': handlers.users || (() => console.log('Пользователи')),
-    'ctrl+3': handlers.doctors || (() => console.log('Врачи')),
-    'ctrl+4': handlers.services || (() => console.log('Услуги')),
-    'ctrl+5': handlers.settings || (() => console.log('Настройки')),
+    'ctrl+1': handlers.dashboard || (() => logger.log('Дашборд')),
+    'ctrl+2': handlers.users || (() => logger.log('Пользователи')),
+    'ctrl+3': handlers.doctors || (() => logger.log('Врачи')),
+    'ctrl+4': handlers.services || (() => logger.log('Услуги')),
+    'ctrl+5': handlers.settings || (() => logger.log('Настройки')),
     
     // Модальные окна
-    'escape': handlers.closeModal || (() => console.log('Закрыть модальное окно')),
-    'ctrl+n': handlers.createNew || (() => console.log('Создать новый')),
+    'escape': handlers.closeModal || (() => logger.log('Закрыть модальное окно')),
+    'ctrl+n': handlers.createNew || (() => logger.log('Создать новый')),
     
     // Специальные
-    'ctrl+shift+o': handlers.openQueue || (() => console.log('Открыть прием')),
-    'ctrl+alt+t': handlers.testSystem || (() => console.log('Тестировать систему')),
+    'ctrl+shift+o': handlers.openQueue || (() => logger.log('Открыть прием')),
+    'ctrl+alt+t': handlers.testSystem || (() => logger.log('Тестировать систему')),
     
     // Помощь
-    'f1': handlers.help || (() => console.log('Справка')),
-    'ctrl+/': handlers.shortcuts || (() => console.log('Показать горячие клавиши'))
+    'f1': handlers.help || (() => logger.log('Справка')),
+    'ctrl+/': handlers.shortcuts || (() => logger.log('Показать горячие клавиши'))
   };
 
   useHotkeys(shortcuts);

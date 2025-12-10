@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   User, 
   Phone, 
@@ -160,7 +161,7 @@ const PatientCard = ({
       
       setIsEditing(false);
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
     } finally {
       setLoading(false);
     }

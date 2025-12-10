@@ -36,6 +36,7 @@ import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 import IconSelector, { iconMap } from './IconSelector';
 
+import logger from '../../utils/logger';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const DEFAULT_STATS = {
@@ -187,7 +188,7 @@ const DepartmentManagement = () => {
                 ...(overview.totals || {}),
             });
         } catch (err) {
-            console.error('Ошибка загрузки отделений:', err);
+            logger.error('Ошибка загрузки отделений:', err);
             setError('Не удалось загрузить отделения');
             toast.error('Не удалось загрузить отделения');
         } finally {
@@ -266,7 +267,7 @@ const DepartmentManagement = () => {
                     await api.post('/services', serviceData);
                     toast.success('Услуга создана автоматически');
                 } catch (err) {
-                    console.error('Ошибка создания услуги:', err);
+                    logger.error('Ошибка создания услуги:', err);
                     toast.warning('Отделение создано, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
                 }
             }
@@ -274,7 +275,7 @@ const DepartmentManagement = () => {
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
-            console.error('Ошибка создания отделения:', err);
+            logger.error('Ошибка создания отделения:', err);
             toast.error(err.response?.data?.detail || 'Не удалось создать отделение');
         }
     };
@@ -324,7 +325,7 @@ const DepartmentManagement = () => {
                     await api.post('/services', serviceData);
                     toast.success('Услуга создана');
                 } catch (err) {
-                    console.error('Ошибка создания услуги:', err);
+                    logger.error('Ошибка создания услуги:', err);
                     toast.warning('Отделение обновлено, но услуга не была создана: ' + (err.response?.data?.detail || 'Ошибка'));
                 }
             }
@@ -335,7 +336,7 @@ const DepartmentManagement = () => {
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
-            console.error('Ошибка обновления отделения:', err);
+            logger.error('Ошибка обновления отделения:', err);
             toast.error(err.response?.data?.detail || 'Не удалось обновить отделение');
         }
     };
@@ -348,7 +349,7 @@ const DepartmentManagement = () => {
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
-            console.error('Ошибка обновления статуса:', err);
+            logger.error('Ошибка обновления статуса:', err);
             toast.error(err.response?.data?.detail || 'Не удалось обновить статус');
         }
     };
@@ -360,7 +361,7 @@ const DepartmentManagement = () => {
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
-            console.error('Ошибка обновления порядка:', err);
+            logger.error('Ошибка обновления порядка:', err);
             toast.error(err.response?.data?.detail || 'Не удалось обновить порядок');
         }
     };
@@ -373,7 +374,7 @@ const DepartmentManagement = () => {
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
-            console.error('Ошибка удаления отделения:', err);
+            logger.error('Ошибка удаления отделения:', err);
             toast.error(err.response?.data?.detail || 'Не удалось удалить отделение');
         }
     };
@@ -391,7 +392,7 @@ const DepartmentManagement = () => {
             await loadDepartments();
             broadcastDepartmentsUpdate();
         } catch (err) {
-            console.error('Ошибка синхронизации отделения:', err);
+            logger.error('Ошибка синхронизации отделения:', err);
             toast.error(err.response?.data?.detail || 'Не удалось обновить интеграцию');
         } finally {
             setSyncingId(null);
@@ -481,7 +482,7 @@ const DepartmentManagement = () => {
 
             toast.success('Отделения успешно экспортированы');
         } catch (error) {
-            console.error('Ошибка экспорта:', error);
+            logger.error('Ошибка экспорта:', error);
             toast.error('Ошибка при экспорте отделений');
         }
     };
@@ -547,7 +548,7 @@ const DepartmentManagement = () => {
 
             if (errors.length > 0) {
                 toast.error(`Найдены ошибки в ${errors.length} строках. Проверьте данные и попробуйте снова.`);
-                console.error('Ошибки импорта:', errors);
+                logger.error('Ошибки импорта:', errors);
                 return;
             }
 
@@ -576,7 +577,7 @@ const DepartmentManagement = () => {
             }
 
         } catch (error) {
-            console.error('Ошибка импорта:', error);
+            logger.error('Ошибка импорта:', error);
             toast.error('Ошибка при чтении файла');
         }
 
@@ -637,7 +638,7 @@ const DepartmentManagement = () => {
                 toast.error(`Ошибка при удалении: ${errorMessage}`);
             }
         } catch (error) {
-            console.error('Ошибка массового удаления:', error);
+            logger.error('Ошибка массового удаления:', error);
             toast.error('Ошибка при удалении отделений');
         }
     };
@@ -673,7 +674,7 @@ const DepartmentManagement = () => {
                 toast.error(`Ошибка при ${activate ? 'активации' : 'деактивации'}: ${errorMessage}`);
             }
         } catch (error) {
-            console.error('Ошибка массовой активации:', error);
+            logger.error('Ошибка массовой активации:', error);
             toast.error(`Ошибка при ${activate ? 'активации' : 'деактивации'} отделений`);
         }
     };

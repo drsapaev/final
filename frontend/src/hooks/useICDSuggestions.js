@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { api } from '../api/client.js';
 
+import logger from '../utils/logger';
 /**
  * Хук для получения ICD-10 предложений с помощью AI
  * @returns {Object} Объект с данными и методами для работы с ICD предложениями
@@ -48,7 +49,7 @@ export const useICDSuggestions = () => {
       
       return result;
     } catch (err) {
-      console.error('Ошибка получения ICD предложений:', err);
+      logger.error('Ошибка получения ICD предложений:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения предложений';
       setError(errorMessage);
       setSuggestions([]);
@@ -77,7 +78,7 @@ export const useICDSuggestions = () => {
       
       return response.data || [];
     } catch (err) {
-      console.error('Ошибка поиска ICD кодов:', err);
+      logger.error('Ошибка поиска ICD кодов:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка поиска';
       setError(errorMessage);
       return [];
@@ -100,7 +101,7 @@ export const useICDSuggestions = () => {
       const response = await api.get(`/ai/icd-details/${icdCode}`);
       return response.data;
     } catch (err) {
-      console.error('Ошибка получения деталей ICD кода:', err);
+      logger.error('Ошибка получения деталей ICD кода:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения деталей';
       setError(errorMessage);
       return null;
@@ -122,7 +123,7 @@ export const useICDSuggestions = () => {
       const response = await api.post('/ai/icd-validate', { code: icdCode });
       return response.data;
     } catch (err) {
-      console.error('Ошибка валидации ICD кода:', err);
+      logger.error('Ошибка валидации ICD кода:', err);
       return { 
         isValid: false, 
         message: err.response?.data?.detail || 'Ошибка валидации' 
@@ -148,7 +149,7 @@ export const useICDSuggestions = () => {
       
       return response.data || [];
     } catch (err) {
-      console.error('Ошибка получения связанных кодов:', err);
+      logger.error('Ошибка получения связанных кодов:', err);
       setError(err.response?.data?.detail || err.message || 'Ошибка получения связанных кодов');
       return [];
     } finally {
@@ -174,7 +175,7 @@ export const useICDSuggestions = () => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка анализа совместимости:', err);
+      logger.error('Ошибка анализа совместимости:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа совместимости';
       setError(errorMessage);
       return null;
@@ -196,7 +197,7 @@ export const useICDSuggestions = () => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка получения статистики:', err);
+      logger.error('Ошибка получения статистики:', err);
       return null;
     }
   }, []);

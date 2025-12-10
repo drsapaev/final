@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 /**
  * Утилита для очистки кэша аутентификации
  * Используется при проблемах с маршрутизацией из-за устаревших данных
@@ -13,10 +15,10 @@ export function clearAuthCache() {
     sessionStorage.removeItem('auth_token');
     sessionStorage.removeItem('auth_profile');
     
-    console.log('Auth cache cleared successfully');
+    logger.log('Auth cache cleared successfully');
     return true;
   } catch (error) {
-    console.error('Failed to clear auth cache:', error);
+    logger.error('Failed to clear auth cache:', error);
     return false;
   }
 }
@@ -36,7 +38,7 @@ export function hasStaleAuthCache() {
     const validRoles = ['admin', 'registrar', 'lab', 'doctor', 'cashier', 'cardio', 'derma', 'dentist'];
     return !validRoles.includes(role?.toLowerCase());
   } catch (error) {
-    console.error('Error checking auth cache:', error);
+    logger.error('Error checking auth cache:', error);
     return true; // Если ошибка, считаем кэш устаревшим
   }
 }
@@ -46,7 +48,7 @@ export function hasStaleAuthCache() {
  */
 export function autoClearStaleCache() {
   if (hasStaleAuthCache()) {
-    console.warn('Stale auth cache detected, clearing...');
+    logger.warn('Stale auth cache detected, clearing...');
     clearAuthCache();
     return true;
   }

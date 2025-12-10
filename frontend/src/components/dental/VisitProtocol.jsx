@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   Calendar, 
   Clock, 
@@ -167,7 +168,7 @@ const VisitProtocol = ({
       
       setIsEditing(false);
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import AppointmentFlow from '../components/AppointmentFlow.jsx';
 import EnhancedAppointmentsTable from '../components/tables/EnhancedAppointmentsTable.jsx';
 import { api } from '../api/client.js';
 
+import logger from '../utils/logger';
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -90,8 +91,8 @@ export default function Appointments() {
               appointments={filtered}
               appointmentsSelected={selectedAppointments}
               setAppointmentsSelected={setSelectedAppointments}
-              updateAppointmentStatus={(id, status) => console.log('Update status:', id, status)}
-              setShowWizard={(show) => console.log('Show wizard:', show)}
+              updateAppointmentStatus={(id, status) => logger.log('Update status:', id, status)}
+              setShowWizard={(show) => logger.log('Show wizard:', show)}
             />
           ) : (
             <div style={{ overflow: 'auto', border: '1px solid #eee', borderRadius: 12, background: '#fff' }}>
@@ -121,8 +122,8 @@ export default function Appointments() {
                         {a.status && (
                           <AppointmentFlow 
                             appointment={a}
-                            onStartVisit={(appointment) => console.log('Start visit:', appointment)}
-                            onPayment={(appointment) => console.log('Payment:', appointment)}
+                            onStartVisit={(appointment) => logger.log('Start visit:', appointment)}
+                            onPayment={(appointment) => logger.log('Payment:', appointment)}
                           />
                         )}
                       </div>

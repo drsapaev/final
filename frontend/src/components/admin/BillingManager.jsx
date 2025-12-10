@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState([]);
@@ -92,7 +93,7 @@ const BillingManager = () => {
         setSettings(response.data);
       }
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -121,7 +122,7 @@ const BillingManager = () => {
       });
       loadData();
     } catch (error) {
-      console.error('Ошибка создания счета:', error);
+      logger.error('Ошибка создания счета:', error);
       toast.error(error.response?.data?.detail || 'Ошибка создания счета');
     }
   };
@@ -141,7 +142,7 @@ const BillingManager = () => {
       });
       loadData();
     } catch (error) {
-      console.error('Ошибка записи платежа:', error);
+      logger.error('Ошибка записи платежа:', error);
       toast.error(error.response?.data?.detail || 'Ошибка записи платежа');
     }
   };
@@ -151,7 +152,7 @@ const BillingManager = () => {
       await api.post(`/billing/invoices/${invoiceId}/send`);
       toast.success('Счет отправлен');
     } catch (error) {
-      console.error('Ошибка отправки счета:', error);
+      logger.error('Ошибка отправки счета:', error);
       toast.error(error.response?.data?.detail || 'Ошибка отправки счета');
     }
   };
@@ -164,7 +165,7 @@ const BillingManager = () => {
       newWindow.document.write(response.data.html);
       newWindow.document.close();
     } catch (error) {
-      console.error('Ошибка получения HTML счета:', error);
+      logger.error('Ошибка получения HTML счета:', error);
       toast.error(error.response?.data?.detail || 'Ошибка получения HTML счета');
     }
   };

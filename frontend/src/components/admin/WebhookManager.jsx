@@ -41,6 +41,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const WebhookManager = () => {
   const [activeTab, setActiveTab] = useState('webhooks');
   const [webhooks, setWebhooks] = useState([]);
@@ -63,7 +64,7 @@ const WebhookManager = () => {
       const { data } = await api.get('/webhooks/');
       setWebhooks(data.items || data || []);
     } catch (error) {
-      console.error('Ошибка загрузки webhook\'ов:', error);
+      logger.error('Ошибка загрузки webhook\'ов:', error);
       toast.error('Ошибка загрузки webhook\'ов');
     }
   }, []);
@@ -73,7 +74,7 @@ const WebhookManager = () => {
       const { data } = await api.get('/webhooks/system/stats');
         setStats(data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
     }
   }, []);
 
@@ -82,7 +83,7 @@ const WebhookManager = () => {
       const { data } = await api.get(`/webhooks/${webhookId}/calls`);
       setCalls(data.items || data || []);
     } catch (error) {
-      console.error('Ошибка загрузки вызовов:', error);
+      logger.error('Ошибка загрузки вызовов:', error);
     }
   }, []);
 
@@ -106,7 +107,7 @@ const WebhookManager = () => {
       toast.success('Webhook активирован');
       loadWebhooks();
     } catch (error) {
-      console.error('Ошибка активации:', error);
+      logger.error('Ошибка активации:', error);
       toast.error(error.response?.data?.detail || 'Ошибка активации webhook\'а');
     }
   };
@@ -117,7 +118,7 @@ const WebhookManager = () => {
       toast.success('Webhook деактивирован');
       loadWebhooks();
     } catch (error) {
-      console.error('Ошибка деактивации:', error);
+      logger.error('Ошибка деактивации:', error);
       toast.error(error.response?.data?.detail || 'Ошибка деактивации webhook\'а');
     }
   };
@@ -136,7 +137,7 @@ const WebhookManager = () => {
         toast.error(`Ошибка тестирования: ${result.data?.error_message || 'Неизвестная ошибка'}`);
       }
     } catch (error) {
-      console.error('Ошибка тестирования:', error);
+      logger.error('Ошибка тестирования:', error);
       toast.error(error.response?.data?.detail || 'Ошибка тестирования webhook\'а');
     }
   };
@@ -151,7 +152,7 @@ const WebhookManager = () => {
       toast.success('Webhook удален');
       loadWebhooks();
     } catch (error) {
-      console.error('Ошибка удаления:', error);
+      logger.error('Ошибка удаления:', error);
       toast.error(error.response?.data?.detail || 'Ошибка удаления webhook\'а');
     }
   };

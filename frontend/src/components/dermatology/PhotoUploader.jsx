@@ -37,6 +37,7 @@ import { useDropzone } from 'react-dropzone';
 import heic2any from 'heic2any';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
   const [photos, setPhotos] = useState({
     before: [],
@@ -87,7 +88,7 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
       setConverting(false);
       return convertedFile;
     } catch (error) {
-      console.error('Ошибка конвертации HEIC:', error);
+      logger.error('Ошибка конвертации HEIC:', error);
       setConverting(false);
       throw error;
     }
@@ -149,7 +150,7 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
         reader.readAsDataURL(processedFile);
         
       } catch (error) {
-        console.error('Ошибка загрузки фото:', error);
+        logger.error('Ошибка загрузки фото:', error);
         setUploadProgress(0);
       }
     }
@@ -202,7 +203,7 @@ const PhotoUploader = ({ visitId, patientId, onDataUpdate }) => {
       }));
       onDataUpdate && onDataUpdate();
     } catch (error) {
-      console.error('Ошибка удаления фото:', error);
+      logger.error('Ошибка удаления фото:', error);
     }
   };
 

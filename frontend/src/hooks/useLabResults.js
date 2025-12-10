@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client.js';
 
+import logger from '../utils/logger';
 /**
  * Хук для управления лабораторными результатами
  * @param {string} visitId - ID визита
@@ -22,7 +23,7 @@ export const useLabResults = (visitId) => {
       const response = await api.get(`/visits/${visitId}/lab-results`);
       setResults(response.data || []);
     } catch (err) {
-      console.error('Ошибка загрузки результатов:', err);
+      logger.error('Ошибка загрузки результатов:', err);
       setError(err.message || 'Ошибка загрузки результатов');
       setResults([]);
     } finally {
@@ -51,7 +52,7 @@ export const useLabResults = (visitId) => {
       await loadResults();
       return response.data;
     } catch (err) {
-      console.error('Ошибка сохранения результата:', err);
+      logger.error('Ошибка сохранения результата:', err);
       setError(err.message || 'Ошибка сохранения результата');
       throw err;
     } finally {
@@ -68,7 +69,7 @@ export const useLabResults = (visitId) => {
       // Обновляем локальный список
       await loadResults();
     } catch (err) {
-      console.error('Ошибка удаления результата:', err);
+      logger.error('Ошибка удаления результата:', err);
       setError(err.message || 'Ошибка удаления результата');
       throw err;
     } finally {
@@ -100,7 +101,7 @@ export const useLabResults = (visitId) => {
       await loadResults();
       return response.data;
     } catch (err) {
-      console.error('Ошибка загрузки файла:', err);
+      logger.error('Ошибка загрузки файла:', err);
       setError(err.message || 'Ошибка загрузки файла');
       throw err;
     } finally {
@@ -127,7 +128,7 @@ export const useLabResults = (visitId) => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Ошибка генерации PDF:', err);
+      logger.error('Ошибка генерации PDF:', err);
       setError(err.message || 'Ошибка генерации PDF');
       throw err;
     } finally {
@@ -145,7 +146,7 @@ export const useLabResults = (visitId) => {
         result_ids: resultIds.length > 0 ? resultIds : results.map(r => r.id)
       });
     } catch (err) {
-      console.error('Ошибка отправки результатов:', err);
+      logger.error('Ошибка отправки результатов:', err);
       setError(err.message || 'Ошибка отправки результатов');
       throw err;
     } finally {

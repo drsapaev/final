@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   Clock, 
   Users, 
@@ -89,7 +90,7 @@ const QueueSettings = () => {
         setSettings(data);
       }
     } catch (error) {
-      console.error('Ошибка загрузки настроек очередей:', error);
+      logger.error('Ошибка загрузки настроек очередей:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки настроек очередей' });
     } finally {
       setLoading(false);
@@ -133,7 +134,7 @@ const QueueSettings = () => {
         throw new Error('Ошибка сохранения настроек');
       }
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек очередей' });
     } finally {
       setSaving(false);
@@ -173,7 +174,7 @@ const QueueSettings = () => {
         throw new Error('Ошибка тестирования');
       }
     } catch (error) {
-      console.error('Ошибка тестирования:', error);
+      logger.error('Ошибка тестирования:', error);
       setMessage({ type: 'error', text: 'Ошибка тестирования очереди' });
     } finally {
       setTesting(false);

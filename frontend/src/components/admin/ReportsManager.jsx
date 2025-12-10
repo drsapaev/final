@@ -30,6 +30,7 @@ import {
 } from '../ui/macos';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const ReportsManager = () => {
   const [activeTab, setActiveTab] = useState('generate');
   const [loading, setLoading] = useState(false);
@@ -74,7 +75,7 @@ const ReportsManager = () => {
         setAvailableReports(data.reports || []);
       }
     } catch (error) {
-      console.error('Ошибка загрузки доступных отчетов:', error);
+      logger.error('Ошибка загрузки доступных отчетов:', error);
     }
   };
 
@@ -93,7 +94,7 @@ const ReportsManager = () => {
         setFiles(data.files || []);
       }
     } catch (error) {
-      console.error('Ошибка загрузки файлов отчетов:', error);
+      logger.error('Ошибка загрузки файлов отчетов:', error);
     }
   };
 
@@ -114,7 +115,7 @@ const ReportsManager = () => {
         setQuickReports(prev => ({ ...prev, daily: dailyData }));
       }
     } catch (error) {
-      console.error('Ошибка загрузки быстрых отчетов:', error);
+      logger.error('Ошибка загрузки быстрых отчетов:', error);
     }
   };
 
@@ -155,7 +156,7 @@ const ReportsManager = () => {
         toast.error('Ошибка генерации отчета');
       }
     } catch (error) {
-      console.error('Ошибка генерации отчета:', error);
+      logger.error('Ошибка генерации отчета:', error);
       toast.error('Ошибка генерации отчета');
     } finally {
       setLoading(false);
@@ -216,7 +217,7 @@ const ReportsManager = () => {
         toast.error('Ошибка загрузки файла');
       }
     } catch (error) {
-      console.error('Ошибка загрузки файла:', error);
+      logger.error('Ошибка загрузки файла:', error);
       toast.error('Ошибка загрузки файла');
     }
   };
@@ -244,7 +245,7 @@ const ReportsManager = () => {
         toast.error('Ошибка очистки файлов');
       }
     } catch (error) {
-      console.error('Ошибка очистки файлов:', error);
+      logger.error('Ошибка очистки файлов:', error);
       toast.error('Ошибка очистки файлов');
     }
   };

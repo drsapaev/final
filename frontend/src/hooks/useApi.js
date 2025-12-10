@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api, apiRequest } from '../api/client';
 import { toast } from 'react-toastify';
 
+import logger from '../utils/logger';
 /**
  * Хук для выполнения API запросов с состоянием загрузки
  */
@@ -87,7 +88,7 @@ export function useApiData(endpoint, options = {}) {
       }
       
       if (!loadSilent) {
-        console.error(`API Error (${endpoint}):`, errorMsg);
+        logger.error(`API Error (${endpoint}):`, errorMsg);
       }
       
       throw err;
@@ -264,7 +265,7 @@ export function useWebSocket(url, options = {}) {
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      logger.error('WebSocket error:', error);
     };
 
     setSocket(ws);
@@ -329,7 +330,7 @@ export function useCachedData(key, fetcher, options = {}) {
           timestamp: Date.now()
         }));
       } catch (error) {
-        console.error('Cache error:', error);
+        logger.error('Cache error:', error);
         if (fallback) {
           setData(fallback);
         }

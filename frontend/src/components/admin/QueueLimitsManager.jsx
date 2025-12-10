@@ -13,6 +13,7 @@ import {
   Shield
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import logger from '../../utils/logger';
 import { 
   MacOSCard, 
   MacOSButton, 
@@ -74,7 +75,7 @@ const QueueLimitsManager = () => {
         ]);
       }
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
       toast.error('Ошибка загрузки данных о лимитах');
       
       // Fallback данные при ошибке
@@ -140,7 +141,7 @@ const QueueLimitsManager = () => {
         toast.error(error.detail || 'Ошибка сохранения');
       }
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       toast.error('Ошибка сохранения изменений');
     } finally {
       setSaving(false);
@@ -177,7 +178,7 @@ const QueueLimitsManager = () => {
         toast.error(error.detail || 'Ошибка сброса');
       }
     } catch (error) {
-      console.error('Ошибка сброса:', error);
+      logger.error('Ошибка сброса:', error);
       toast.error('Ошибка сброса лимитов');
     }
   };

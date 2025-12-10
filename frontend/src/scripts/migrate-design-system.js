@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import logger from '../utils/logger';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -128,19 +129,19 @@ function migrateFile(filePath) {
     // Проверяем на потенциальные проблемы
     const issues = checkForIssues(content, filePath);
     if (issues.length > 0) {
-      console.warn(`⚠️  Potential issues in ${filePath}:`);
-      issues.forEach(issue => console.warn(`   - ${issue}`));
+      logger.warn(`⚠️  Potential issues in ${filePath}:`);
+      issues.forEach(issue => logger.warn(`   - ${issue}`));
     }
     
     // Сохраняем файл если были изменения
     if (changed) {
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`✅ Migrated: ${filePath}`);
+      logger.log(`✅ Migrated: ${filePath}`);
       
       // Показываем что изменилось
       if (process.env.VERBOSE) {
-        console.log(`   Old: ${originalContent.slice(0, 100)}...`);
-        console.log(`   New: ${content.slice(0, 100)}...`);
+        logger.log(`   Old: ${originalContent.slice(0, 100)}...`);
+        logger.log(`   New: ${content.slice(0, 100)}...`);
       }
       
       return true;
@@ -148,7 +149,7 @@ function migrateFile(filePath) {
     
     return false;
   } catch (error) {
-    console.error(`❌ Error migrating ${filePath}:`, error.message);
+    logger.error(`❌ Error migrating ${filePath}:`, error.message);
     return false;
   }
 }
@@ -196,13 +197,13 @@ function checkForIssues(content, filePath) {
 
 // Основная функция
 function main() {
-  console.log('🚀 Starting design system migration...\n');
+  logger.log('🚀 Starting design system migration...\n');
   
   const srcDir = path.join(__dirname, '../');
-  console.log(`📂 Searching in directory: ${srcDir}`);
+  logger.log(`📂 Searching in directory: ${srcDir}`);
   
   const files = findFiles(srcDir, '.jsx').concat(findFiles(srcDir, '.js'));
-  console.log(`📄 Found ${files.length} files to check`);
+  logger.log(`📄 Found ${files.length} files to check`);
   
   let migratedCount = 0;
   let totalFiles = 0;
@@ -219,19 +220,19 @@ function main() {
     }
   });
   
-  console.log(`\n📊 Migration Summary:`);
-  console.log(`   Total files checked: ${totalFiles}`);
-  console.log(`   Files migrated: ${migratedCount}`);
-  console.log(`   Files unchanged: ${totalFiles - migratedCount}`);
+  logger.log(`\n📊 Migration Summary:`);
+  logger.log(`   Total files checked: ${totalFiles}`);
+  logger.log(`   Files migrated: ${migratedCount}`);
+  logger.log(`   Files unchanged: ${totalFiles - migratedCount}`);
   
   if (migratedCount > 0) {
-    console.log('\n✨ Migration completed successfully!');
-    console.log('\n📝 Next steps:');
-    console.log('   1. Test the migrated components');
-    console.log('   2. Remove old design-system imports');
-    console.log('   3. Update any remaining manual imports');
+    logger.log('\n✨ Migration completed successfully!');
+    logger.log('\n📝 Next steps:');
+    logger.log('   1. Test the migrated components');
+    logger.log('   2. Remove old design-system imports');
+    logger.log('   3. Update any remaining manual imports');
   } else {
-    console.log('\n💡 No files needed migration.');
+    logger.log('\n💡 No files needed migration.');
   }
 }
 

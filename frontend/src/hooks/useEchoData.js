@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client.js';
 
+import logger from '../utils/logger';
 /**
  * Хук для управления данными эхокардиографии
  * @param {string} visitId - ID визита
@@ -68,10 +69,10 @@ export const useEchoData = (visitId, patientId) => {
     } catch (err) {
       // Если бэкенд не реализован (404) — тихо используем значения по умолчанию
       if (err?.response?.status === 404) {
-        console.info('Echo params endpoint not found (404). Using defaults.');
+        logger.info('Echo params endpoint not found (404). Using defaults.');
         return;
       }
-      console.error('Ошибка загрузки данных ЭхоКГ:', err);
+      logger.error('Ошибка загрузки данных ЭхоКГ:', err);
       setError(err.message || 'Ошибка загрузки данных ЭхоКГ');
     } finally {
       setLoading(false);
@@ -97,7 +98,7 @@ export const useEchoData = (visitId, patientId) => {
       
       return response.data;
     } catch (err) {
-      console.error('Ошибка сохранения данных ЭхоКГ:', err);
+      logger.error('Ошибка сохранения данных ЭхоКГ:', err);
       setError(err.message || 'Ошибка сохранения данных ЭхоКГ');
       throw err;
     } finally {

@@ -64,6 +64,14 @@ app.add_middleware(AuditMiddleware)
 log.info("Audit middleware registered")
 
 # -----------------------------------------------------------------------------
+# Security Middleware (rate limiting, brute force protection, IP logging)
+# -----------------------------------------------------------------------------
+from app.middleware.security_middleware import SecurityMiddleware  # noqa: E402
+
+app.add_middleware(SecurityMiddleware)
+log.info("Security middleware registered")
+
+# -----------------------------------------------------------------------------
 # CORS
 # -----------------------------------------------------------------------------
 if not CORS_DISABLE:

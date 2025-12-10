@@ -38,6 +38,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const SystemManagement = () => {
   const [activeTab, setActiveTab] = useState('monitoring');
   const [loading, setLoading] = useState(false);
@@ -74,7 +75,7 @@ const SystemManagement = () => {
       const { data } = await api.get('/system/monitoring/health');
         setSystemHealth(data);
     } catch (error) {
-      console.error('Ошибка загрузки состояния системы:', error);
+      logger.error('Ошибка загрузки состояния системы:', error);
     }
   };
 
@@ -83,7 +84,7 @@ const SystemManagement = () => {
       const { data } = await api.get('/system/monitoring/metrics/system');
         setSystemMetrics(data.metrics);
     } catch (error) {
-      console.error('Ошибка загрузки метрик системы:', error);
+      logger.error('Ошибка загрузки метрик системы:', error);
     }
   };
 
@@ -92,7 +93,7 @@ const SystemManagement = () => {
       const { data } = await api.get('/system/monitoring/alerts', { params: { limit: 50 } });
         setAlerts(data.alerts || []);
     } catch (error) {
-      console.error('Ошибка загрузки алертов:', error);
+      logger.error('Ошибка загрузки алертов:', error);
     }
   };
 
@@ -101,7 +102,7 @@ const SystemManagement = () => {
       const { data } = await api.get('/system/monitoring/thresholds');
         setThresholds(data.thresholds || {});
     } catch (error) {
-      console.error('Ошибка загрузки порогов:', error);
+      logger.error('Ошибка загрузки порогов:', error);
     }
   };
 
@@ -116,7 +117,7 @@ const SystemManagement = () => {
         toast.error('Ошибка сбора метрик');
       }
     } catch (error) {
-      console.error('Ошибка сбора метрик:', error);
+      logger.error('Ошибка сбора метрик:', error);
       toast.error('Ошибка сбора метрик');
     }
   };
@@ -128,7 +129,7 @@ const SystemManagement = () => {
       const response = await api.get('/system/backup/list');
       setBackups(response.data?.backups || []);
     } catch (error) {
-      console.error('Ошибка загрузки бэкапов:', error);
+      logger.error('Ошибка загрузки бэкапов:', error);
     }
   };
 
@@ -143,7 +144,7 @@ const SystemManagement = () => {
         toast.error(response.data?.error || 'Ошибка создания бэкапа');
       }
     } catch (error) {
-      console.error('Ошибка создания бэкапа:', error);
+      logger.error('Ошибка создания бэкапа:', error);
       toast.error(error.response?.data?.detail || 'Ошибка создания бэкапа');
     } finally {
       setLoading(false);
@@ -164,7 +165,7 @@ const SystemManagement = () => {
         toast.error(response.data?.error || 'Ошибка удаления бэкапа');
       }
     } catch (error) {
-      console.error('Ошибка удаления бэкапа:', error);
+      logger.error('Ошибка удаления бэкапа:', error);
       toast.error('Ошибка удаления бэкапа');
     }
   };

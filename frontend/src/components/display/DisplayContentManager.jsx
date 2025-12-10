@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Управление контентом для табло
  * Основа: passport.md стр. 2571-3324
@@ -59,7 +60,7 @@ const DisplayContentManager = ({
         setContent(data);
       }
     } catch (error) {
-      console.error('Ошибка загрузки контента:', error);
+      logger.error('Ошибка загрузки контента:', error);
     } finally {
       setLoading(false);
     }
@@ -83,7 +84,7 @@ const DisplayContentManager = ({
         setUploadDialog({ open: false, type: '' });
       }
     } catch (error) {
-      console.error('Ошибка загрузки файла:', error);
+      logger.error('Ошибка загрузки файла:', error);
     }
   };
 
@@ -98,7 +99,7 @@ const DisplayContentManager = ({
         await loadContent();
       }
     } catch (error) {
-      console.error('Ошибка удаления контента:', error);
+      logger.error('Ошибка удаления контента:', error);
     }
   };
 

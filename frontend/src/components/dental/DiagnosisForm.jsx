@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   FileText, 
   Pill, 
@@ -129,7 +130,7 @@ const DiagnosisForm = ({
       
       setIsEditing(false);
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 // Единый сервис работы с очередью и приемом пациента
 
 function getAuthToken() {
@@ -14,7 +16,7 @@ async function apiRequest(path, options = {}) {
 	const token = getAuthToken();
 	
 	if (!token) {
-		console.error('[queueService] No auth token found');
+		logger.error('[queueService] No auth token found');
 		throw new Error('Требуется авторизация. Пожалуйста, войдите в систему.');
 	}
 	
@@ -24,7 +26,7 @@ async function apiRequest(path, options = {}) {
 		...(token ? { Authorization: `Bearer ${token}` } : {})
 	};
 	
-	console.log(`[queueService] ${options.method || 'GET'} ${path}`, { hasToken: !!token, tokenLength: token.length });
+	logger.log(`[queueService] ${options.method || 'GET'} ${path}`, { hasToken: !!token, tokenLength: token.length });
 	
 	const res = await fetch(`${base}/api/v1${path}`, {
 		method: options.method || 'GET',
@@ -42,7 +44,7 @@ async function apiRequest(path, options = {}) {
 			detail = `HTTP ${res.status}: ${res.statusText}`;
 		}
 		
-		console.error(`[queueService] Request failed: ${path}`, {
+		logger.error(`[queueService] Request failed: ${path}`, {
 			status: res.status,
 			statusText: res.statusText,
 			detail,
@@ -60,7 +62,7 @@ async function apiRequest(path, options = {}) {
 
 // Глобальное уведомление об обновлении очереди
 function notifyQueueUpdate(specialty, action = 'update') {
-	console.log('[queueService] notifyQueueUpdate:', { specialty, action });
+	logger.log('[queueService] notifyQueueUpdate:', { specialty, action });
 	// Отправляем CustomEvent для синхронизации всех компонентов
 	const event = new CustomEvent('queueUpdated', {
 		detail: { specialty, action, timestamp: Date.now() }
@@ -98,7 +100,7 @@ export const queueService = {
 		});
 		// Уведомляем об обновлении после завершения приема
 		notifyQueueUpdate('all', 'visitCompleted');
-		console.log('[queueService] completeVisit: отправлено уведомление об обновлении очереди');
+		logger.log('[queueService] completeVisit: отправлено уведомление об обновлении очереди');
 		return result;
 	},
 

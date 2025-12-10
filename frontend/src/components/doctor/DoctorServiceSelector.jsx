@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { MacOSCard, MacOSButton, MacOSBadge, MacOSLoadingSkeleton } from '../ui/macos';
 
+import logger from '../../utils/logger';
 /**
  * Селектор услуг для панели врача
  * Использует справочник из админ панели согласно passport.md стр. 1254
@@ -33,7 +34,7 @@ const DoctorServiceSelector = ({
   
   // В демо-режиме не рендерим компонент
   if (isDemoMode) {
-    console.log('DoctorServiceSelector: Skipping render in demo mode');
+    logger.log('DoctorServiceSelector: Skipping render in demo mode');
     return null;
   }
   
@@ -72,7 +73,7 @@ const DoctorServiceSelector = ({
     const isDemoMode = window.location.pathname.includes('/medilab-demo');
     
     if (isDemoMode) {
-      console.log('DoctorServiceSelector: Skipping loadServices in demo mode');
+      logger.log('DoctorServiceSelector: Skipping loadServices in demo mode');
       setLoading(false);
       return;
     }
@@ -94,7 +95,7 @@ const DoctorServiceSelector = ({
         throw new Error(error.detail);
       }
     } catch (err) {
-      console.error('Ошибка загрузки услуг врача:', err);
+      logger.error('Ошибка загрузки услуг врача:', err);
       setError('Ошибка загрузки услуг');
     } finally {
       setLoading(false);

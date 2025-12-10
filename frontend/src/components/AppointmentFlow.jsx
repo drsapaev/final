@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CreditCard, User, FileText, Pill, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
+import logger from '../utils/logger';
 import { 
   APPOINTMENT_STATUS, 
   STATUS_LABELS, 
@@ -19,7 +20,7 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
     try {
       await onStartVisit(appointment);
     } catch (error) {
-      console.error('AppointmentFlow: Start visit error:', error);
+      logger.error('AppointmentFlow: Start visit error:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -30,7 +31,7 @@ const AppointmentFlow = ({ appointment, onStartVisit, onPayment }) => {
     try {
       await onPayment(appointment);
     } catch (error) {
-      console.error('AppointmentFlow: Payment error:', error);
+      logger.error('AppointmentFlow: Payment error:', error);
     } finally {
       setIsProcessing(false);
     }

@@ -20,6 +20,7 @@ import {
 import { api } from '../../utils/api';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const PhoneVerification = ({ 
   phone, 
   purpose = 'verification', 
@@ -89,7 +90,7 @@ const PhoneVerification = ({
         setAttemptsLeft(response.data.max_attempts - response.data.attempts);
       }
     } catch (error) {
-      console.error('Error checking verification status:', error);
+      logger.error('Error checking verification status:', error);
     }
   };
 
@@ -119,7 +120,7 @@ const PhoneVerification = ({
         toast.success('Код верификации отправлен на ваш номер');
       }
     } catch (error) {
-      console.error('Error sending verification code:', error);
+      logger.error('Error sending verification code:', error);
       
       if (error.response?.status === 429) {
         toast.error('Слишком частые запросы. Попробуйте позже.');
@@ -157,7 +158,7 @@ const PhoneVerification = ({
         }
       }
     } catch (error) {
-      console.error('Error verifying code:', error);
+      logger.error('Error verifying code:', error);
       
       const errorData = error.response?.data?.detail;
       
@@ -196,7 +197,7 @@ const PhoneVerification = ({
         onCancel();
       }
     } catch (error) {
-      console.error('Error cancelling verification:', error);
+      logger.error('Error cancelling verification:', error);
     }
   };
 

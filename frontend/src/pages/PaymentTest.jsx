@@ -22,6 +22,7 @@ import {
 import PaymentWidget from '../components/payment/PaymentWidget';
 import { setToken, getToken } from '../api/client';
 
+import logger from '../utils/logger';
 const PaymentTest = () => {
   const [showWidget, setShowWidget] = useState(false);
   const [testData, setTestData] = useState({
@@ -46,7 +47,7 @@ const PaymentTest = () => {
       setResult({ type: 'info', message: 'Выполняется авторизация...' });
       
       // Проверяем доступность backend
-      console.log('🔍 Проверяем доступность backend...');
+      logger.log('🔍 Проверяем доступность backend...');
       
       // Пробуем войти с тестовыми данными (JSON формат)
       const loginData = {
@@ -55,7 +56,7 @@ const PaymentTest = () => {
         remember_me: false
       };
       
-      console.log('📤 Отправляем запрос авторизации:', {
+      logger.log('📤 Отправляем запрос авторизации:', {
         url: 'http://localhost:8000/api/v1/auth/login',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,7 +71,7 @@ const PaymentTest = () => {
         body: JSON.stringify(loginData)
       });
 
-      console.log('📥 Получен ответ:', {
+      logger.log('📥 Получен ответ:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
@@ -106,7 +107,7 @@ const PaymentTest = () => {
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error('Ошибка авторизации:', error);
+      logger.error('Ошибка авторизации:', error);
       
       // Получаем понятное сообщение об ошибке
       let errorMessage = 'Неизвестная ошибка';
@@ -128,7 +129,7 @@ const PaymentTest = () => {
   };
 
   const handlePaymentSuccess = (paymentData) => {
-    console.log('Payment Success:', paymentData);
+    logger.log('Payment Success:', paymentData);
     setResult({
       type: 'success',
       data: paymentData,
@@ -138,7 +139,7 @@ const PaymentTest = () => {
   };
 
   const handlePaymentError = (errorMessage) => {
-    console.error('Payment Error:', errorMessage);
+    logger.error('Payment Error:', errorMessage);
     setError(errorMessage);
     setResult({
       type: 'error',
@@ -147,7 +148,7 @@ const PaymentTest = () => {
   };
 
   const handlePaymentCancel = () => {
-    console.log('Payment Cancelled');
+    logger.log('Payment Cancelled');
     setShowWidget(false);
     setResult({
       type: 'info',

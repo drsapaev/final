@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const DiscountBenefitsManager = () => {
   const [activeTab, setActiveTab] = useState('discounts');
   const [discounts, setDiscounts] = useState([]);
@@ -106,7 +107,7 @@ const DiscountBenefitsManager = () => {
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -130,7 +131,7 @@ const DiscountBenefitsManager = () => {
 
       setAnalytics(analytics);
     } catch (error) {
-      console.error('Ошибка загрузки аналитики:', error);
+      logger.error('Ошибка загрузки аналитики:', error);
     }
   };
 
@@ -163,7 +164,7 @@ const DiscountBenefitsManager = () => {
       });
       loadData();
     } catch (error) {
-      console.error('Ошибка создания скидки:', error);
+      logger.error('Ошибка создания скидки:', error);
       toast.error(error.response?.data?.detail || 'Ошибка создания скидки');
     }
   };
@@ -191,7 +192,7 @@ const DiscountBenefitsManager = () => {
       });
       loadData();
     } catch (error) {
-      console.error('Ошибка создания льготы:', error);
+      logger.error('Ошибка создания льготы:', error);
       toast.error(error.response?.data?.detail || 'Ошибка создания льготы');
     }
   };
@@ -215,7 +216,7 @@ const DiscountBenefitsManager = () => {
       });
       loadData();
     } catch (error) {
-      console.error('Ошибка создания программы лояльности:', error);
+      logger.error('Ошибка создания программы лояльности:', error);
       toast.error(error.response?.data?.detail || 'Ошибка создания программы лояльности');
     }
   };

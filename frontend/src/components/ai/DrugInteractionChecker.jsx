@@ -32,6 +32,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const DrugInteractionChecker = () => {
   const [activeTab, setActiveTab] = useState('interactions');
   const [loading, setLoading] = useState(false);
@@ -111,7 +112,7 @@ const DrugInteractionChecker = () => {
       setResult(response.data);
       toast.success('Анализ завершен!');
     } catch (error) {
-      console.error('Ошибка анализа:', error);
+      logger.error('Ошибка анализа:', error);
       toast.error(error.response?.data?.detail || 'Ошибка при выполнении анализа');
     } finally {
       setLoading(false);

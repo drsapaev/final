@@ -12,6 +12,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
 
 /**
@@ -58,7 +59,7 @@ const PriceOverrideManager = ({
         setPriceOverrides(data);
       }
     } catch (error) {
-      console.error('Error loading price overrides:', error);
+      logger.error('Error loading price overrides:', error);
     } finally {
       setLoadingOverrides(false);
     }
@@ -111,7 +112,7 @@ const PriceOverrideManager = ({
         toast.error(errorData.detail || 'Ошибка создания изменения цены');
       }
     } catch (error) {
-      console.error('Error creating price override:', error);
+      logger.error('Error creating price override:', error);
       toast.error('Ошибка создания изменения цены');
     } finally {
       setIsLoading(false);

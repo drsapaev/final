@@ -1,0 +1,267 @@
+/**
+ * Global Accessibility Styles
+ * WCAG 2.1 AA Compliance
+ */
+
+/* ===========================
+   Screen Reader Only
+   =========================== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.sr-only-focusable:focus,
+.sr-only-focusable:active {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+}
+
+/* ===========================
+   Focus Styles
+   =========================== */
+:focus-visible {
+    outline: 2px solid var(--mac-accent-blue, #007aff);
+    outline-offset: 2px;
+}
+
+/* Remove default focus ring for mouse users */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Skip to main content link */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--mac-accent-blue, #007aff);
+    color: white;
+    padding: 8px 16px;
+    z-index: 10000;
+    text-decoration: none;
+    font-weight: 500;
+    border-radius: 0 0 8px 0;
+    transition: top 0.2s;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* ===========================
+   Touch Targets (44px minimum)
+   =========================== */
+.touch-target {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+button,
+[role="button"],
+a,
+input[type="checkbox"],
+input[type="radio"],
+select {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* Exception for inline links */
+a:not(.btn):not(.button) {
+    min-width: auto;
+    min-height: auto;
+}
+
+/* ===========================
+   High Contrast Colors
+   =========================== */
+:root {
+    /* WCAG AA contrast ratios - 4.5:1 for normal text, 3:1 for large text */
+    --a11y-text-primary: #1a1a1a;
+    --a11y-text-secondary: #4a4a4a;
+    --a11y-text-on-primary: #ffffff;
+    --a11y-error: #d32f2f;
+    --a11y-success: #2e7d32;
+    --a11y-warning: #ed6c02;
+    --a11y-info: #0288d1;
+}
+
+/* Forced colors mode (Windows High Contrast) */
+@media (forced-colors: active) {
+    * {
+        forced-color-adjust: auto;
+    }
+
+    button,
+    [role="button"] {
+        border: 2px solid currentColor !important;
+    }
+
+    :focus-visible {
+        outline: 3px solid Highlight !important;
+        outline-offset: 2px;
+    }
+}
+
+/* ===========================
+   Reduced Motion
+   =========================== */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Allow essential animations if user prefers */
+@media (prefers-reduced-motion: no-preference) {
+    .animate-safe {
+        animation-duration: inherit;
+        transition-duration: inherit;
+    }
+}
+
+/* ===========================
+   Color Vision Deficiency
+   =========================== */
+/* Don't rely on color alone - add icons/patterns */
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-indicator::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-indicator--success::before {
+    background: var(--a11y-success);
+    /* Add pattern for color blind users */
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+.status-indicator--error::before {
+    background: var(--a11y-error);
+    /* Diagonal pattern */
+    background-image: repeating-linear-gradient(45deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 255, 255, 0.3) 2px,
+            rgba(255, 255, 255, 0.3) 4px);
+}
+
+.status-indicator--warning::before {
+    background: var(--a11y-warning);
+    /* Dot pattern */
+    background-image: radial-gradient(circle,
+            rgba(255, 255, 255, 0.4) 1px,
+            transparent 1px);
+    background-size: 3px 3px;
+}
+
+/* ===========================
+   Text Spacing (WCAG 1.4.12)
+   =========================== */
+body {
+    line-height: 1.5;
+    letter-spacing: 0.012em;
+    word-spacing: 0.16em;
+}
+
+p {
+    margin-bottom: 1em;
+}
+
+/* ===========================
+   Focus Trap Container
+   =========================== */
+[data-focus-trap="true"] {
+    /* Helps with focus management in modals */
+    position: relative;
+}
+
+/* ===========================
+   Live Regions
+   =========================== */
+[aria-live="polite"],
+[aria-live="assertive"],
+[role="status"],
+[role="alert"] {
+    /* Ensure visibility for screen readers */
+    position: relative;
+}
+
+/* ===========================
+   Interactive Elements
+   =========================== */
+[aria-disabled="true"],
+[disabled] {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+[aria-busy="true"] {
+    cursor: wait;
+}
+
+/* ===========================
+   Form Validation States
+   =========================== */
+[aria-invalid="true"] {
+    border-color: var(--a11y-error) !important;
+}
+
+[aria-required="true"]::after {
+    content: ' *';
+    color: var(--a11y-error);
+}
+
+/* ===========================
+   Dark Mode Adjustments
+   =========================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --a11y-text-primary: #f5f5f5;
+        --a11y-text-secondary: #b0b0b0;
+    }
+}
+
+/* ===========================
+   Print Styles
+   =========================== */
+@media print {
+
+    .no-print,
+    [aria-hidden="true"] {
+        display: none !important;
+    }
+
+    a[href]::after {
+        content: " (" attr(href) ")";
+        font-size: 0.8em;
+        color: #666;
+    }
+}

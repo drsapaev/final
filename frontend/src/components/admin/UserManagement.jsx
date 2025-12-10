@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 import {
   Box,
   Card,
@@ -85,7 +86,7 @@ const UserManagement = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка подключения к серверу';
       setError(errorMessage);
-      console.error('Ошибка загрузки пользователей:', err);
+      logger.error('Ошибка загрузки пользователей:', err);
     } finally {
       setLoading(false);
     }
@@ -102,7 +103,7 @@ const UserManagement = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка создания пользователя';
       setError(errorMessage);
-      console.error('Ошибка создания пользователя:', err);
+      logger.error('Ошибка создания пользователя:', err);
     }
   };
 
@@ -118,7 +119,7 @@ const UserManagement = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обновления пользователя';
       setError(errorMessage);
-      console.error('Ошибка обновления пользователя:', err);
+      logger.error('Ошибка обновления пользователя:', err);
     }
   };
 
@@ -133,7 +134,7 @@ const UserManagement = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления пользователя';
       setError(errorMessage);
-      console.error('Ошибка удаления пользователя:', err);
+      logger.error('Ошибка удаления пользователя:', err);
     }
   };
 
@@ -146,7 +147,7 @@ const UserManagement = () => {
     } catch (err) {
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка изменения статуса пользователя';
       setError(errorMessage);
-      console.error('Ошибка изменения статуса пользователя:', err);
+      logger.error('Ошибка изменения статуса пользователя:', err);
     }
   };
 

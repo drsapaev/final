@@ -6,6 +6,7 @@ import KPIMetrics from '../components/analytics/KPIMetrics';
 import AdvancedCharts from '../components/analytics/AdvancedCharts';
 import DataExporter from '../components/analytics/DataExporter';
 import PredictiveAnalytics from '../components/analytics/PredictiveAnalytics';
+import logger from '../utils/logger';
 import { 
   Calendar, 
   TrendingUp, 
@@ -79,7 +80,7 @@ export default function AnalyticsPage() {
       
       setData(prev => ({ ...prev, [tab]: response }));
     } catch (error) {
-      console.error('Ошибка загрузки аналитики:', error);
+      logger.error('Ошибка загрузки аналитики:', error);
     } finally {
       setLoading(false);
     }
@@ -126,7 +127,7 @@ export default function AnalyticsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Ошибка экспорта:', error);
+      logger.error('Ошибка экспорта:', error);
     }
   };
 

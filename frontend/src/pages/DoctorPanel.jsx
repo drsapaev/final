@@ -39,6 +39,7 @@ import { useModal } from '../hooks/useModal.jsx';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 
+import logger from '../utils/logger';
 const DoctorPanel = () => {
   const location = useLocation();
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
@@ -155,7 +156,7 @@ const DoctorPanel = () => {
       setPatients(mockPatients);
       setAppointments(mockAppointments);
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
     }
@@ -813,7 +814,7 @@ const DoctorPanel = () => {
                               style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('View patient', patient.id);
+                                logger.log('View patient', patient.id);
                               }}
                             >
                               <Eye size={16} />
@@ -822,7 +823,7 @@ const DoctorPanel = () => {
                               style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('Delete patient', patient.id);
+                                logger.log('Delete patient', patient.id);
                               }}
                             >
                               <Trash2 size={16} />
@@ -945,7 +946,7 @@ const DoctorPanel = () => {
                               style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('Edit appointment', appointment.id);
+                                logger.log('Edit appointment', appointment.id);
                               }}
                             >
                               <Edit size={16} />
@@ -954,7 +955,7 @@ const DoctorPanel = () => {
                               style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('Complete appointment', appointment.id);
+                                logger.log('Complete appointment', appointment.id);
                               }}
                             >
                               <CheckCircle size={16} />
@@ -963,7 +964,7 @@ const DoctorPanel = () => {
                               style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('Cancel appointment', appointment.id);
+                                logger.log('Cancel appointment', appointment.id);
                               }}
                             >
                               <XCircle size={16} />
@@ -996,7 +997,7 @@ const DoctorPanel = () => {
                 <AIAssistant
                   specialty="general"
                   onSuggestionSelect={(type, suggestion) => {
-                    console.log('AI предложение для общего врача:', type, suggestion);
+                    logger.log('AI предложение для общего врача:', type, suggestion);
                   }}
                 />
               </CardContent>

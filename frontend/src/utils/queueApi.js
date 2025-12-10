@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 
+import logger from '../utils/logger';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 /**
@@ -134,7 +135,7 @@ export const useQueueManager = (specialistId) => {
       setQueueId(queueData.queue_id);
       setQueue(formatQueueData(queueData));
     } catch (err) {
-      console.error('Error loading queue:', err);
+      logger.error('Error loading queue:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -149,7 +150,7 @@ export const useQueueManager = (specialistId) => {
       }
       return result;
     } catch (err) {
-      console.error('Error moving queue entry:', err);
+      logger.error('Error moving queue entry:', err);
       throw err;
     }
   };
@@ -166,7 +167,7 @@ export const useQueueManager = (specialistId) => {
       }
       return result;
     } catch (err) {
-      console.error('Error reordering queue:', err);
+      logger.error('Error reordering queue:', err);
       throw err;
     }
   };

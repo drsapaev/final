@@ -1,7 +1,13 @@
 import { useState, useCallback } from 'react';
 import { api as apiClient } from '../api/client';
 import { mcpAPI } from '../api/mcpClient';
+import {
+  validateICD10Suggestions,
+  validateClinicalRecommendations,
+  validateAIResponse
+} from '../utils/aiValidator';
 
+import logger from '../utils/logger';
 /**
  * Кастомный хук для AI функций в EMR системе через MCP
  * Поддерживает все медицинские AI функции
@@ -35,16 +41,23 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
 
         if (mcpResult.status === 'success') {
           const data = mcpResult.data;
-          
-          // Новый формат с клиническими рекомендациями
+
+          // Validate and sanitize clinical recommendations
           if (data.clinical_recommendations) {
-            setClinicalRecommendations(data.clinical_recommendations);
+            const validatedRecommendations = validateClinicalRecommendations(data.clinical_recommendations);
+            setClinicalRecommendations(validatedRecommendations);
           }
-          
-          // Извлекаем suggestions
-          const suggestions = data.suggestions || [];
-          setIcd10Suggestions(suggestions);
-          return suggestions;
+
+          // Validate and sanitize ICD10 suggestions
+          const rawSuggestions = data.suggestions || [];
+          const validatedSuggestions = validateICD10Suggestions(rawSuggestions);
+
+          if (validatedSuggestions.length === 0 && rawSuggestions.length > 0) {
+            logger.warn('[AI Security] All ICD10 suggestions failed validation');
+          }
+
+          setIcd10Suggestions(validatedSuggestions);
+          return validatedSuggestions;
         } else {
           throw new Error(mcpResult.error || 'MCP ICD10 suggestion failed');
         }
@@ -61,7 +74,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         return suggestions;
       }
     } catch (err) {
-      console.error('AI error:', err);
+      logger.error('AI error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения AI подсказок';
       setError(errorMessage);
       return [];
@@ -86,7 +99,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         });
 
         if (mcpResult.status === 'success') {
-          return mcpResult.data;
+          // Validate AI response
+          const validatedData = validateAIResponse(mcpResult.data, {
+            expectedType: 'object',
+            sanitize: true,
+            strictMode: false
+          });
+          return validatedData;
         } else {
           throw new Error(mcpResult.error || 'MCP complaint analysis failed');
         }
@@ -98,7 +117,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         return response.data;
       }
     } catch (err) {
-      console.error('AI analysis error:', err);
+      logger.error('AI analysis error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа жалоб';
       setError(errorMessage);
       return null;
@@ -116,7 +135,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       const response = await apiClient.post('/ai/treatment-recommendations', patientData);
       return response.data;
     } catch (err) {
-      console.error('AI recommendations error:', err);
+      logger.error('AI recommendations error:', err);
       const errorMessage = err.response?.data?.detail || 'Ошибка получения рекомендаций';
       setError(errorMessage);
       return null;
@@ -141,7 +160,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         });
 
         if (mcpResult.status === 'success') {
-          return mcpResult.data;
+          // Validate AI response
+          const validatedData = validateAIResponse(mcpResult.data, {
+            expectedType: 'object',
+            sanitize: true,
+            strictMode: false
+          });
+          return validatedData;
         } else {
           throw new Error(mcpResult.error || 'MCP lab interpretation failed');
         }
@@ -155,7 +180,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         return response.data;
       }
     } catch (err) {
-      console.error('AI lab interpretation error:', err);
+      logger.error('AI lab interpretation error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка интерпретации анализов';
       setError(errorMessage);
       return null;
@@ -177,7 +202,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
       });
       return response.data;
     } catch (err) {
-      console.error('AI lab suggestions error:', err);
+      logger.error('AI lab suggestions error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка получения предложений по анализам';
       setError(errorMessage);
       return [];
@@ -208,7 +233,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         });
 
         if (mcpResult.status === 'success') {
-          return mcpResult.data;
+          // Validate AI response
+          const validatedData = validateAIResponse(mcpResult.data, {
+            expectedType: 'object',
+            sanitize: true,
+            strictMode: false
+          });
+          return validatedData;
         } else {
           throw new Error(mcpResult.error || 'MCP image analysis failed');
         }
@@ -216,7 +247,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         throw new Error('Image analysis requires MCP mode');
       }
     } catch (err) {
-      console.error('AI image analysis error:', err);
+      logger.error('AI image analysis error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа изображения';
       setError(errorMessage);
       return null;
@@ -235,7 +266,13 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         const mcpResult = await mcpAPI.analyzeSkinLesion(imageFile, lesionInfo, patientHistory, provider);
 
         if (mcpResult.status === 'success') {
-          return mcpResult.data;
+          // Validate AI response
+          const validatedData = validateAIResponse(mcpResult.data, {
+            expectedType: 'object',
+            sanitize: true,
+            strictMode: false
+          });
+          return validatedData;
         } else {
           throw new Error(mcpResult.error || 'MCP skin lesion analysis failed');
         }
@@ -243,7 +280,7 @@ export const useEMRAI = (useMCP = true, provider = 'deepseek') => {
         throw new Error('Skin lesion analysis requires MCP mode');
       }
     } catch (err) {
-      console.error('AI skin lesion analysis error:', err);
+      logger.error('AI skin lesion analysis error:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка анализа кожного образования';
       setError(errorMessage);
       return null;

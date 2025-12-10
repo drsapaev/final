@@ -32,6 +32,7 @@ import {
 } from '../ui/macos';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const EquipmentManagement = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,7 +91,7 @@ const EquipmentManagement = () => {
       const response = await api.get('/equipment');
       setEquipment(response.data.equipment || []);
     } catch (error) {
-      console.error('Ошибка загрузки оборудования:', error);
+      logger.error('Ошибка загрузки оборудования:', error);
       // Fallback данные
       setEquipment([
         {
@@ -132,7 +133,7 @@ const EquipmentManagement = () => {
       const response = await api.get('/branches');
       setBranches(response.data.branches || []);
     } catch (error) {
-      console.error('Ошибка загрузки филиалов:', error);
+      logger.error('Ошибка загрузки филиалов:', error);
       setBranches([
         { id: 1, name: 'Центральный филиал', code: 'CEN001' },
         { id: 2, name: 'Филиал Чиланзар', code: 'CHI002' }
@@ -145,7 +146,7 @@ const EquipmentManagement = () => {
       const response = await api.get('/equipment/stats');
       setStats(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
       setStats({
         total_equipment: 2,
         active_equipment: 2,

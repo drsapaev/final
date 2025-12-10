@@ -16,6 +16,7 @@ import React, { useState } from 'react';
 import { usePatients, useApiCall, useFormSubmit } from '../hooks/useApi';
 import { validators, validateForm } from '../utils/errorHandler';
 
+import logger from '../../utils/logger';
 // ❌ СТАРЫЙ ПОДХОД - НЕ ИСПОЛЬЗУЙТЕ
 function OldPatientComponent() {
   const [patients, setPatients] = useState([]);
@@ -43,7 +44,7 @@ function OldPatientComponent() {
       }
     } catch (error) {
       setError(error.message);
-      console.error('Ошибка загрузки пациентов:', error);
+      logger.error('Ошибка загрузки пациентов:', error);
     } finally {
       setLoading(false);
     }
@@ -225,10 +226,10 @@ function RealtimeQueueComponent() {
     'ws://localhost:8000/api/v1/display/ws/queue/cardiology',
     {
       onMessage: (message) => {
-        console.log('Получено сообщение очереди:', message);
+        logger.log('Получено сообщение очереди:', message);
       },
       onConnect: () => {
-        console.log('Подключен к очереди кардиологии');
+        logger.log('Подключен к очереди кардиологии');
       }
     }
   );

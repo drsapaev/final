@@ -4,6 +4,7 @@ import ModernDialog from './ModernDialog';
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const PaymentDialog = ({ 
   isOpen, 
   onClose, 
@@ -66,7 +67,7 @@ const PaymentDialog = ({
         });
       }
     } catch (error) {
-      console.error('Payment error:', error);
+      logger.error('Payment error:', error);
       toast.error('Ошибка при обработке платежа');
     } finally {
       setIsProcessing(false);

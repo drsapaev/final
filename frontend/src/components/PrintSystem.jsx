@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Printer, Settings, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Card, Button, Badge } from './ui/native';
 
+import logger from '../utils/logger';
 const PrintSystem = () => {
   const [printerStatus, setPrinterStatus] = useState('disconnected');
   const [printQueue, setPrintQueue] = useState([]);
@@ -33,7 +34,7 @@ const PrintSystem = () => {
         setPrinterStatus('error');
       }
     } catch (error) {
-      console.error('PrintSystem: Test print error:', error);
+      logger.error('PrintSystem: Test print error:', error);
       setPrinterStatus('error');
     }
   };
@@ -55,10 +56,10 @@ const PrintSystem = () => {
       if (response.ok) {
         addToPrintQueue('ticket', `Талон №${ticketData.number}`, ticketData.patient_name);
       } else {
-        console.error('PrintSystem: Print ticket error');
+        logger.error('PrintSystem: Print ticket error');
       }
     } catch (error) {
-      console.error('PrintSystem: Print ticket error:', error);
+      logger.error('PrintSystem: Print ticket error:', error);
     }
   };
 
@@ -80,7 +81,7 @@ const PrintSystem = () => {
         addToPrintQueue('receipt', `Чек №${receiptData.number}`, receiptData.patient_name);
       }
     } catch (error) {
-      console.error('PrintSystem: Print receipt error:', error);
+      logger.error('PrintSystem: Print receipt error:', error);
     }
   };
 

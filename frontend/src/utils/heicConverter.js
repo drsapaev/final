@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 /**
  * HEIC → JPEG конвертация на клиенте
  * Использует Service Worker для фоновой конвертации
@@ -74,7 +76,7 @@ export async function convertHEICToJPEG(heicFile, quality = 0.8) {
     });
     
   } catch (error) {
-    console.error('HEIC conversion error:', error);
+    logger.error('HEIC conversion error:', error);
     
     // Fallback: используем heic2any библиотеку напрямую
     return await convertHEICFallback(heicFile, quality);
@@ -111,7 +113,7 @@ async function convertHEICFallback(heicFile, quality = 0.8) {
     return jpegFile;
     
   } catch (error) {
-    console.error('HEIC fallback conversion failed:', error);
+    logger.error('HEIC fallback conversion failed:', error);
     throw new Error('Не удалось конвертировать HEIC файл');
   }
 }
@@ -129,7 +131,7 @@ export async function convertMultipleFiles(files, quality = 0.8) {
   for (const file of fileArray) {
     try {
       if (isHEICFile(file)) {
-        console.log(`Converting HEIC file: ${file.name}`);
+        logger.log(`Converting HEIC file: ${file.name}`);
         const convertedFile = await convertHEICToJPEG(file, quality);
         convertedFiles.push(convertedFile);
       } else {
@@ -137,7 +139,7 @@ export async function convertMultipleFiles(files, quality = 0.8) {
         convertedFiles.push(file);
       }
     } catch (error) {
-      console.error(`Failed to convert ${file.name}:`, error);
+      logger.error(`Failed to convert ${file.name}:`, error);
       // В случае ошибки, добавляем оригинальный файл
       convertedFiles.push(file);
     }
@@ -275,14 +277,14 @@ export async function handleFileInputWithHEICConversion(event, callback) {
   if (!files || files.length === 0) return;
   
   try {
-    console.log('Processing files with HEIC conversion...');
+    logger.log('Processing files with HEIC conversion...');
     const convertedFiles = await convertMultipleFiles(files);
     
     // Вызываем callback с конвертированными файлами
     callback(convertedFiles);
     
   } catch (error) {
-    console.error('File processing error:', error);
+    logger.error('File processing error:', error);
     // В случае ошибки возвращаем оригинальные файлы
     callback(Array.from(files));
   }

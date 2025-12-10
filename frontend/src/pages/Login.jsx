@@ -6,6 +6,7 @@ import auth from '../stores/auth.js';
 import { ROLE_OPTIONS, getRouteForProfile } from '../constants/routes';
 import ForgotPassword from '../components/auth/ForgotPassword';
 import SMSEmail2FA from '../components/security/SMSEmail2FA';
+import logger from '../utils/logger';
 import {
   Lock,
   User,
@@ -132,12 +133,12 @@ export default function Login() {
         const profile = await me();
         setProfile(profile);
       } catch (profileError) {
-        console.warn('Не удалось получить профиль:', profileError);
+        logger.warn('Не удалось получить профиль:', profileError);
         setProfile(null);
       }
       return { requires2FA: false };
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error:', error);
       throw error;
     }
   }
@@ -150,7 +151,7 @@ export default function Login() {
         const profile = await me();
         setProfile(profile);
       } catch (profileError) {
-        console.warn('Не удалось получить профиль:', profileError);
+        logger.warn('Не удалось получить профиль:', profileError);
         setProfile(null);
       }
 

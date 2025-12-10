@@ -146,6 +146,7 @@ import IntegrationDemo from './components/integration/IntegrationDemo.jsx';
 
 import auth from './stores/auth.js';
 
+import logger from './utils/logger';
 // ===== мягкая проверка ролей (как раньше) =====
 function hasRole(profile, roles) {
   if (!roles || roles.length === 0) return true;
@@ -1131,7 +1132,7 @@ function AppContent() {
     const pwa = usePWA();
     shouldShowInstallPrompt = pwa.shouldShowInstallPrompt;
   } catch (error) {
-    console.warn('PWA hook failed in AppContent, using fallback:', error);
+    logger.warn('PWA hook failed in AppContent, using fallback:', error);
   }
 
   return (
@@ -1145,8 +1146,9 @@ function AppContent() {
           <Route path="/" element={<Landing />} />
           <Route path="/medilab-demo" element={<MediLabDemo />} />
           <Route path="/macos-demo" element={<MacOSDemoPage />} />
-          <Route path="/css-test" element={<CSSTestPage />} />
-          <Route path="/buttons" element={<ButtonShowcase />} />
+          {/* Test pages - Admin only (security fix) */}
+          <Route path="/css-test" element={<RequireAuth roles={['Admin']}><CSSTestPage /></RequireAuth>} />
+          <Route path="/buttons" element={<RequireAuth roles={['Admin']}><ButtonShowcase /></RequireAuth>} />
           <Route path="/medilab-demo/dashboard" element={<MediLabDemo />} />
           <Route path="/medilab-demo/patients" element={<MediLabDemo />} />
           <Route path="/medilab-demo/appointments" element={<MediLabDemo />} />
@@ -1157,7 +1159,8 @@ function AppContent() {
           <Route path="/pwa/queue" element={<QueueJoin />} />
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/cancel" element={<PaymentCancel />} />
-          <Route path="/payment/test" element={<PaymentTest />} />
+          {/* Payment test - Admin only (security fix) */}
+          <Route path="/payment/test" element={<RequireAuth roles={['Admin']}><PaymentTest /></RequireAuth>} />
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
               <Route path="cashier-panel" element={<RequireAuth roles={['Admin', 'Cashier']}><CashierPanel /></RequireAuth>} />
@@ -1199,20 +1202,23 @@ function AppContent() {
               <Route path="scheduler" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar']}><Scheduler /></RequireAuth>} />
               <Route path="appointments" element={<RequireAuth roles={['Admin', 'Registrar']}><Appointments /></RequireAuth>} />
               <Route path="analytics" element={<RequireAuth roles={['Admin']}><AnalyticsPage /></RequireAuth>} />
-              <Route path="visits/:id" element={<VisitDetails />} />
-              <Route path="search" element={<Search />} />
+              {/* Visit details - Medical staff only (security fix - contains PHI) */}
+              <Route path="visits/:id" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><VisitDetails /></RequireAuth>} />
+              {/* Search - Medical staff only (security fix) */}
+              <Route path="search" element={<RequireAuth roles={['Admin', 'Doctor', 'Registrar', 'cardio', 'derma', 'dentist']}><Search /></RequireAuth>} />
 
               {/* Интегрированные скрытые компоненты */}
               <Route path="advanced-users" element={<RequireAuth roles={['Admin']}><UserManagement /></RequireAuth>} />
               <Route path="advanced-emr" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><EMRInterface /></RequireAuth>} />
-              <Route path="emr-demo" element={<EMRDemo />} />
+              {/* EMR Demo - Medical staff only (security fix - contains PHI) */}
+              <Route path="emr-demo" element={<RequireAuth roles={['Admin', 'Doctor', 'cardio', 'derma', 'dentist']}><EMRDemo /></RequireAuth>} />
               <Route path="file-management" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><FileManager /></RequireAuth>} />
               <Route path="notifications" element={<RequireAuth roles={['Admin']}><EmailSMSManager /></RequireAuth>} />
               <Route path="telegram-integration" element={<RequireAuth roles={['Admin']}><TelegramManager /></RequireAuth>} />
               <Route path="security-settings" element={<RequireAuth roles={['Admin', 'Doctor', 'Nurse']}><TwoFactorManager /></RequireAuth>} />
 
-              {/* Демо интеграции */}
-              <Route path="integration-demo" element={<IntegrationDemo />} />
+              {/* Демо интеграции - Admin only (security fix) */}
+              <Route path="integration-demo" element={<RequireAuth roles={['Admin']}><IntegrationDemo /></RequireAuth>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

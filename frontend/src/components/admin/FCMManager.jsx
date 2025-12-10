@@ -26,6 +26,7 @@ import {
 import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const FCMManager = () => {
   const [loading, setLoading] = useState(false);
   const [fcmStatus, setFcmStatus] = useState(null);
@@ -52,7 +53,7 @@ const FCMManager = () => {
         loadUsersWithTokens()
       ]);
     } catch (error) {
-      console.error('Error loading FCM data:', error);
+      logger.error('Error loading FCM data:', error);
       toast.error('Ошибка загрузки данных FCM');
     } finally {
       setLoading(false);
@@ -64,7 +65,7 @@ const FCMManager = () => {
       const response = await api.get('/fcm/status');
       setFcmStatus(response.data.fcm_service);
     } catch (error) {
-      console.error('Error loading FCM status:', error);
+      logger.error('Error loading FCM status:', error);
     }
   };
 
@@ -73,7 +74,7 @@ const FCMManager = () => {
       const response = await api.get('/fcm/user-tokens');
       setUsersWithTokens(response.data.users || []);
     } catch (error) {
-      console.error('Error loading users with tokens:', error);
+      logger.error('Error loading users with tokens:', error);
     }
   };
 
@@ -88,7 +89,7 @@ const FCMManager = () => {
         toast.error(`Ошибка: ${response.data.message}`);
       }
     } catch (error) {
-      console.error('Error testing FCM:', error);
+      logger.error('Error testing FCM:', error);
       toast.error('Ошибка тестирования FCM');
     } finally {
       setLoading(false);
@@ -141,7 +142,7 @@ const FCMManager = () => {
         toast.error(`Ошибка отправки: ${response.data.message}`);
       }
     } catch (error) {
-      console.error('Error sending FCM notification:', error);
+      logger.error('Error sending FCM notification:', error);
       toast.error('Ошибка отправки FCM уведомления');
     } finally {
       setLoading(false);

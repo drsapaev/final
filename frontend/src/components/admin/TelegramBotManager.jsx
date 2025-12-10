@@ -28,6 +28,7 @@ import {
 import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const TelegramBotManager = () => {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -60,7 +61,7 @@ const TelegramBotManager = () => {
       setUsersError('');
       await Promise.all([loadStats(), loadUsers(), loadCommands()]);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data:', error);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ const TelegramBotManager = () => {
       setStats(response.data);
       setStatsError('');
     } catch (error) {
-      console.error('Error loading stats:', error);
+      logger.error('Error loading stats:', error);
       setStatsError('Не удалось загрузить статистику');
     }
   };
@@ -85,7 +86,7 @@ const TelegramBotManager = () => {
       setUsers(data.users || data || []);
       setUsersError('');
     } catch (error) {
-      console.error('Error loading users:', error);
+      logger.error('Error loading users:', error);
       setUsersError('Не удалось загрузить пользователей');
     }
   };
@@ -95,7 +96,7 @@ const TelegramBotManager = () => {
       const response = await api.get('/telegram-bot/bot-commands');
       setCommands(response.data);
     } catch (error) {
-      console.error('Error loading commands:', error);
+      logger.error('Error loading commands:', error);
     }
   };
 
@@ -107,7 +108,7 @@ const TelegramBotManager = () => {
         toast.success('Тестовое сообщение отправлено!');
       }
     } catch (error) {
-      console.error('Error testing bot:', error);
+      logger.error('Error testing bot:', error);
       toast.error('Ошибка тестирования бота');
     } finally {
       setLoading(false);
@@ -134,7 +135,7 @@ const TelegramBotManager = () => {
         });
       }
     } catch (error) {
-      console.error('Error sending notification:', error);
+      logger.error('Error sending notification:', error);
       toast.error('Ошибка отправки уведомления');
     } finally {
       setLoading(false);
@@ -153,7 +154,7 @@ const TelegramBotManager = () => {
         toast.success('Срочное уведомление отправлено администраторам');
       }
     } catch (error) {
-      console.error('Error sending admin alert:', error);
+      logger.error('Error sending admin alert:', error);
       toast.error('Ошибка отправки срочного уведомления');
     } finally {
       setLoading(false);
@@ -177,7 +178,7 @@ const TelegramBotManager = () => {
         toast.success(`Системное сообщение отправлено ${response.data.sent_count} пользователям`);
       }
     } catch (error) {
-      console.error('Error broadcasting system message:', error);
+      logger.error('Error broadcasting system message:', error);
       toast.error('Ошибка отправки системного сообщения');
     } finally {
       setLoading(false);

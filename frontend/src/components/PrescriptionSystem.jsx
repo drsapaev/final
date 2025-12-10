@@ -3,6 +3,7 @@ import { Pill, Plus, X, Save, Printer, AlertCircle, CheckCircle } from 'lucide-r
 import { Card, Button, Badge } from './ui/native';
 import { APPOINTMENT_STATUS, STATUS_LABELS, STATUS_COLORS } from '../constants/appointmentStatus';
 
+import logger from '../utils/logger';
 const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
   const [prescription, setPrescription] = useState({
     medications: [],         // Список препаратов
@@ -82,7 +83,7 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
       setPrescription(prev => ({ ...prev, isDraft: false }));
       setHasUnsavedChanges(false);
     } catch (error) {
-      console.error('Prescription: Save error:', error);
+      logger.error('Prescription: Save error:', error);
     } finally {
       setIsSaving(false);
     }
@@ -96,7 +97,7 @@ const PrescriptionSystem = ({ appointment, emr, onSave, onPrint }) => {
         printedAt: new Date().toISOString() 
       }));
     } catch (error) {
-      console.error('Prescription: Print error:', error);
+      logger.error('Prescription: Print error:', error);
     }
   };
 

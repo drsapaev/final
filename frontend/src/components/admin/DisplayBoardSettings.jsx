@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/macos';
 
+import logger from '../../utils/logger';
 const DisplayBoardSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,7 +92,7 @@ const DisplayBoardSettings = () => {
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки данных табло:', error);
+      logger.error('Ошибка загрузки данных табло:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки данных табло' });
     } finally {
       setLoading(false);
@@ -125,7 +126,7 @@ const DisplayBoardSettings = () => {
         throw new Error('Ошибка сохранения настроек табло');
       }
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек табло' });
     } finally {
       setSaving(false);
@@ -174,7 +175,7 @@ const DisplayBoardSettings = () => {
         throw new Error('Ошибка тестирования');
       }
     } catch (error) {
-      console.error('Ошибка тестирования:', error);
+      logger.error('Ошибка тестирования:', error);
       setTestResults(prev => ({ 
         ...prev, 
         [testType]: { 

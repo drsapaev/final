@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 // Процедуры для зуба
 const TOOTH_PROCEDURES = {
   EXAMINATION: { id: 'examination', name: 'Осмотр', price: 20000 },
@@ -104,7 +105,7 @@ const ToothModal = ({
       const response = await api.get(`/patients/${patientId}/teeth/${toothNumber}/history`);
       setHistory(response.data || []);
     } catch (error) {
-      console.error('Ошибка загрузки истории зуба:', error);
+      logger.error('Ошибка загрузки истории зуба:', error);
       setHistory([]);
     }
   };
@@ -174,7 +175,7 @@ const ToothModal = ({
       onClose();
       
     } catch (error) {
-      console.error('Ошибка сохранения данных зуба:', error);
+      logger.error('Ошибка сохранения данных зуба:', error);
     } finally {
       setLoading(false);
     }

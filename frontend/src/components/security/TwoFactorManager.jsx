@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../ui/native';
+import logger from '../../utils/logger';
 import { 
   Shield, 
   Smartphone, 
@@ -71,7 +72,7 @@ const TwoFactorManager = () => {
       const data = await response.json();
       setDevices(data.devices || []);
     } catch (err) {
-      console.error('Error loading devices:', err);
+      logger.error('Error loading devices:', err);
     }
   };
 
@@ -85,7 +86,7 @@ const TwoFactorManager = () => {
       const data = await response.json();
       setSecurityLogs(data.logs || []);
     } catch (err) {
-      console.error('Error loading security logs:', err);
+      logger.error('Error loading security logs:', err);
     }
   };
 
@@ -99,7 +100,7 @@ const TwoFactorManager = () => {
       const data = await response.json();
       setRecoveryMethods(data.methods || []);
     } catch (err) {
-      console.error('Error loading recovery methods:', err);
+      logger.error('Error loading recovery methods:', err);
     }
   };
 

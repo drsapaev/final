@@ -19,6 +19,7 @@
 
 import { me, setToken as setClientToken } from '../api/client.js';
 
+import logger from '../utils/logger';
 const TOKEN_KEY = 'auth_token';
 const PROFILE_KEY = 'auth_profile';
 
@@ -33,7 +34,7 @@ function notify() {
       // swallow subscriber errors so one bad subscriber doesn't break others
       // but log for debugging.
       // eslint-disable-next-line no-console
-      console.error('auth subscriber error:', e);
+      logger.error('auth subscriber error:', e);
     }
   }
 }
@@ -49,7 +50,7 @@ export function subscribe(fn) {
   try {
     fn(getState());
   } catch (e) {
-    console.error('auth subscriber initial call error:', e);
+    logger.error('auth subscriber initial call error:', e);
   }
   return () => subscribers.delete(fn);
 }
@@ -91,7 +92,7 @@ export function setToken(token) {
     }
   } catch (e) {
     // ignore localStorage failures (e.g. private mode)
-    console.warn('setToken localStorage failed:', e);
+    logger.warn('setToken localStorage failed:', e);
   }
 
   // Синхронизируем токен с API клиентом
@@ -100,7 +101,7 @@ export function setToken(token) {
       setClientToken(token);
     }
   } catch (e) {
-    console.warn('client.setToken call failed:', e);
+    logger.warn('client.setToken call failed:', e);
   }
 
   // notify subscribers
@@ -136,7 +137,7 @@ export async function getProfile(force = false) {
   } catch (err) {
     // don't throw — return local stored profile or null
     // eslint-disable-next-line no-console
-    console.warn('getProfile: API call failed:', err);
+    logger.warn('getProfile: API call failed:', err);
   }
 
   return stored;
@@ -154,7 +155,7 @@ export function setProfile(profile) {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     }
   } catch (e) {
-    console.warn('setProfile localStorage failed:', e);
+    logger.warn('setProfile localStorage failed:', e);
   }
   notify();
 }

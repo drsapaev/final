@@ -8,6 +8,7 @@ import UnifiedLayout from '../components/layout/UnifiedLayout';
 import { PatientCard, MetricCard, MedicalTable } from '../components/medical';
 import MedicalCard from '../components/medical/MedicalCard';
 import { useTheme } from '../contexts/ThemeContext';
+import logger from '../utils/logger';
 import '../styles/full-width.css';
 import '../styles/cursor-effects.css';
 import '../styles/animations.css';
@@ -486,9 +487,9 @@ const MediLabDemo = () => {
           <PatientCard
             key={patient.id}
             patient={patient}
-            onView={(patient) => console.log('View patient:', patient)}
-            onEdit={(patient) => console.log('Edit patient:', patient)}
-            onDelete={(patient) => console.log('Delete patient:', patient)}
+            onView={(patient) => logger.log('View patient:', patient)}
+            onEdit={(patient) => logger.log('Edit patient:', patient)}
+            onDelete={(patient) => logger.log('Delete patient:', patient)}
             className="h-40"
           />
         ))}
@@ -561,9 +562,9 @@ const MediLabDemo = () => {
               }
             ]}
             data={appointments}
-            onView={(appointment) => console.log('View appointment:', appointment)}
-            onEdit={(appointment) => console.log('Edit appointment:', appointment)}
-            onDelete={(appointment) => console.log('Delete appointment:', appointment)}
+            onView={(appointment) => logger.log('View appointment:', appointment)}
+            onEdit={(appointment) => logger.log('Edit appointment:', appointment)}
+            onDelete={(appointment) => logger.log('Delete appointment:', appointment)}
             pagination={false}
           />
         </MedicalCard>

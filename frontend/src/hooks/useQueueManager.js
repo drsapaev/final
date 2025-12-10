@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import logger from '../utils/logger';
 import {
   fetchAvailableSpecialists,
   fetchQueuesToday,
@@ -28,7 +29,7 @@ const normalizeSpecialty = (value) =>
 
 const pickQueueForDoctor = (payload, specialistId, doctor) => {
   if (!payload?.queues) {
-    console.warn('[useQueueManager] pickQueueForDoctor: payload.queues отсутствует');
+    logger.warn('[useQueueManager] pickQueueForDoctor: payload.queues отсутствует');
     return null;
   }
 
@@ -36,7 +37,7 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
   const doctorId = Number(specialistId);
 
   // ✅ ОТЛАДКА: Логируем входные данные
-  console.log('[useQueueManager] pickQueueForDoctor:', {
+  logger.log('[useQueueManager] pickQueueForDoctor:', {
     specialistId,
     doctorId,
     doctorIdFromDoctor: doctor?.id,
@@ -61,7 +62,7 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
       if (queueSpecialistId === doctorId || 
           (doctor?.id && queueSpecialistId === Number(doctor.id)) ||
           (doctor?.user_id && queueSpecialistId === Number(doctor.user_id))) {
-        console.log('[useQueueManager] ✅ Найдена очередь по specialist_id:', {
+        logger.log('[useQueueManager] ✅ Найдена очередь по specialist_id:', {
           queueSpecialistId,
           doctorId,
           doctorIdFromDoctor: doctor?.id,
@@ -74,7 +75,7 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
     // Приоритет 2: Совпадение по specialty (fallback для групповых очередей)
     if (queue.specialty && normalizedSpecialty) {
       if (normalizeSpecialty(queue.specialty) === normalizedSpecialty) {
-        console.log('[useQueueManager] ✅ Найдена очередь по specialty:', {
+        logger.log('[useQueueManager] ✅ Найдена очередь по specialty:', {
           queueSpecialty: queue.specialty,
           normalizedSpecialty,
           specialist_id: queue.specialist_id
@@ -86,7 +87,7 @@ const pickQueueForDoctor = (payload, specialistId, doctor) => {
   });
 
   if (!foundQueue) {
-    console.warn('[useQueueManager] ❌ Очередь не найдена для врача:', {
+    logger.warn('[useQueueManager] ❌ Очередь не найдена для врача:', {
       specialistId,
       doctorId,
       doctorIdFromDoctor: doctor?.id,

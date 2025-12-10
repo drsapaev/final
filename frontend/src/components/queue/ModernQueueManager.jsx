@@ -7,6 +7,7 @@ import { Button, Card, CardContent, Badge, Icon } from '../ui/macos';
 import { getLocalDateString, getTomorrowDateString } from '../../utils/dateUtils';
 import { useQueueManager } from '../../hooks/useQueueManager';
 import QueueTable from './QueueTable';
+import logger from '../../utils/logger';
 import './ModernQueueManager.css';
 
 const ModernQueueManager = ({
@@ -90,7 +91,7 @@ const ModernQueueManager = ({
       });
     } catch (error) {
       // Не показываем тост при автообновлении, чтобы не спамить
-      console.error('Ошибка загрузки очереди:', error);
+      logger.error('Ошибка загрузки очереди:', error);
     }
   }, [effectiveDoctor, effectiveDate, doctors, loadQueueSnapshot]);
 
@@ -115,7 +116,7 @@ const ModernQueueManager = ({
   // Слушатель событий от QueueJoin для мгновенного обновления
   useEffect(() => {
     const handleQueueUpdate = (event) => {
-      console.log('[ModernQueueManager] Получено событие queueUpdated:', event.detail);
+      logger.log('[ModernQueueManager] Получено событие queueUpdated:', event.detail);
       // Обновляем очередь при любом событии добавления
       if (event.detail?.action === 'refreshAll' || event.detail?.action === 'entryAdded') {
         loadQueue();

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge, MacOSInput, MacOSSelect, MacOSCheckbox } from '../ui/macos';
 
+import logger from '../../utils/logger';
 const TelegramSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,7 +80,7 @@ const TelegramSettings = () => {
       }
 
     } catch (error) {
-      console.error('Ошибка загрузки Telegram данных:', error);
+      logger.error('Ошибка загрузки Telegram данных:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки Telegram данных' });
     } finally {
       setLoading(false);
@@ -111,7 +112,7 @@ const TelegramSettings = () => {
         throw new Error('Ошибка сохранения настроек');
       }
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек Telegram' });
     } finally {
       setSaving(false);
@@ -138,7 +139,7 @@ const TelegramSettings = () => {
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка тестирования бота:', error);
+      logger.error('Ошибка тестирования бота:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
@@ -165,7 +166,7 @@ const TelegramSettings = () => {
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка установки webhook:', error);
+      logger.error('Ошибка установки webhook:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };
@@ -197,7 +198,7 @@ const TelegramSettings = () => {
         throw new Error(error.detail);
       }
     } catch (error) {
-      console.error('Ошибка отправки:', error);
+      logger.error('Ошибка отправки:', error);
       setMessage({ type: 'error', text: error.message });
     }
   };

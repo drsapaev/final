@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logger from '../../utils/logger';
 import {
   Key,
   Shield,
@@ -61,7 +62,7 @@ const AppActivation = ({ onClose }) => {
         throw new Error(result.detail || result.message || 'Ошибка активации');
       }
     } catch (err) {
-      console.error('Ошибка активации:', err);
+      logger.error('Ошибка активации:', err);
       setError(err.message || 'Ошибка активации. Проверьте ключ.');
     } finally {
       setLoading(false);

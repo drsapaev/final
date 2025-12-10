@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import { toast } from 'react-toastify';
 
+import logger from '../utils/logger';
 const useUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ const useUsers = () => {
         });
       }
     } catch (err) {
-      console.error('Ошибка загрузки пользователей:', err);
+      logger.error('Ошибка загрузки пользователей:', err);
       setError(err);
       toast.error('Ошибка загрузки пользователей');
     } finally {
@@ -66,7 +67,7 @@ const useUsers = () => {
         return response.data;
       }
     } catch (err) {
-      console.error('Ошибка создания пользователя:', err);
+      logger.error('Ошибка создания пользователя:', err);
       setError(err);
       const errorMessage = err.response?.data?.detail || 'Ошибка создания пользователя';
       toast.error(errorMessage);
@@ -91,7 +92,7 @@ const useUsers = () => {
         return response.data;
       }
     } catch (err) {
-      console.error('Ошибка обновления пользователя:', err);
+      logger.error('Ошибка обновления пользователя:', err);
       setError(err);
       const errorMessage = err.response?.data?.detail || 'Ошибка обновления пользователя';
       toast.error(errorMessage);
@@ -113,7 +114,7 @@ const useUsers = () => {
       // Перезагружаем список пользователей
       await loadUsers(pagination.page);
     } catch (err) {
-      console.error('Ошибка удаления пользователя:', err);
+      logger.error('Ошибка удаления пользователя:', err);
       setError(err);
       const errorMessage = err.response?.data?.detail || 'Ошибка удаления пользователя';
       toast.error(errorMessage);

@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../ui/native';
 
+import logger from '../../utils/logger';
+import { createMarkup } from '../../utils/sanitizer';
 /**
  * Диалог печати с выбором принтера и предварительным просмотром
  * Основа: passport.md стр. 1925-2063
@@ -54,7 +56,7 @@ const PrintDialog = ({
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки принтеров:', err);
+      logger.error('Ошибка загрузки принтеров:', err);
       setError('Ошибка загрузки принтеров');
     } finally {
       setLoading(false);
@@ -86,7 +88,7 @@ const PrintDialog = ({
         setPreview(data.rendered_content);
       }
     } catch (err) {
-      console.error('Ошибка предварительного просмотра:', err);
+      logger.error('Ошибка предварительного просмотра:', err);
       setError('Ошибка предварительного просмотра');
     } finally {
       setLoading(false);
@@ -285,10 +287,10 @@ const PrintDialog = ({
                       {preview}
                     </pre>
                   ) : (
-                    // Предварительный просмотр для PDF
-                    <div 
+                    // Предварительный просмотр для PDF (с XSS защитой)
+                    <div
                       className="prose max-w-none"
-                      dangerouslySetInnerHTML={{ __html: preview }}
+                      {...createMarkup(preview)}
                     />
                   )}
                 </div>

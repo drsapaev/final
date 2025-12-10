@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, Clock, User, Stethoscope, AlertCircle, Phone, Mail } from 'lucide-react';
+import logger from '../../utils/logger';
 import { 
   MacOSCard, 
   MacOSButton, 
@@ -134,7 +135,7 @@ const AppointmentModal = ({
       await onSave(appointmentData);
       onClose();
     } catch (error) {
-      console.error('Ошибка сохранения записи:', error);
+      logger.error('Ошибка сохранения записи:', error);
     } finally {
       setIsSubmitting(false);
     }

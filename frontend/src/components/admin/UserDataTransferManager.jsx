@@ -4,6 +4,7 @@ import { Users, ArrowRight, Search, CheckCircle, XCircle, AlertTriangle, History
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const UserDataTransferManager = () => {
   const [activeTab, setActiveTab] = useState('transfer');
   const [sourceUser, setSourceUser] = useState(null);
@@ -28,7 +29,7 @@ const UserDataTransferManager = () => {
       const response = await api.get('/admin/user-data/transfer/data-types');
       setAvailableDataTypes(response.data.data_types);
     } catch (error) {
-      console.error('Ошибка загрузки типов данных:', error);
+      logger.error('Ошибка загрузки типов данных:', error);
       toast.error('Ошибка загрузки типов данных');
     }
   };
@@ -44,7 +45,7 @@ const UserDataTransferManager = () => {
       const response = await api.get(`/admin/user-data/users/search?query=${encodeURIComponent(query)}&limit=10`);
       setSearchResults(response.data.users);
     } catch (error) {
-      console.error('Ошибка поиска пользователей:', error);
+      logger.error('Ошибка поиска пользователей:', error);
       toast.error('Ошибка поиска пользователей');
       setSearchResults([]);
     } finally {
@@ -57,7 +58,7 @@ const UserDataTransferManager = () => {
       const response = await api.get(`/admin/user-data/users/${userId}/data-summary`);
       setUserDataSummary(response.data);
     } catch (error) {
-      console.error('Ошибка получения сводки данных:', error);
+      logger.error('Ошибка получения сводки данных:', error);
       toast.error('Ошибка получения данных пользователя');
     }
   };
@@ -78,7 +79,7 @@ const UserDataTransferManager = () => {
 
       return true;
     } catch (error) {
-      console.error('Ошибка валидации:', error);
+      logger.error('Ошибка валидации:', error);
       toast.error('Ошибка валидации передачи');
       return false;
     }
@@ -130,7 +131,7 @@ const UserDataTransferManager = () => {
         toast.error('Ошибка передачи данных');
       }
     } catch (error) {
-      console.error('Ошибка передачи:', error);
+      logger.error('Ошибка передачи:', error);
       toast.error('Ошибка выполнения передачи');
     } finally {
       setIsTransferring(false);
@@ -142,7 +143,7 @@ const UserDataTransferManager = () => {
       const response = await api.get('/admin/user-data/transfer/history?limit=50');
       setTransferHistory(response.data.history);
     } catch (error) {
-      console.error('Ошибка загрузки истории:', error);
+      logger.error('Ошибка загрузки истории:', error);
       toast.error('Ошибка загрузки истории');
     }
   };
@@ -152,7 +153,7 @@ const UserDataTransferManager = () => {
       const response = await api.get('/admin/user-data/transfer/statistics?period_days=30');
       setStatistics(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
       toast.error('Ошибка загрузки статистики');
     }
   };

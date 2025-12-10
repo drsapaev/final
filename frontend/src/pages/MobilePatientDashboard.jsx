@@ -18,6 +18,7 @@ import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
 import OfflineIndicator from '../components/mobile/OfflineIndicator';
 
+import logger from '../utils/logger';
 /**
  * Мобильная панель пациента для PWA
  */
@@ -62,7 +63,7 @@ const MobilePatientDashboard = () => {
       }
       
     } catch (error) {
-      console.error('Ошибка загрузки данных:', error);
+      logger.error('Ошибка загрузки данных:', error);
     } finally {
       setLoading(false);
     }

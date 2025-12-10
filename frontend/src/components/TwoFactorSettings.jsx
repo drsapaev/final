@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api/client';
+import logger from '../utils/logger';
 import { 
   Shield, 
   Smartphone, 
@@ -44,7 +45,7 @@ const TwoFactorSettings = () => {
       const response = await api.get('/2fa/devices');
       setDevices(response.devices || []);
     } catch (err) {
-      console.error('Error loading devices:', err);
+      logger.error('Error loading devices:', err);
     }
   };
 

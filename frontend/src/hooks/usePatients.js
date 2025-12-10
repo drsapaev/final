@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import logger from '../utils/logger';
 const API_BASE = (import.meta?.env?.VITE_API_BASE_URL) || 'http://localhost:8000';
 
 const usePatients = () => {
@@ -63,7 +64,7 @@ const usePatients = () => {
       setPatients(transformedPatients);
     } catch (err) {
       setError(err);
-      console.error('Ошибка загрузки пациентов:', err);
+      logger.error('Ошибка загрузки пациентов:', err);
     } finally {
       setLoading(false);
     }

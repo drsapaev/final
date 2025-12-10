@@ -1,6 +1,7 @@
 import React from 'react';
 import iconsMap from '../assets/iconsMap';
 
+import logger from '../utils/logger';
 /**
  * Универсальный компонент иконок
  * Использует глобальный набор иконок из iconsMap.js
@@ -18,7 +19,7 @@ const Icon = ({
   
   // Если иконка не найдена, возвращаем fallback
   if (!IconComponent) {
-    console.warn(`Иконка "${name}" не найдена в iconsMap`);
+    logger.warn(`Иконка "${name}" не найдена в iconsMap`);
     return (
       <span 
         className={className}

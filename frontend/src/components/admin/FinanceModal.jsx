@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, CreditCard, DollarSign, Calendar, User, AlertCircle, Receipt, Building } from 'lucide-react';
 import { Card, Button } from '../ui/native';
 
+import logger from '../../utils/logger';
 const FinanceModal = ({ 
   isOpen, 
   onClose, 
@@ -121,7 +122,7 @@ const FinanceModal = ({
       await onSave(transactionData);
       onClose();
     } catch (error) {
-      console.error('Ошибка сохранения транзакции:', error);
+      logger.error('Ошибка сохранения транзакции:', error);
     } finally {
       setIsSubmitting(false);
     }

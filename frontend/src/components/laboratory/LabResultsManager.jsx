@@ -45,6 +45,7 @@ import {
 import { api } from '../../api/client';
 import { AIButton, AIAssistant } from '../ai';
 
+import logger from '../../utils/logger';
 // Категории анализов
 const LAB_CATEGORIES = {
   blood: { name: 'Анализы крови', icon: <TestTube style={{ color: 'var(--mac-accent-red)' }} /> },
@@ -98,7 +99,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       const response = await api.get(`/visits/${visitId}/lab-results`);
       setResults(response.data || []);
     } catch (error) {
-      console.error('Ошибка загрузки результатов:', error);
+      logger.error('Ошибка загрузки результатов:', error);
       setResults([]);
     } finally {
       setLoading(false);
@@ -160,7 +161,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       onUpdate && onUpdate();
       
     } catch (error) {
-      console.error('Ошибка сохранения результата:', error);
+      logger.error('Ошибка сохранения результата:', error);
     }
   };
 
@@ -173,7 +174,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       loadResults();
       onUpdate && onUpdate();
     } catch (error) {
-      console.error('Ошибка удаления результата:', error);
+      logger.error('Ошибка удаления результата:', error);
     }
   };
 
@@ -201,7 +202,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       onUpdate && onUpdate();
       
     } catch (error) {
-      console.error('Ошибка загрузки файла:', error);
+      logger.error('Ошибка загрузки файла:', error);
     } finally {
       setLoading(false);
     }
@@ -223,7 +224,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       link.remove();
       
     } catch (error) {
-      console.error('Ошибка экспорта PDF:', error);
+      logger.error('Ошибка экспорта PDF:', error);
     }
   };
 
@@ -237,7 +238,7 @@ const LabResultsManager = ({ patientId, visitId, onUpdate }) => {
       
       alert('Результаты отправлены пациенту');
     } catch (error) {
-      console.error('Ошибка отправки результатов:', error);
+      logger.error('Ошибка отправки результатов:', error);
     }
   };
 

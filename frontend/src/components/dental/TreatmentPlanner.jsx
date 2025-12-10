@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
   const [treatmentPlan, setTreatmentPlan] = useState({
     name: '',
@@ -104,7 +105,7 @@ const TreatmentPlanner = ({ patientId, visitId, teethData = {}, onUpdate }) => {
       await api.post(`/visits/${visitId}/treatment-plan`, treatmentPlan);
       onUpdate && onUpdate(treatmentPlan);
     } catch (error) {
-      console.error('Ошибка сохранения плана:', error);
+      logger.error('Ошибка сохранения плана:', error);
     }
   };
 

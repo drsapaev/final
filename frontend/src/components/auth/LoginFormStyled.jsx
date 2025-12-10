@@ -9,6 +9,7 @@ import { colors } from '../../theme/tokens';
 import TwoFactorVerify from '../TwoFactorVerify.jsx';
 import ForgotPassword from './ForgotPassword';
 import { Button, Card, CardHeader, CardTitle, CardContent, Input, Select, Checkbox, Alert } from '../ui/macos';
+import logger from '../../utils/logger';
 
 // macOS-стиль анимации для декоративных элементов
 const floatingAnimation = `
@@ -32,8 +33,8 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
   const from = location.state?.from?.pathname || '/';
 
   const [formData, setFormData] = useState({
-    username: 'admin@example.com',
-    password: 'admin123',
+    username: '',
+    password: '',
     loginType: 'username'
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -62,18 +63,21 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
     setError('');
 
     try {
-      // Принудительно используем значения по умолчанию, если поля пустые
-      const username = formData.username || 'admin@example.com';
-      const password = formData.password || 'admin123';
+      // Валидация обязательных полей
+      if (!formData.username || !formData.password) {
+        setError('Пожалуйста, введите логин и пароль');
+        setLoading(false);
+        return;
+      }
 
       const credentials = {
-        username: username,
-        password: password,
+        username: formData.username,
+        password: formData.password,
         remember_me: rememberMe
       };
 
-      console.log('🔍 Отправляемые данные:', credentials);
-      console.log('📝 formData:', formData);
+      logger.log('🔍 Отправляемые данные:', credentials);
+      logger.log('📝 formData:', formData);
 
       // Используем основной backend на порту 8000
       const response = await fetch('http://localhost:8000/api/v1/auth/minimal-login', {
@@ -128,7 +132,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
           }
 
           // Детальная аналитика входа
-          console.log('🔐 Login redirect:', {
+          logger.log('🔐 Login redirect:', {
             from: fromClean,
             computedRoute,
             target,
@@ -138,7 +142,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
 
           navigate(target, { replace: true });
         } catch (profileError) {
-          console.warn('Не удалось получить профиль:', profileError);
+          logger.warn('Не удалось получить профиль:', profileError);
           navigate('/', { replace: true });
         }
       } else {
@@ -164,7 +168,7 @@ const LoginFormStyled = ({ onLogin, onRegister, onForgotPassword }) => {
       }
 
       // Логирование ошибки для аналитики
-      console.error('🚨 Login error:', {
+      logger.error('🚨 Login error:', {
         error: errorMessage,
         timestamp: new Date().toISOString(),
         username: formData.username,

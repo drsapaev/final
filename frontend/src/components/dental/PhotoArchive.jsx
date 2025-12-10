@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import logger from '../../utils/logger';
 import { 
   Camera, 
   Upload, 
@@ -161,7 +162,7 @@ const PhotoArchive = ({
       
       setIsEditing(false);
     } catch (error) {
-      console.error('Ошибка сохранения:', error);
+      logger.error('Ошибка сохранения:', error);
     } finally {
       setLoading(false);
     }

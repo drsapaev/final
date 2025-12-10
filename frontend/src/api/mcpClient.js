@@ -4,6 +4,7 @@
 import axios from 'axios';
 import { getAuthToken } from '../services/auth';
 
+import logger from '../utils/logger';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
 // Создаем axios instance для MCP
@@ -31,7 +32,7 @@ mcpClient.interceptors.response.use(
     const detail = error.response?.data?.detail || error.response?.data?.message;
     
     // Логирование ошибок
-    console.error(`[MCP Client] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
+    logger.error(`[MCP Client] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
       status,
       detail,
       data: error.response?.data
@@ -39,21 +40,21 @@ mcpClient.interceptors.response.use(
     
     // Обработка различных статусов
     if (status === 401) {
-      console.warn('[MCP Client] 401 Unauthorized - редирект на /login');
+      logger.warn('[MCP Client] 401 Unauthorized - редирект на /login');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     } else if (status === 403) {
       const message = detail || 'Недостаточно прав для выполнения операции';
-      console.warn(`[MCP Client] 403 Forbidden: ${message}`);
+      logger.warn(`[MCP Client] 403 Forbidden: ${message}`);
       // Не блокируем Promise, позволяем компонентам обработать ошибку
     } else if (status === 404) {
       const message = detail || 'Ресурс не найден';
-      console.warn(`[MCP Client] 404 Not Found: ${message}`);
+      logger.warn(`[MCP Client] 404 Not Found: ${message}`);
     } else if (status >= 500) {
-      console.error(`[MCP Client] Server Error ${status}: ${detail || 'Внутренняя ошибка сервера'}`);
+      logger.error(`[MCP Client] Server Error ${status}: ${detail || 'Внутренняя ошибка сервера'}`);
     } else if (!error.response) {
-      console.error('[MCP Client] Network Error - нет ответа от сервера');
+      logger.error('[MCP Client] Network Error - нет ответа от сервера');
     }
     
     return Promise.reject(error);

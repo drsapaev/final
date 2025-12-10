@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Printer, Download, FileText, Receipt, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { Button } from '../ui/native';
 
+import logger from '../../utils/logger';
 /**
  * Компонент кнопки печати с поддержкой разных типов документов
  * Основа: detail.md стр. 3721-3888
@@ -92,7 +93,7 @@ const PrintButton = ({
       }
 
     } catch (error) {
-      console.error('Ошибка печати:', error);
+      logger.error('Ошибка печати:', error);
       const errorMessage = error.message || 'Ошибка печати';
       setLastResult({ type: 'error', message: errorMessage });
       if (onPrintError) onPrintError(error);

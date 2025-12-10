@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import logger from '../../utils/logger';
 import { 
   Upload, 
   Download, 
@@ -88,7 +89,7 @@ const FileManager = () => {
       const data = await response.json();
       setFiles(data.files || []);
     } catch (error) {
-      console.error('Ошибка загрузки файлов:', error);
+      logger.error('Ошибка загрузки файлов:', error);
     } finally {
       setLoading(false);
     }
@@ -99,7 +100,7 @@ const FileManager = () => {
       // Здесь будет API для загрузки папок
       setFolders([]);
     } catch (error) {
-      console.error('Ошибка загрузки папок:', error);
+      logger.error('Ошибка загрузки папок:', error);
     }
   };
 
@@ -111,7 +112,7 @@ const FileManager = () => {
       const data = await response.json();
       setStats(data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
     }
   };
 
@@ -143,10 +144,10 @@ const FileManager = () => {
         if (response.ok) {
           setUploadProgress(((i + 1) / files.length) * 100);
         } else {
-          console.error(`Ошибка загрузки файла ${file.name}`);
+          logger.error(`Ошибка загрузки файла ${file.name}`);
         }
       } catch (error) {
-        console.error(`Ошибка загрузки файла ${file.name}:`, error);
+        logger.error(`Ошибка загрузки файла ${file.name}:`, error);
       }
     }
 
@@ -217,7 +218,7 @@ const FileManager = () => {
         document.body.removeChild(a);
       }
     } catch (error) {
-      console.error('Ошибка скачивания файла:', error);
+      logger.error('Ошибка скачивания файла:', error);
     }
   };
 
@@ -233,7 +234,7 @@ const FileManager = () => {
         window.open(url, '_blank');
       }
     } catch (error) {
-      console.error('Ошибка предварительного просмотра:', error);
+      logger.error('Ошибка предварительного просмотра:', error);
     }
   };
 
@@ -250,7 +251,7 @@ const FileManager = () => {
         await loadFiles();
       }
     } catch (error) {
-      console.error('Ошибка удаления файла:', error);
+      logger.error('Ошибка удаления файла:', error);
     }
   };
 

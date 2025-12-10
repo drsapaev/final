@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { api } from '../../api/client';
+import logger from '../../utils/logger';
 import './ModernTabs.css';
 
 // Маппинг иконок из lucide-react
@@ -86,7 +87,7 @@ const ModernTabs = ({
 
       setTabs(departmentsData);
     } catch (error) {
-      console.error('Ошибка загрузки отделений:', error);
+      logger.error('Ошибка загрузки отделений:', error);
       // Fallback на hardcoded вкладки если API не работает
       setTabs([
         {
@@ -144,7 +145,7 @@ const ModernTabs = ({
   // Слушаем обновления отделений
   useEffect(() => {
     const handleDepartmentsUpdate = (event) => {
-      console.log('ModernTabs: Получено обновление отделений', event.detail);
+      logger.log('ModernTabs: Получено обновление отделений', event.detail);
       loadDepartments();
     };
 

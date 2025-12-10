@@ -3,6 +3,7 @@ import { Card, Button, Badge } from '../ui/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { validateComponentDesign, generateDesignReport } from '../../utils/designValidator';
 
+import logger from '../../utils/logger';
 /**
  * Компонент для валидации дизайна панелей
  */
@@ -43,7 +44,7 @@ const DesignValidator = ({ componentName = 'CardiologistPanel', onValidationComp
         onValidationComplete(results);
       }
     } catch (error) {
-      console.error('Ошибка валидации:', error);
+      logger.error('Ошибка валидации:', error);
     } finally {
       setIsValidating(false);
     }

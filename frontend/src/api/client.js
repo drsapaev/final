@@ -9,6 +9,8 @@
 //  - login(username, password) - POST /login (x-www-form-urlencoded)
 
 import axios from 'axios';
+import { tokenManager } from '../utils/tokenManager';
+import logger from '../utils/logger';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api/v1';
 
@@ -20,8 +22,8 @@ const api = axios.create({
 
 // Ensure Authorization header is attached for every request from localStorage
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
-  console.log('🔍 [api/client.js] Request interceptor:', {
+  const token = tokenManager.getAccessToken();
+  logger.log('🔍 [api/client.js] Request interceptor:', {
     url: config.url,
     hasToken: !!token,
     tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',
@@ -40,16 +42,16 @@ function getApiBase() {
 
 function setToken(token) {
   if (token) {
-    localStorage.setItem('auth_token', token);
+    tokenManager.setAccessToken(token);
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   } else {
-    localStorage.removeItem('auth_token');
+    tokenManager.clearAll();
     delete api.defaults.headers.common['Authorization'];
   }
 }
 
 function getToken() {
-  return localStorage.getItem('auth_token');
+  return tokenManager.getAccessToken();
 }
 
 function clearToken() {
@@ -115,7 +117,7 @@ const get = api.get; // alias for direct axios usage
 const apiClient = api; // alias for PaymentWidget and other components
 
 // Инициализируем токен при загрузке модуля
-const existingToken = localStorage.getItem('auth_token');
+const existingToken = tokenManager.getAccessToken();
 if (existingToken) {
   api.defaults.headers.common['Authorization'] = `Bearer ${existingToken}`;
 }

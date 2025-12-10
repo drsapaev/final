@@ -35,6 +35,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const AIAnalytics = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -73,7 +74,7 @@ const AIAnalytics = () => {
       const response = await api.get(`/analytics/ai/usage-analytics?${params}`);
       setUsageAnalytics(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки аналитики AI:', error);
+      logger.error('Ошибка загрузки аналитики AI:', error);
       toast.error('Ошибка загрузки аналитики AI');
     } finally {
       setLoading(false);
@@ -91,7 +92,7 @@ const AIAnalytics = () => {
       const response = await api.get(`/analytics/ai/learning-insights?${params}`);
       setLearningInsights(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки инсайтов обучения:', error);
+      logger.error('Ошибка загрузки инсайтов обучения:', error);
       toast.error('Ошибка загрузки инсайтов обучения');
     } finally {
       setLoading(false);
@@ -103,7 +104,7 @@ const AIAnalytics = () => {
       const response = await api.get('/analytics/ai/usage-summary?days=30');
       setUsageSummary(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки сводки AI:', error);
+      logger.error('Ошибка загрузки сводки AI:', error);
     }
   };
 
@@ -119,7 +120,7 @@ const AIAnalytics = () => {
       const response = await api.get(`/analytics/ai/cost-analysis?${params}`);
       setCostAnalysis(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки анализа затрат:', error);
+      logger.error('Ошибка загрузки анализа затрат:', error);
       toast.error('Ошибка загрузки анализа затрат');
     } finally {
       setLoading(false);
@@ -137,7 +138,7 @@ const AIAnalytics = () => {
       const response = await api.get(`/analytics/ai/model-comparison?${params}`);
       setModelComparison(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки сравнения моделей:', error);
+      logger.error('Ошибка загрузки сравнения моделей:', error);
       toast.error('Ошибка загрузки сравнения моделей');
     } finally {
       setLoading(false);
@@ -149,9 +150,9 @@ const AIAnalytics = () => {
     try {
       const response = await api.post('/analytics/ai/optimize-models');
       toast.success('Оптимизация AI моделей запущена');
-      console.log('Результат оптимизации:', response.data);
+      logger.log('Результат оптимизации:', response.data);
     } catch (error) {
-      console.error('Ошибка оптимизации моделей:', error);
+      logger.error('Ошибка оптимизации моделей:', error);
       toast.error('Ошибка оптимизации моделей');
     } finally {
       setLoading(false);
@@ -168,9 +169,9 @@ const AIAnalytics = () => {
         anonymize: true
       });
       toast.success(`Датасет "${dataType}" успешно сгенерирован`);
-      console.log('Информация о датасете:', response.data);
+      logger.log('Информация о датасете:', response.data);
     } catch (error) {
-      console.error('Ошибка генерации датасета:', error);
+      logger.error('Ошибка генерации датасета:', error);
       toast.error('Ошибка генерации датасета');
     } finally {
       setLoading(false);

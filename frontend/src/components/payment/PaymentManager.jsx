@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { CreditCard, DollarSign, Receipt, Clock, CheckCircle, XCircle } from 'lucide-react';
 import PaymentClick from './PaymentClick';
 import PaymentPayMe from './PaymentPayMe';
+import logger from '../../utils/logger';
 import './PaymentManager.css';
 
 const API_BASE = '/api/v1';
@@ -49,7 +50,7 @@ const PaymentManager = ({
         toast.error('Ошибка загрузки счетов');
       }
     } catch (error) {
-      console.error('Ошибка загрузки счетов:', error);
+      logger.error('Ошибка загрузки счетов:', error);
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
@@ -97,7 +98,7 @@ const PaymentManager = ({
         toast.error(`Ошибка создания счета: ${errorData.detail || 'Неизвестная ошибка'}`);
       }
     } catch (error) {
-      console.error('Ошибка создания счета:', error);
+      logger.error('Ошибка создания счета:', error);
       toast.error('Ошибка создания счета');
     } finally {
       setLoading(false);

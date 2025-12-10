@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
 
+import logger from '../utils/logger';
 /**
  * Универсальный хук для async действий с обработкой ошибок
  * Устраняет дублирование async обработчиков в AdminPanel
@@ -41,7 +42,7 @@ export const useAsyncAction = () => {
 
       return result;
     } catch (err) {
-      console.error('AsyncAction error:', err);
+      logger.error('AsyncAction error:', err);
       setError(err);
 
       if (showToast) {

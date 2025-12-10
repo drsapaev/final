@@ -3,6 +3,8 @@
  * Обработка запросов и ответов
  */
 import { api } from './client';
+import { tokenManager } from '../utils/tokenManager';
+import logger from '../utils/logger';
 
 /**
  * Настройка interceptors для API клиента
@@ -12,14 +14,14 @@ export function setupInterceptors() {
   api.interceptors.request.use(
     (config) => {
       // Добавляем токен если есть
-      const token = localStorage.getItem('auth_token');
+      const token = tokenManager.getAccessToken();
       if (token && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
       }
 
       // Логируем запросы в development
       if (process.env.NODE_ENV === 'development') {
-        console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+        logger.log(`🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
           params: config.params,
           data: config.data
         });
@@ -28,7 +30,7 @@ export function setupInterceptors() {
       return config;
     },
     (error) => {
-      console.error('❌ Request Error:', error);
+      logger.error('❌ Request Error:', error);
       return Promise.reject(error);
     }
   );
@@ -38,7 +40,7 @@ export function setupInterceptors() {
     (response) => {
       // Логируем успешные ответы в development
       if (process.env.NODE_ENV === 'development') {
-        console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+        logger.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
           status: response.status,
           data: response.data
         });
@@ -60,7 +62,7 @@ export function setupInterceptors() {
       });
 
       // Логируем ошибки
-      console.error(`❌ API Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`, {
+      logger.error(`❌ API Error: ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`, {
         status: error.response?.status,
         data: error.response?.data
       });
@@ -71,8 +73,8 @@ export function setupInterceptors() {
 
         try {
           // Пытаемся обновить токен
-          const refreshToken = localStorage.getItem('refresh_token');
-          
+          const refreshToken = tokenManager.getRefreshToken();
+
           if (refreshToken) {
             const response = await api.post('/authentication/refresh', {
               refresh_token: refreshToken
@@ -80,20 +82,20 @@ export function setupInterceptors() {
 
             if (response.data.access_token) {
               // Сохраняем новый токен
-              localStorage.setItem('auth_token', response.data.access_token);
+              tokenManager.setAccessToken(response.data.access_token);
               api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-              
+
               // Повторяем оригинальный запрос
               originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`;
               return api(originalRequest);
             }
           }
         } catch (refreshError) {
-          console.error('Ошибка обновления токена:', refreshError);
+          logger.error('Ошибка обновления токена:', refreshError);
         }
 
         // Проверяем, есть ли токен ДО удаления
-        const hadToken = !!localStorage.getItem('auth_token');
+        const hadToken = tokenManager.hasToken();
         
         // Перенаправляем на страницу входа только если запрос не помечен как некритичный
         // или если это не некритичный эндпоинт (например, /clinic/stats, /clinic/health)
@@ -111,7 +113,7 @@ export function setupInterceptors() {
         
         // Логируем для отладки
         if (process.env.NODE_ENV === 'development') {
-          console.log('🔍 401 Error:', { 
+          logger.log('🔍 401 Error:', { 
             url: requestUrl, 
             isNonCritical: isNonCriticalEndpoint,
             hadToken,
@@ -123,9 +125,7 @@ export function setupInterceptors() {
         }
         
         // Если обновление токена не удалось, выходим
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+        tokenManager.clearAll();
         delete api.defaults.headers.common['Authorization'];
         
         // Перенаправляем только если:
@@ -138,7 +138,7 @@ export function setupInterceptors() {
           // Используем небольшую задержку, чтобы дать RequireAuth время проверить токен
           setTimeout(() => {
             // Проверяем еще раз, не был ли токен восстановлен
-            if (!localStorage.getItem('auth_token')) {
+            if (!tokenManager.hasToken()) {
               window.location.href = '/login';
             }
           }, 100);
@@ -148,7 +148,7 @@ export function setupInterceptors() {
       // Обработка 403 ошибок (недостаточно прав)
       if (error.response?.status === 403) {
         const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Недостаточно прав для выполнения операции';
-        console.warn(`❌ 403 Forbidden: ${errorMessage}`, {
+        logger.warn(`❌ 403 Forbidden: ${errorMessage}`, {
           url: originalRequest?.url,
           method: originalRequest?.method,
           role: error.response?.data?.role
@@ -158,14 +158,14 @@ export function setupInterceptors() {
         if (window.showToast) {
           window.showToast(errorMessage, 'error');
         } else {
-          console.error(`403 Forbidden: ${errorMessage}`);
+          logger.error(`403 Forbidden: ${errorMessage}`);
         }
       }
 
       // Обработка 404 ошибок (ресурс не найден)
       if (error.response?.status === 404) {
         const errorMessage = error.response?.data?.detail || error.response?.data?.message || 'Запрашиваемый ресурс не найден';
-        console.warn(`❌ 404 Not Found: ${errorMessage}`, {
+        logger.warn(`❌ 404 Not Found: ${errorMessage}`, {
           url: originalRequest?.url,
           method: originalRequest?.method
         });
@@ -173,13 +173,13 @@ export function setupInterceptors() {
         if (window.showToast) {
           window.showToast(errorMessage, 'warning');
         } else {
-          console.error(`404 Not Found: ${errorMessage}`);
+          logger.error(`404 Not Found: ${errorMessage}`);
         }
       }
 
       // Обработка 500 ошибок (серверные ошибки)
       if (error.response?.status >= 500) {
-        console.error('Серверная ошибка');
+        logger.error('Серверная ошибка');
         
         if (window.showToast) {
           window.showToast('Серверная ошибка. Попробуйте позже.', 'error');
@@ -188,7 +188,7 @@ export function setupInterceptors() {
 
       // Обработка сетевых ошибок
       if (!error.response) {
-        console.error('Сетевая ошибка');
+        logger.error('Сетевая ошибка');
         
         if (window.showToast) {
           window.showToast('Проблемы с подключением к серверу', 'error');
@@ -204,7 +204,7 @@ export function setupInterceptors() {
  * Установка базового токена при загрузке приложения
  */
 export function initializeAuth() {
-  const token = localStorage.getItem('auth_token');
+  const token = tokenManager.getAccessToken();
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
@@ -214,8 +214,6 @@ export function initializeAuth() {
  * Очистка авторизации
  */
 export function clearAuth() {
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
+  tokenManager.clearAll();
   delete api.defaults.headers.common['Authorization'];
 }

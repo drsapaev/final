@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
+import logger from '../utils/logger';
 const useWizardSettings = () => {
   const [settings, setSettings] = useState({
     use_new_wizard: true,  // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
@@ -17,7 +18,7 @@ const useWizardSettings = () => {
       
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.warn('No auth token found, using default wizard settings');
+        logger.warn('No auth token found, using default wizard settings');
         setSettings({
           use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
           loading: false,
@@ -36,7 +37,7 @@ const useWizardSettings = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.warn('Unauthorized access to wizard settings, using default');
+          logger.warn('Unauthorized access to wizard settings, using default');
           setSettings({
             use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
             loading: false,
@@ -55,7 +56,7 @@ const useWizardSettings = () => {
         error: null
       });
     } catch (error) {
-      console.error('Error fetching wizard settings:', error);
+      logger.error('Error fetching wizard settings:', error);
       setSettings({
         use_new_wizard: true, // 🎯 По умолчанию используем НОВЫЙ мастер (V2)
         loading: false,

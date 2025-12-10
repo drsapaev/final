@@ -11,6 +11,7 @@ import {
 } from '../ui/macos';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const DoctorModal = ({ 
   isOpen, 
   onClose, 
@@ -54,11 +55,11 @@ const DoctorModal = ({
           value: dept.key || dept.department_key || dept.id?.toString(),
           label: dept.name_ru || dept.name || dept.key || 'Неизвестно'
         }));
-        console.log('🔵 Загружены отделения:', deptOptions);
+        logger.log('🔵 Загружены отделения:', deptOptions);
         setDepartments(deptOptions);
       }
     } catch (error) {
-      console.error('Ошибка загрузки отделений:', error);
+      logger.error('Ошибка загрузки отделений:', error);
       // Fallback на статический список
       setDepartments([
         { value: 'cardiology', label: 'Кардиология' },
@@ -123,7 +124,7 @@ const DoctorModal = ({
 
     // Проверяем department - может быть строкой или числом
     const departmentValue = formData.department;
-    console.log('🔍 Проверка department:', { departmentValue, type: typeof departmentValue, isEmpty: !departmentValue, isStringEmpty: typeof departmentValue === 'string' && !departmentValue.trim() });
+    logger.log('🔍 Проверка department:', { departmentValue, type: typeof departmentValue, isEmpty: !departmentValue, isStringEmpty: typeof departmentValue === 'string' && !departmentValue.trim() });
     if (!departmentValue || (typeof departmentValue === 'string' && !departmentValue.trim())) {
       newErrors.department = 'Отделение обязательно';
     }
@@ -134,7 +135,7 @@ const DoctorModal = ({
 
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
-    console.log('🔍 Валидация:', { formData, newErrors, isValid });
+    logger.log('🔍 Валидация:', { formData, newErrors, isValid });
     return { isValid, errors: newErrors };
   };
 
@@ -142,14 +143,14 @@ const DoctorModal = ({
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🔵 handleSubmit вызван', { formData, isSubmitting, loading });
+    logger.log('🔵 handleSubmit вызван', { formData, isSubmitting, loading });
     
     // Валидация формы
     const validation = validateForm();
-    console.log('🔵 Валидация формы:', validation);
+    logger.log('🔵 Валидация формы:', validation);
     
     if (!validation.isValid) {
-      console.log('❌ Форма не прошла валидацию:', validation.errors);
+      logger.log('❌ Форма не прошла валидацию:', validation.errors);
       // Прокручиваем к первой ошибке
       const firstErrorField = Object.keys(validation.errors)[0];
       if (firstErrorField) {
@@ -180,12 +181,12 @@ const DoctorModal = ({
         bio: formData.bio.trim()
       };
 
-      console.log('🔵 Отправляем данные врача:', doctorData);
+      logger.log('🔵 Отправляем данные врача:', doctorData);
       await onSave(doctorData);
-      console.log('✅ Врач успешно сохранен');
+      logger.log('✅ Врач успешно сохранен');
       onClose();
     } catch (error) {
-      console.error('❌ Ошибка сохранения врача:', error);
+      logger.error('❌ Ошибка сохранения врача:', error);
       const errorMessage = error.message || error.response?.data?.detail || 'Ошибка при сохранении врача';
       setSubmitError(errorMessage);
     } finally {
@@ -194,10 +195,10 @@ const DoctorModal = ({
   };
 
   const handleChange = (field, value) => {
-    console.log(`🔵 handleChange: ${field} =`, value, typeof value);
+    logger.log(`🔵 handleChange: ${field} =`, value, typeof value);
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-      console.log('🔵 Новый formData:', newData);
+      logger.log('🔵 Новый formData:', newData);
       return newData;
     });
     if (errors[field]) {
@@ -335,7 +336,7 @@ const DoctorModal = ({
               value={formData.department || ''}
               onChange={(e) => {
                 const selectedValue = e.target.value;
-                console.log('🔵 MacOSSelect onChange:', selectedValue, 'type:', typeof selectedValue, 'event:', e);
+                logger.log('🔵 MacOSSelect onChange:', selectedValue, 'type:', typeof selectedValue, 'event:', e);
                 handleChange('department', selectedValue);
               }}
               options={[

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { doctorsService } from '../api/services';
 import { api } from '../api/client';
 
+import logger from '../utils/logger';
 const useDoctors = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,7 @@ const useDoctors = () => {
         setDoctors(Array.isArray(response.data) ? response.data : []);
       }
     } catch (err) {
-      console.error('Ошибка загрузки врачей:', err);
+      logger.error('Ошибка загрузки врачей:', err);
       setError(err);
     } finally {
       setLoading(false);
@@ -45,7 +46,7 @@ const useDoctors = () => {
           // Роутер подключен с префиксом /users, а внутри есть эндпоинт /users
           // Полный путь: /api/v1/users/users
           const userCreateUrl = '/users/users';
-          console.log('🔵 Создание пользователя:', userCreateUrl, {
+          logger.log('🔵 Создание пользователя:', userCreateUrl, {
             username: doctorData.email?.split('@')[0] || `doctor_${Date.now()}`,
             email: doctorData.email,
             full_name: doctorData.name,
@@ -65,7 +66,7 @@ const useDoctors = () => {
             userId = userResponse.data.id || userResponse.data.user.id;
           }
         } catch (userError) {
-          console.error('Ошибка создания пользователя:', userError);
+          logger.error('Ошибка создания пользователя:', userError);
           // Если пользователь уже существует, пытаемся найти его
           if (userError.response?.status === 400) {
             const errorDetail = userError.response?.data?.detail || '';
@@ -102,7 +103,7 @@ const useDoctors = () => {
       
       throw new Error('Не удалось создать врача');
     } catch (err) {
-      console.error('Ошибка создания врача:', err);
+      logger.error('Ошибка создания врача:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка создания врача';
       setError(err);
       throw new Error(errorMessage);
@@ -135,7 +136,7 @@ const useDoctors = () => {
       
       throw new Error('Не удалось обновить врача');
     } catch (err) {
-      console.error('Ошибка обновления врача:', err);
+      logger.error('Ошибка обновления врача:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обновления врача';
       setError(err);
       throw new Error(errorMessage);
@@ -154,7 +155,7 @@ const useDoctors = () => {
       // Обновляем список врачей
       await loadDoctors();
     } catch (err) {
-      console.error('Ошибка удаления врача:', err);
+      logger.error('Ошибка удаления врача:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка удаления врача';
       setError(err);
       throw new Error(errorMessage);

@@ -24,6 +24,7 @@ import {
 import { api } from '../../api/client';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const PhoneVerificationManager = () => {
   const [loading, setLoading] = useState(false);
   const [statistics, setStatistics] = useState(null);
@@ -45,7 +46,7 @@ const PhoneVerificationManager = () => {
       const response = await api.get('/phone-verification/statistics');
       setStatistics(response.data.statistics);
     } catch (error) {
-      console.error('Error loading verification statistics:', error);
+      logger.error('Error loading verification statistics:', error);
       toast.error('Ошибка загрузки статистики верификации');
     } finally {
       setLoading(false);
@@ -86,7 +87,7 @@ const PhoneVerificationManager = () => {
         loadStatistics(); // Обновляем статистику
       }
     } catch (error) {
-      console.error('Error sending admin verification code:', error);
+      logger.error('Error sending admin verification code:', error);
       toast.error('Ошибка отправки кода верификации');
     } finally {
       setLoading(false);

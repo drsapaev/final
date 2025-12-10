@@ -43,7 +43,7 @@ export default [
       
       // Общие правила
       'no-unused-vars': 'warn',
-      'no-console': 'warn',
+      'no-console': 'error', // HIPAA Compliance: запрещаем console.log для предотвращения утечки PHI
       'prefer-const': 'warn',
       'no-var': 'error',
       

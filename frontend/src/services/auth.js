@@ -3,6 +3,8 @@
  * Централизованная работа с авторизацией
  */
 import { api } from '../api/client';
+import { tokenManager } from '../utils/tokenManager';
+import logger from '../utils/logger';
 
 export const authService = {
   /**
@@ -13,11 +15,11 @@ export const authService = {
       const response = await api.post('/auth/login', credentials);
       
       if (response.data.access_token) {
-        // Сохраняем токен
-        localStorage.setItem('auth_token', response.data.access_token);
-        localStorage.setItem('refresh_token', response.data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        
+        // Сохраняем токен через tokenManager
+        tokenManager.setAccessToken(response.data.access_token);
+        tokenManager.setRefreshToken(response.data.refresh_token);
+        tokenManager.setUserData(response.data.user);
+
         // Устанавливаем токен в заголовки
         api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
       }
@@ -41,12 +43,10 @@ export const authService = {
     try {
       await api.post('/auth/logout');
     } catch (error) {
-      console.warn('Ошибка выхода:', error);
+      logger.warn('Ошибка выхода:', error);
     } finally {
-      // Очищаем локальные данные
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
+      // Очищаем локальные данные через tokenManager
+      tokenManager.clearAll();
       delete api.defaults.headers.common['Authorization'];
     }
   },
@@ -56,7 +56,7 @@ export const authService = {
    */
   async refreshToken() {
     try {
-      const refreshToken = localStorage.getItem('refresh_token');
+      const refreshToken = tokenManager.getRefreshToken();
       if (!refreshToken) return false;
 
       const response = await api.post('/auth/refresh', {
@@ -64,14 +64,14 @@ export const authService = {
       });
 
       if (response.data.access_token) {
-        localStorage.setItem('token', response.data.access_token);
+        tokenManager.setAccessToken(response.data.access_token);
         api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
         return true;
       }
-      
+
       return false;
     } catch (error) {
-      console.error('Ошибка обновления токена:', error);
+      logger.error('Ошибка обновления токена:', error);
       this.logout();
       return false;
     }
@@ -99,20 +99,14 @@ export const authService = {
    * Проверка авторизации
    */
   isAuthenticated() {
-    const token = localStorage.getItem('token');
-    return !!token;
+    return tokenManager.hasToken();
   },
 
   /**
    * Получение текущего пользователя
    */
   getCurrentUser() {
-    try {
-      const userStr = localStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
-    } catch (error) {
-      return null;
-    }
+    return tokenManager.getUserData();
   },
 
   /**
@@ -134,5 +128,5 @@ export const authService = {
  * Получение токена авторизации
  */
 export const getAuthToken = () => {
-  return localStorage.getItem('auth_token') || localStorage.getItem('token');
+  return tokenManager.getAccessToken();
 };

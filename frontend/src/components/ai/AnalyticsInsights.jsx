@@ -33,6 +33,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const AnalyticsInsights = () => {
   const [activeTab, setActiveTab] = useState('trends');
   const [loading, setLoading] = useState(false);
@@ -162,7 +163,7 @@ const AnalyticsInsights = () => {
       toast.success('AI аналитика успешно выполнена!');
     } catch (err) {
       toast.error('Ошибка при выполнении AI аналитики.');
-      console.error('AI analytics error:', err);
+      logger.error('AI analytics error:', err);
       setError(err.response?.data?.detail || err.message);
     } finally {
       setLoading(false);

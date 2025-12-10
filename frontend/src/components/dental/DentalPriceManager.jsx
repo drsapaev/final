@@ -13,6 +13,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { toast } from 'react-toastify';
 
+import logger from '../../utils/logger';
 const API_BASE = (import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api/v1');
 
 /**
@@ -62,7 +63,7 @@ const DentalPriceManager = ({
         setPriceOverrides(data);
       }
     } catch (error) {
-      console.error('Error loading price overrides:', error);
+      logger.error('Error loading price overrides:', error);
     } finally {
       setLoadingOverrides(false);
     }
@@ -116,7 +117,7 @@ const DentalPriceManager = ({
         toast.error(errorData.detail || 'Ошибка указания цены');
       }
     } catch (error) {
-      console.error('Error setting price:', error);
+      logger.error('Error setting price:', error);
       toast.error('Ошибка указания цены');
     } finally {
       setIsLoading(false);

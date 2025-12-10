@@ -1,3 +1,5 @@
+import logger from '../utils/logger';
+
 /**
  * API кэширование с поддержкой TTL и инвалидации
  */
@@ -200,7 +202,7 @@ export async function cachedFetch(url, options = {}) {
   if (!force) {
     const cached = apiCache.get(cacheKey);
     if (cached) {
-      console.log(`Cache HIT: ${url}`);
+      logger.log(`Cache HIT: ${url}`);
       return Promise.resolve(new Response(JSON.stringify(cached.data), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -208,7 +210,7 @@ export async function cachedFetch(url, options = {}) {
     }
   }
 
-  console.log(`Cache MISS: ${url}`);
+  logger.log(`Cache MISS: ${url}`);
 
   try {
     // Выполняем запрос
@@ -222,7 +224,7 @@ export async function cachedFetch(url, options = {}) {
 
     return response;
   } catch (error) {
-    console.error(`Fetch error for ${url}:`, error);
+    logger.error(`Fetch error for ${url}:`, error);
     throw error;
   }
 }
@@ -248,9 +250,9 @@ export function useCachedAPI() {
     preload: async (url, options = {}) => {
       try {
         await cachedFetch(url, options);
-        console.log(`Preloaded: ${url}`);
+        logger.log(`Preloaded: ${url}`);
       } catch (error) {
-        console.warn(`Preload failed for ${url}:`, error);
+        logger.warn(`Preload failed for ${url}:`, error);
       }
     }
   };

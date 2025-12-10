@@ -1,0 +1,7124 @@
+{
+  "roles": {
+    "roles": [
+      "\n    )\n\n\nclass Role(Base):\n    ",
+      "\n    )\n\n    # users: Mapped[List[",
+      "\n    )\n\n    permissions: Mapped[List[",
+      "), nullable=False, index=True\n    )\n\n    # Метаданные\n    created_at: Mapped[datetime] = mapped_column(\n        DateTime(timezone=True), server_default=func.now()\n    )\n    created_by: Mapped[Optional[int]] = mapped_column(\n        Integer, \n        ForeignKey(",
+      "), nullable=False, index=True\n    )\n    child_role_id: Mapped[int] = mapped_column(\n        Integer, ForeignKey(",
+      "), primary_key=True\n    ),\n    Column(",
+      "), primary_key=True\n    ),\n    Column(\n        ",
+      ", foreign_keys=[child_role_id])\n    creator: Mapped[Optional[",
+      ", foreign_keys=[parent_role_id])\n    child_role: Mapped[",
+      ", remote_side=[id])\n    child_roles: Mapped[List[",
+      "Admin",
+      "Cashier",
+      "Doctor",
+      "Lab",
+      "Manager",
+      "Nurse",
+      "Patient",
+      "Receptionist",
+      "Registrar",
+      "Role",
+      "SuperAdmin",
+      "cardio",
+      "dentist",
+      "derma"
+    ],
+    "sources": {
+      "enum": [
+        "Admin",
+        "Cashier",
+        "Doctor",
+        "Lab",
+        "Manager",
+        "Nurse",
+        "Patient",
+        "Receptionist",
+        "Registrar",
+        "SuperAdmin",
+        "cardio",
+        "dentist",
+        "derma"
+      ],
+      "models": [
+        "\n    )\n\n\nclass Role(Base):\n    ",
+        "\n    )\n\n    # users: Mapped[List[",
+        "\n    )\n\n    permissions: Mapped[List[",
+        "), nullable=False, index=True\n    )\n\n    # Метаданные\n    created_at: Mapped[datetime] = mapped_column(\n        DateTime(timezone=True), server_default=func.now()\n    )\n    created_by: Mapped[Optional[int]] = mapped_column(\n        Integer, \n        ForeignKey(",
+        "), nullable=False, index=True\n    )\n    child_role_id: Mapped[int] = mapped_column(\n        Integer, ForeignKey(",
+        "), primary_key=True\n    ),\n    Column(",
+        "), primary_key=True\n    ),\n    Column(\n        ",
+        ", foreign_keys=[child_role_id])\n    creator: Mapped[Optional[",
+        ", foreign_keys=[parent_role_id])\n    child_role: Mapped[",
+        ", remote_side=[id])\n    child_roles: Mapped[List[",
+        "Role"
+      ]
+    }
+  },
+  "endpoints": {
+    "total_endpoints": 382,
+    "endpoints": [
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "get_ai_providers",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/ai/providers"
+          }
+        ],
+        "line": 34,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "get_ai_provider",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/ai/providers/{provider_id}"
+          }
+        ],
+        "line": 57,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "create_ai_provider",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/ai/providers"
+          }
+        ],
+        "line": 78,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "update_ai_provider",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/ai/providers/{provider_id}"
+          }
+        ],
+        "line": 110,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "delete_ai_provider",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/ai/providers/{provider_id}"
+          }
+        ],
+        "line": 140,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "test_ai_provider",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/ai/providers/{provider_id}/test"
+          }
+        ],
+        "line": 165,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "get_ai_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/ai/settings"
+          }
+        ],
+        "line": 248,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "update_ai_settings",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/ai/settings"
+          }
+        ],
+        "line": 263,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "get_ai_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/ai/stats"
+          }
+        ],
+        "line": 289,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_ai.py",
+        "function": "get_ai_usage_logs",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/ai/usage-logs"
+          }
+        ],
+        "line": 310,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "get_clinic_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/clinic/settings"
+          }
+        ],
+        "line": 34,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "get_clinic_setting",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/clinic/settings/{key}"
+          }
+        ],
+        "line": 51,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "update_clinic_settings_batch",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/clinic/settings"
+          }
+        ],
+        "line": 67,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "update_clinic_setting",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/clinic/settings/{key}"
+          }
+        ],
+        "line": 86,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "create_clinic_setting",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/clinic/settings"
+          }
+        ],
+        "line": 103,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "upload_clinic_logo",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/clinic/logo"
+          }
+        ],
+        "line": 133,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "get_queue_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/queue/settings"
+          }
+        ],
+        "line": 189,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "update_queue_settings",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/queue/settings"
+          }
+        ],
+        "line": 204,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "test_queue_generation",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/queue/test"
+          }
+        ],
+        "line": 227,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "get_system_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/system/info"
+          }
+        ],
+        "line": 280,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_clinic.py",
+        "function": "get_service_categories",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/service-categories"
+          }
+        ],
+        "line": 318,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "list_departments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": ""
+          }
+        ],
+        "line": 415,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_departments_overview",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/overview"
+          }
+        ],
+        "line": 444,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_department",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{department_id}"
+          }
+        ],
+        "line": 458,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "create_department",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": ""
+          }
+        ],
+        "line": 480,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "update_department",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/{department_id}"
+          }
+        ],
+        "line": 536,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "initialize_department",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{department_id}/initialize"
+          }
+        ],
+        "line": 571,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "delete_department",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/{department_id}"
+          }
+        ],
+        "line": 603,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "toggle_department",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{department_id}/toggle"
+          }
+        ],
+        "line": 631,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_department_services",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{department_id}/services"
+          }
+        ],
+        "line": 669,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "add_service_to_department",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{department_id}/services/{service_id}"
+          }
+        ],
+        "line": 710,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "remove_service_from_department",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/{department_id}/services/{service_id}"
+          }
+        ],
+        "line": 753,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_queue_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{department_id}/settings/queue"
+          }
+        ],
+        "line": 784,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "update_queue_settings",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/{department_id}/settings/queue"
+          }
+        ],
+        "line": 815,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_departments_overview",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/overview"
+          }
+        ],
+        "line": 850,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "initialize_department",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{department_id}/initialize"
+          }
+        ],
+        "line": 952,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_registration_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{department_id}/settings/registration"
+          }
+        ],
+        "line": 1070,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "update_registration_settings",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/{department_id}/settings/registration"
+          }
+        ],
+        "line": 1099,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "get_department_doctors",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{department_id}/doctors"
+          }
+        ],
+        "line": 1133,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "assign_doctor_to_department",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{department_id}/doctors/{doctor_id}"
+          }
+        ],
+        "line": 1161,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_departments.py",
+        "function": "remove_doctor_from_department",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/{department_id}/doctors/{doctor_id}"
+          }
+        ],
+        "line": 1188,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "get_display_boards",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/display/boards"
+          }
+        ],
+        "line": 22,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "get_display_board",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/display/boards/{board_id}"
+          }
+        ],
+        "line": 66,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "update_display_board",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/display/boards/{board_id}"
+          }
+        ],
+        "line": 108,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "get_display_banners",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/display/boards/{board_id}/banners"
+          }
+        ],
+        "line": 135,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "create_display_banner",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/display/boards/{board_id}/banners"
+          }
+        ],
+        "line": 153,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "upload_banner_image",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/display/upload-banner"
+          }
+        ],
+        "line": 171,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "get_display_themes",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/display/themes"
+          }
+        ],
+        "line": 226,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "test_display_board",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/display/boards/{board_id}/test"
+          }
+        ],
+        "line": 295,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_display.py",
+        "function": "get_display_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/display/stats"
+          }
+        ],
+        "line": 342,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "get_doctors",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctors"
+          }
+        ],
+        "line": 30,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "get_doctor",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctors/{doctor_id}"
+          }
+        ],
+        "line": 94,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "create_doctor",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/doctors"
+          }
+        ],
+        "line": 141,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "update_doctor",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/doctors/{doctor_id}"
+          }
+        ],
+        "line": 200,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "delete_doctor",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/doctors/{doctor_id}"
+          }
+        ],
+        "line": 274,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "get_doctor_schedule",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctors/{doctor_id}/schedule"
+          }
+        ],
+        "line": 302,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "update_doctor_schedule",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/doctors/{doctor_id}/schedule"
+          }
+        ],
+        "line": 321,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "create_schedule",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/doctors/{doctor_id}/schedule"
+          }
+        ],
+        "line": 356,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "get_specialties",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/specialties"
+          }
+        ],
+        "line": 390,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_doctors.py",
+        "function": "get_doctors_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctors/stats"
+          }
+        ],
+        "line": 461,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "list_providers",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/providers"
+          }
+        ],
+        "line": 32,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "get_provider",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/providers/{provider_id}"
+          }
+        ],
+        "line": 54,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "create_new_provider",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/providers"
+          }
+        ],
+        "line": 82,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "update_existing_provider",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/admin/providers/{provider_id}"
+          }
+        ],
+        "line": 115,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "delete_existing_provider",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/admin/providers/{provider_id}"
+          }
+        ],
+        "line": 154,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "test_provider_connection",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/providers/{provider_id}/test"
+          }
+        ],
+        "line": 192,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "get_provider_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/providers/{provider_id}/stats"
+          }
+        ],
+        "line": 230,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_providers.py",
+        "function": "bulk_update_providers",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/providers/bulk-update"
+          }
+        ],
+        "line": 271,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_stats.py",
+        "function": "get_admin_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/stats"
+          }
+        ],
+        "line": 21,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_stats.py",
+        "function": "get_quick_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/quick-stats"
+          }
+        ],
+        "line": 116,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_stats.py",
+        "function": "get_recent_activities",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/recent-activities"
+          }
+        ],
+        "line": 172,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_stats.py",
+        "function": "get_activity_chart",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/activity-chart"
+          }
+        ],
+        "line": 369,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_stats.py",
+        "function": "get_analytics_overview",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/analytics/overview"
+          }
+        ],
+        "line": 460,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_stats.py",
+        "function": "get_analytics_charts",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/analytics/charts"
+          }
+        ],
+        "line": 618,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "get_telegram_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/telegram/settings"
+          }
+        ],
+        "line": 23,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "update_telegram_settings",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/telegram/settings"
+          }
+        ],
+        "line": 61,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "test_telegram_bot",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/telegram/test-bot"
+          }
+        ],
+        "line": 86,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "set_telegram_webhook",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/telegram/set-webhook"
+          }
+        ],
+        "line": 154,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "get_telegram_webhook_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/telegram/webhook-info"
+          }
+        ],
+        "line": 212,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "get_telegram_templates",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/telegram/templates"
+          }
+        ],
+        "line": 252,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "send_test_message",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/telegram/send-test-message"
+          }
+        ],
+        "line": 349,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "get_telegram_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/telegram/stats"
+          }
+        ],
+        "line": 408,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin",
+          "admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "get_telegram_users",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/telegram/users"
+          }
+        ],
+        "line": 437,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin",
+          "admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_telegram.py",
+        "function": "send_broadcast_message",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/telegram/broadcast"
+          }
+        ],
+        "line": 459,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\admin_users.py",
+        "function": "list_users",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/users"
+          }
+        ],
+        "line": 17,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\ai_integration.py",
+        "function": "get_ai_usage_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/usage-stats"
+          }
+        ],
+        "line": 263,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "list_appointments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/"
+          }
+        ],
+        "line": 84,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "create_appointment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/"
+          }
+        ],
+        "line": 183,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "get_appointment",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{appointment_id}"
+          }
+        ],
+        "line": 459,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "update_appointment",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/{appointment_id}"
+          }
+        ],
+        "line": 475,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "delete_appointment",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/{appointment_id}"
+          }
+        ],
+        "line": 517,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "get_doctor_schedule",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/{doctor_id}/schedule"
+          }
+        ],
+        "line": 535,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "get_department_schedule",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/department/{department}/schedule"
+          }
+        ],
+        "line": 550,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "open_day",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/open-day"
+          }
+        ],
+        "line": 570,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/stats"
+          }
+        ],
+        "line": 621,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "close_day",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/close"
+          }
+        ],
+        "line": 648,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointments.py",
+        "function": "qrcode_png",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/qrcode"
+          }
+        ],
+        "line": 675,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "start_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/start-visit"
+          }
+        ],
+        "line": 48,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "create_or_update_emr",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/emr"
+          }
+        ],
+        "line": 86,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "cardio",
+          "cardiology",
+          "Cardiologist",
+          "Cardio",
+          "derma",
+          "Dermatologist",
+          "dentist",
+          "Dentist",
+          "Lab",
+          "Laboratory"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "save_emr",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/emr/save"
+          }
+        ],
+        "line": 421,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "get_emr",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{appointment_id}/emr"
+          }
+        ],
+        "line": 441,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "create_or_update_prescription",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/prescription"
+          }
+        ],
+        "line": 454,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "save_prescription",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/prescription/save"
+          }
+        ],
+        "line": 507,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "get_prescription",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{appointment_id}/prescription"
+          }
+        ],
+        "line": 531,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "complete_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/complete"
+          }
+        ],
+        "line": 546,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "mark_appointment_paid",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{appointment_id}/mark-paid"
+          }
+        ],
+        "line": 580,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Cashier",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\appointment_flow.py",
+        "function": "get_appointment_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{appointment_id}/status"
+          }
+        ],
+        "line": 598,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "create_invoice",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/invoices"
+          }
+        ],
+        "line": 169,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "get_invoices",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/invoices"
+          }
+        ],
+        "line": 225,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "get_invoice",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/invoices/{invoice_id}"
+          }
+        ],
+        "line": 257,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "update_invoice",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/invoices/{invoice_id}"
+          }
+        ],
+        "line": 273,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "delete_invoice",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/invoices/{invoice_id}"
+          }
+        ],
+        "line": 296,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "get_invoice_html",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/invoices/{invoice_id}/html"
+          }
+        ],
+        "line": 318,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "send_invoice",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/invoices/{invoice_id}/send"
+          }
+        ],
+        "line": 337,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "record_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/payments"
+          }
+        ],
+        "line": 353,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "get_payments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payments"
+          }
+        ],
+        "line": 378,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "auto_generate_invoice_for_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/auto-generate/visit/{visit_id}"
+          }
+        ],
+        "line": 410,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "auto_generate_invoice_for_appointment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/auto-generate/appointment/{appointment_id}"
+          }
+        ],
+        "line": 430,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "process_recurring_invoices",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/process-recurring"
+          }
+        ],
+        "line": 450,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "send_payment_reminders",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/send-reminders"
+          }
+        ],
+        "line": 465,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "get_billing_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/settings"
+          }
+        ],
+        "line": 480,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "update_billing_settings",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/settings"
+          }
+        ],
+        "line": 512,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\billing.py",
+        "function": "get_billing_analytics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/analytics"
+          }
+        ],
+        "line": 532,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\board.py",
+        "function": "board_state",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/state"
+          }
+        ],
+        "line": 13,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_branch",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/branches"
+          }
+        ],
+        "line": 52,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_branches",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/branches"
+          }
+        ],
+        "line": 69,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_branch",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/branches/{branch_id}"
+          }
+        ],
+        "line": 87,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_branch",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/branches/{branch_id}"
+          }
+        ],
+        "line": 103,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_branch",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/branches/{branch_id}"
+          }
+        ],
+        "line": 122,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_branch_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/branches/{branch_id}/stats"
+          }
+        ],
+        "line": 137,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_equipment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/equipment"
+          }
+        ],
+        "line": 158,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_equipment",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/equipment"
+          }
+        ],
+        "line": 177,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_equipment_by_id",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/equipment/{equipment_id}"
+          }
+        ],
+        "line": 203,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_equipment",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/equipment/{equipment_id}"
+          }
+        ],
+        "line": 219,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_equipment",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/equipment/{equipment_id}"
+          }
+        ],
+        "line": 238,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_maintenance_due",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/equipment/maintenance/due"
+          }
+        ],
+        "line": 253,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "schedule_maintenance",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/equipment/{equipment_id}/maintenance"
+          }
+        ],
+        "line": 270,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_maintenance_history",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/equipment/{equipment_id}/maintenance"
+          }
+        ],
+        "line": 294,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_license",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/licenses"
+          }
+        ],
+        "line": 314,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_licenses",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/licenses"
+          }
+        ],
+        "line": 331,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_license",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/licenses/{license_id}"
+          }
+        ],
+        "line": 355,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_license",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/licenses/{license_id}"
+          }
+        ],
+        "line": 371,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_license",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/licenses/{license_id}"
+          }
+        ],
+        "line": 390,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_expiring_licenses",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/licenses/expiring"
+          }
+        ],
+        "line": 405,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "activate_license",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/licenses/{license_id}/activate"
+          }
+        ],
+        "line": 422,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_license_activations",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/licenses/{license_id}/activations"
+          }
+        ],
+        "line": 444,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_backup",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/backups"
+          }
+        ],
+        "line": 462,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_backups",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/backups"
+          }
+        ],
+        "line": 479,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_backup",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/backups/{backup_id}"
+          }
+        ],
+        "line": 495,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_backup",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/backups/{backup_id}"
+          }
+        ],
+        "line": 511,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_backup",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/backups/{backup_id}"
+          }
+        ],
+        "line": 530,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "cleanup_expired_backups",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/backups/cleanup"
+          }
+        ],
+        "line": 545,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_full_backup",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/backups/full"
+          }
+        ],
+        "line": 556,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_incremental_backup",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/backups/incremental"
+          }
+        ],
+        "line": 571,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_system_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/system/info/{key}"
+          }
+        ],
+        "line": 585,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "set_system_info",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/system/info/{key}"
+          }
+        ],
+        "line": 602,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_all_system_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/system/info"
+          }
+        ],
+        "line": 617,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_clinic_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/stats"
+          }
+        ],
+        "line": 628,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_system_health",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/health"
+          }
+        ],
+        "line": 636,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "initialize_clinic_data",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/initialize"
+          }
+        ],
+        "line": 644,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dermatology_photos.py",
+        "function": "get_patient_photos",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/"
+          }
+        ],
+        "line": 140,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "derma"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dermatology_photos.py",
+        "function": "get_photo_image",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{photo_id}/image"
+          }
+        ],
+        "line": 211,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "derma"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dermatology_photos.py",
+        "function": "get_photo_thumbnail",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{photo_id}/thumbnail"
+          }
+        ],
+        "line": 249,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "derma"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dermatology_photos.py",
+        "function": "delete_photo",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/{photo_id}"
+          }
+        ],
+        "line": 289,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "derma"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dermatology_photos.py",
+        "function": "update_photo",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/{photo_id}"
+          }
+        ],
+        "line": 326,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "derma"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dermatology_photos.py",
+        "function": "get_patient_photo_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/stats/patient/{patient_id}"
+          }
+        ],
+        "line": 379,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "derma"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\display_websocket.py",
+        "function": "get_boards_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/boards/status"
+          }
+        ],
+        "line": 370,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_doctor_queue_today",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/{specialty}/queue/today"
+          }
+        ],
+        "line": 70,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "call_patient",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/doctor/queue/{entry_id}/call"
+          }
+        ],
+        "line": 257,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "start_patient_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/doctor/queue/{entry_id}/start-visit"
+          }
+        ],
+        "line": 369,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "complete_patient_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/doctor/queue/{entry_id}/complete"
+          }
+        ],
+        "line": 439,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_doctor_services",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/{specialty}/services"
+          }
+        ],
+        "line": 777,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_doctor_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/my-info"
+          }
+        ],
+        "line": 863,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_doctor_calendar",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/calendar"
+          }
+        ],
+        "line": 947,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_doctor_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/stats"
+          }
+        ],
+        "line": 1007,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_today_visits",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/visits/today"
+          }
+        ],
+        "line": 1296,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_visit_details",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/visits/{visit_id}"
+          }
+        ],
+        "line": 1370,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": [
+          {
+            "line": 28,
+            "operator": "not in",
+            "roles": [
+              "Admin"
+            ],
+            "code": "if current_user.role not in [\"Admin\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "add_service_to_visit",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/doctor/visits/{visit_id}/add-service"
+          }
+        ],
+        "line": 1460,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": [
+          {
+            "line": 21,
+            "operator": "not in",
+            "roles": [
+              "Admin"
+            ],
+            "code": "if current_user.role not in [\"Admin\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "remove_service_from_visit",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/doctor/visits/{visit_id}/services/{visit_service_id}"
+          }
+        ],
+        "line": 1526,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": [
+          {
+            "line": 19,
+            "operator": "not in",
+            "roles": [
+              "Admin"
+            ],
+            "code": "if current_user.role not in [\"Admin\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_visit_statistics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/doctor/visits/statistics"
+          }
+        ],
+        "line": 1573,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "create_pricing_rule",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/pricing-rules"
+          }
+        ],
+        "line": 151,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "get_pricing_rules",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/pricing-rules"
+          }
+        ],
+        "line": 193,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "get_pricing_rule",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/pricing-rules/{rule_id}"
+          }
+        ],
+        "line": 216,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "update_pricing_rule",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/pricing-rules/{rule_id}"
+          }
+        ],
+        "line": 232,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "delete_pricing_rule",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/pricing-rules/{rule_id}"
+          }
+        ],
+        "line": 255,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "calculate_price",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/calculate-price"
+          }
+        ],
+        "line": 273,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "create_service_package",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/service-packages"
+          }
+        ],
+        "line": 293,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "get_service_packages",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/service-packages"
+          }
+        ],
+        "line": 319,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "get_service_package",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/service-packages/{package_id}"
+          }
+        ],
+        "line": 346,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "update_service_package",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/service-packages/{package_id}"
+          }
+        ],
+        "line": 362,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "delete_service_package",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/service-packages/{package_id}"
+          }
+        ],
+        "line": 397,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "purchase_package",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/purchase-package"
+          }
+        ],
+        "line": 415,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "update_dynamic_prices",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/update-dynamic-prices"
+          }
+        ],
+        "line": 447,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "get_pricing_analytics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/pricing-analytics"
+          }
+        ],
+        "line": 462,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\dynamic_pricing.py",
+        "function": "get_price_history",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/price-history/{service_id}"
+          }
+        ],
+        "line": 481,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_all_feature_flags",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/feature-flags"
+          }
+        ],
+        "line": 114,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_feature_flag",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/feature-flags/{flag_key}"
+          }
+        ],
+        "line": 146,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "create_feature_flag",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/feature-flags"
+          }
+        ],
+        "line": 180,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "update_feature_flag",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/admin/feature-flags/{flag_key}"
+          }
+        ],
+        "line": 234,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "toggle_feature_flag",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/feature-flags/{flag_key}/toggle"
+          }
+        ],
+        "line": 316,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "bulk_toggle_feature_flags",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/feature-flags/bulk-toggle"
+          }
+        ],
+        "line": 352,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "delete_feature_flag",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/admin/feature-flags/{flag_key}"
+          }
+        ],
+        "line": 392,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_feature_flag_history",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/feature-flags/{flag_key}/history"
+          }
+        ],
+        "line": 421,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_feature_flag_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/feature-flags/status/{flag_key}"
+          }
+        ],
+        "line": 457,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_multiple_feature_flags_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/feature-flags/status"
+          }
+        ],
+        "line": 471,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "get_user_permissions",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/users/{user_id}/permissions"
+          }
+        ],
+        "line": 102,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "check_user_permission",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/users/{user_id}/permissions/check"
+          }
+        ],
+        "line": 149,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "get_groups",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/groups"
+          }
+        ],
+        "line": 184,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "get_group_permissions_summary",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/groups/{group_id}/permissions"
+          }
+        ],
+        "line": 233,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "assign_role_to_group",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/groups/{group_id}/roles"
+          }
+        ],
+        "line": 263,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "revoke_role_from_group",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/groups/{group_id}/roles/{role_id}"
+          }
+        ],
+        "line": 296,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "add_user_to_group",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/groups/{group_id}/users"
+          }
+        ],
+        "line": 327,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "remove_user_from_group",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/groups/{group_id}/users/{user_id}"
+          }
+        ],
+        "line": 362,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "get_roles",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/roles"
+          }
+        ],
+        "line": 398,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "get_permissions",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/permissions"
+          }
+        ],
+        "line": 445,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "create_permission_override",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/users/permission-override"
+          }
+        ],
+        "line": 493,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "clear_permissions_cache",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/cache/clear"
+          }
+        ],
+        "line": 584,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\group_permissions.py",
+        "function": "get_cache_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/cache/stats"
+          }
+        ],
+        "line": 610,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\health.py",
+        "function": "get_health",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/health"
+          }
+        ],
+        "line": 13,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\health.py",
+        "function": "get_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/status"
+          }
+        ],
+        "line": 25,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "migrate_legacy_queue_data",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/migration/migrate-legacy-data"
+          }
+        ],
+        "line": 73,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "check_data_integrity",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/migration/check-integrity"
+          }
+        ],
+        "line": 102,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "backup_queue_data",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/migration/backup-queue-data"
+          }
+        ],
+        "line": 131,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "restore_queue_data",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/migration/restore-queue-data"
+          }
+        ],
+        "line": 177,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "cleanup_old_queue_data",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/migration/cleanup-old-data"
+          }
+        ],
+        "line": 208,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "get_migration_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/migration/stats"
+          }
+        ],
+        "line": 242,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\migration_management.py",
+        "function": "check_migration_health",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/migration/health"
+          }
+        ],
+        "line": 354,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\morning_assignment.py",
+        "function": "run_morning_assignment_manual",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/morning-assignment/run"
+          }
+        ],
+        "line": 53,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\morning_assignment.py",
+        "function": "get_morning_assignment_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/morning-assignment/stats"
+          }
+        ],
+        "line": 92,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\morning_assignment.py",
+        "function": "manual_assignment_for_visits",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/morning-assignment/manual"
+          }
+        ],
+        "line": 131,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\morning_assignment.py",
+        "function": "get_pending_visits",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/morning-assignment/pending-visits"
+          }
+        ],
+        "line": 228,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\morning_assignment.py",
+        "function": "get_queue_summary",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/morning-assignment/queue-summary"
+          }
+        ],
+        "line": 302,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue.py",
+        "function": "open_day_alias",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/open"
+          }
+        ],
+        "line": 27,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue.py",
+        "function": "stats_alias",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/stats"
+          }
+        ],
+        "line": 45,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue.py",
+        "function": "qrcode_alias",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/qrcode"
+          }
+        ],
+        "line": 65,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue.py",
+        "function": "close_alias",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/close"
+          }
+        ],
+        "line": 84,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue.py",
+        "function": "join_online_queue",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/join"
+          }
+        ],
+        "line": 102,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "generate_qr_token",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/online-queue/qrcode"
+          }
+        ],
+        "line": 37,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "join_queue",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/online-queue/join"
+          }
+        ],
+        "line": 85,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "open_queue",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/online-queue/open"
+          }
+        ],
+        "line": 156,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "check_queue_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/online-queue/status"
+          }
+        ],
+        "line": 184,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "get_today_queue",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/online-queue/today"
+          }
+        ],
+        "line": 227,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "get_queue_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/online-queue/stats"
+          }
+        ],
+        "line": 256,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\patients.py",
+        "function": "list_patients",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/"
+          }
+        ],
+        "line": 19,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "Lab",
+          "Cashier",
+          "Nurse"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\patients.py",
+        "function": "create_patient",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/"
+          }
+        ],
+        "line": 40,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\patients.py",
+        "function": "get_patient",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{patient_id}"
+          }
+        ],
+        "line": 227,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "Lab",
+          "Cashier",
+          "Nurse",
+          "Patient"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\patients.py",
+        "function": "update_patient",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/{patient_id}"
+          }
+        ],
+        "line": 243,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\patients.py",
+        "function": "delete_patient",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/{patient_id}"
+          }
+        ],
+        "line": 292,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\patients.py",
+        "function": "get_patient_appointments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{patient_id}/appointments"
+          }
+        ],
+        "line": 346,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "Patient"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "get_available_providers",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/providers"
+          }
+        ],
+        "line": 178,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "init_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/init"
+          }
+        ],
+        "line": 200,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Cashier"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "create_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/"
+          }
+        ],
+        "line": 442,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Cashier"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "list_payments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/"
+          }
+        ],
+        "line": 566,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Cashier",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "get_payment_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{payment_id}"
+          }
+        ],
+        "line": 602,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Cashier",
+          "Registrar",
+          "Doctor",
+          "Patient"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "get_visit_payments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visit/{visit_id}"
+          }
+        ],
+        "line": 651,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Cashier",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "cancel_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{payment_id}/cancel"
+          }
+        ],
+        "line": 682,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Cashier"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "test_init_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/test-init"
+          }
+        ],
+        "line": 743,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "generate_receipt",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{payment_id}/receipt"
+          }
+        ],
+        "line": 822,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "download_receipt",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/{payment_id}/receipt/download"
+          }
+        ],
+        "line": 867,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_settings.py",
+        "function": "get_payment_provider_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/payment-provider-settings"
+          }
+        ],
+        "line": 116,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_settings.py",
+        "function": "update_payment_provider_settings",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/payment-provider-settings"
+          }
+        ],
+        "line": 126,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_settings.py",
+        "function": "test_payment_provider",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/test-payment-provider"
+          }
+        ],
+        "line": 189,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_settings.py",
+        "function": "get_payment_providers_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/payment-providers-info"
+          }
+        ],
+        "line": 323,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "list_providers",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment/providers"
+          }
+        ],
+        "line": 113,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "create_provider",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/payment/providers"
+          }
+        ],
+        "line": 123,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "get_provider",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment/providers/{provider_id}"
+          }
+        ],
+        "line": 147,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "update_provider",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/payment/providers/{provider_id}"
+          }
+        ],
+        "line": 166,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "delete_provider_endpoint",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/payment/providers/{provider_id}"
+          }
+        ],
+        "line": 183,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "list_webhooks",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment"
+          }
+        ],
+        "line": 209,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "list_transactions",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment/transactions"
+          }
+        ],
+        "line": 234,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "get_webhook_summary",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment/summary"
+          }
+        ],
+        "line": 271,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "get_transaction",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment/transactions/{transaction_id}"
+          }
+        ],
+        "line": 295,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payment_webhook.py",
+        "function": "get_webhook",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/payment/{webhook_id}"
+          }
+        ],
+        "line": 312,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_api.py",
+        "function": "get_printers",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/printers"
+          }
+        ],
+        "line": 217,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_api.py",
+        "function": "get_printer_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/printers/{printer_name}/status"
+          }
+        ],
+        "line": 248,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_api.py",
+        "function": "test_printer",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/printers/{printer_name}/test"
+          }
+        ],
+        "line": 274,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "get_print_templates",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/templates"
+          }
+        ],
+        "line": 36,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "create_print_template",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/templates"
+          }
+        ],
+        "line": 61,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "get_print_template",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/templates/{template_id}"
+          }
+        ],
+        "line": 101,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "update_print_template",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/templates/{template_id}"
+          }
+        ],
+        "line": 120,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "delete_print_template",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/templates/{template_id}"
+          }
+        ],
+        "line": 164,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "upload_template_file",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/templates/upload/{template_type}"
+          }
+        ],
+        "line": 188,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "preview_template",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/templates/{template_id}/preview"
+          }
+        ],
+        "line": 248,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "get_default_template",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/templates/default/{template_type}"
+          }
+        ],
+        "line": 294,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "get_template_types",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/templates/types"
+          }
+        ],
+        "line": 337,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\print_templates.py",
+        "function": "get_print_jobs",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/jobs"
+          }
+        ],
+        "line": 411,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "generate_qr_token",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/qr-tokens/generate"
+          }
+        ],
+        "line": 213,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "generate_clinic_qr_token",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/qr-tokens/generate-clinic"
+          }
+        ],
+        "line": 276,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_available_specialists",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/available-specialists"
+          }
+        ],
+        "line": 335,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_qr_token_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/qr-tokens/{token}/info"
+          }
+        ],
+        "line": 457,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "start_join_session",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/join/start"
+          }
+        ],
+        "line": 491,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "complete_join_session",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/join/complete"
+          }
+        ],
+        "line": 546,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_queue_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/status/{specialist_id}"
+          }
+        ],
+        "line": 604,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "call_next_patient",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/{specialist_id}/call-next"
+          }
+        ],
+        "line": 633,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_active_qr_tokens",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/qr-tokens/active"
+          }
+        ],
+        "line": 669,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "deactivate_qr_token",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/admin/qr-tokens/{token}"
+          }
+        ],
+        "line": 685,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_queue_analytics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/queue-analytics/{specialist_id}"
+          }
+        ],
+        "line": 711,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "update_online_entry",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/online-entry/{entry_id}/update"
+          }
+        ],
+        "line": 828,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Doctor",
+          "Registrar",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "full_update_online_entry",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/online-entry/{entry_id}/full-update"
+          }
+        ],
+        "line": 937,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "cardio",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "cancel_service_in_entry",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/online-entry/{entry_id}/cancel-service"
+          }
+        ],
+        "line": 1867,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "generate_qr_token",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/qrcode"
+          }
+        ],
+        "line": 86,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": [
+          {
+            "line": 18,
+            "operator": "not in",
+            "roles": [
+              "Admin",
+              "Registrar"
+            ],
+            "code": "if current_user.role not in [\"Admin\", \"Registrar\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "join_queue",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/join"
+          }
+        ],
+        "line": 148,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "get_queue_statistics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/statistics/{specialist_id}"
+          }
+        ],
+        "line": 253,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "open_queue",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/open"
+          }
+        ],
+        "line": 315,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": [
+          {
+            "line": 18,
+            "operator": "not in",
+            "roles": [
+              "Admin",
+              "Registrar"
+            ],
+            "code": "if current_user.role not in [\"Admin\", \"Registrar\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "get_today_queue",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/today"
+          }
+        ],
+        "line": 368,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "call_patient",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/call/{entry_id}"
+          }
+        ],
+        "line": 445,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": [
+          {
+            "line": 15,
+            "operator": "not in",
+            "roles": [
+              "Admin",
+              "Registrar",
+              "Doctor"
+            ],
+            "code": "if current_user.role not in [\"Admin\", \"Registrar\", \"Doctor\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queues.py",
+        "function": "stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/stats"
+          }
+        ],
+        "line": 15,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queues.py",
+        "function": "next_ticket",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/next-ticket"
+          }
+        ],
+        "line": 31,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_cabinet_management.py",
+        "function": "get_queues_cabinet_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/queues/cabinet-info"
+          }
+        ],
+        "line": 58,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_cabinet_management.py",
+        "function": "get_queue_cabinet_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/queues/{queue_id}/cabinet-info"
+          }
+        ],
+        "line": 139,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_cabinet_management.py",
+        "function": "update_queue_cabinet_info",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/queues/{queue_id}/cabinet-info"
+          }
+        ],
+        "line": 199,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_cabinet_management.py",
+        "function": "bulk_update_cabinet_info",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/queues/cabinet-info/bulk"
+          }
+        ],
+        "line": 263,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_cabinet_management.py",
+        "function": "sync_cabinet_info_from_doctors",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/queues/sync-cabinet-info"
+          }
+        ],
+        "line": 345,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_cabinet_management.py",
+        "function": "get_cabinet_statistics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/queues/cabinet-statistics"
+          }
+        ],
+        "line": 433,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_limits.py",
+        "function": "get_queue_limits",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/queue-limits"
+          }
+        ],
+        "line": 84,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_limits.py",
+        "function": "update_queue_limits",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/queue-limits"
+          }
+        ],
+        "line": 167,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_limits.py",
+        "function": "get_queue_status_with_limits",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/queue-status"
+          }
+        ],
+        "line": 219,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_limits.py",
+        "function": "set_doctor_queue_limit",
+        "decorators": [
+          {
+            "method": "PUT",
+            "path": "/doctor-queue-limit"
+          }
+        ],
+        "line": 305,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue_limits.py",
+        "function": "reset_queue_limits",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/reset-queue-limits"
+          }
+        ],
+        "line": 369,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_registrar_departments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/departments"
+          }
+        ],
+        "line": 37,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "Cashier"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_registrar_services",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/services"
+          }
+        ],
+        "line": 104,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_registrar_doctors",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/doctors"
+          }
+        ],
+        "line": 299,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_registrar_queue_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/queue-settings"
+          }
+        ],
+        "line": 411,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "create_registrar_appointment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/appointments"
+          }
+        ],
+        "line": 481,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "generate_qr_for_registrar",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/generate-qr"
+          }
+        ],
+        "line": 592,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "open_reception",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/open-reception"
+          }
+        ],
+        "line": 640,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "start_queue_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/queue/{entry_id}/start-visit"
+          }
+        ],
+        "line": 671,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_today_queues",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/queues/today"
+          }
+        ],
+        "line": 838,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Cashier",
+          "Doctor",
+          "Lab",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_registrar_calendar",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/calendar"
+          }
+        ],
+        "line": 2267,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "create_queue_entries_batch",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar-integration/queue/entries/batch"
+          }
+        ],
+        "line": 2353,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_integration.py",
+        "function": "get_doctor_user_id",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar-integration/doctors/{doctor_id}/user-id"
+          }
+        ],
+        "line": 2580,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "init_invoice_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/invoice/init-payment"
+          }
+        ],
+        "line": 261,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "check_invoice_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/invoice/{invoice_id}/status"
+          }
+        ],
+        "line": 355,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "create_cart_appointments",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/cart"
+          }
+        ],
+        "line": 491,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "get_pending_price_overrides",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/price-overrides"
+          }
+        ],
+        "line": 862,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "approve_price_override",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/price-override/approve"
+          }
+        ],
+        "line": 923,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "get_all_free_requests",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/all-free-requests"
+          }
+        ],
+        "line": 1029,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "approve_all_free_request",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/all-free-approve"
+          }
+        ],
+        "line": 1153,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "get_benefit_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/benefit-settings"
+          }
+        ],
+        "line": 1241,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "update_benefit_settings",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/benefit-settings"
+          }
+        ],
+        "line": 1326,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "get_wizard_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/wizard-settings"
+          }
+        ],
+        "line": 1419,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "update_wizard_settings",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/wizard-settings"
+          }
+        ],
+        "line": 1456,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "get_visits",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/visits"
+          }
+        ],
+        "line": 1530,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "get_all_appointments",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/registrar/all-appointments"
+          }
+        ],
+        "line": 1713,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor",
+          "cardio",
+          "cardiology",
+          "derma",
+          "dentist",
+          "Lab"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "mark_visit_as_paid",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/visits/{visit_id}/mark-paid"
+          }
+        ],
+        "line": 2167,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "complete_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/visits/{visit_id}/complete"
+          }
+        ],
+        "line": 2290,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Cashier",
+          "Receptionist",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "start_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/visits/{visit_id}/start-visit"
+          }
+        ],
+        "line": 2323,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\registrar_wizard.py",
+        "function": "confirm_visit_by_registrar",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/registrar/visits/{visit_id}/confirm"
+          }
+        ],
+        "line": 2379,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "get_security_stats",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/security/stats"
+          }
+        ],
+        "line": 56,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "cleanup_expired_tokens",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/security/cleanup-expired-tokens"
+          }
+        ],
+        "line": 91,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "get_security_config",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/security/config"
+          }
+        ],
+        "line": 119,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "validate_token_security",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/admin/security/validate-token/{token}"
+          }
+        ],
+        "line": 156,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "reset_rate_limits",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/security/reset-rate-limits"
+          }
+        ],
+        "line": 196,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "block_ip_address",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/admin/security/block-ip/{ip}"
+          }
+        ],
+        "line": 246,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\security_management.py",
+        "function": "unblock_ip_address",
+        "decorators": [
+          {
+            "method": "DELETE",
+            "path": "/admin/security/block-ip/{ip}"
+          }
+        ],
+        "line": 284,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\settings.py",
+        "function": "get_settings",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/settings"
+          }
+        ],
+        "line": 15,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\telegram_integration.py",
+        "function": "get_bot_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/bot-status"
+          }
+        ],
+        "line": 272,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\telegram_integration.py",
+        "function": "get_telegram_users",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/users"
+          }
+        ],
+        "line": 315,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "get_user_data_summary",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/users/{user_id}/data-summary"
+          }
+        ],
+        "line": 62,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "search_users_for_transfer",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/users/search"
+          }
+        ],
+        "line": 93,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "transfer_user_data",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/transfer"
+          }
+        ],
+        "line": 139,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "request_transfer_confirmation",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/transfer/request-confirmation"
+          }
+        ],
+        "line": 189,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "confirm_data_transfer",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/transfer/confirm"
+          }
+        ],
+        "line": 243,
+        "auth_check": "get_current_user",
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "get_transfer_history",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/transfer/history"
+          }
+        ],
+        "line": 280,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "get_transfer_statistics",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/transfer/statistics"
+          }
+        ],
+        "line": 312,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "SuperAdmin"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "validate_transfer_request",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/transfer/validate"
+          }
+        ],
+        "line": 346,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\user_data_transfer.py",
+        "function": "get_available_data_types",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/transfer/data-types"
+          }
+        ],
+        "line": 380,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "list_visits",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visits"
+          }
+        ],
+        "line": 66,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "create_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visits"
+          }
+        ],
+        "line": 102,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "get_visit",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visits/{visit_id}"
+          }
+        ],
+        "line": 211,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "add_service",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visits/{visit_id}/services"
+          }
+        ],
+        "line": 233,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "set_status",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visits/{visit_id}/status"
+          }
+        ],
+        "line": 264,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "reschedule_visit",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visits/{visit_id}/reschedule"
+          }
+        ],
+        "line": 289,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "reschedule_visit_tomorrow",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visits/{visit_id}/reschedule/tomorrow"
+          }
+        ],
+        "line": 335,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_confirmation.py",
+        "function": "confirm_visit_by_telegram",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/telegram/visits/confirm"
+          }
+        ],
+        "line": 60,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_confirmation.py",
+        "function": "confirm_visit_by_pwa",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/patient/visits/confirm"
+          }
+        ],
+        "line": 200,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_confirmation.py",
+        "function": "get_visit_info_by_token",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visits/info/{token}"
+          }
+        ],
+        "line": 428,
+        "auth_check": null,
+        "role_check": null,
+        "ownership_check": true,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_payments.py",
+        "function": "get_visit_payment_info",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visit-payments/{visit_id}"
+          }
+        ],
+        "line": 16,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar",
+          "Doctor"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_payments.py",
+        "function": "get_visits_by_payment_status",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visit-payments/by-status/{payment_status}"
+          }
+        ],
+        "line": 44,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_payments.py",
+        "function": "update_visit_payment_status",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visit-payments/{visit_id}/update-status"
+          }
+        ],
+        "line": 84,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_payments.py",
+        "function": "get_visit_payments_summary",
+        "decorators": [
+          {
+            "method": "GET",
+            "path": "/visit-payments/summary"
+          }
+        ],
+        "line": 124,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_payments.py",
+        "function": "create_visit_from_payment",
+        "decorators": [
+          {
+            "method": "POST",
+            "path": "/visit-payments/{visit_id}/create-from-payment"
+          }
+        ],
+        "line": 181,
+        "auth_check": "require_roles",
+        "role_check": [
+          "Admin",
+          "Registrar"
+        ],
+        "ownership_check": false,
+        "explicit_role_checks": []
+      }
+    ]
+  },
+  "problems": {
+    "endpoints_without_auth": [
+      {
+        "file": "app\\api\\v1\\endpoints\\board.py",
+        "function": "board_state",
+        "line": 13
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_branch",
+        "line": 52
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_branches",
+        "line": 69
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_branch",
+        "line": 87
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_branch",
+        "line": 103
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_branch",
+        "line": 122
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_branch_stats",
+        "line": 137
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_equipment",
+        "line": 158
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_equipment",
+        "line": 177
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_equipment_by_id",
+        "line": 203
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_equipment",
+        "line": 219
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_equipment",
+        "line": 238
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_maintenance_due",
+        "line": 253
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "schedule_maintenance",
+        "line": 270
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_maintenance_history",
+        "line": 294
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_license",
+        "line": 314
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_licenses",
+        "line": 331
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_license",
+        "line": 355
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_license",
+        "line": 371
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_license",
+        "line": 390
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_expiring_licenses",
+        "line": 405
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "activate_license",
+        "line": 422
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_license_activations",
+        "line": 444
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_backup",
+        "line": 462
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_backups",
+        "line": 479
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_backup",
+        "line": 495
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "update_backup",
+        "line": 511
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "delete_backup",
+        "line": 530
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "cleanup_expired_backups",
+        "line": 545
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_full_backup",
+        "line": 556
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "create_incremental_backup",
+        "line": 571
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_system_info",
+        "line": 585
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "set_system_info",
+        "line": 602
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_all_system_info",
+        "line": 617
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_clinic_stats",
+        "line": 628
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "get_system_health",
+        "line": 636
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\clinic_management.py",
+        "function": "initialize_clinic_data",
+        "line": 644
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_feature_flag_status",
+        "line": 457
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\feature_flags.py",
+        "function": "get_multiple_feature_flags_status",
+        "line": 471
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\health.py",
+        "function": "get_health",
+        "line": 13
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\health.py",
+        "function": "get_status",
+        "line": 25
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue.py",
+        "function": "join_online_queue",
+        "line": 102
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "join_queue",
+        "line": 85
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\online_queue_new.py",
+        "function": "check_queue_status",
+        "line": 184
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "get_available_providers",
+        "line": 178
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\payments.py",
+        "function": "test_init_payment",
+        "line": 743
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_available_specialists",
+        "line": 335
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "get_qr_token_info",
+        "line": 457
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "start_join_session",
+        "line": 491
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\qr_queue.py",
+        "function": "complete_join_session",
+        "line": 546
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "join_queue",
+        "line": 148
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queues.py",
+        "function": "stats",
+        "line": 15
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queues.py",
+        "function": "next_ticket",
+        "line": 31
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\settings.py",
+        "function": "get_settings",
+        "line": 15
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "list_visits",
+        "line": 66
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "get_visit",
+        "line": 211
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "add_service",
+        "line": 233
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "set_status",
+        "line": 264
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "reschedule_visit",
+        "line": 289
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visits.py",
+        "function": "reschedule_visit_tomorrow",
+        "line": 335
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_confirmation.py",
+        "function": "confirm_visit_by_telegram",
+        "line": 60
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_confirmation.py",
+        "function": "confirm_visit_by_pwa",
+        "line": 200
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\visit_confirmation.py",
+        "function": "get_visit_info_by_token",
+        "line": 428
+      }
+    ],
+    "endpoints_with_explicit_role_checks": [
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "get_visit_details",
+        "line": 1370,
+        "checks": [
+          {
+            "line": 28,
+            "operator": "not in",
+            "roles": [
+              "Admin"
+            ],
+            "code": "if current_user.role not in [\"Admin\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "add_service_to_visit",
+        "line": 1460,
+        "checks": [
+          {
+            "line": 21,
+            "operator": "not in",
+            "roles": [
+              "Admin"
+            ],
+            "code": "if current_user.role not in [\"Admin\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\doctor_integration.py",
+        "function": "remove_service_from_visit",
+        "line": 1526,
+        "checks": [
+          {
+            "line": 19,
+            "operator": "not in",
+            "roles": [
+              "Admin"
+            ],
+            "code": "if current_user.role not in [\"Admin\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "generate_qr_token",
+        "line": 86,
+        "checks": [
+          {
+            "line": 18,
+            "operator": "not in",
+            "roles": [
+              "Admin",
+              "Registrar"
+            ],
+            "code": "if current_user.role not in [\"Admin\", \"Registrar\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "open_queue",
+        "line": 315,
+        "checks": [
+          {
+            "line": 18,
+            "operator": "not in",
+            "roles": [
+              "Admin",
+              "Registrar"
+            ],
+            "code": "if current_user.role not in [\"Admin\", \"Registrar\"]"
+          }
+        ]
+      },
+      {
+        "file": "app\\api\\v1\\endpoints\\queue.py",
+        "function": "call_patient",
+        "line": 445,
+        "checks": [
+          {
+            "line": 15,
+            "operator": "not in",
+            "roles": [
+              "Admin",
+              "Registrar",
+              "Doctor"
+            ],
+            "code": "if current_user.role not in [\"Admin\", \"Registrar\", \"Doctor\"]"
+          }
+        ]
+      }
+    ],
+    "endpoints_without_ownership_check": []
+  },
+  "summary": {
+    "total_roles": 24,
+    "total_endpoints": 382,
+    "endpoints_without_auth": 63,
+    "endpoints_with_explicit_checks": 6
+  }
+}

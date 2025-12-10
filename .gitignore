@@ -43,4 +43,6 @@ nul
 backend/quality-reports/*.txt
 backend/quality-reports/*.md
 !backend/quality-reports/README.md
-!backend/quality-reports/.gitkeep
+!backend/quality-reports/.gitkeep.secret_key
+backend/.secret_key
+*.db.backup*

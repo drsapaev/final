@@ -12,14 +12,9 @@ import '../components/ui/animations.css';
 import '../styles/responsive.css';
 import '../styles/animations.css';
 import '../styles/dark-theme-visibility-fix.css';
+import logger from '../utils/logger';
 
 const API_BASE = import.meta?.env?.VITE_API_BASE_URL || 'http://localhost:8000';
-
-const logger = {
-  info: (...args) => console.log('[RegistrarPanel]', ...args),
-  warn: (...args) => console.warn('[RegistrarPanel]', ...args),
-  error: (...args) => console.error('[RegistrarPanel]', ...args),
-};
 
 // Современные диалоги
 import PaymentDialog from '../components/dialogs/PaymentDialog';
@@ -1002,7 +997,7 @@ const RegistrarPanel = () => {
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   const loadAppointments = useCallback(async (options = {}) => {
-    logger.info('📥 loadAppointments called at:', new Date().toISOString(), options);
+    console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
     const { silent = false, source: callSource = 'unknown' } = options || {};
     try {
       if (!silent) {
@@ -1012,9 +1007,9 @@ const RegistrarPanel = () => {
 
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
-      logger.info('🔍 loadAppointments: token from localStorage:', token ? `${token.substring(0, 30)}...` : 'null');
+      console.log('🔍 loadAppointments: token exists:', !!token);
       if (!token) {
-        logger.warn('Токен аутентификации отсутствует, показываем пустое состояние');
+        console.warn('Токен аутентификации отсутствует, показываем пустое состояние');
         startTransition(() => {
           if (!silent) setDataSource('api');
           setAppointments([]);
@@ -1022,12 +1017,12 @@ const RegistrarPanel = () => {
         return;
       }
 
-      logger.info('🔍 loadAppointments: making request with token:', token ? `${token.substring(0, 30)}...` : 'null');
+      console.log('🔍 loadAppointments: making request');
 
       // Используем новый эндпоинт для получения очередей на указанную дату
       // Если календарь открыт, используем historyDate, иначе сегодня
       const dateParam = showCalendar && historyDate ? historyDate : getLocalDateString();
-      logger.info('📅 Параметры для loadAppointments:', {
+      console.log('📅 Параметры для loadAppointments:', {
         source: callSource,
         showCalendar,
         historyDate,
@@ -1039,7 +1034,7 @@ const RegistrarPanel = () => {
       params.append('target_date', dateParam);
 
 
-      logger.info('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
+      console.log('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
 
       const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } });
 
@@ -1050,13 +1045,15 @@ const RegistrarPanel = () => {
       let appointmentsData = [];
 
       if (data && typeof data === 'object') {
-        logger.info('📊 Получены данные от сервера:', data);
+        // Временно отключено логирование больших объектов для диагностики
+        // logger.info('📊 Получены данные от сервера:', data);
+        console.log('📊 Получены данные от сервера (count):', data.queues?.length || 0);
 
         // Обрабатываем формат от эндпоинта registrar_integration.py
         if (data.queues && Array.isArray(data.queues)) {
-          logger.info('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+          console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
           // ✅ ОТЛАДКА: Логируем структуру данных от сервера
-          data.queues.forEach((q, idx) => {
+          /*data.queues.forEach((q, idx) => {
             logger.info(`  Очередь ${idx + 1}: specialty=${q.specialty}, entries=${q.entries?.length || 0}`);
             if (q.entries && q.entries.length > 0) {
               q.entries.slice(0, 2).forEach((e, eIdx) => {
@@ -1064,18 +1061,18 @@ const RegistrarPanel = () => {
                 logger.info(`    Запись ${eIdx + 1}: type=${e.type}, id=${entryData?.id}, patient_id=${entryData?.patient_id}, patient_name=${entryData?.patient_name}`);
               });
             }
-          });
+          });*/
 
           // Ранее здесь был фильтр по activeTab. Убираем серверную фильтрацию —
           // всегда объединяем все очереди, вкладки фильтруют на клиенте.
           // Объединяем все очереди
-          logger.info('📊 Объединяем все очереди');
+          console.log('📊 Объединяем все очереди');
 
           // ✅ ИСПРАВЛЕНО: Используем Map для дедупликации по patient_id + date (для online_queue) или по ID записи (для других типов)
           const appointmentsMap = new Map(); // key -> appointment object
 
           data.queues.forEach(queue => {
-            logger.info(`📋 Обработка очереди: ${queue.specialty}, записей: ${queue.entries?.length || 0}`);
+            console.log(`📋 Обработка очереди: ${queue.specialty}, записей: ${queue.entries?.length || 0}`);
             if (queue.entries && Array.isArray(queue.entries)) {
               queue.entries.forEach((entry, index) => {
                 try {
@@ -1649,7 +1646,7 @@ const RegistrarPanel = () => {
         logger.info('✅ Загружены динамические отделения:', departmentsArray.map(d => d.key));
       }
     } catch (error) {
-      console.error('Ошибка загрузки отделений:', error);
+      logger.error('Ошибка загрузки отделений:', error);
     }
   }, []);
 

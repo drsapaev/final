@@ -22,6 +22,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../utils/api';
 
+import logger from '../../utils/logger';
 const TreatmentRecommendations = () => {
   const [activeTab, setActiveTab] = useState('treatment-plan');
   const [loading, setLoading] = useState(false);
@@ -92,7 +93,7 @@ const TreatmentRecommendations = () => {
       setResult(response.data);
       toast.success('Рекомендации получены!');
     } catch (error) {
-      console.error('Ошибка получения рекомендаций:', error);
+      logger.error('Ошибка получения рекомендаций:', error);
       toast.error(error.response?.data?.detail || 'Ошибка при получении рекомендаций');
     } finally {
       setLoading(false);

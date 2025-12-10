@@ -20,6 +20,7 @@ import {
 import { toast } from 'react-toastify';
 import { api } from '../../api/client';
 
+import logger from '../../utils/logger';
 const RegistrarNotificationManager = () => {
   const [activeTab, setActiveTab] = useState('send');
   const [loading, setLoading] = useState(false);
@@ -48,7 +49,7 @@ const RegistrarNotificationManager = () => {
       const response = await api.get('/registrar/notifications/registrars');
       setRegistrars(response.data.registrars || []);
     } catch (error) {
-      console.error('Ошибка загрузки регистраторов:', error);
+      logger.error('Ошибка загрузки регистраторов:', error);
       toast.error('Ошибка загрузки списка регистраторов');
     }
   };
@@ -58,7 +59,7 @@ const RegistrarNotificationManager = () => {
       const response = await api.get('/registrar/notifications/stats');
       setStats(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
       toast.error('Ошибка загрузки статистики');
     }
   };
@@ -89,7 +90,7 @@ const RegistrarNotificationManager = () => {
         toast.error('Ошибка отправки уведомления');
       }
     } catch (error) {
-      console.error('Ошибка отправки уведомления:', error);
+      logger.error('Ошибка отправки уведомления:', error);
       toast.error('Ошибка отправки уведомления');
     } finally {
       setLoading(false);
@@ -108,7 +109,7 @@ const RegistrarNotificationManager = () => {
         toast.error('Ошибка отправки сводки');
       }
     } catch (error) {
-      console.error('Ошибка отправки сводки:', error);
+      logger.error('Ошибка отправки сводки:', error);
       toast.error('Ошибка отправки ежедневной сводки');
     } finally {
       setLoading(false);
@@ -132,7 +133,7 @@ const RegistrarNotificationManager = () => {
         toast.error('Ошибка отправки тестового уведомления');
       }
     } catch (error) {
-      console.error('Ошибка отправки тестового уведомления:', error);
+      logger.error('Ошибка отправки тестового уведомления:', error);
       toast.error('Ошибка отправки тестового уведомления');
     } finally {
       setLoading(false);

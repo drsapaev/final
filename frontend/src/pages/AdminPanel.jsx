@@ -162,6 +162,7 @@ import DiscountBenefitsManager from '../components/admin/DiscountBenefitsManager
 import { useAdminHotkeys } from '../hooks/useHotkeys';
 import { HotkeysModal } from '../components/admin/HelpTooltip';
 import { MobileNavigation, useScreenSize } from '../components/admin/MobileOptimization';
+import logger from '../utils/logger';
 import '../styles/admin-styles.css';
 
 const AdminPanel = () => {
@@ -187,7 +188,7 @@ const AdminPanel = () => {
       try {
         await refreshStats();
       } catch (error) {
-        console.error('Ошибка обновления:', error);
+        logger.error('Ошибка обновления:', error);
       }
     },
     dashboard: () => navigate('/admin'),
@@ -213,7 +214,7 @@ const AdminPanel = () => {
     refreshInterval: 0, // Автообновление отключено, можно включить при необходимости
     enabled: true, // Включена загрузка реальных данных
     onError: (error) => {
-      console.error('Ошибка загрузки статистики:', error);
+      logger.error('Ошибка загрузки статистики:', error);
     }
   });
 
@@ -604,7 +605,7 @@ const AdminPanel = () => {
     try {
       await saveSettings(settingsData);
     } catch (error) {
-      console.error('Ошибка сохранения настроек:', error);
+      logger.error('Ошибка сохранения настроек:', error);
       throw error;
     }
   };
@@ -614,7 +615,7 @@ const AdminPanel = () => {
       try {
         await resetSettings();
       } catch (error) {
-        console.error('Ошибка сброса настроек:', error);
+        logger.error('Ошибка сброса настроек:', error);
         alert('Ошибка при сбросе настроек');
       }
     }
@@ -624,7 +625,7 @@ const AdminPanel = () => {
     try {
       await exportSettings();
     } catch (error) {
-      console.error('Ошибка экспорта настроек:', error);
+      logger.error('Ошибка экспорта настроек:', error);
       alert('Ошибка при экспорте настроек');
     }
   };
@@ -633,7 +634,7 @@ const AdminPanel = () => {
     try {
       await importSettings(file);
     } catch (error) {
-      console.error('Ошибка импорта настроек:', error);
+      logger.error('Ошибка импорта настроек:', error);
       alert('Ошибка при импорте настроек');
     }
   };
@@ -643,7 +644,7 @@ const AdminPanel = () => {
     try {
       await blockIP(ip, reason);
     } catch (error) {
-      console.error('Ошибка блокировки IP:', error);
+      logger.error('Ошибка блокировки IP:', error);
       alert('Ошибка при блокировке IP адреса');
     }
   };
@@ -652,7 +653,7 @@ const AdminPanel = () => {
     try {
       await unblockIP(ipId);
     } catch (error) {
-      console.error('Ошибка разблокировки IP:', error);
+      logger.error('Ошибка разблокировки IP:', error);
       alert('Ошибка при разблокировке IP адреса');
     }
   };
@@ -661,7 +662,7 @@ const AdminPanel = () => {
     try {
       await terminateSession(sessionId);
     } catch (error) {
-      console.error('Ошибка завершения сессии:', error);
+      logger.error('Ошибка завершения сессии:', error);
       alert('Ошибка при завершении сессии');
     }
   };
@@ -671,7 +672,7 @@ const AdminPanel = () => {
       try {
         await terminateAllOtherSessions();
       } catch (error) {
-        console.error('Ошибка завершения сессий:', error);
+        logger.error('Ошибка завершения сессий:', error);
         alert('Ошибка при завершении сессий');
       }
     }
@@ -681,7 +682,7 @@ const AdminPanel = () => {
     try {
       await updateThreatStatus(threatId, newStatus);
     } catch (error) {
-      console.error('Ошибка обновления статуса угрозы:', error);
+      logger.error('Ошибка обновления статуса угрозы:', error);
       alert('Ошибка при обновлении статуса угрозы');
     }
   };
@@ -690,7 +691,7 @@ const AdminPanel = () => {
     try {
       await exportSecurityLogs(format);
     } catch (error) {
-      console.error('Ошибка экспорта логов:', error);
+      logger.error('Ошибка экспорта логов:', error);
       alert('Ошибка при экспорте логов безопасности');
     }
   };
@@ -736,7 +737,7 @@ const AdminPanel = () => {
       try {
         await deleteUser(user.id);
       } catch (error) {
-        console.error('Ошибка удаления пользователя:', error);
+        logger.error('Ошибка удаления пользователя:', error);
         alert('Ошибка при удалении пользователя');
       }
     }
@@ -752,7 +753,7 @@ const AdminPanel = () => {
       }
       userModal.closeModal();
     } catch (error) {
-      console.error('Ошибка сохранения пользователя:', error);
+      logger.error('Ошибка сохранения пользователя:', error);
       throw error;
     } finally {
       userModal.setModalLoading(false);
@@ -802,7 +803,7 @@ const AdminPanel = () => {
       try {
         await deleteDoctor(doctor.id);
       } catch (error) {
-        console.error('Ошибка удаления врача:', error);
+        logger.error('Ошибка удаления врача:', error);
         alert('Ошибка при удалении врача');
       }
     }
@@ -818,7 +819,7 @@ const AdminPanel = () => {
       }
       doctorModal.closeModal();
     } catch (error) {
-      console.error('Ошибка сохранения врача:', error);
+      logger.error('Ошибка сохранения врача:', error);
       throw error;
     } finally {
       doctorModal.setModalLoading(false);
@@ -877,7 +878,7 @@ const AdminPanel = () => {
       try {
         await deletePatient(patient.id);
       } catch (error) {
-        console.error('Ошибка удаления пациента:', error);
+        logger.error('Ошибка удаления пациента:', error);
         alert('Ошибка при удалении пациента');
       }
     }
@@ -893,7 +894,7 @@ const AdminPanel = () => {
       }
       patientModal.closeModal();
     } catch (error) {
-      console.error('Ошибка сохранения пациента:', error);
+      logger.error('Ошибка сохранения пациента:', error);
       throw error;
     } finally {
       patientModal.setModalLoading(false);
@@ -938,7 +939,7 @@ const AdminPanel = () => {
       try {
         await deleteAppointment(appointment.id);
       } catch (error) {
-        console.error('Ошибка удаления записи:', error);
+        logger.error('Ошибка удаления записи:', error);
         alert('Ошибка при удалении записи');
       }
     }
@@ -954,7 +955,7 @@ const AdminPanel = () => {
       }
       appointmentModal.closeModal();
     } catch (error) {
-      console.error('Ошибка сохранения записи:', error);
+      logger.error('Ошибка сохранения записи:', error);
       throw error;
     } finally {
       appointmentModal.setModalLoading(false);
@@ -1021,7 +1022,7 @@ const AdminPanel = () => {
       try {
         await deleteTransaction(transaction.id);
       } catch (error) {
-        console.error('Ошибка удаления транзакции:', error);
+        logger.error('Ошибка удаления транзакции:', error);
         alert('Ошибка при удалении транзакции');
       }
     }
@@ -1037,7 +1038,7 @@ const AdminPanel = () => {
       }
       financeModal.closeModal();
     } catch (error) {
-      console.error('Ошибка сохранения транзакции:', error);
+      logger.error('Ошибка сохранения транзакции:', error);
       throw error;
     } finally {
       financeModal.setModalLoading(false);

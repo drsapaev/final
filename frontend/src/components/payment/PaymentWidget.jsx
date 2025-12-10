@@ -33,6 +33,7 @@ import {
 // API клиент
 import { api as apiClient, getToken } from '../../api/client';
 
+import logger from '../../utils/logger';
 const PaymentWidget = ({ 
   visitId, 
   amount, 
@@ -92,7 +93,7 @@ const PaymentWidget = ({
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки провайдеров:', err);
+      logger.error('Ошибка загрузки провайдеров:', err);
       setError('Не удалось загрузить способы оплаты');
     } finally {
       setProvidersLoading(false);
@@ -108,7 +109,7 @@ const PaymentWidget = ({
 
     // Проверяем наличие токена авторизации
     const token = getToken();
-    console.log('🔑 Проверяем токен для платежа:', {
+    logger.log('🔑 Проверяем токен для платежа:', {
       hasToken: !!token,
       tokenLength: token ? token.length : 0,
       tokenStart: token ? token.substring(0, 20) + '...' : 'null'
@@ -141,7 +142,7 @@ const PaymentWidget = ({
       const isTestToken = token === 'demo_token_for_ui_testing';
       const endpoint = isTestToken ? '/payments/test-init' : '/payments/init';
       
-      console.log('📤 Отправляем запрос платежа:', {
+      logger.log('📤 Отправляем запрос платежа:', {
         endpoint,
         isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
@@ -170,7 +171,7 @@ const PaymentWidget = ({
         throw new Error(response.data?.error_message || 'Ошибка инициализации платежа');
       }
     } catch (err) {
-      console.error('Ошибка инициализации платежа:', err);
+      logger.error('Ошибка инициализации платежа:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обработки платежа';
       setError(errorMessage);
       
@@ -197,7 +198,7 @@ const PaymentWidget = ({
         }
       }
     } catch (err) {
-      console.error('Ошибка проверки статуса:', err);
+      logger.error('Ошибка проверки статуса:', err);
     }
   };
 

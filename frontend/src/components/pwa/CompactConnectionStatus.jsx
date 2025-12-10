@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Wifi, WifiOff, Cloud, RefreshCw } from 'lucide-react';
 import { usePWA } from '../../hooks/usePWA';
 
+import logger from '../../utils/logger';
 /**
  * Компактный индикатор подключения с PWA статусом
  * ИСПРАВЛЕНО: Убран избыточный импорт React, добавлен try/catch для хука
@@ -13,7 +14,7 @@ const CompactConnectionStatus = ({ className = '', showTooltip = true }) => {
   try {
     pwaState = usePWA();
   } catch (error) {
-    console.warn('PWA hook failed, using fallback:', error);
+    logger.warn('PWA hook failed, using fallback:', error);
   }
   
   const { isOnline, isServiceWorkerReady } = pwaState;
