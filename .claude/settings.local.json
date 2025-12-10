@@ -27,7 +27,10 @@
       "Bash(for file in \"components/wizard/AppointmentWizardV2.jsx\" \"components/queue/ModernQueueManager.jsx\" \"components/statistics/ModernStatistics.jsx\" \"components/payment/PaymentManager.jsx\")",
       "Bash(do echo -n \"$file: \")",
       "Bash(done)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(sqlite3:*)",
+      "Bash(cmd //c \"taskkill /F /PID 11484\")"
     ],
     "deny": [],
     "ask": []
