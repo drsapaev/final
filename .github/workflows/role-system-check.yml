@@ -87,6 +87,7 @@ jobs:
             cashier = User(
                 username="cashier",
                 full_name="Cashier",
+                role="Cashier",
                 hashed_password=get_password_hash("cashier123"),
                 is_active=True
             )
