@@ -31,9 +31,8 @@ logger = logging.getLogger(__name__)
 # try to import settings (SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES)
 from app.core.config import settings  # type: ignore
 
-print(
-    f"DEBUG: deps.py successfully imported settings. SECRET_KEY starts with: {settings.SECRET_KEY[:5]}"
-)
+# Log settings loaded confirmation (non-blocking)
+logger.debug(f"deps.py: settings loaded, SECRET_KEY starts with: {settings.SECRET_KEY[:5]}")
 
 # import get_db lazily -- it may return AsyncSession or sync Session
 try:

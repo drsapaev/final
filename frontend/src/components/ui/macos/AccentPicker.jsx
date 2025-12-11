@@ -1,5 +1,5 @@
 import React from 'react';
-import { ACCENT_OPTIONS, useMacOSTheme } from '../../../theme/macosTheme';
+import { ACCENT_OPTIONS, useMacOSTheme } from '../../../theme/macosTheme.jsx';
 
 const LABELS = {
   blue: 'Blue',

@@ -9,7 +9,7 @@ import './styles/dark-theme-visibility-fix.css';
 import './styles/global-fixes.css';
 import './theme/macos-tokens.css';
 import './styles/macos.css';
-import { MacOSThemeProvider } from './theme/macosTheme';
+import { MacOSThemeProvider } from './theme/macosTheme.jsx';
 
 // Global color scheme initializer - синхронизировано с ColorSchemeSelector
 function initializeColorScheme() {

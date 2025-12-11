@@ -7,7 +7,7 @@ import logging
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -58,7 +58,9 @@ class ConfirmationResponse(BaseModel):
 
 @router.post("/telegram/visits/confirm", response_model=ConfirmationResponse)
 def confirm_visit_by_telegram(
-    request: TelegramConfirmRequest, db: Session = Depends(get_db)
+    request_body: TelegramConfirmRequest, 
+    request: Request,
+    db: Session = Depends(get_db)
 ):
     """
     Подтверждение визита через Telegram бот по токену
@@ -67,11 +69,15 @@ def confirm_visit_by_telegram(
     security_service = ConfirmationSecurityService(db)
 
     try:
+        # Get client info from request for audit
+        source_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent")
+        
         # Проверяем безопасность запроса
         security_check = security_service.validate_confirmation_request(
-            token=request.token,
-            source_ip=None,  # TODO: получить из request
-            user_agent=None,  # TODO: получить из request
+            token=request_body.token,
+            source_ip=source_ip,
+            user_agent=user_agent,
             channel="telegram",
         )
 
@@ -102,7 +108,7 @@ def confirm_visit_by_telegram(
         visit = (
             db.query(Visit)
             .filter(
-                Visit.confirmation_token == request.token,
+                Visit.confirmation_token == request_body.token,
                 Visit.status == "pending_confirmation",
             )
             .first()
@@ -135,7 +141,7 @@ def confirm_visit_by_telegram(
 
         # Подтверждаем визит
         visit.confirmed_at = datetime.utcnow()
-        visit.confirmed_by = f"telegram_{request.telegram_user_id or 'unknown'}"
+        visit.confirmed_by = f"telegram_{request_body.telegram_user_id or 'unknown'}"
         visit.status = "confirmed"
 
         queue_numbers = {}

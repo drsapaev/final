@@ -78,10 +78,10 @@ class Invoice(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_number = Column(String(50), unique=True, nullable=False, index=True)
 
-    # Связи
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    visit_id = Column(Integer, ForeignKey("visits.id"))
-    appointment_id = Column(Integer, ForeignKey("appointments.id"))
+    # Связи - SECURITY: RESTRICT prevents deletion of patient with unpaid invoices
+    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False)
+    visit_id = Column(Integer, ForeignKey("visits.id", ondelete="SET NULL"), nullable=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True)
 
     # Основная информация
     invoice_type = Column(Enum(InvoiceType), default=InvoiceType.STANDARD)
@@ -116,12 +116,12 @@ class Invoice(Base):
     recurrence_type = Column(Enum(RecurrenceType))
     recurrence_interval = Column(Integer, default=1)  # Интервал повторения
     next_invoice_date = Column(DateTime)  # Дата следующего счета
-    parent_invoice_id = Column(Integer, ForeignKey("invoices.id"))  # Родительский счет
+    parent_invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True)  # Родительский счет
 
     # Метаданные
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи (без прямой связи c payments: используйте Payment через Visit)
     patient = relationship("Patient")
@@ -142,10 +142,10 @@ class InvoiceItem(Base):
     __tablename__ = "invoice_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
 
     # Информация о позиции
-    service_id = Column(Integer, ForeignKey("services.id"))
+    service_id = Column(Integer, ForeignKey("services.id", ondelete="SET NULL"), nullable=True)
     description = Column(String(500), nullable=False)  # Описание услуги/товара
     quantity = Column(Float, nullable=False, default=1.0)  # Количество
     unit_price = Column(Float, nullable=False)  # Цена за единицу
@@ -196,7 +196,7 @@ class InvoiceTemplate(Base):
     # Метаданные
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     creator = relationship("User", foreign_keys=[created_by])
@@ -229,7 +229,7 @@ class BillingRule(Base):
     send_reminders = Column(Boolean, default=True)
 
     # Шаблон
-    template_id = Column(Integer, ForeignKey("invoice_templates.id"))
+    template_id = Column(Integer, ForeignKey("invoice_templates.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     template = relationship("InvoiceTemplate", back_populates="billing_rules")
@@ -240,7 +240,7 @@ class BillingRule(Base):
     # Метаданные
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     creator = relationship("User", foreign_keys=[created_by])
@@ -252,7 +252,7 @@ class PaymentReminder(Base):
     __tablename__ = "payment_reminders"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
 
     # Настройки напоминания
     reminder_type = Column(String(50), nullable=False)  # email, sms, call
@@ -331,7 +331,7 @@ class BillingSettings(Base):
 
     # Метаданные
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    updated_by = Column(Integer, ForeignKey("users.id"))
+    updated_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     updater = relationship("User", foreign_keys=[updated_by])

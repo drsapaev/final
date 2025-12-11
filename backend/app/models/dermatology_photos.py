@@ -47,7 +47,7 @@ class DermatologyPhoto(Base):
     tags = Column(String(500), nullable=True)  # Теги (через запятую)
 
     # Системные поля
-    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(

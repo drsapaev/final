@@ -1,4 +1,3 @@
-/** @jsxImportSource react */
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 const ACCENTS = {

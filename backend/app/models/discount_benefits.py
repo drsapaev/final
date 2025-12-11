@@ -88,7 +88,7 @@ class Discount(Base):
     # Метаданные
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     creator = relationship("User", foreign_keys=[created_by])
@@ -129,7 +129,7 @@ class Benefit(Base):
     # Метаданные
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     creator = relationship("User", foreign_keys=[created_by])
@@ -144,8 +144,8 @@ class DiscountService(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    discount_id = Column(Integer, ForeignKey("discounts.id"), nullable=False)
-    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    discount_id = Column(Integer, ForeignKey("discounts.id", ondelete="CASCADE"), nullable=False)
+    service_id = Column(Integer, ForeignKey("services.id", ondelete="CASCADE"), nullable=False)
 
     # Связи
     discount = relationship("Discount", back_populates="discount_services")
@@ -159,8 +159,8 @@ class PatientBenefit(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    benefit_id = Column(Integer, ForeignKey("benefits.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
+    benefit_id = Column(Integer, ForeignKey("benefits.id", ondelete="CASCADE"), nullable=False)
 
     # Статус льготы
     is_active = Column(Boolean, default=True)
@@ -181,8 +181,8 @@ class PatientBenefit(Base):
     # Метаданные
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
-    verified_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    verified_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     patient = relationship("Patient")
@@ -198,7 +198,7 @@ class DiscountApplication(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    discount_id = Column(Integer, ForeignKey("discounts.id"), nullable=False)
+    discount_id = Column(Integer, ForeignKey("discounts.id", ondelete="CASCADE"), nullable=False)
 
     # Связанные объекты
     appointment_id = Column(Integer)  # ForeignKey("appointments.id") - убираем пока
@@ -212,7 +212,7 @@ class DiscountApplication(Base):
 
     # Метаданные
     applied_at = Column(DateTime, default=func.now())
-    applied_by = Column(Integer, ForeignKey("users.id"))
+    applied_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text)
 
     # Связи
@@ -230,9 +230,9 @@ class BenefitApplication(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_benefit_id = Column(
-        Integer, ForeignKey("patient_benefits.id"), nullable=False
+        Integer, ForeignKey("patient_benefits.id", ondelete="CASCADE"), nullable=False
     )
-    benefit_id = Column(Integer, ForeignKey("benefits.id"), nullable=False)
+    benefit_id = Column(Integer, ForeignKey("benefits.id", ondelete="CASCADE"), nullable=False)
 
     # Связанные объекты
     appointment_id = Column(Integer)  # ForeignKey("appointments.id") - убираем пока
@@ -246,7 +246,7 @@ class BenefitApplication(Base):
 
     # Метаданные
     applied_at = Column(DateTime, default=func.now())
-    applied_by = Column(Integer, ForeignKey("users.id"))
+    applied_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text)
 
     # Связи
@@ -286,7 +286,7 @@ class LoyaltyProgram(Base):
     # Метаданные
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     creator = relationship("User", foreign_keys=[created_by])
@@ -300,8 +300,8 @@ class PatientLoyalty(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    program_id = Column(Integer, ForeignKey("loyalty_programs.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
+    program_id = Column(Integer, ForeignKey("loyalty_programs.id", ondelete="CASCADE"), nullable=False)
 
     # Баллы
     total_points_earned = Column(Integer, default=0)
@@ -333,7 +333,7 @@ class LoyaltyPointTransaction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     patient_loyalty_id = Column(
-        Integer, ForeignKey("patient_loyalty.id"), nullable=False
+        Integer, ForeignKey("patient_loyalty.id", ondelete="CASCADE"), nullable=False
     )
 
     # Тип транзакции
@@ -355,7 +355,7 @@ class LoyaltyPointTransaction(Base):
 
     # Метаданные
     created_at = Column(DateTime, default=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # Связи
     patient_loyalty = relationship(

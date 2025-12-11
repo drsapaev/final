@@ -210,7 +210,7 @@ class Equipment(Base):
     model = Column(String(100), nullable=True)
     serial_number = Column(String(100), unique=True, nullable=True, index=True)
     equipment_type = Column(Enum(EquipmentType), nullable=False)
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False)
+    branch_id = Column(Integer, ForeignKey("branches.id", ondelete="CASCADE"), nullable=False)
     cabinet = Column(String(20), nullable=True)
     status = Column(
         Enum(EquipmentStatus), default=EquipmentStatus.ACTIVE, nullable=False

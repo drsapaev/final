@@ -1,8 +1,10 @@
 # 📚 API Reference - Clinic Management System
 
 > **Base URL**: `http://localhost:8000/api/v1`  
-> **Version**: 1.0.0  
-> **Authentication**: Bearer Token (JWT)
+> **Version**: 2.1.0  
+> **Total Routes**: 981 endpoints  
+> **Authentication**: Bearer Token (JWT)  
+> **Last Updated**: December 2024
 
 ---
 
@@ -365,8 +367,43 @@ Authorization: Bearer <access_token>
 
 ---
 
+## 🆕 New Modules (v2.1.0)
+
+### 💓 ECG Data (`/cardio/ecg`)
+- `POST /cardio/ecg/upload` - Upload ECG file
+- `GET /cardio/ecg/{patient_id}` - Get patient ECG records
+- `GET /cardio/ecg/{id}` - Get ECG details
+- `POST /cardio/ecg/{id}/interpret` - AI interpretation
+
+### 🦷 Odontogram (`/dental/odontogram`)
+- `GET /dental/odontogram/{patient_id}` - Get patient odontogram
+- `POST /dental/odontogram` - Create odontogram
+- `PUT /dental/odontogram/{id}` - Update tooth status
+- `GET /dental/odontogram/{id}/history` - Get tooth history
+
+### 💰 Salary Management (`/admin/salary`)
+- `GET /admin/salary/history/{user_id}` - Salary history
+- `POST /admin/salary/change` - Record salary change
+- `GET /admin/salary/payments` - List salary payments
+- `POST /admin/salary/payments` - Record salary payment
+
+### 🎤 Voice Messages (`/messages`)
+- `POST /messages/audio` - Send voice message
+- `GET /messages/{id}/audio` - Get audio file
+- Voice messages support in chat WebSocket
+
+### 📊 Monitoring (`/admin/monitoring`)
+- `GET /admin/monitoring/query-stats` - Database query stats
+- `GET /admin/monitoring/alerts` - Recent system alerts
+- `GET /admin/monitoring/missing-indexes` - Missing DB indexes
+- `POST /admin/monitoring/reset-query-stats` - Reset stats
+
+---
+
 ## 📖 Links
 
 - **Swagger UI**: `/docs`
 - **ReDoc**: `/redoc`
 - **OpenAPI JSON**: `/openapi.json`
+- **WebSocket**: `wss://api.clinic.example.com/ws/`
+
