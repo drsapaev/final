@@ -53,7 +53,7 @@ class AIPromptTemplate(Base):
     __tablename__ = "ai_prompt_templates"
 
     id = Column(Integer, primary_key=True, index=True)
-    provider_id = Column(Integer, ForeignKey("ai_providers.id"), nullable=False)
+    provider_id = Column(Integer, ForeignKey("ai_providers.id", ondelete="CASCADE"), nullable=False)
     task_type = Column(
         String(50), nullable=False, index=True
     )  # complaints2plan, icd10, lab_interpret
@@ -90,8 +90,11 @@ class AIUsageLog(Base):
     __tablename__ = "ai_usage_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    provider_id = Column(Integer, ForeignKey("ai_providers.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # AUDIT INTEGRITY: provider_id должен быть NOT NULL с RESTRICT для сохранения audit trail
+    # Провайдер не может быть удален, если существуют логи (пометить как inactive вместо удаления)
+    provider_id = Column(Integer, ForeignKey("ai_providers.id", ondelete="RESTRICT"), nullable=False)
+    provider_name = Column(String(100), nullable=False)  # Копия имени провайдера для дополнительной защиты
     task_type = Column(String(50), nullable=False, index=True)
     specialty = Column(String(50), nullable=True)
 

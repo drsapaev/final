@@ -119,6 +119,7 @@ class AITrackingService:
             log = AIUsageLog(
                 user_id=tracking.user_id,
                 provider_id=tracking.model_info.provider_id,
+                provider_name=tracking.model_info.provider_name,  # Копируем имя для audit trail
                 task_type=tracking.task_type,
                 specialty=tracking.specialty,
                 tokens_used=tracking.tokens_used,

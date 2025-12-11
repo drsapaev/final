@@ -207,9 +207,15 @@ def create_ai_usage_log(
     cached_response: bool = False,
 ) -> AIUsageLog:
     """Создать лог использования AI"""
+    # Получаем провайдера для копирования его имени в audit log
+    provider = get_ai_provider(db, provider_id)
+    if not provider:
+        raise ValueError(f"AI Provider с ID {provider_id} не найден")
+
     log = AIUsageLog(
         user_id=user_id,
         provider_id=provider_id,
+        provider_name=provider.display_name,  # Копируем имя для audit trail
         task_type=task_type,
         specialty=specialty,
         tokens_used=tokens_used,
