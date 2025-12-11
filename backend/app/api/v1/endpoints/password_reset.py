@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -24,8 +24,9 @@ class PasswordResetInitiateRequest(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
 
-    @validator('phone')
-    def validate_phone(cls, v):
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         phone = re.sub(r'[^\d+]', '', v)
@@ -33,21 +34,22 @@ class PasswordResetInitiateRequest(BaseModel):
             raise ValueError('Номер телефона должен быть в формате +998XXXXXXXXX')
         return phone
 
-    @validator('email')
-    def validate_email(cls, v):
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', v):
             raise ValueError('Неверный формат email адреса')
         return v
 
-    @validator('email', always=True)
-    def validate_contact_provided(cls, v, values):
-        if not v and not values.get('phone'):
+    @model_validator(mode='after')
+    def validate_contact_provided(self):
+        if not self.email and not self.phone:
             raise ValueError('Необходимо указать номер телефона или email')
-        if v and values.get('phone'):
+        if self.email and self.phone:
             raise ValueError('Укажите только один способ связи: телефон или email')
-        return v
+        return self
 
 
 class PhoneVerificationRequest(BaseModel):
@@ -56,15 +58,17 @@ class PhoneVerificationRequest(BaseModel):
     phone: str
     verification_code: str
 
-    @validator('phone')
-    def validate_phone(cls, v):
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
         phone = re.sub(r'[^\d+]', '', v)
         if not re.match(r'^\+998\d{9}$', phone):
             raise ValueError('Номер телефона должен быть в формате +998XXXXXXXXX')
         return phone
 
-    @validator('verification_code')
-    def validate_code(cls, v):
+    @field_validator('verification_code')
+    @classmethod
+    def validate_code(cls, v: str) -> str:
         if not re.match(r'^\d{6}$', v):
             raise ValueError('Код должен состоять из 6 цифр')
         return v
@@ -76,8 +80,9 @@ class PasswordResetConfirmRequest(BaseModel):
     token: str
     new_password: str
 
-    @validator('new_password')
-    def validate_password(cls, v):
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
         if len(v) < 6:
             raise ValueError('Пароль должен содержать минимум 6 символов')
         return v

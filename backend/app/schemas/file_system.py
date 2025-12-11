@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.file_system import FilePermission, FileStatus, FileType
 
@@ -407,30 +407,7 @@ class FileImportResponse(BaseModel):
     success: bool
 
 
-# ===================== ВАЛИДАТОРЫ =====================
-
-
-@validator('tags')
-def validate_tags(cls, v):
-    if v is not None:
-        if len(v) > 20:
-            raise ValueError('Максимум 20 тегов')
-        for tag in v:
-            if len(tag) > 50:
-                raise ValueError('Тег не может быть длиннее 50 символов')
-    return v
-
-
-@validator('shared_with_email')
-def validate_email(cls, v):
-    if v is not None:
-        import re
-
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, v):
-            raise ValueError('Неверный формат email')
-    return v
-
+# ===================== ОБНОВЛЕНИЕ РЕКУРСИВНЫХ ССЫЛОК =====================
 
 # Обновляем рекурсивные ссылки
 FileFolderTree.model_rebuild()

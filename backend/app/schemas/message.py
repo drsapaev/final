@@ -5,7 +5,7 @@ Pydantic схемы для сообщений
 from datetime import datetime
 from typing import Optional, List
 from enum import Enum
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class MessageType(str, Enum):
@@ -19,8 +19,9 @@ class MessageCreate(BaseModel):
     recipient_id: int = Field(..., description="ID получателя")
     content: str = Field(..., min_length=1, max_length=5000, description="Текст сообщения")
     
-    @validator('content')
-    def validate_content(cls, v):
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
         v = v.strip()
         if not v:
             raise ValueError('Сообщение не может быть пустым')

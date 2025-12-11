@@ -5,7 +5,7 @@ Pydantic схемы для системы аутентификации
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic.config import ConfigDict
 
 
@@ -88,8 +88,9 @@ class PasswordResetConfirmRequest(BaseModel):
     token: str = Field(..., min_length=32, max_length=64)
     new_password: str = Field(..., min_length=8, max_length=100)
 
-    @validator('new_password')
-    def validate_password(cls, v):
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError('Пароль должен содержать минимум 8 символов')
         if not any(c.isupper() for c in v):
@@ -109,8 +110,9 @@ class PasswordChangeRequest(BaseModel):
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8, max_length=100)
 
-    @validator('new_password')
-    def validate_password(cls, v):
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError('Пароль должен содержать минимум 8 символов')
         if not any(c.isupper() for c in v):
@@ -328,8 +330,9 @@ class UserCreateRequest(BaseModel):
     is_active: bool = True
     is_superuser: bool = False
 
-    @validator('password')
-    def validate_password(cls, v):
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError('Пароль должен содержать минимум 8 символов')
         if not any(c.isupper() for c in v):

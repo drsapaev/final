@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -27,8 +27,9 @@ class SendVerificationCodeRequest(BaseModel):
     provider: Optional[str] = None
     custom_message: Optional[str] = None
 
-    @validator('phone')
-    def validate_phone(cls, v):
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
         # Удаляем все символы кроме цифр и +
         phone = re.sub(r'[^\d+]', '', v)
 
@@ -38,8 +39,9 @@ class SendVerificationCodeRequest(BaseModel):
 
         return phone
 
-    @validator('purpose')
-    def validate_purpose(cls, v):
+    @field_validator('purpose')
+    @classmethod
+    def validate_purpose(cls, v: str) -> str:
         allowed_purposes = [
             'verification',
             'password_reset',
@@ -60,15 +62,17 @@ class VerifyCodeRequest(BaseModel):
     code: str
     purpose: str = "verification"
 
-    @validator('phone')
-    def validate_phone(cls, v):
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
         phone = re.sub(r'[^\d+]', '', v)
         if not re.match(r'^\+998\d{9}$', phone):
             raise ValueError('Номер телефона должен быть в формате +998XXXXXXXXX')
         return phone
 
-    @validator('code')
-    def validate_code(cls, v):
+    @field_validator('code')
+    @classmethod
+    def validate_code(cls, v: str) -> str:
         if not re.match(r'^\d{6}$', v):
             raise ValueError('Код должен состоять из 6 цифр')
         return v
@@ -80,15 +84,17 @@ class UpdatePhoneRequest(BaseModel):
     new_phone: str
     verification_code: str
 
-    @validator('new_phone')
-    def validate_phone(cls, v):
+    @field_validator('new_phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
         phone = re.sub(r'[^\d+]', '', v)
         if not re.match(r'^\+998\d{9}$', phone):
             raise ValueError('Номер телефона должен быть в формате +998XXXXXXXXX')
         return phone
 
-    @validator('verification_code')
-    def validate_code(cls, v):
+    @field_validator('verification_code')
+    @classmethod
+    def validate_code(cls, v: str) -> str:
         if not re.match(r'^\d{6}$', v):
             raise ValueError('Код должен состоять из 6 цифр')
         return v

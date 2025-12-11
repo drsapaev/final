@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -26,8 +26,9 @@ class QueueReorderRequest(BaseModel):
     queue_id: int
     entry_orders: List[Dict[str, int]]  # [{"entry_id": 1, "new_position": 2}, ...]
 
-    @validator('entry_orders')
-    def validate_entry_orders(cls, v):
+    @field_validator('entry_orders')
+    @classmethod
+    def validate_entry_orders(cls, v: List[Dict[str, int]]) -> List[Dict[str, int]]:
         if not v:
             raise ValueError('Список изменений не может быть пустым')
 
@@ -58,8 +59,9 @@ class QueueEntryMoveRequest(BaseModel):
     entry_id: int
     new_position: int
 
-    @validator('new_position')
-    def validate_new_position(cls, v):
+    @field_validator('new_position')
+    @classmethod
+    def validate_new_position(cls, v: int) -> int:
         if v < 1:
             raise ValueError('Позиция должна быть больше 0')
         return v

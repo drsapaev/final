@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, HttpUrl, validator
+from pydantic import BaseModel, HttpUrl, field_validator
 
 from app.models.webhook import WebhookCallStatus, WebhookEventType, WebhookStatus
 
@@ -92,26 +92,30 @@ class WebhookBase(BaseModel):
     timeout: int = 30
     filters: Optional[Dict[str, Any]] = {}
 
-    @validator('events')
-    def validate_events(cls, v):
+    @field_validator('events')
+    @classmethod
+    def validate_events(cls, v: List) -> List:
         if not v:
             raise ValueError('Необходимо указать хотя бы одно событие')
         return v
 
-    @validator('max_retries')
-    def validate_max_retries(cls, v):
+    @field_validator('max_retries')
+    @classmethod
+    def validate_max_retries(cls, v: int) -> int:
         if v < 0 or v > 10:
             raise ValueError('Количество повторов должно быть от 0 до 10')
         return v
 
-    @validator('retry_delay')
-    def validate_retry_delay(cls, v):
+    @field_validator('retry_delay')
+    @classmethod
+    def validate_retry_delay(cls, v: int) -> int:
         if v < 1 or v > 3600:
             raise ValueError('Задержка повтора должна быть от 1 до 3600 секунд')
         return v
 
-    @validator('timeout')
-    def validate_timeout(cls, v):
+    @field_validator('timeout')
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
         if v < 1 or v > 300:
             raise ValueError('Таймаут должен быть от 1 до 300 секунд')
         return v
@@ -372,8 +376,9 @@ class WebhookBulkAction(BaseModel):
     webhook_ids: List[int]
     action: str  # activate, deactivate, delete
 
-    @validator('action')
-    def validate_action(cls, v):
+    @field_validator('action')
+    @classmethod
+    def validate_action(cls, v: str) -> str:
         if v not in ['activate', 'deactivate', 'delete']:
             raise ValueError(
                 'Действие должно быть одним из: activate, deactivate, delete'

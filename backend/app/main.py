@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import Depends, FastAPI
@@ -28,6 +29,23 @@ CORS_DISABLE = settings.CORS_DISABLE
 CORS_ALLOW_ALL = settings.CORS_ALLOW_ALL
 CORS_ORIGINS = settings.BACKEND_CORS_ORIGINS
 
+
+# -----------------------------------------------------------------------------
+# Lifespan Context Manager (replaces deprecated on_event)
+# -----------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # === STARTUP ===
+    await _startup_tasks()
+    
+    yield  # Application is running
+    
+    # === SHUTDOWN ===
+    # Add any cleanup code here if needed
+    log.info("Application shutdown complete")
+
+
 # -----------------------------------------------------------------------------
 # Приложение
 # -----------------------------------------------------------------------------
@@ -37,6 +55,7 @@ app = FastAPI(
     openapi_url="/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # -----------------------------------------------------------------------------
@@ -148,11 +167,10 @@ def root():
 
 
 # -----------------------------------------------------------------------------
-# Диагностика подключённых маршрутов
+# Диагностика подключённых маршрутов (called from lifespan)
 # -----------------------------------------------------------------------------
-@app.on_event("startup")
 async def _startup_tasks() -> None:
-    """Startup event handler - validates security settings and prints routes"""
+    """Startup tasks - validates security settings and prints routes"""
     # Validate SECRET_KEY on startup
     try:
         from app.core.config import get_settings, _DEFAULT_SECRET_KEY
