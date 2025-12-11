@@ -646,19 +646,14 @@ class QueueBusinessService:
                 raise QueueValidationError("Срок действия QR токена истёк")
 
         daily_queue: Optional[DailyQueue] = None
-        queue_user_id: Optional[int] = None
         if not queue_token.is_clinic_wide and queue_token.specialist_id:
-            doctor = queue_token.specialist
-            if doctor and doctor.user_id:
-                queue_user_id = doctor.user_id
-            else:
-                queue_user_id = queue_token.specialist_id
-
+            # ✅ ИСПРАВЛЕНО: DailyQueue.specialist_id ссылается на doctors.id,
+            # а не на users.id. queue_token.specialist_id уже содержит doctor.id
             daily_queue = (
                 db.query(DailyQueue)
                 .filter(
                     DailyQueue.day == queue_token.day,
-                    DailyQueue.specialist_id == queue_user_id,
+                    DailyQueue.specialist_id == queue_token.specialist_id,
                 )
                 .first()
             )
