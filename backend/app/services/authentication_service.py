@@ -211,6 +211,10 @@ class AuthenticationService:
         two_factor_method = None
         
         # ✅ CERTIFICATION: Принудительное 2FA для критичных ролей (Admin, Cashier)
+        # ✅ CI/TESTING: Можно отключить через переменную окружения DISABLE_2FA_REQUIREMENT=1
+        import os
+        disable_2fa_requirement = os.getenv("DISABLE_2FA_REQUIREMENT", "").lower() in ("1", "true", "yes")
+        
         from app.core.roles import Roles
         
         CRITICAL_2FA_ROLES = {Roles.ADMIN, Roles.CASHIER}
@@ -225,7 +229,8 @@ class AuthenticationService:
         )
         
         # Если роль критичная (Admin/Cashier), но 2FA не настроена - блокируем вход
-        if is_critical_role and not has_2fa_enabled:
+        # КРОМЕ случая, когда DISABLE_2FA_REQUIREMENT=1 (для тестирования)
+        if is_critical_role and not has_2fa_enabled and not disable_2fa_requirement:
             return {
                 "success": False,
                 "message": f"Для роли {user_role} требуется настройка двухфакторной аутентификации (2FA). Пожалуйста, настройте 2FA перед входом.",

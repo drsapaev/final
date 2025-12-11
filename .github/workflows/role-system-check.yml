@@ -19,6 +19,7 @@ jobs:
       DATABASE_URL: "sqlite:///./clinic.db"
       CORS_DISABLE: "1"
       WS_DEV_ALLOW: "1"
+      DISABLE_2FA_REQUIREMENT: "1"
     steps:
     - uses: actions/checkout@v4
 
