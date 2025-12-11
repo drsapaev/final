@@ -26,7 +26,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
     Это позволяет трассировать все операции в рамках одного запроса.
     """
     
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Response]
+    ) -> Response:
         # Генерируем уникальный request_id для каждого запроса
         request_id = str(uuid4())
         request.state.request_id = request_id

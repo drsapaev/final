@@ -3,6 +3,9 @@
 """
 
 import enum
+from datetime import date, datetime, time
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -22,6 +25,13 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.department import Department
+    from app.models.service import Service
+    from app.models.visit import Visit
+    from app.models.doctor_price_override import DoctorPriceOverride
 
 
 class ClinicSettings(Base):

@@ -4,12 +4,13 @@ Middleware для аутентификации и авторизации
 
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 
 from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
+from starlette.responses import Response
 
 from app.crud.authentication import refresh_token, user, user_session
 from app.db.session import get_db
@@ -176,7 +177,9 @@ class AuthenticationMiddleware:
             logger.error(f"Error getting device fingerprint: {e}")
             return None
 
-    async def __call__(self, request: Request, call_next):
+    async def __call__(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         try:
             # Пропускаем публичные пути
@@ -336,7 +339,9 @@ class AuthorizationMiddleware:
 
         return user_role in required_roles
 
-    async def __call__(self, request: Request, call_next):
+    async def __call__(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         try:
             # Получаем роль пользователя из состояния запроса
@@ -415,7 +420,9 @@ class RateLimitMiddleware:
         self.request_counts[key].append(current_time)
         return False
 
-    async def __call__(self, request: Request, call_next):
+    async def __call__(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         try:
             # Определяем тип ограничения

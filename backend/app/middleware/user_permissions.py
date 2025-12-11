@@ -4,10 +4,11 @@ Middleware для проверки прав пользователей
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
+from starlette.responses import Response
 
 from app.crud.user_management import user_group, user_permission, user_role
 from app.db.session import get_db
@@ -271,7 +272,9 @@ class UserPermissionsMiddleware:
         else:
             self.permission_cache.clear()
 
-    async def __call__(self, request: Request, call_next):
+    async def __call__(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         try:
             # Получаем пользователя из состояния запроса
@@ -379,7 +382,9 @@ class UserActivityMiddleware:
         # Отслеживаем только определенные методы
         return method in self.tracked_actions
 
-    async def __call__(self, request: Request, call_next):
+    async def __call__(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         try:
             # Проверяем, нужно ли отслеживать активность
@@ -460,7 +465,9 @@ class UserRateLimitMiddleware:
         self.request_counts[key].append(current_time)
         return False
 
-    async def __call__(self, request: Request, call_next):
+    async def __call__(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         try:
             # Получаем пользователя

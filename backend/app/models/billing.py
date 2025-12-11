@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -26,6 +27,13 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.models.appointment import Appointment
+    from app.models.user import User
+    from app.models.service import Service
 
 
 class InvoiceStatus(str, enum.Enum):

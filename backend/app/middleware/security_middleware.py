@@ -6,7 +6,7 @@ import logging
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -224,7 +224,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 f"(type: {endpoint_type}, blocked: {blocked})"
             )
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
         """Основной метод middleware"""
         # Пропускаем публичные эндпоинты
         public_paths = [

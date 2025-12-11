@@ -3,6 +3,9 @@
 Основа: passport.md стр. 1789-2063
 """
 
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -17,6 +20,10 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.patient import Patient
+    from app.models.user import User
 
 
 class DermatologyPhoto(Base):

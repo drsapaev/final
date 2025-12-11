@@ -2,6 +2,9 @@
 Модели для конфигурации AI в админ панели
 """
 
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 from sqlalchemy import (
     Boolean,
     Column,
@@ -17,6 +20,9 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class AIProvider(Base):
