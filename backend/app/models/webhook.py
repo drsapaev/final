@@ -2,27 +2,24 @@
 Модели для системы webhook'ов
 """
 
-import uuid
-from enum import Enum
+from __future__ import annotations
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Enum as SQLEnum,
-    ForeignKey,
-    Integer,
-    JSON,
-    String,
-    Text,
-)
-from sqlalchemy.orm import relationship
+import uuid as uuid_module
+import enum
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
 
+if TYPE_CHECKING:
+    from app.models.user import User
 
-class WebhookEventType(str, Enum):
+
+class WebhookEventType(str, enum.Enum):
     """Типы событий для webhook'ов"""
 
     # Пациенты
@@ -65,7 +62,7 @@ class WebhookEventType(str, Enum):
     SYSTEM_MAINTENANCE_END = "system.maintenance_end"
 
 
-class WebhookStatus(str, Enum):
+class WebhookStatus(str, enum.Enum):
     """Статусы webhook'ов"""
 
     ACTIVE = "active"
@@ -74,7 +71,7 @@ class WebhookStatus(str, Enum):
     FAILED = "failed"
 
 
-class WebhookCallStatus(str, Enum):
+class WebhookCallStatus(str, enum.Enum):
     """Статусы вызовов webhook'ов"""
 
     PENDING = "pending"
@@ -89,49 +86,55 @@ class Webhook(Base):
 
     __tablename__ = "webhooks"
 
-    id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(
-        String(36), unique=True, index=True, default=lambda: str(uuid.uuid4())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    uuid: Mapped[str] = mapped_column(
+        String(36), unique=True, index=True, default=lambda: str(uuid_module.uuid4())
     )
 
     # Основная информация
-    name = Column(String(255), nullable=False, index=True)
-    description = Column(Text)
-    url = Column(String(500), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
 
     # Конфигурация
-    events = Column(JSON, nullable=False)  # Список событий для подписки
-    headers = Column(JSON, default={})  # Дополнительные заголовки
-    secret = Column(String(255))  # Секрет для подписи
+    events: Mapped[List[str]] = mapped_column(JSON, nullable=False)  # Список событий для подписки
+    headers: Mapped[Dict[str, str]] = mapped_column(JSON, default={})  # Дополнительные заголовки
+    secret: Mapped[Optional[str]] = mapped_column(String(255))  # Секрет для подписи
 
     # Настройки повторов
-    max_retries = Column(Integer, default=3)
-    retry_delay = Column(Integer, default=60)  # секунды
-    timeout = Column(Integer, default=30)  # секунды
+    max_retries: Mapped[int] = mapped_column(Integer, default=3)
+    retry_delay: Mapped[int] = mapped_column(Integer, default=60)  # секунды
+    timeout: Mapped[int] = mapped_column(Integer, default=30)  # секунды
 
     # Фильтры
-    filters = Column(JSON, default={})  # Условия для фильтрации событий
+    filters: Mapped[Dict[str, Any]] = mapped_column(JSON, default={})  # Условия для фильтрации событий
 
     # Статус
-    status = Column(SQLEnum(WebhookStatus), default=WebhookStatus.ACTIVE, index=True)
-    is_active = Column(Boolean, default=True, index=True)
+    status: Mapped[WebhookStatus] = mapped_column(
+        SQLEnum(WebhookStatus), default=WebhookStatus.ACTIVE, index=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
     # Статистика
-    total_calls = Column(Integer, default=0)
-    successful_calls = Column(Integer, default=0)
-    failed_calls = Column(Integer, default=0)
-    last_call_at = Column(DateTime(timezone=True))
-    last_success_at = Column(DateTime(timezone=True))
-    last_failure_at = Column(DateTime(timezone=True))
+    total_calls: Mapped[int] = mapped_column(Integer, default=0)
+    successful_calls: Mapped[int] = mapped_column(Integer, default=0)
+    failed_calls: Mapped[int] = mapped_column(Integer, default=0)
+    last_call_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_failure_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # Метаданные
-    created_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now()
+    )
 
     # Связи
-    creator = relationship("User", back_populates="created_webhooks")
-    calls = relationship(
+    creator: Mapped[Optional["User"]] = relationship("User", back_populates="created_webhooks")
+    calls: Mapped[List["WebhookCall"]] = relationship(
         "WebhookCall", back_populates="webhook", cascade="all, delete-orphan"
     )
 
@@ -141,81 +144,91 @@ class WebhookCall(Base):
 
     __tablename__ = "webhook_calls"
 
-    id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(
-        String(36), unique=True, index=True, default=lambda: str(uuid.uuid4())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    uuid: Mapped[str] = mapped_column(
+        String(36), unique=True, index=True, default=lambda: str(uuid_module.uuid4())
     )
 
     # Связь с webhook'ом
-    webhook_id = Column(Integer, ForeignKey("webhooks.id"), nullable=False, index=True)
+    webhook_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("webhooks.id"), nullable=False, index=True
+    )
 
     # Информация о событии
-    event_type = Column(SQLEnum(WebhookEventType), nullable=False, index=True)
-    event_data = Column(JSON, nullable=False)
+    event_type: Mapped[WebhookEventType] = mapped_column(
+        SQLEnum(WebhookEventType), nullable=False, index=True
+    )
+    event_data: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
 
     # Информация о вызове
-    url = Column(String(500), nullable=False)
-    method = Column(String(10), default="POST")
-    headers = Column(JSON, default={})
-    payload = Column(JSON, nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    method: Mapped[str] = mapped_column(String(10), default="POST")
+    headers: Mapped[Dict[str, str]] = mapped_column(JSON, default={})
+    payload: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
 
     # Результат
-    status = Column(
+    status: Mapped[WebhookCallStatus] = mapped_column(
         SQLEnum(WebhookCallStatus), default=WebhookCallStatus.PENDING, index=True
     )
-    response_status_code = Column(Integer)
-    response_headers = Column(JSON, default={})
-    response_body = Column(Text)
-    error_message = Column(Text)
+    response_status_code: Mapped[Optional[int]] = mapped_column(Integer)
+    response_headers: Mapped[Dict[str, str]] = mapped_column(JSON, default={})
+    response_body: Mapped[Optional[str]] = mapped_column(Text)
+    error_message: Mapped[Optional[str]] = mapped_column(Text)
 
     # Повторы
-    attempt_number = Column(Integer, default=1)
-    max_attempts = Column(Integer, default=3)
-    next_retry_at = Column(DateTime(timezone=True))
+    attempt_number: Mapped[int] = mapped_column(Integer, default=1)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    next_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # Время выполнения
-    duration_ms = Column(Integer)  # Время выполнения в миллисекундах
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer)  # Время выполнения в миллисекундах
 
     # Метаданные
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    completed_at = Column(DateTime(timezone=True))
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now()
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     # Связи
-    webhook = relationship("Webhook", back_populates="calls")
+    webhook: Mapped["Webhook"] = relationship("Webhook", back_populates="calls")
 
 
 class WebhookEvent(Base):
     """Модель события для webhook'ов (очередь событий)"""
 
     __tablename__ = "webhook_events"
+    __table_args__ = {"extend_existing": True}
 
-    id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(
-        String(36), unique=True, index=True, default=lambda: str(uuid.uuid4())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    uuid: Mapped[str] = mapped_column(
+        String(36), unique=True, index=True, default=lambda: str(uuid_module.uuid4())
     )
 
     # Информация о событии
-    event_type = Column(SQLEnum(WebhookEventType), nullable=False, index=True)
-    event_data = Column(JSON, nullable=False)
+    event_type: Mapped[WebhookEventType] = mapped_column(
+        SQLEnum(WebhookEventType), nullable=False, index=True
+    )
+    event_data: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
 
     # Метаданные события
-    source = Column(String(100))  # Источник события (api, system, etc.)
-    source_id = Column(String(100))  # ID источника
-    correlation_id = Column(String(100))  # ID для корреляции событий
+    source: Mapped[Optional[str]] = mapped_column(String(100))  # Источник события (api, system, etc.)
+    source_id: Mapped[Optional[str]] = mapped_column(String(100))  # ID источника
+    correlation_id: Mapped[Optional[str]] = mapped_column(String(100))  # ID для корреляции событий
 
     # Статус обработки
-    processed = Column(Boolean, default=False, index=True)
-    processed_at = Column(DateTime(timezone=True))
-    failed_webhooks = Column(
+    processed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    failed_webhooks: Mapped[List[int]] = mapped_column(
         JSON, default=[]
     )  # Список webhook'ов, которые не смогли обработать событие
 
     # Метаданные
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Индексы для быстрого поиска
-    __table_args__ = {"extend_existing": True}
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 # Обновляем модель User для связи с webhook'ами

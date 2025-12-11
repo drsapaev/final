@@ -2,23 +2,24 @@
 Модели для динамического ценообразования и пакетных услуг
 """
 
-import enum
+from __future__ import annotations
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Enum,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-)
-from sqlalchemy.orm import relationship
+import enum
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Optional
+
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.patient import Patient
+    from app.models.visit import Visit
+    from app.models.appointment import Appointment
+    from app.models.service import Service
 
 
 class PricingRuleType(str, enum.Enum):
@@ -46,40 +47,46 @@ class PricingRule(Base):
 
     __tablename__ = "pricing_rules"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False, index=True)
-    description = Column(Text)
-    rule_type = Column(Enum(PricingRuleType), nullable=False)
-    is_active = Column(Boolean, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    rule_type: Mapped[PricingRuleType] = mapped_column(Enum(PricingRuleType), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Условия применения
-    start_date = Column(DateTime)
-    end_date = Column(DateTime)
-    start_time = Column(String(8))  # HH:MM:SS
-    end_time = Column(String(8))  # HH:MM:SS
-    days_of_week = Column(String(20))  # 1,2,3,4,5,6,7 (пн-вс)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    start_time: Mapped[Optional[str]] = mapped_column(String(8))  # HH:MM:SS
+    end_time: Mapped[Optional[str]] = mapped_column(String(8))  # HH:MM:SS
+    days_of_week: Mapped[Optional[str]] = mapped_column(String(20))  # 1,2,3,4,5,6,7 (пн-вс)
 
     # Параметры скидки
-    discount_type = Column(Enum(DiscountType), nullable=False)
-    discount_value = Column(Float, nullable=False)  # Процент или сумма
-    min_quantity = Column(Integer, default=1)
-    max_quantity = Column(Integer)
-    min_amount = Column(Float)  # Минимальная сумма заказа
+    discount_type: Mapped[DiscountType] = mapped_column(Enum(DiscountType), nullable=False)
+    discount_value: Mapped[float] = mapped_column(Float, nullable=False)  # Процент или сумма
+    min_quantity: Mapped[int] = mapped_column(Integer, default=1)
+    max_quantity: Mapped[Optional[int]] = mapped_column(Integer)
+    min_amount: Mapped[Optional[float]] = mapped_column(Float)  # Минимальная сумма заказа
 
     # Дополнительные параметры
-    priority = Column(Integer, default=0)  # Приоритет применения
-    max_uses = Column(Integer)  # Максимальное количество использований
-    current_uses = Column(Integer, default=0)
+    priority: Mapped[int] = mapped_column(Integer, default=0)  # Приоритет применения
+    max_uses: Mapped[Optional[int]] = mapped_column(Integer)  # Максимальное количество использований
+    current_uses: Mapped[int] = mapped_column(Integer, default=0)
 
     # Метаданные
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
 
     # Связи
-    creator = relationship("User", foreign_keys=[created_by])
-    rule_services = relationship("PricingRuleService", back_populates="rule")
-    rule_packages = relationship("ServicePackage", back_populates="pricing_rule")
+    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    rule_services: Mapped[List["PricingRuleService"]] = relationship(
+        "PricingRuleService", back_populates="rule"
+    )
+    rule_packages: Mapped[List["ServicePackage"]] = relationship(
+        "ServicePackage", back_populates="pricing_rule"
+    )
 
 
 class PricingRuleService(Base):
@@ -87,19 +94,19 @@ class PricingRuleService(Base):
 
     __tablename__ = "pricing_rule_services"
 
-    id = Column(Integer, primary_key=True, index=True)
-    rule_id = Column(Integer, ForeignKey("pricing_rules.id"), nullable=False)
-    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    rule_id: Mapped[int] = mapped_column(Integer, ForeignKey("pricing_rules.id"), nullable=False)
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id"), nullable=False)
 
     # Специфичные параметры для услуги
-    custom_discount_value = Column(
+    custom_discount_value: Mapped[Optional[float]] = mapped_column(
         Float
     )  # Переопределение скидки для конкретной услуги
-    is_excluded = Column(Boolean, default=False)  # Исключить услугу из правила
+    is_excluded: Mapped[bool] = mapped_column(Boolean, default=False)  # Исключить услугу из правила
 
     # Связи
-    rule = relationship("PricingRule", back_populates="rule_services")
-    service = relationship("Service")
+    rule: Mapped["PricingRule"] = relationship("PricingRule", back_populates="rule_services")
+    service: Mapped["Service"] = relationship("Service")
 
 
 class ServicePackage(Base):
@@ -107,41 +114,49 @@ class ServicePackage(Base):
 
     __tablename__ = "service_packages"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False, index=True)
-    description = Column(Text)
-    is_active = Column(Boolean, default=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Ценообразование
-    package_price = Column(Float, nullable=False)
-    original_price = Column(Float)  # Сумма цен отдельных услуг
-    savings_amount = Column(Float)  # Размер экономии
-    savings_percentage = Column(Float)  # Процент экономии
+    package_price: Mapped[float] = mapped_column(Float, nullable=False)
+    original_price: Mapped[Optional[float]] = mapped_column(Float)  # Сумма цен отдельных услуг
+    savings_amount: Mapped[Optional[float]] = mapped_column(Float)  # Размер экономии
+    savings_percentage: Mapped[Optional[float]] = mapped_column(Float)  # Процент экономии
 
     # Условия
-    min_services = Column(Integer, default=1)
-    max_services = Column(Integer)
-    valid_from = Column(DateTime)
-    valid_to = Column(DateTime)
+    min_services: Mapped[int] = mapped_column(Integer, default=1)
+    max_services: Mapped[Optional[int]] = mapped_column(Integer)
+    valid_from: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    valid_to: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # Ограничения
-    max_purchases = Column(Integer)  # Максимальное количество покупок
-    current_purchases = Column(Integer, default=0)
-    per_patient_limit = Column(Integer)  # Лимит на пациента
+    max_purchases: Mapped[Optional[int]] = mapped_column(Integer)  # Максимальное количество покупок
+    current_purchases: Mapped[int] = mapped_column(Integer, default=0)
+    per_patient_limit: Mapped[Optional[int]] = mapped_column(Integer)  # Лимит на пациента
 
     # Связи с правилами ценообразования
-    pricing_rule_id = Column(Integer, ForeignKey("pricing_rules.id"))
-    pricing_rule = relationship("PricingRule", back_populates="rule_packages")
+    pricing_rule_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("pricing_rules.id"))
+    pricing_rule: Mapped[Optional["PricingRule"]] = relationship(
+        "PricingRule", back_populates="rule_packages"
+    )
 
     # Метаданные
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
 
     # Связи
-    creator = relationship("User", foreign_keys=[created_by])
-    package_services = relationship("PackageService", back_populates="package")
-    package_purchases = relationship("PackagePurchase", back_populates="package")
+    creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
+    package_services: Mapped[List["PackageService"]] = relationship(
+        "PackageService", back_populates="package"
+    )
+    package_purchases: Mapped[List["PackagePurchase"]] = relationship(
+        "PackagePurchase", back_populates="package"
+    )
 
 
 class PackageService(Base):
@@ -149,18 +164,20 @@ class PackageService(Base):
 
     __tablename__ = "package_services"
 
-    id = Column(Integer, primary_key=True, index=True)
-    package_id = Column(Integer, ForeignKey("service_packages.id"), nullable=False)
-    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    package_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("service_packages.id"), nullable=False
+    )
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id"), nullable=False)
 
     # Параметры услуги в пакете
-    quantity = Column(Integer, default=1)  # Количество данной услуги в пакете
-    is_required = Column(Boolean, default=True)  # Обязательная услуга
-    discount_percentage = Column(Float)  # Индивидуальная скидка на услугу
+    quantity: Mapped[int] = mapped_column(Integer, default=1)  # Количество данной услуги в пакете
+    is_required: Mapped[bool] = mapped_column(Boolean, default=True)  # Обязательная услуга
+    discount_percentage: Mapped[Optional[float]] = mapped_column(Float)  # Индивидуальная скидка на услугу
 
     # Связи
-    package = relationship("ServicePackage", back_populates="package_services")
-    service = relationship("Service")
+    package: Mapped["ServicePackage"] = relationship("ServicePackage", back_populates="package_services")
+    service: Mapped["Service"] = relationship("Service")
 
 
 class PackagePurchase(Base):
@@ -168,30 +185,32 @@ class PackagePurchase(Base):
 
     __tablename__ = "package_purchases"
 
-    id = Column(Integer, primary_key=True, index=True)
-    package_id = Column(Integer, ForeignKey("service_packages.id"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    visit_id = Column(Integer, ForeignKey("visits.id"))
-    appointment_id = Column(Integer, ForeignKey("appointments.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    package_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("service_packages.id"), nullable=False
+    )
+    patient_id: Mapped[int] = mapped_column(Integer, ForeignKey("patients.id"), nullable=False)
+    visit_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("visits.id"))
+    appointment_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("appointments.id"))
 
     # Детали покупки
-    purchase_price = Column(Float, nullable=False)
-    original_price = Column(Float, nullable=False)
-    savings_amount = Column(Float, nullable=False)
+    purchase_price: Mapped[float] = mapped_column(Float, nullable=False)
+    original_price: Mapped[float] = mapped_column(Float, nullable=False)
+    savings_amount: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Статус
-    status = Column(String(50), default="active")  # active, used, expired, cancelled
+    status: Mapped[str] = mapped_column(String(50), default="active")  # active, used, expired, cancelled
 
     # Временные метки
-    purchased_at = Column(DateTime, server_default=func.now())
-    expires_at = Column(DateTime)
-    used_at = Column(DateTime)
+    purchased_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # Связи
-    package = relationship("ServicePackage", back_populates="package_purchases")
-    patient = relationship("Patient")
-    visit = relationship("Visit")
-    appointment = relationship("Appointment")
+    package: Mapped["ServicePackage"] = relationship("ServicePackage", back_populates="package_purchases")
+    patient: Mapped["Patient"] = relationship("Patient")
+    visit: Mapped[Optional["Visit"]] = relationship("Visit")
+    appointment: Mapped[Optional["Appointment"]] = relationship("Appointment")
 
 
 class DynamicPrice(Base):
@@ -199,34 +218,36 @@ class DynamicPrice(Base):
 
     __tablename__ = "dynamic_prices"
 
-    id = Column(Integer, primary_key=True, index=True)
-    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id"), nullable=False)
 
     # Ценовые параметры
-    base_price = Column(Float, nullable=False)
-    current_price = Column(Float, nullable=False)
-    min_price = Column(Float, nullable=False)
-    max_price = Column(Float, nullable=False)
+    base_price: Mapped[float] = mapped_column(Float, nullable=False)
+    current_price: Mapped[float] = mapped_column(Float, nullable=False)
+    min_price: Mapped[float] = mapped_column(Float, nullable=False)
+    max_price: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Факторы влияния на цену
-    demand_factor = Column(Float, default=1.0)  # Коэффициент спроса
-    time_factor = Column(Float, default=1.0)  # Временной коэффициент
-    capacity_factor = Column(Float, default=1.0)  # Коэффициент загруженности
-    seasonal_factor = Column(Float, default=1.0)  # Сезонный коэффициент
+    demand_factor: Mapped[float] = mapped_column(Float, default=1.0)  # Коэффициент спроса
+    time_factor: Mapped[float] = mapped_column(Float, default=1.0)  # Временной коэффициент
+    capacity_factor: Mapped[float] = mapped_column(Float, default=1.0)  # Коэффициент загруженности
+    seasonal_factor: Mapped[float] = mapped_column(Float, default=1.0)  # Сезонный коэффициент
 
     # Статистика
-    price_changes_count = Column(Integer, default=0)
-    last_price_change = Column(DateTime)
-    avg_price_last_30d = Column(Float)
+    price_changes_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_price_change: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    avg_price_last_30d: Mapped[Optional[float]] = mapped_column(Float)
 
     # Временные метки
-    effective_from = Column(DateTime, server_default=func.now())
-    effective_to = Column(DateTime)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    effective_from: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    effective_to: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
     # Связи
-    service = relationship("Service")
+    service: Mapped["Service"] = relationship("Service")
 
 
 class PriceHistory(Base):
@@ -234,24 +255,24 @@ class PriceHistory(Base):
 
     __tablename__ = "price_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    service_id = Column(Integer, ForeignKey("services.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id"), nullable=False)
 
     # Цены
-    old_price = Column(Float, nullable=False)
-    new_price = Column(Float, nullable=False)
-    price_type = Column(String(50), default="base")  # base, dynamic, package
+    old_price: Mapped[float] = mapped_column(Float, nullable=False)
+    new_price: Mapped[float] = mapped_column(Float, nullable=False)
+    price_type: Mapped[str] = mapped_column(String(50), default="base")  # base, dynamic, package
 
     # Причина изменения
-    change_reason = Column(String(255))
-    change_type = Column(String(50))  # manual, automatic, rule_based
+    change_reason: Mapped[Optional[str]] = mapped_column(String(255))
+    change_type: Mapped[Optional[str]] = mapped_column(String(50))  # manual, automatic, rule_based
 
     # Метаданные
-    changed_at = Column(DateTime, server_default=func.now())
-    changed_by = Column(Integer, ForeignKey("users.id"))
-    effective_from = Column(DateTime)
-    effective_to = Column(DateTime)
+    changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.now())
+    changed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"))
+    effective_from: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    effective_to: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # Связи
-    service = relationship("Service")
-    changed_by_user = relationship("User", foreign_keys=[changed_by])
+    service: Mapped["Service"] = relationship("Service")
+    changed_by_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[changed_by])
