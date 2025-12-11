@@ -4,7 +4,7 @@ CRUD endpoints для управления отделениями в админ-
 
 from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -22,8 +22,8 @@ from app.models.department import (
 )
 from app.models.online_queue import DailyQueue, OnlineQueueEntry
 from app.models.service import Service
-from app.models.user import User
 from app.models.visit import Visit
+
 from app.schemas.department import (
     DepartmentQueueSettingsUpdate,
     DepartmentRegistrationSettingsUpdate,
@@ -415,7 +415,7 @@ def _collect_department_overview(db: Session) -> Dict[str, Any]:
 def list_departments(
     active_only: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin", "Registrar")),
+    current_user: Any = Depends(require_roles("Admin", "Registrar")),
 ):
     """
     Получить список всех отделений
@@ -442,7 +442,7 @@ def list_departments(
 
 @router.get("/overview", response_model=dict)
 def get_departments_overview(
-    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
+    db: Session = Depends(get_db), current_user: Any = Depends(require_roles("Admin"))
 ):
     """
     Получить реальные показатели по отделениям (очередь, услуги, визиты)
@@ -458,7 +458,7 @@ def get_departments_overview(
 def get_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """
     Получить отделение по ID
@@ -480,7 +480,7 @@ def get_department(
 def create_department(
     department_data: DepartmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """
     Создать новое отделение
@@ -537,7 +537,7 @@ def update_department(
     department_id: int,
     department_data: DepartmentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """
     Обновить отделение
@@ -572,7 +572,7 @@ def initialize_department(
     department_id: int,
     integration: Optional[DepartmentIntegrationOptions] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """
     Повторно синхронизировать отделение с очередями/услугами
@@ -603,7 +603,7 @@ def initialize_department(
 def delete_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """
     Удалить отделение
@@ -631,7 +631,7 @@ def delete_department(
 def toggle_department(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """
     Переключить активность отделения
@@ -669,7 +669,7 @@ def toggle_department(
 def get_department_services(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Получить услуги отделения"""
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -712,7 +712,7 @@ def add_service_to_department(
     service_id: int,
     data: DepartmentServiceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Добавить услугу в отделение"""
     # Проверки
@@ -754,7 +754,7 @@ def remove_service_from_department(
     department_id: int,
     service_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Удалить услугу из отделения"""
     dept_service = (
@@ -784,7 +784,7 @@ def remove_service_from_department(
 def get_queue_settings(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Получить настройки очереди отделения"""
     settings = (
@@ -816,7 +816,7 @@ def update_queue_settings(
     department_id: int,
     data: DepartmentQueueSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Обновить настройки очереди отделения"""
     settings = (
@@ -848,7 +848,7 @@ def update_queue_settings(
 
 @router.get("/overview", response_model=dict)
 def get_departments_overview(
-    db: Session = Depends(get_db), current_user: User = Depends(require_roles("Admin"))
+    db: Session = Depends(get_db), current_user: Any = Depends(require_roles("Admin"))
 ):
     """Получить обзор статистики всех отделений"""
     departments = db.query(Department).order_by(Department.display_order).all()
@@ -953,7 +953,7 @@ def initialize_department(
     department_id: int,
     payload: Optional[Dict[str, Any]] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Инициализировать отделение - создать настройки очередей и регистрации"""
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -1070,7 +1070,7 @@ def initialize_department(
 def get_registration_settings(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Получить настройки регистрации отделения"""
     settings = (
@@ -1100,7 +1100,7 @@ def update_registration_settings(
     department_id: int,
     data: DepartmentRegistrationSettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Обновить настройки регистрации отделения"""
     settings = (
@@ -1133,7 +1133,7 @@ def update_registration_settings(
 def get_department_doctors(
     department_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Получить список врачей отделения"""
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -1162,7 +1162,7 @@ def assign_doctor_to_department(
     department_id: int,
     doctor_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Назначить врача в отделение"""
     department = db.query(Department).filter(Department.id == department_id).first()
@@ -1189,7 +1189,7 @@ def remove_doctor_from_department(
     department_id: int,
     doctor_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("Admin")),
+    current_user: Any = Depends(require_roles("Admin")),
 ):
     """Убрать врача из отделения"""
     doctor = (
