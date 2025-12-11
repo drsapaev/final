@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 20
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v5
@@ -385,7 +385,7 @@ jobs:
     timeout-minutes: 10
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 📦 Установка Node.js
       uses: actions/setup-node@v4
@@ -421,7 +421,7 @@ jobs:
     needs: code-quality
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v5
@@ -477,7 +477,7 @@ jobs:
     timeout-minutes: 10
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v5
@@ -510,7 +510,7 @@ jobs:
     needs: [code-quality, frontend-tests, backend-tests]
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐳 Настройка Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -561,7 +561,7 @@ jobs:
     needs: [backend-tests, frontend-tests]
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v5
@@ -844,7 +844,7 @@ jobs:
     timeout-minutes: 10
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🐍 Установка Python
       uses: actions/setup-python@v5
@@ -951,7 +951,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🚀 Deploy to Staging
       run: |
@@ -970,7 +970,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: 🌟 Deploy to Production
       run: |
