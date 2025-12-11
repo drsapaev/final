@@ -15,7 +15,10 @@ on:
 jobs:
   role-system-check:
     runs-on: ubuntu-latest
-
+    env:
+      DATABASE_URL: "sqlite:///./clinic.db"
+      CORS_DISABLE: "1"
+      WS_DEV_ALLOW: "1"
     steps:
     - uses: actions/checkout@v4
 
@@ -32,10 +35,6 @@ jobs:
     - name: Setup test database
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
-        export CORS_DISABLE="1"
-        export WS_DEV_ALLOW="1"
-
         python - << 'PY'
         import sys
         import time
@@ -143,11 +142,7 @@ jobs:
     - name: Start backend server
       run: |
         cd backend
-        export DATABASE_URL="sqlite:///./clinic.db"
-        export CORS_DISABLE="1"
-        export WS_DEV_ALLOW="1"
         echo "Запуск backend сервера..."
-
         # Запускаем сервер в фоне с перенаправлением вывода
         nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
         SERVER_PID=$!
@@ -190,6 +185,8 @@ jobs:
       run: |
         cd backend
         echo "Running role system tests..."
+        echo "Verifying server is still running..."
+        curl -f http://127.0.0.1:8000/api/v1/health || echo "Warning: Health check failed"
         python test_role_routing.py
 
     - name: Check system integrity
