@@ -16,15 +16,20 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
 
     # Логин
     login_url = f"{BASE_URL}/api/v1/authentication/login"
-    login_data = {"username": username, "password": password, "grant_type": "password"}
+    login_data = {"username": username, "password": password}
 
     try:
         response = requests.post(login_url, json=login_data)
+        print(f"DEBUG: Login response status: {response.status_code}")
+        
         if response.status_code != 200:
             print(f"ОШИБКА: Логин не удался: {response.status_code}")
+            print(f"DEBUG: Response text: {response.text[:500]}")
             return False
 
         token_data = response.json()
+        print(f"DEBUG: Token data keys: {token_data.keys()}")
+        
         # Новая система аутентификации возвращает токены в объекте tokens
         token = token_data.get("access_token")
         if not token and token_data.get("tokens"):
@@ -35,13 +40,16 @@ def test_user_login_and_role(username, password, expected_role, expected_redirec
             print(f"DEBUG: Response data: {token_data}")
             return False
 
+
         # Получение профиля
         profile_url = f"{BASE_URL}/api/v1/authentication/profile"
         headers = {"Authorization": f"Bearer {token}"}
         profile_response = requests.get(profile_url, headers=headers)
+        print(f"DEBUG: Profile response status: {profile_response.status_code}")
 
         if profile_response.status_code != 200:
             print(f"ОШИБКА: Профиль не получен: {profile_response.status_code}")
+            print(f"DEBUG: Profile response text: {profile_response.text[:500]}")
             return False
 
         profile = profile_response.json()
