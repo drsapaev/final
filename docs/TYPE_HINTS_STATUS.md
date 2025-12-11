@@ -86,6 +86,7 @@ if TYPE_CHECKING:
 | `openai_provider.pyi` | 20+ методов |
 | `gemini_provider.pyi` | 25+ методов |
 | `deepseek_provider.pyi` | 25+ методов |
+| `mock_provider.pyi` | 20+ методов |
 
 ---
 
