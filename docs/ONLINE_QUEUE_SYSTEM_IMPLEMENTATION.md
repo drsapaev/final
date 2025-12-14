@@ -728,7 +728,13 @@ python -m alembic upgrade b9716387212f
   **⚠️ ВАЖНО (см. раздел 8.9 в ONLINE_QUEUE_SYSTEM_V2.md):**  
   Вкладка "Все отделения" **обязана** вызывать `filterServicesByDepartment(patient, null)` для корректного отображения всех услуг мульти-QR записей. Напрямую использовать `appointment.services` для QR-записей **ЗАПРЕЩЕНО**.
   
-  **Отмена записей:** Для агрегированных строк (вкладка "Все отделения") при отмене используется массив `aggregated_ids`, чтобы отменить **все** услуги пациента за этот день одновременно. Частичная отмена доступна только через редактирование в `AppointmentWizardV2`.
+  **Отмена записей (aggregated_ids):**
+  - `loadAppointments` собирает `aggregated_ids` при первой дедупликации (по `dedupKey`)
+  - `mergeAppointments` объединяет `aggregated_ids` при второй дедупликации
+  - `aggregatePatientsForAllDepartments` агрегирует все `aggregated_ids` для вкладки "Все отделения"
+  - `onCancel` итерирует по `aggregated_ids` и вызывает API отмены для каждого ID
+  
+  Частичная отмена доступна только через редактирование в `AppointmentWizardV2`.
 
 - [x] **`AppointmentWizardV2`** (`frontend/src/components/wizard/AppointmentWizardV2.jsx`)  
   - Новый визит (desk) → формирует `CartRequest` и вызывает `/registrar/cart`.  
