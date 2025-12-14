@@ -2989,6 +2989,7 @@ const RegistrarPanel = () => {
           confirmed_at: appointment.confirmed_at,
           confirmed_by: appointment.confirmed_by,
           record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
+          source: appointment.source, // ✅ FIX: Сохраняем источник (online/desk) для Wizard'а
           // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
           discount_mode: appointment.discount_mode,
           discount_mode: appointment.discount_mode,
