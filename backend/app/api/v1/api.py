@@ -37,7 +37,8 @@ from app.api.v1.endpoints import system_management  # Система бэкап�
 from app.api.v1.endpoints import telegram_bot  # Telegram Bot
 from app.api.v1.endpoints import user_data_transfer  # Передача данных пользователей
 from app.api.v1.endpoints import wait_time_analytics  # Аналитика времени ожидания
-from app.api.v1.endpoints import (  # online_queue,  # Временно отключено; online_queue_new,  # Временно отключено; queue,  # Временно отключено
+from app.api.v1.endpoints import (  # online_queue,  # Временно отключено; queue,  # Временно отключено
+    online_queue_new,
     activation as activation_ep,
     admin_ai,
     admin_clinic,
@@ -225,7 +226,7 @@ api_router.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"]
 api_router.include_router(queues.router, prefix="/queues", tags=["queues"])
 api_router.include_router(appointments.router, tags=["appointments"])
 # api_router.include_router(online_queue.router, tags=["online-queue"])  # Временно отключено
-# api_router.include_router(online_queue_new.router, tags=["online-queue-new"])  # Временно отключено
+api_router.include_router(online_queue_new.router, tags=["online-queue-new"])
 api_router.include_router(registrar_integration.router, tags=["registrar"])
 api_router.include_router(registrar_wizard.router, tags=["registrar-wizard"])
 api_router.include_router(doctor_integration.router, tags=["doctor-integration"])
@@ -420,3 +421,13 @@ api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(
     discount_benefits.router, prefix="/discount-benefits", tags=["discount-benefits"]
 )
+
+# Эндпоинты для кассира
+from app.api.v1.endpoints import cashier
+
+api_router.include_router(cashier.router, prefix="/cashier", tags=["cashier"])
+
+# WebSocket для кассира (real-time updates)
+from app.ws import cashier_ws
+
+api_router.include_router(cashier_ws.router, prefix="/ws", tags=["cashier-ws"])

@@ -140,7 +140,7 @@ const AppointmentWizardV2 = ({
 
         // ✅ ИСПРАВЛЕНО: Правильная инициализация даты рождения
         const birthDate = initialData.patient_birth_date ||
-                          (initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
+          (initialData.patient_birth_year ? `${initialData.patient_birth_year}-01-01` : '');
 
         setWizardData({
           patient: {
@@ -151,12 +151,12 @@ const AppointmentWizardV2 = ({
             address: initialData.address || initialData.patient?.address || '',
             gender: (() => {
               // ✅ ИСПРАВЛЕНО: Преобразование пола из формата БД (M/F/sex) в формат формы (male/female)
-              const genderValue = initialData.patient_gender || 
-                                  initialData.gender || 
-                                  initialData.patient?.gender || 
-                                  initialData.patient?.sex || 
-                                  initialData.sex || 
-                                  '';
+              const genderValue = initialData.patient_gender ||
+                initialData.gender ||
+                initialData.patient?.gender ||
+                initialData.patient?.sex ||
+                initialData.sex ||
+                '';
               if (genderValue === 'M' || genderValue === 'm' || genderValue === 'male') return 'male';
               if (genderValue === 'F' || genderValue === 'f' || genderValue === 'female') return 'female';
               return genderValue; // Если уже в формате male/female, оставляем как есть
@@ -174,20 +174,39 @@ const AppointmentWizardV2 = ({
               // Получаем doctor_id из initialData (может быть в разных полях)
               // ⚠️ ВАЖНО: Для записей типа visit, doctor_id может быть в queue.specialist_id
               // Но для отдельных услуг нужен doctor_id из самой услуги или из initialData
-              const doctorId = initialData.doctor_id || 
-                              initialData.specialist_id || 
-                              (initialData.queue_numbers && Array.isArray(initialData.queue_numbers) && initialData.queue_numbers[0]?.specialist_id) ||
-                              null;
-              
+              const doctorId = initialData.doctor_id ||
+                initialData.specialist_id ||
+                (initialData.queue_numbers && Array.isArray(initialData.queue_numbers) && initialData.queue_numbers[0]?.specialist_id) ||
+                null;
+
               logger.log('🔍 Извлечение doctor_id из initialData:', {
                 doctor_id: initialData.doctor_id,
                 specialist_id: initialData.specialist_id,
                 queue_numbers_specialist: initialData.queue_numbers?.[0]?.specialist_id,
                 result: doctorId
               });
-              
-              // 1. Сначала пробуем из services (массив строк или кодов)
-              if (Array.isArray(initialData.services) && initialData.services.length > 0) {
+
+              // ✅ НОВОЕ: Приоритет 0 - из service_details (полные данные услуг)
+              if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
+                logger.log('📦 Восстановление услуг из service_details:', initialData.service_details);
+                initialData.service_details.forEach(svc => {
+                  if (svc) {
+                    items.push({
+                      id: Date.now() + Math.random(),
+                      service_id: svc.id || null,
+                      service_name: svc.name || svc.code || 'Услуга',
+                      service_price: svc.price || 0,
+                      quantity: 1,
+                      doctor_id: doctorId,
+                      visit_date: initialData.date || new Date().toISOString().split('T')[0],
+                      visit_time: null,
+                      _temp_name: svc.name || svc.code
+                    });
+                  }
+                });
+              }
+              // 1. Затем пробуем из services (массив строк или кодов)
+              else if (Array.isArray(initialData.services) && initialData.services.length > 0) {
                 logger.log('📦 Восстановление услуг из services:', initialData.services);
                 initialData.services.forEach(serviceName => {
                   if (serviceName) { // Проверка существования
@@ -224,7 +243,29 @@ const AppointmentWizardV2 = ({
                   }
                 });
               }
-              // 3. Последний вариант - из queue_numbers (только если есть service_name)
+              // 3. Пробуем из queue_numbers.service_details (новый формат)
+              else if (Array.isArray(initialData.queue_numbers) &&
+                initialData.queue_numbers[0]?.service_details?.length > 0) {
+                const qServiceDetails = initialData.queue_numbers[0].service_details;
+                logger.log('📦 Восстановление услуг из queue_numbers.service_details:', qServiceDetails);
+                qServiceDetails.forEach(svc => {
+                  if (svc) {
+                    items.push({
+                      id: Date.now() + Math.random(),
+                      service_id: svc.id || null,
+                      service_name: svc.name || svc.code || 'Услуга',
+                      service_price: svc.price || 0,
+                      quantity: 1,
+                      doctor_id: doctorId,
+                      visit_date: initialData.date || new Date().toISOString().split('T')[0],
+                      visit_time: null,
+                      original_queue_id: initialData.queue_numbers[0].id,
+                      _temp_name: svc.name || svc.code
+                    });
+                  }
+                });
+              }
+              // 4. Последний вариант - из queue_numbers (только если есть service_name)
               else if (Array.isArray(initialData.queue_numbers)) {
                 logger.log('📦 Восстановление услуг из queue_numbers:', initialData.queue_numbers);
                 initialData.queue_numbers.forEach(q => {
@@ -243,6 +284,7 @@ const AppointmentWizardV2 = ({
                     doctor_id: q.doctor_id || null,
                     visit_date: q.date || initialData.date || new Date().toISOString().split('T')[0],
                     visit_time: q.visit_time || null,
+                    original_queue_id: q.id, // ✅ Сохраняем ID записи очереди для отслеживания удалений
                     _temp_name: q.service_name
                   });
                 });
@@ -686,13 +728,13 @@ const AppointmentWizardV2 = ({
   // ✅ SSOT: Функция для получения названия услуги из servicesData
   const getServiceName = useCallback((item) => {
     if (!item) return 'Неизвестная услуга';
-    
+
     // Приоритет 1: Если есть service_id, ищем в servicesData
     if (item.service_id) {
       const service = servicesData.find(s => s.id === item.service_id);
       if (service?.name) return service.name;
     }
-    
+
     // Приоритет 2: Если service_name уже является полным названием (не код), используем его
     const serviceName = item.service_name;
     if (serviceName && serviceName.length > 3 && !/^[A-Z]\d+$/i.test(serviceName)) {
@@ -700,26 +742,26 @@ const AppointmentWizardV2 = ({
       const foundByName = servicesData.find(s => s.name === serviceName);
       if (foundByName) return foundByName.name;
     }
-    
+
     // Приоритет 3: Пытаемся найти по коду
     const searchName = item._temp_name || item.service_name;
     if (searchName && servicesData.length > 0) {
       const searchNameUpper = String(searchName).toUpperCase().trim();
       const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-      
+
       const foundService = servicesData.find(s => {
         if (!s.service_code) return false;
         const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
         const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-        
+
         if (serviceCodeUpper === searchNameUpper) return true;
         if (serviceCodeNoZero === searchNameNoZero) return true;
         if (s.name === searchName || s.name === searchNameUpper) return true;
         return false;
       });
-      
+
       if (foundService?.name) return foundService.name;
-      
+
       // ✅ УЛУЧШЕНО: Поиск по частичному совпадению названия
       const foundByNamePartial = servicesData.find(s => {
         if (!s.name) return false;
@@ -727,10 +769,10 @@ const AppointmentWizardV2 = ({
         const searchNameLower = String(searchName).toLowerCase();
         return serviceNameLower.includes(searchNameLower) || searchNameLower.includes(serviceNameLower);
       });
-      
+
       if (foundByNamePartial?.name) return foundByNamePartial.name;
     }
-    
+
     // Fallback: возвращаем service_name (если это название) или код
     return serviceName || searchName || 'Неизвестная услуга';
   }, [servicesData]);
@@ -750,7 +792,7 @@ const AppointmentWizardV2 = ({
 
       // Если нет ни нерешённых услуг, ни несоответствий имён — выходим
       if (unresolvedCount === 0 && !hasNameMismatches) return;
-      
+
       logger.log('🔍 Attempting to resolve services...', {
         servicesDataCount: servicesData.length,
         cartItemsCount: wizardData.cart.items.length,
@@ -798,12 +840,12 @@ const AppointmentWizardV2 = ({
         const searchNameUpper = String(searchName).toUpperCase().trim();
         // Убираем ведущие нули для сравнения (p09 = p9)
         const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-        
+
         const foundService = servicesData.find(s => {
           if (!s.service_code) return false;
           const serviceCodeUpper = String(s.service_code).toUpperCase().trim();
           const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-          
+
           // Прямое сравнение
           if (serviceCodeUpper === searchNameUpper) return true;
           // Сравнение без ведущих нулей (p09 = p9)
@@ -832,7 +874,7 @@ const AppointmentWizardV2 = ({
             const searchNameLower = String(searchName).toLowerCase();
             return serviceNameLower.includes(searchNameLower) || searchNameLower.includes(serviceNameLower);
           });
-          
+
           if (foundByName) {
             logger.log(`✅ Service found by name match: "${searchName}" -> ID ${foundByName.id} (${foundByName.name})`);
             return {
@@ -845,8 +887,8 @@ const AppointmentWizardV2 = ({
               doctor_id: item.doctor_id || null
             };
           }
-          
-          logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`, 
+
+          logger.warn(`⚠️ Service not found in servicesData: "${searchName}". Available codes:`,
             servicesData.slice(0, 20).map(s => `${s.service_code || 'N/A'}: ${s.name || 'N/A'}`).filter(s => s !== 'N/A: N/A'));
         }
 
@@ -856,9 +898,9 @@ const AppointmentWizardV2 = ({
       // ✅ ИСПРАВЛЕНО: Проверяем изменения, включая service_name
       const hasChanges = updatedItems.some((item, index) => {
         const prevItem = wizardData.cart.items[index];
-        return item.service_id !== prevItem.service_id || 
-               item.service_price !== prevItem.service_price ||
-               item.service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
+        return item.service_id !== prevItem.service_id ||
+          item.service_price !== prevItem.service_price ||
+          item.service_name !== prevItem.service_name; // ✅ Проверяем также изменение названия
       });
 
       if (hasChanges) {
@@ -871,7 +913,7 @@ const AppointmentWizardV2 = ({
         if (resolved.length > 0) {
           logger.log('📋 Resolved services:', resolved.map(item => `${item._temp_name || item.service_name} -> ${item.service_name} (ID: ${item.service_id})`));
         }
-        
+
         setWizardData(prev => ({
           ...prev,
           cart: {
@@ -929,7 +971,7 @@ const AppointmentWizardV2 = ({
   const addToCart = (service) => {
     // ✅ SSOT: Всегда используем данные из servicesData
     const serviceFromData = servicesData.find(s => s.id === service.id) || service;
-    
+
     const newItem = {
       id: Date.now(), // Временный ID для React keys
       service_id: serviceFromData.id,
@@ -1163,9 +1205,9 @@ const AppointmentWizardV2 = ({
       }
 
       // Проверяем, что все визиты имеют хотя бы одну услугу с service_id
-      const invalidVisits = visits.filter(visit => 
-        !visit.services || 
-        visit.services.length === 0 || 
+      const invalidVisits = visits.filter(visit =>
+        !visit.services ||
+        visit.services.length === 0 ||
         visit.services.some(s => !s.service_id)
       );
 
@@ -1430,35 +1472,38 @@ const AppointmentWizardV2 = ({
       // ✅ ИСПРАВЛЕНО Bug 1: Добавлены явные скобки для правильного приоритета операторов
       const hasQueueEntries = editMode && initialData && (
         (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) ||
-        initialData.source === 'online' || 
+        initialData.source === 'online' ||
         initialData.source === 'desk' ||
         initialData.record_type === 'online_queue' ||
         initialData.record_type === 'visit' ||
         initialData.record_type === 'appointment'
       );
 
+      const originalServiceIds = new Set();
+      const originalQueueIds = new Set(); // ✅ Moved here for availability in handleComplete
+
       if (hasQueueEntries) {
         // ✅ Устанавливаем source по умолчанию для записей типа visit
-        const effectiveSource = initialData.source || 
+        const effectiveSource = initialData.source ||
           (initialData.record_type === 'visit' || initialData.record_type === 'appointment' ? 'desk' : 'online');
-        
+
         // ✅ Сценарий 3: Редактирование записи в очереди (QR или desk) с добавлением новых услуг
         const recordType = effectiveSource === 'online' ? 'QR-запись' : 'ручная запись';
         logger.log(`📝 Редактирование ${recordType}, проверяем новые услуги...`, {
           source: initialData.source,
           effectiveSource,
           record_type: initialData.record_type,
-          queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length : 
-                        (initialData.queue_numbers ? 1 : 0),
+          queue_numbers: Array.isArray(initialData.queue_numbers) ? initialData.queue_numbers.length :
+            (initialData.queue_numbers ? 1 : 0),
           service_codes: Array.isArray(initialData.service_codes) ? initialData.service_codes.length : 0,
           services: Array.isArray(initialData.services) ? initialData.services.length : 0
         });
-        
+
         // Определяем исходные услуги из initialData
-        const originalServiceIds = new Set();
         const originalServiceCodes = new Set();
         const originalServiceNames = new Set();
-        
+        // originalQueueIds moved to higher scope
+
         // ✅ ПРИОРИТЕТ 1: service_codes - наиболее надежный источник для записей типа visit
         if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
           logger.log('📋 Извлечение услуг из service_codes:', initialData.service_codes);
@@ -1484,7 +1529,7 @@ const AppointmentWizardV2 = ({
             }
           });
         }
-        
+
         // ✅ ПРИОРИТЕТ 1.5: services (если service_codes пуст) - может быть кодами
         // ⚠️ ВАЖНО: services может содержать коды (k01, d05) или имена
         if (originalServiceIds.size === 0 && Array.isArray(initialData.services) && initialData.services.length > 0) {
@@ -1492,7 +1537,7 @@ const AppointmentWizardV2 = ({
           initialData.services.forEach(serviceValue => {
             if (serviceValue) {
               const normalizedValue = serviceValue.toUpperCase().trim();
-              
+
               // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
               // ⚠️ ВАЖНО: Коды могут быть в формате 'K01', 'k01', 'K01: Название' и т.д.
               let service = servicesData.find(s => {
@@ -1501,7 +1546,7 @@ const AppointmentWizardV2 = ({
                 // Убираем ведущие нули для сравнения (k01 = k1)
                 const serviceCodeNoZero = serviceCodeUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
                 const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
-                
+
                 // Прямое сравнение
                 if (serviceCodeUpper === normalizedValue) return true;
                 // Сравнение без ведущих нулей
@@ -1510,18 +1555,18 @@ const AppointmentWizardV2 = ({
                 const serviceCodeBase = serviceCodeUpper.split(':')[0].trim();
                 const valueBase = normalizedValue.split(':')[0].trim();
                 if (serviceCodeBase === valueBase) return true;
-                
+
                 return false;
               });
-              
+
               // Если не нашли по коду, пробуем по имени (fallback)
               if (!service) {
                 const normalizedName = serviceValue.toLowerCase().trim();
-                service = servicesData.find(s => 
+                service = servicesData.find(s =>
                   s.name && s.name.toLowerCase().trim() === normalizedName
                 );
               }
-              
+
               if (service) {
                 originalServiceIds.add(service.id);
                 if (service.service_code) {
@@ -1541,13 +1586,14 @@ const AppointmentWizardV2 = ({
             }
           });
         }
-        
+
         // ✅ ПРИОРИТЕТ 2: queue_numbers - основной источник для всех типов записей
         if (Array.isArray(initialData.queue_numbers) && initialData.queue_numbers.length > 0) {
           logger.log('📋 Извлечение услуг из queue_numbers:', initialData.queue_numbers);
           initialData.queue_numbers.forEach(q => {
             if (q && q.service_id) {
               originalServiceIds.add(q.service_id);
+              if (q.id) originalQueueIds.add(q.id); // ✅ Сохраняем ID записи очереди
               // Находим service_code и name по service_id
               const service = servicesData.find(s => s.id === q.service_id);
               if (service) {
@@ -1560,7 +1606,7 @@ const AppointmentWizardV2 = ({
             if (q && q.service_code) {
               const normalizedCode = q.service_code.toUpperCase().trim();
               originalServiceCodes.add(normalizedCode);
-              const service = servicesData.find(s => 
+              const service = servicesData.find(s =>
                 s.service_code && s.service_code.toUpperCase().trim() === normalizedCode
               );
               if (service) {
@@ -1571,7 +1617,7 @@ const AppointmentWizardV2 = ({
             if (q && q.service_name) {
               const normalizedName = q.service_name.toLowerCase().trim();
               originalServiceNames.add(normalizedName);
-              const service = servicesData.find(s => 
+              const service = servicesData.find(s =>
                 s.name && s.name.toLowerCase().trim() === normalizedName
               );
               if (service) {
@@ -1583,7 +1629,7 @@ const AppointmentWizardV2 = ({
             }
           });
         }
-        
+
         // ✅ ПРИОРИТЕТ 3: services (массив строк) - может быть кодами или именами
         if (Array.isArray(initialData.services) && initialData.services.length > 0) {
           logger.log('📋 Извлечение услуг из services:', initialData.services);
@@ -1591,7 +1637,7 @@ const AppointmentWizardV2 = ({
             if (serviceValue) {
               const normalizedValue = serviceValue.toUpperCase().trim();
               const normalizedName = serviceValue.toLowerCase().trim();
-              
+
               // ✅ Сначала пробуем найти по service_code (коды типа 'k01', 'd05')
               let service = servicesData.find(s => {
                 if (!s.service_code) return false;
@@ -1601,14 +1647,14 @@ const AppointmentWizardV2 = ({
                 const valueNoZero = normalizedValue.replace(/^([A-Z])0+(\d+)$/, '$1$2');
                 return serviceCodeUpper === normalizedValue || serviceCodeNoZero === valueNoZero;
               });
-              
+
               // Если не нашли по коду, пробуем по имени
               if (!service) {
-                service = servicesData.find(s => 
+                service = servicesData.find(s =>
                   s.name && s.name.toLowerCase().trim() === normalizedName
                 );
               }
-              
+
               if (service) {
                 originalServiceIds.add(service.id);
                 if (service.service_code) {
@@ -1622,7 +1668,7 @@ const AppointmentWizardV2 = ({
             }
           });
         }
-        
+
         logger.log('📋 Исходные услуги определены:', {
           serviceIds: Array.from(originalServiceIds),
           serviceCodes: Array.from(originalServiceCodes),
@@ -1634,7 +1680,7 @@ const AppointmentWizardV2 = ({
         const newServicesWithDoctorId = [];
         const newServicesWithoutDoctor = [];
         const existingServices = [];
-        
+
         for (const visit of visits) {
           logger.log(`🔍 Проверка визита: doctor_id=${visit.doctor_id}, services count=${visit.services.length}`);
           for (const serviceItem of visit.services) {
@@ -1643,12 +1689,12 @@ const AppointmentWizardV2 = ({
               logger.warn('⚠️ Услуга не найдена в servicesData:', serviceItem.service_id);
               continue;
             }
-            
+
             // Проверяем, является ли услуга новой
             const isNewService = !originalServiceIds.has(serviceItem.service_id) &&
               !originalServiceCodes.has((service.service_code || '').toUpperCase().trim()) &&
               !originalServiceNames.has((service.name || '').toLowerCase().trim());
-            
+
             logger.log(`  🔍 Услуга "${service.name}" (ID: ${serviceItem.service_id}, код: ${service.service_code}):`, {
               isNewService,
               inServiceIds: originalServiceIds.has(serviceItem.service_id),
@@ -1656,7 +1702,7 @@ const AppointmentWizardV2 = ({
               inServiceNames: originalServiceNames.has((service.name || '').toLowerCase().trim()),
               hasDoctorId: !!visit.doctor_id
             });
-            
+
             if (isNewService) {
               // Новая услуга - нужно добавить через batch endpoint
               // ⚠️ ВАЖНО: batch endpoint требует specialist_id (user_id), а не doctor_id
@@ -1685,7 +1731,7 @@ const AppointmentWizardV2 = ({
             }
           }
         }
-        
+
         // ✅ Конвертируем все doctor_id в user_id параллельно
         const newServices = [];
         if (newServicesWithDoctorId.length > 0) {
@@ -1717,16 +1763,16 @@ const AppointmentWizardV2 = ({
               };
             }
           });
-          
+
           const conversionResults = await Promise.all(conversionPromises);
-          
+
           // Добавляем успешно конвертированные услуги
           conversionResults.forEach(result => {
             if (result.success && result.service) {
               newServices.push(result.service);
             }
           });
-          
+
           // ✅ ИСПРАВЛЕНО Bug 1: Добавляем услуги с ошибкой конвертации в newServicesWithoutDoctor для fallback
           conversionResults.forEach(result => {
             if (!result.success && result.failedItem) {
@@ -1744,17 +1790,17 @@ const AppointmentWizardV2 = ({
             withDoctor: newServices.length,
             withoutDoctor: newServicesWithoutDoctor.length
           });
-          
+
           // Фильтруем услуги, которые требуют специалиста (имеют specialist_id)
           const servicesWithSpecialist = newServices.filter(s => s.specialist_id);
-          
+
           if (servicesWithSpecialist.length > 0) {
             // Используем batch endpoint для добавления новых услуг с специалистами
             try {
               // ✅ Сохраняем оригинальный source (online для QR, desk для ручных записей)
               const originalSource = effectiveSource; // Используем effectiveSource, установленный выше
               logger.log(`📤 Вызов batch endpoint для ${servicesWithSpecialist.length} новых услуг с source="${originalSource}"...`);
-              
+
               const batchResult = await createQueueEntriesBatch({
                 patientId: patientId,
                 source: originalSource, // ⭐ Сохраняем оригинальный source
@@ -1763,7 +1809,7 @@ const AppointmentWizardV2 = ({
 
               logger.log('✅ Batch endpoint успешно создал записи:', batchResult);
               toast.success(`Добавлено ${servicesWithSpecialist.length} новых услуг в очередь`);
-              
+
               // Если есть услуги без специалиста, обрабатываем их через обычный cart endpoint
               if (newServicesWithoutDoctor.length > 0) {
                 logger.log('ℹ️ Найдены услуги без специалиста, обрабатываем через cart endpoint');
@@ -1773,7 +1819,7 @@ const AppointmentWizardV2 = ({
                 // Обновляем данные пациента через cart endpoint (если нужно обновить личные данные)
                 // Но не создаем новые визиты, так как новые услуги уже добавлены в очередь
                 logger.log('✅ Все новые услуги обработаны через batch endpoint');
-                
+
                 // Если нужно обновить личные данные пациента, вызываем cart endpoint с существующими услугами
                 // Иначе просто завершаем
                 if (existingServices.length > 0 || Object.keys(wizardData.patient).some(key => {
@@ -1792,6 +1838,35 @@ const AppointmentWizardV2 = ({
                   // Продолжаем с cart endpoint для обновления данных
                 } else {
                   // Нет изменений в данных, просто завершаем
+                  // ✅ НОВОЕ: Обработка удаленных записей очереди
+                  // Находим записи, которых больше нет в корзине
+                  const currentQueueIds = new Set(
+                    wizardData.cart.items
+                      .map(item => item.original_queue_id)
+                      .filter(id => id)
+                  );
+
+                  const removedQueueIds = Array.from(originalQueueIds).filter(id => !currentQueueIds.has(id));
+
+                  if (removedQueueIds.length > 0) {
+                    logger.log(`🗑️ Найдены удаленные записи очереди: ${removedQueueIds.join(', ')}. Отменяем их...`);
+                    try {
+                      // Параллельная отмена всех удаленных записей
+                      await Promise.all(removedQueueIds.map(id =>
+                        api.post(`/online-queue/entries/${id}/cancel`)
+                          .catch(err => {
+                            logger.error(`❌ Ошибка отмены записи очереди ${id}:`, err);
+                            // Не прерываем процесс, если одна отмена не удалась
+                          })
+                      ));
+                      logger.log('✅ Все удаленные записи очереди успешно отменены');
+                    } catch (error) {
+                      logger.error('❌ Ошибка при отмене записей очереди:', error);
+                    }
+                  } else {
+                    logger.log('ℹ️ Нет удаленных записей очереди для отмены');
+                  }
+
                   if (!editMode) {
                     localStorage.removeItem(DRAFT_KEY);
                   }
@@ -1857,12 +1932,12 @@ const AppointmentWizardV2 = ({
       }
 
       // === ШАГ 2: СОЗДАЁМ КОРЗИНУ ВИЗИТОВ ИЛИ ОБНОВЛЯЕМ ДАННЫЕ ПАЦИЕНТА ===
-      
+
       // ✅ ИСПРАВЛЕНО Bug 2: Если visits пустой (все услуги обработаны через batch),
       // используем отдельный endpoint для обновления данных пациента, чтобы не создавать invoice с нулевой суммой
       if (visits.length === 0 && editMode) {
         logger.log('📝 Режим редактирования: visits пустой, обновляем только данные пациента через patients API');
-        
+
         // Обновляем данные пациента через отдельный endpoint
         const patientUpdateData = {
           full_name: wizardData.patient.fio || wizardData.patient.name,
@@ -1871,12 +1946,12 @@ const AppointmentWizardV2 = ({
           sex: wizardData.patient.gender === 'male' ? 'M' : wizardData.patient.gender === 'female' ? 'F' : null,
           address: wizardData.patient.address
         };
-        
+
         // Удаляем undefined значения
-        Object.keys(patientUpdateData).forEach(key => 
+        Object.keys(patientUpdateData).forEach(key =>
           patientUpdateData[key] === undefined && delete patientUpdateData[key]
         );
-        
+
         try {
           // ✅ ИСПРАВЛЕНО Bug 1: API_BASE уже содержит '/api/v1', не дублируем префикс
           const patientResponse = await fetch(`${API_BASE}/patients/${patientId}`, {
@@ -1887,12 +1962,29 @@ const AppointmentWizardV2 = ({
             },
             body: JSON.stringify(patientUpdateData)
           });
-          
+
           if (patientResponse.ok) {
             logger.log('✅ Данные пациента успешно обновлены');
             // ✅ ИСПРАВЛЕНО: Очищаем draft после успешного обновления
             localStorage.removeItem(DRAFT_KEY);
             toast.success('Данные пациента обновлены');
+
+            // ✅ НОВОЕ: Обработка удаленных записей очереди (для patient update path)
+            const currentQueueIds = new Set(
+              wizardData.cart.items
+                .map(item => item.original_queue_id)
+                .filter(id => id)
+            );
+
+            const removedQueueIds = Array.from(originalQueueIds).filter(id => !currentQueueIds.has(id));
+
+            if (removedQueueIds.length > 0) {
+              logger.log(`🗑️ Найдены удаленные записи очереди (Update Path): ${removedQueueIds.join(', ')}`);
+              // Non-blocking cleanup
+              Promise.all(removedQueueIds.map(id => api.post(`/online-queue/entries/${id}/cancel`)))
+                .catch(e => logger.error('❌ Ошибка отмены записей:', e));
+            }
+
             onComplete?.({ success: true, message: 'Данные пациента обновлены' });
             onClose();
             return;
@@ -1906,7 +1998,7 @@ const AppointmentWizardV2 = ({
           // Продолжаем с обычным flow (хотя visits пустой, это не должно произойти)
         }
       }
-      
+
       const cartData = {
         patient_id: patientId,
         visits: visits,
@@ -1939,6 +2031,23 @@ const AppointmentWizardV2 = ({
         }
 
         toast.success(editMode ? 'Запись обновлена!' : 'Запись создана успешно!');
+
+        // ✅ НОВОЕ: Обработка удаленных записей очереди (для cart creation path)
+        const currentQueueIds = new Set(
+          wizardData.cart.items
+            .map(item => item.original_queue_id)
+            .filter(id => id)
+        );
+
+        const removedQueueIds = Array.from(originalQueueIds).filter(id => !currentQueueIds.has(id));
+
+        if (removedQueueIds.length > 0) {
+          logger.log(`🗑️ Найдены удаленные записи очереди (Cart Path): ${removedQueueIds.join(', ')}`);
+          // Non-blocking cleanup
+          Promise.all(removedQueueIds.map(id => api.post(`/online-queue/entries/${id}/cancel`)))
+            .catch(e => logger.error('❌ Ошибка отмены записей:', e));
+        }
+
         onComplete?.(result);
         onClose();
       } else {
@@ -3038,23 +3147,23 @@ const CartStepV2 = ({
     return filtered.filter(service => {
       const normalizedCategory = service.category_code ? normalizeCategoryCode(service.category_code) : 'other';
       const isConsultation = service.name.toLowerCase().includes('консультация');
-      
+
       // ✅ Проверка на ЭКГ, ЭхоКГ и рентгенографию по service_code и названию
       const serviceCode = service.service_code ? String(service.service_code).toUpperCase() : '';
       const serviceName = service.name ? service.name.toLowerCase() : '';
-      
-      const isECG = serviceCode === 'K10' || 
-                    serviceCode.includes('ECG') || 
-                    serviceName.includes('экг');
-      
-      const isEchoCG = serviceCode === 'K11' || 
-                       serviceCode.includes('ECHO') || 
-                       serviceName.includes('эхокг') || 
-                       serviceName.includes('эхо-кг');
-      
+
+      const isECG = serviceCode === 'K10' ||
+        serviceCode.includes('ECG') ||
+        serviceName.includes('экг');
+
+      const isEchoCG = serviceCode === 'K11' ||
+        serviceCode.includes('ECHO') ||
+        serviceName.includes('эхокг') ||
+        serviceName.includes('эхо-кг');
+
       // ✅ Рентгенография зубов: S-коды (стоматология) + название содержит "рентген"
       const isDentalXRay = (serviceCode.startsWith('S') && serviceCode.match(/^S\d+$/)) &&
-                           (serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes('рентгенография'));
+        (serviceName.includes('рентген') || serviceName.includes('рентгено') || serviceName.includes('x-ray') || serviceName.includes('xray') || serviceName.includes('рентгенография'));
 
       switch (activeCategory) {
         case 'specialists':
@@ -3234,36 +3343,36 @@ const CartStepV2 = ({
             {cart.items.map(item => {
               // ✅ SSOT: Используем единую функцию для получения названия услуги
               const displayName = getServiceName ? getServiceName(item) : (item.service_name || 'Неизвестная услуга');
-              
+
               return (
-              <div key={item.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 8px',
-                background: 'var(--mac-bg-secondary)',
-                border: '1px solid var(--mac-border)',
-                borderRadius: 'var(--mac-radius-sm)',
-                fontSize: 'var(--mac-font-size-xs)',
-                whiteSpace: 'nowrap'
-              }}>
-                <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
-                  {displayName}
-                </span>
-                <button
-                  onClick={() => onRemoveFromCart(item.id)}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--mac-danger)',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex'
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
+                <div key={item.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 8px',
+                  background: 'var(--mac-bg-secondary)',
+                  border: '1px solid var(--mac-border)',
+                  borderRadius: 'var(--mac-radius-sm)',
+                  fontSize: 'var(--mac-font-size-xs)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={displayName}>
+                    {displayName}
+                  </span>
+                  <button
+                    onClick={() => onRemoveFromCart(item.id)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--mac-danger)',
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'flex'
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               );
             })}
           </div>

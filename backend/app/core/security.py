@@ -93,7 +93,13 @@ def require_roles(*roles: str):
         role_lower = str(role).lower() if role else ""
         allowed_roles_lower = [r.lower() for r in roles]
 
+        # ✅ DEBUG LOG: Explicitly log the mismatch
+        print(f"DEBUG: Checking roles for user {current_user.id} ({current_user.username})")
+        print(f"DEBUG: User Role: '{role}', Normalized: '{role_lower}'")
+        print(f"DEBUG: Required Roles: {roles}, Normalized: {allowed_roles_lower}")
+
         if role_lower not in allowed_roles_lower:
+            print(f"DEBUG: ACCESS DENIED for user {current_user.username}")
             # ✅ AUDIT LOG: Логируем попытку несанкционированного доступа
             from app.core.audit import log_critical_change
             
@@ -121,6 +127,15 @@ def require_roles(*roles: str):
                     f"roles={roles}, user_role={role}. Audit log may be incomplete."
                 )
             
+            # ✅ DEBUG LOG: Explicitly log the mismatch
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                f"ACCESS DENIED DEBUG: User={current_user.username} (ID={current_user.id}), "
+                f"RoleInDB='{role}' (normalized='{role_lower}'), "
+                f"Required='{roles}' (normalized='{allowed_roles_lower}')"
+            )
+
             # ✅ FIX: Всегда логируем 403, даже если request недоступен (для безопасности)
             try:
                 log_critical_change(

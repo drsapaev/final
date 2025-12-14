@@ -140,12 +140,25 @@ class OnlineQueueEntry(Base):
     # Статус
     status: Mapped[str] = mapped_column(
         String(20), default="waiting", nullable=False
-    )  # waiting, called, served, no_show
+    )  # waiting, called, in_service, diagnostics, served, incomplete, no_show, cancelled
+
+    # ✅ НОВОЕ: Дополнительные поля для статусов
+    incomplete_reason: Mapped[Optional[str]] = mapped_column(
+        String(200), nullable=True
+    )  # Причина incomplete: "Пациент ушёл", "Не вернулся" и т.д.
+    diagnostics_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )  # Время начала обследования (для таймера)
 
     # Время регистрации в очереди
     queue_time: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
+
+    # ✅ НОВОЕ: Приоритет (для вставки "следующим")
+    priority: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )  # 0 = обычный, 1 = следующий (восстановленный), 2 = VIP
 
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True

@@ -4,23 +4,31 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Button, 
-  Alert, 
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Alert,
   CircularProgress,
-  Badge,
-  Select,
-  Option,
-  Input,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Grid
 } from '../ui/macos';
+
+// MUI imports - using MUI Select for compatibility with FormControl/MenuItem
+import {
+  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip
+} from '@mui/material';
+
 import {
   CreditCard,
   Banknote,
@@ -32,19 +40,28 @@ import {
 
 // API клиент
 import { api as apiClient, getToken } from '../../api/client';
-
+import { useTheme } from '../../contexts/ThemeContext';
 import logger from '../../utils/logger';
-const PaymentWidget = ({ 
-  visitId, 
-  amount, 
+
+const PaymentWidget = ({
+  visitId,
+  amount,
   currency = 'UZS',
   description = 'Оплата медицинских услуг',
   onSuccess,
   onError,
-  onCancel 
+  onCancel
 }) => {
   const theme = useTheme();
-  
+
+  // Icon aliases
+  const CreditCardIcon = CreditCard;
+  const PaymentIcon = Banknote;
+  const BankIcon = Building;
+  const CheckIcon = CheckCircle;
+  const ErrorIcon = XCircle;
+  const InfoIcon = Info;
+
   // Состояния
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -57,9 +74,9 @@ const PaymentWidget = ({
 
   // Иконки провайдеров
   const providerIcons = {
-    click: <CreditCardIcon sx={{ color: '#00AAFF' }} />,
-    payme: <PaymentIcon sx={{ color: '#00C851' }} />,
-    kaspi: <BankIcon sx={{ color: '#FF6B35' }} />
+    click: <CreditCardIcon style={{ color: '#00AAFF' }} />,
+    payme: <PaymentIcon style={{ color: '#00C851' }} />,
+    kaspi: <BankIcon style={{ color: '#FF6B35' }} />
   };
 
   // Цвета провайдеров
@@ -78,15 +95,15 @@ const PaymentWidget = ({
     try {
       setProvidersLoading(true);
       const response = await apiClient.get('/payments/providers');
-      
+
       if (response.data?.providers) {
         // Фильтруем активные провайдеры по валюте
         const availableProviders = response.data.providers.filter(
-          provider => provider.is_active && 
-          provider.supported_currencies.includes(currency)
+          provider => provider.is_active &&
+            provider.supported_currencies.includes(currency)
         );
         setProviders(availableProviders);
-        
+
         // Автовыбор первого доступного провайдера
         if (availableProviders.length > 0) {
           setSelectedProvider(availableProviders[0].code);
@@ -114,7 +131,7 @@ const PaymentWidget = ({
       tokenLength: token ? token.length : 0,
       tokenStart: token ? token.substring(0, 20) + '...' : 'null'
     });
-    
+
     if (!token) {
       setError('Для оплаты требуется авторизация. Пожалуйста, войдите в систему.');
       if (onError) {
@@ -138,31 +155,31 @@ const PaymentWidget = ({
       };
 
       // Используем тестовый endpoint если токен демо
-      const token = getToken();
-      const isTestToken = token === 'demo_token_for_ui_testing';
+      const currentToken = getToken();
+      const isTestToken = currentToken === 'demo_token_for_ui_testing';
       const endpoint = isTestToken ? '/payments/test-init' : '/payments/init';
-      
+
       logger.log('📤 Отправляем запрос платежа:', {
         endpoint,
         isTestToken,
         hasAuthHeader: !!apiClient.defaults.headers.common['Authorization'],
-        authHeader: apiClient.defaults.headers.common['Authorization'] ? 
+        authHeader: apiClient.defaults.headers.common['Authorization'] ?
           apiClient.defaults.headers.common['Authorization'].substring(0, 30) + '...' : 'none',
         paymentRequest
       });
-      
+
       const response = await apiClient.post(endpoint, paymentRequest);
-      
+
       if (response.data?.success) {
         setPaymentData(response.data);
         setPaymentStatus('initialized');
-        
+
         // Если есть URL для оплаты, открываем его
         if (response.data.payment_url) {
           window.open(response.data.payment_url, '_blank');
           setPaymentStatus('redirected');
         }
-        
+
         // Уведомляем родительский компонент
         if (onSuccess) {
           onSuccess(response.data);
@@ -174,7 +191,7 @@ const PaymentWidget = ({
       logger.error('Ошибка инициализации платежа:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Ошибка обработки платежа';
       setError(errorMessage);
-      
+
       if (onError) {
         onError(errorMessage);
       }
@@ -189,10 +206,10 @@ const PaymentWidget = ({
 
     try {
       const response = await apiClient.get(`/payments/${paymentData.payment_id}/status`);
-      
+
       if (response.data?.status) {
         setPaymentStatus(response.data.status);
-        
+
         if (response.data.status === 'completed' && onSuccess) {
           onSuccess(response.data);
         }
@@ -207,7 +224,7 @@ const PaymentWidget = ({
     setPaymentData(null);
     setPaymentStatus('pending');
     setError(null);
-    
+
     if (onCancel) {
       onCancel();
     }
@@ -219,12 +236,12 @@ const PaymentWidget = ({
   };
 
   // Форматирование суммы
-  const formatAmount = (amount, currency) => {
+  const formatAmount = (amountValue, currencyCode) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
-      currency: currency === 'UZS' ? 'UZS' : currency === 'KZT' ? 'KZT' : 'USD',
+      currency: currencyCode === 'UZS' ? 'UZS' : currencyCode === 'KZT' ? 'KZT' : 'USD',
       minimumFractionDigits: 0
-    }).format(amount);
+    }).format(amountValue);
   };
 
   // Рендер статуса платежа
@@ -246,10 +263,10 @@ const PaymentWidget = ({
         return (
           <Alert severity="info" icon={<InfoIcon />}>
             Перенаправление на страницу оплаты...
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               onClick={checkPaymentStatus}
-              sx={{ ml: 2 }}
+              style={{ marginLeft: 16 }}
             >
               Проверить статус
             </Button>
@@ -276,9 +293,9 @@ const PaymentWidget = ({
     return (
       <Card>
         <CardContent>
-          <Box display="flex" justifyContent="center" alignItems="center" p={3}>
+          <Box display="flex" justifyContent="center" alignItems="center" style={{ padding: 24 }}>
             <CircularProgress />
-            <Typography variant="body1" sx={{ ml: 2 }}>
+            <Typography variant="body1" style={{ marginLeft: 16 }}>
               Загрузка способов оплаты...
             </Typography>
           </Box>
@@ -303,41 +320,42 @@ const PaymentWidget = ({
     <Card elevation={3}>
       <CardContent>
         {/* Заголовок */}
-        <Box display="flex" alignItems="center" mb={3}>
-          <PaymentIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+        <Box display="flex" alignItems="center" style={{ marginBottom: 24 }}>
+          <PaymentIcon style={{ marginRight: 8, color: theme?.palette?.primary?.main || '#007AFF' }} />
           <Typography variant="h6" component="h2">
             Оплата услуг
           </Typography>
         </Box>
 
         {/* Информация о платеже */}
-        <Box mb={3}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+        <Box style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: '1 1 200px' }}>
               <Typography variant="body2" color="textSecondary">
                 Сумма к оплате:
               </Typography>
-              <Typography variant="h5" color="primary" fontWeight="bold">
+              <Typography variant="h5" color="primary" style={{ fontWeight: 'bold' }}>
                 {formatAmount(amount, currency)}
               </Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
+            </div>
+            <div style={{ flex: '1 1 200px' }}>
               <Typography variant="body2" color="textSecondary">
                 Описание:
               </Typography>
               <Typography variant="body1">
                 {description}
               </Typography>
-            </Grid>
-          </Grid>
+            </div>
+          </div>
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider style={{ marginBottom: 24 }} />
 
         {/* Выбор провайдера */}
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <InputLabel>Способ оплаты</InputLabel>
+        <FormControl fullWidth style={{ marginBottom: 24 }}>
+          <InputLabel id="payment-provider-label">Способ оплаты</InputLabel>
           <Select
+            labelId="payment-provider-label"
             value={selectedProvider}
             onChange={(e) => setSelectedProvider(e.target.value)}
             label="Способ оплаты"
@@ -347,14 +365,14 @@ const PaymentWidget = ({
               <MenuItem key={provider.code} value={provider.code}>
                 <Box display="flex" alignItems="center">
                   {providerIcons[provider.code]}
-                  <Typography sx={{ ml: 1, textTransform: 'capitalize' }}>
+                  <Typography style={{ marginLeft: 8, textTransform: 'capitalize' }}>
                     {provider.name}
                   </Typography>
-                  <Chip 
+                  <Chip
                     label={provider.supported_currencies.join(', ')}
                     size="small"
-                    sx={{ 
-                      ml: 'auto',
+                    style={{
+                      marginLeft: 'auto',
                       backgroundColor: providerColors[provider.code] + '20',
                       color: providerColors[provider.code]
                     }}
@@ -370,13 +388,13 @@ const PaymentWidget = ({
 
         {/* Ошибки */}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="error" style={{ marginBottom: 24 }}>
             {error}
           </Alert>
         )}
 
         {/* Кнопки действий */}
-        <Box display="flex" gap={2} mt={3}>
+        <Box display="flex" style={{ gap: 16, marginTop: 24 }}>
           <Button
             variant="contained"
             color="primary"
@@ -384,11 +402,17 @@ const PaymentWidget = ({
             fullWidth
             onClick={confirmPayment}
             disabled={loading || !selectedProvider || paymentStatus === 'completed'}
-            startIcon={loading ? <CircularProgress size={20} /> : providerIcons[selectedProvider]}
           >
-            {loading ? 'Обработка...' : `Оплатить ${formatAmount(amount, currency)}`}
+            {loading ? (
+              <>
+                <CircularProgress size={20} style={{ marginRight: 8 }} />
+                Обработка...
+              </>
+            ) : (
+              `Оплатить ${formatAmount(amount, currency)}`
+            )}
           </Button>
-          
+
           {paymentStatus !== 'pending' && (
             <Button
               variant="outlined"
@@ -409,7 +433,7 @@ const PaymentWidget = ({
             <Typography variant="body1" gutterBottom>
               Вы собираетесь оплатить:
             </Typography>
-            <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1, mb: 2 }}>
+            <Box style={{ padding: 16, backgroundColor: '#f5f5f5', borderRadius: 4, marginBottom: 16 }}>
               <Typography variant="h6" color="primary">
                 {formatAmount(amount, currency)}
               </Typography>
@@ -425,8 +449,8 @@ const PaymentWidget = ({
             <Button onClick={() => setShowConfirmDialog(false)}>
               Отмена
             </Button>
-            <Button 
-              variant="contained" 
+            <Button
+              variant="contained"
               onClick={() => {
                 setShowConfirmDialog(false);
                 initializePayment();
@@ -443,4 +467,3 @@ const PaymentWidget = ({
 };
 
 export default PaymentWidget;
-

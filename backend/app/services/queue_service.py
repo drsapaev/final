@@ -217,6 +217,7 @@ class QueueBusinessService:
         daily_queue: DailyQueue,
         phone: Optional[str] = None,
         telegram_id: Optional[str] = None,
+        source: str = "online",  # ✅ Added source parameter
     ) -> Tuple[Optional[OnlineQueueEntry], str]:
         """
         Проверить уникальность записи
@@ -226,8 +227,15 @@ class QueueBusinessService:
         """
         if not phone and not telegram_id:
             return None, ""
+            
+        # ✅ SKIP CHECK for trusted sources (desk, morning_assignment)
+        # This allows registrars to add multiple services/appointments for the same patient
+        # The uniqueness check is primarily for online/QR users to prevent spam
+        # We need to pass 'source' to check_uniqueness or check it before calling
+        # ✅ ALLOW DUPLICATES for trusted sources
+        if source in ["desk", "morning_assignment"]:
+            return None, "" 
 
-        # Проверяем по телефону
         if phone:
             phone_entry = (
                 db.query(OnlineQueueEntry)
@@ -776,7 +784,7 @@ class QueueBusinessService:
             raise QueueConflictError(limits_message)
 
         existing_entry, duplicate_reason = self.check_uniqueness(
-            db, daily_queue, phone, telegram_id
+            db, daily_queue, phone, telegram_id, source=source
         )
 
         queue_length_before = (

@@ -704,6 +704,195 @@ def deactivate_qr_token(
     return {"message": "QR токен успешно деактивирован"}
 
 
+# ===================== УПРАВЛЕНИЕ СТАТУСАМИ ОЧЕРЕДИ =====================
+
+
+class RestoreToNextRequest(BaseModel):
+    """Запрос на восстановление пациента следующим в очереди"""
+    reason: Optional[str] = Field(None, description="Причина восстановления")
+
+
+class SetIncompleteRequest(BaseModel):
+    """Запрос на установку статуса incomplete"""
+    reason: str = Field(..., min_length=3, max_length=200, description="Причина незавершённости")
+
+
+@router.post("/entry/{entry_id}/restore-next")
+def restore_entry_to_next(
+    entry_id: int,
+    request: RestoreToNextRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
+):
+    """
+    Восстанавливает пациента no_show как следующего в очереди
+    Устанавливает priority=1 для приоритетной обработки
+    """
+    from app.models.online_queue import OnlineQueueEntry
+    
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись в очереди не найдена"
+        )
+    
+    if entry.status not in ["no_show", "cancelled"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Можно восстановить только записи со статусом no_show или cancelled, текущий: {entry.status}"
+        )
+    
+    # Восстанавливаем с приоритетом "следующий"
+    entry.status = "waiting"
+    entry.priority = 1  # Следующий в очереди
+    db.commit()
+    
+    logger.info(
+        "[restore_entry_to_next] Запись %d восстановлена следующей по запросу пользователя %d",
+        entry_id,
+        current_user.id
+    )
+    
+    return {
+        "success": True,
+        "message": "Пациент восстановлен как следующий в очереди",
+        "entry_id": entry_id,
+        "new_status": "waiting",
+        "priority": 1
+    }
+
+
+@router.post("/entry/{entry_id}/no-show")
+def mark_entry_no_show(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
+):
+    """
+    Отмечает пациента как неявившегося (no_show)
+    """
+    from app.models.online_queue import OnlineQueueEntry
+    
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись в очереди не найдена"
+        )
+    
+    if entry.status not in ["waiting", "called"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Неявку можно отметить только для waiting или called, текущий: {entry.status}"
+        )
+    
+    entry.status = "no_show"
+    db.commit()
+    
+    logger.info(
+        "[mark_entry_no_show] Запись %d отмечена как no_show пользователем %d",
+        entry_id,
+        current_user.id
+    )
+    
+    return {
+        "success": True,
+        "message": "Пациент отмечен как неявившийся",
+        "entry_id": entry_id,
+        "new_status": "no_show"
+    }
+
+
+@router.post("/entry/{entry_id}/diagnostics")
+def send_entry_to_diagnostics(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
+):
+    """
+    Отправляет пациента на обследование (diagnostics)
+    Запускает таймер ожидания
+    """
+    from app.models.online_queue import OnlineQueueEntry
+    
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись в очереди не найдена"
+        )
+    
+    if entry.status not in ["called", "in_service"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"На обследование можно отправить только called или in_service, текущий: {entry.status}"
+        )
+    
+    entry.status = "diagnostics"
+    entry.diagnostics_started_at = datetime.utcnow()
+    db.commit()
+    
+    logger.info(
+        "[send_entry_to_diagnostics] Запись %d отправлена на диагностику пользователем %d",
+        entry_id,
+        current_user.id
+    )
+    
+    return {
+        "success": True,
+        "message": "Пациент отправлен на обследование",
+        "entry_id": entry_id,
+        "new_status": "diagnostics",
+        "started_at": entry.diagnostics_started_at.isoformat() + "Z"
+    }
+
+
+@router.post("/entry/{entry_id}/incomplete")
+def mark_entry_incomplete(
+    entry_id: int,
+    request: SetIncompleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Doctor", "Registrar")),
+):
+    """
+    Завершает приём с указанием причины незавершённости (incomplete)
+    """
+    from app.models.online_queue import OnlineQueueEntry
+    
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись в очереди не найдена"
+        )
+    
+    if entry.status not in ["called", "in_service", "diagnostics"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Incomplete можно установить только для called/in_service/diagnostics, текущий: {entry.status}"
+        )
+    
+    entry.status = "incomplete"
+    entry.incomplete_reason = request.reason
+    db.commit()
+    
+    logger.info(
+        "[mark_entry_incomplete] Запись %d отмечена как incomplete (причина: %s) пользователем %d",
+        entry_id,
+        request.reason,
+        current_user.id
+    )
+    
+    return {
+        "success": True,
+        "message": "Приём отмечен как незавершённый",
+        "entry_id": entry_id,
+        "new_status": "incomplete",
+        "reason": request.reason
+    }
+
+
 # ===================== СТАТИСТИКА И АНАЛИТИКА =====================
 
 

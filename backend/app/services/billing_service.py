@@ -812,7 +812,11 @@ class BillingService:
         }
 
         if current_status in allowed_transitions:
-            if new_status_lower not in allowed_transitions[current_status]:
+            # Allow same-status transitions (idempotent updates)
+            if new_status_lower == current_status:
+                # No status change - just update metadata if provided
+                pass
+            elif new_status_lower not in allowed_transitions[current_status]:
                 raise ValueError(
                     f"Переход статуса с '{current_status}' на '{new_status}' недопустим"
                 )

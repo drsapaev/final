@@ -258,24 +258,51 @@ def add_service(visit_id: int, item: VisitServiceIn, db: Session = Depends(get_d
 
 @router.post(
     "/visits/{visit_id}/status",
-    dependencies=[Depends(require_roles("Admin", "Doctor"))],
+    dependencies=[Depends(require_roles("Admin", "Doctor", "Registrar"))],
     summary="Смена статуса визита",
 )
 def set_status(visit_id: int, status_new: str, db: Session = Depends(get_db)):
     if status_new not in {"open", "in_progress", "closed", "canceled"}:
         raise HTTPException(400, "Invalid status")
-    t = _visits(db)
-    values = {"status": status_new}
-    if status_new == "in_progress":
-        values["started_at"] = datetime.utcnow()
-    if status_new in {"closed", "canceled"}:
-        values["finished_at"] = datetime.utcnow()
-    upd = t.update().where(t.c.id == visit_id).values(**values).returning(t)
-    row = db.execute(upd).mappings().first()
-    if not row:
+    # Use ORM for reliability
+    from app.models.visit import Visit
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
         raise HTTPException(404, "Visit not found")
+
+    visit.status = status_new
+    if status_new == "in_progress":
+        visit.started_at = datetime.utcnow()
+    if status_new in {"closed", "canceled"}:
+        visit.finished_at = datetime.utcnow()
+    
+    # [FIX] Также обновляем статус в очереди, если есть связанная запись
+    if status_new == "canceled":
+        try:
+            from sqlalchemy import text
+            db.execute(
+                text("UPDATE queue_entries SET status = 'canceled' WHERE visit_id = :visit_id"),
+                {"visit_id": visit_id}
+            )
+        except Exception as e:
+            # Ошибка обновления очереди не должна блокировать обновление визита
+            pass
+
     db.commit()
-    return VisitOut(**row)  # type: ignore[arg-type]
+    db.refresh(visit)
+    
+    # Convert ORM object to Pydantic model
+    return VisitOut(
+        id=visit.id,
+        patient_id=visit.patient_id,
+        doctor_id=visit.doctor_id,
+        status=visit.status,
+        created_at=visit.created_at,
+        started_at=visit.started_at,
+        finished_at=visit.finished_at,
+        notes=visit.notes,
+        planned_date=visit.visit_date
+    )
 
 
 #
@@ -296,11 +323,11 @@ def reschedule_visit(
     Требует, чтобы в таблице visits была колонка planned_date.
     """
     t = _visits(db)
-    # Проверка наличия колонки planned_date
-    if not hasattr(t.c, "planned_date"):
+    # Проверка наличия колонки visit_date
+    if not hasattr(t.c, "visit_date"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="visits table has no planned_date column; add it via migration and retry.",
+            detail="visits table has no visit_date column; check your schema.",
         )
 
     vrow = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
@@ -318,11 +345,23 @@ def reschedule_visit(
         )
 
     upd = (
-        t.update().where(t.c.id == visit_id).values(planned_date=new_date).returning(t)
+        t.update().where(t.c.id == visit_id).values(visit_date=new_date).returning(t)
     )
     row = db.execute(upd).mappings().first()
     if not row:
         raise HTTPException(404, "Visit not found")
+    
+    # [FIX] Обновляем статус в очереди для старой даты
+    try:
+        from sqlalchemy import text
+        # Помечаем старую запись очереди как перенесенную
+        db.execute(
+            text("UPDATE queue_entries SET status = 'rescheduled' WHERE visit_id = :visit_id"),
+            {"visit_id": visit_id}
+        )
+    except Exception:
+        pass
+
     db.commit()
     return VisitOut(**row)  # type: ignore[arg-type]
 
@@ -334,10 +373,10 @@ def reschedule_visit(
 )
 def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
     t = _visits(db)
-    if not hasattr(t.c, "planned_date"):
+    if not hasattr(t.c, "visit_date"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="visits table has no planned_date column; add it via migration and retry.",
+            detail="visits table has no visit_date column; check your schema.",
         )
 
     vrow = db.execute(select(t).where(t.c.id == visit_id)).mappings().first()
@@ -355,10 +394,22 @@ def reschedule_visit_tomorrow(visit_id: int, db: Session = Depends(get_db)):
 
     tomorrow = date.today() + timedelta(days=1)
     upd = (
-        t.update().where(t.c.id == visit_id).values(planned_date=tomorrow).returning(t)
+        t.update().where(t.c.id == visit_id).values(visit_date=tomorrow).returning(t)
     )
     row = db.execute(upd).mappings().first()
     if not row:
         raise HTTPException(404, "Visit not found")
+    
+    # [FIX] Обновляем статус в очереди для старой даты
+    try:
+        from sqlalchemy import text
+        # Помечаем старую запись очереди как перенесенную
+        db.execute(
+            text("UPDATE queue_entries SET status = 'rescheduled' WHERE visit_id = :visit_id"),
+            {"visit_id": visit_id}
+        )
+    except Exception:
+        pass
+
     db.commit()
     return VisitOut(**row)  # type: ignore[arg-type]

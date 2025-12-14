@@ -1679,6 +1679,7 @@ def get_today_queues(
                 address = None
                 services = []
                 service_codes = []
+                service_details = []  # ✅ НОВОЕ: Полные данные услуг для редактирования
                 total_cost = 0
                 source = "desk"
                 entry_status = "waiting"
@@ -1812,6 +1813,15 @@ def get_today_queues(
                             service_codes.append(service_code_to_use)
                         elif vs.name:
                             services.append(vs.name)
+
+                        # ✅ НОВОЕ: Собираем полные данные услуг для service_details
+                        if svc:
+                            service_details.append({
+                                "id": svc.id,
+                                "code": service_code_to_use or svc.code,
+                                "name": svc.name,
+                                "price": float(svc.price) if svc.price else 0
+                            })
 
                         if vs.price:
                             total_cost += float(vs.price) * (vs.qty or 1)
@@ -2011,6 +2021,34 @@ def get_today_queues(
                     total_cost = online_entry.total_amount or 0
                     appointment_id_value = record_id
 
+                    # ✅ НОВОЕ: Формируем service_details из services JSON
+                    if online_entry.services:
+                        parsed_services = online_entry.services
+                        if isinstance(parsed_services, str):
+                            import json
+                            try:
+                                parsed_services = json.loads(parsed_services)
+                            except:
+                                parsed_services = []
+                        
+                        if isinstance(parsed_services, list):
+                            for svc in parsed_services:
+                                if isinstance(svc, dict):
+                                    service_details.append({
+                                        "id": svc.get("id") or svc.get("service_id"),
+                                        "code": svc.get("code") or svc.get("service_code"),
+                                        "name": svc.get("name") or svc.get("service_name"),
+                                        "price": float(svc.get("price", 0)) if svc.get("price") else 0
+                                    })
+                                elif isinstance(svc, str):
+                                    # Если только название - добавляем как есть
+                                    service_details.append({
+                                        "id": None,
+                                        "code": None,
+                                        "name": svc,
+                                        "price": 0
+                                    })
+
                 # [OK] УПРОЩЕНО: Добавляем appointment_id для Visit (если был создан соответствующий Appointment)
                 # Используем проверки вместо try/except (Single Source of Truth)
                 appointment_id_value = record_id
@@ -2191,6 +2229,7 @@ def get_today_queues(
                         "address": address,
                         "services": services,
                         "service_codes": service_codes,
+                        "service_details": service_details,  # ✅ НОВОЕ: Полные данные услуг для редактирования
                         "cost": total_cost,
                         "payment_status": (
                             "paid" if discount_mode == "paid" else "pending"
@@ -2451,8 +2490,8 @@ def create_queue_entries_batch(
                 .first()
             )
 
-            if existing_queue:
-                # Проверяем дубликаты
+            if existing_queue and request.source == "online":
+                # Проверяем дубликаты (только для онлайн записи)
                 existing_entry = (
                     db.query(OnlineQueueEntry)
                     .filter(

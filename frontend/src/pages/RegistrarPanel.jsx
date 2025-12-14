@@ -60,8 +60,11 @@ const RegistrarPanel = () => {
 
   // Состояния для печати
   const [printDialog, setPrintDialog] = useState({ open: false, type: '', data: null });
+  const [printData, setPrintData] = useState(null);
   const [cancelDialog, setCancelDialog] = useState({ open: false, row: null, reason: '' });
   const [paymentDialog, setPaymentDialog] = useState({ open: false, row: null, paid: false, source: null });
+  // ✅ State for rescheduling
+  const [rescheduleData, setRescheduleData] = useState(null);
 
   const [contextMenu, setContextMenu] = useState({ open: false, row: null, position: { x: 0, y: 0 } });
 
@@ -1088,7 +1091,7 @@ const RegistrarPanel = () => {
                     logger.error('❌ Запись без ID:', { entry, fullEntry, entryType });
                     return; // Пропускаем записи без ID
                   }
-                  
+
                   // ✅ ОТЛАДКА: Логируем структуру для QR-записей
                   if (entryType === 'online_queue' || entry.source === 'online') {
                     logger.info(`🔍 QR-запись структура: entry.type=${entry.type}, fullEntry.type=${fullEntry?.type}, entry.record_type=${entry.record_type}, patient_id=${fullEntry?.patient_id || entry?.patient_id}`);
@@ -1255,13 +1258,14 @@ const RegistrarPanel = () => {
                     payment_status: paymentStatus,
                     source,
                     status,
+                    record_type: entryType, // ✅ ВАЖНО: сохраняем тип записи (visit, appointment, online_queue)
                     created_at: createdAt,
                     queue_time: queueTime,  // ⭐ ВАЖНО: queue_time для сортировки (приоритет над created_at)
                     called_at: calledAt,
                     visit_time: visitTime,
                     discount_mode: discountMode,
                     approval_status: approvalStatus, // ✅ ДОБАВЛЕНО: approval_status
-                    record_type: fullEntry.record_type || 'visit',
+
                     specialty: queue.specialty || null,
                     department: queue.specialty || null,
                     department_key: fullEntry.department_key || null  // ✅ ДОБАВЛЕНО: для фильтрации по динамическим отделениям
@@ -1296,7 +1300,7 @@ const RegistrarPanel = () => {
           // ✅ ИСПРАВЛЕНО: Преобразуем Map в массив
           appointmentsData = Array.from(appointmentsMap.values());
           logger.info(`📊 После первой дедупликации: ${appointmentsData.length} записей`);
-          
+
           // ✅ ОТЛАДКА: Логируем QR-записи
           const qrAppointments = appointmentsData.filter(a => a.source === 'online');
           logger.info(`🔍 QR-записей после первой дедупликации: ${qrAppointments.length}`);
@@ -1309,7 +1313,7 @@ const RegistrarPanel = () => {
           const getAppointmentKey = (appointment) => {
             const patientKey = appointment.patient_id || appointment.patient_phone || appointment.patient_fio || appointment.id;
             const dateKey = appointment.date || appointment.appointment_date || appointment.visit_date || '';
-            
+
             // ✅ ИСПРАВЛЕНО: Для QR-записей (source='online') НЕ используем specialty в ключе,
             // чтобы записи с несколькими специальностями оставались объединенными
             // Для других записей используем specialty для разделения по отделениям
@@ -1317,7 +1321,7 @@ const RegistrarPanel = () => {
               // Для QR-записей используем только patient_id + date
               return `online_${patientKey || 'unknown'}__${dateKey}`;
             }
-            
+
             const specialtyKey = (appointment.specialty || appointment.department || '').toString().toLowerCase() || 'unknown';
             // ✅ Для обычных записей добавляем specialty в ключ, чтобы одна запись пациента на один день
             // создавалась отдельно для каждого отделения (cardio, lab, derma и т.д.)
@@ -1403,6 +1407,7 @@ const RegistrarPanel = () => {
             if (preferred.payment_type !== undefined) merged.payment_type = preferred.payment_type;
             if (preferred.payment_status !== undefined) merged.payment_status = preferred.payment_status;
             if (preferred.cost !== undefined) merged.cost = preferred.cost;
+            if (preferred.record_type) merged.record_type = preferred.record_type; // ✅ MERGE: сохраняем тип записи
 
             return merged;
           };
@@ -1427,7 +1432,7 @@ const RegistrarPanel = () => {
 
           appointmentsData = Array.from(mergedByPatientKey.values());
           logger.info(`📊 После второй дедупликации: ${appointmentsData.length} записей`);
-          
+
           // ✅ ОТЛАДКА: Логируем QR-записи после второй дедупликации
           const qrAppointmentsAfter = appointmentsData.filter(a => a.source === 'online');
           logger.info(`🔍 QR-записей после второй дедупликации: ${qrAppointmentsAfter.length}`);
@@ -1823,14 +1828,17 @@ const RegistrarPanel = () => {
                   created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
                   visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
                   record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
+                  service_details: entry.service_details || [],  // ✅ НОВОЕ: Полные данные услуг
                   queue_numbers: [{
+                    id: entry.id, // ✅ ВАЖНО для AppointmentWizardV2: originalQueueIds использует это поле
                     queue_tag: targetQueue.specialty,
                     queue_name: targetQueue.specialist_name || targetQueue.specialty || 'Очередь',
                     number: entry.number,
                     status: entry.status,
                     specialty: targetQueue.specialty,
                     source: entry.source,
-                    created_at: entry.created_at
+                    created_at: entry.created_at,
+                    service_details: entry.service_details || []  // ✅ НОВОЕ: Полные данные услуг
                   }],
                   confirmation_status: 'none',
                   confirmed_at: null,
@@ -1864,14 +1872,17 @@ const RegistrarPanel = () => {
                     created_at: entry.created_at,  // ✅ ИСПРАВЛЕНО: Добавляем created_at
                     visit_time: entry.visit_time || null,  // ✅ ДОБАВЛЕНО: Время визита
                     record_type: entry.record_type || 'visit',  // ✅ ДОБАВЛЕНО: Тип записи
+                    service_details: entry.service_details || [],  // ✅ НОВОЕ: Полные данные услуг
                     queue_numbers: [{
+                      id: entry.id, // ✅ ВАЖНО для AppointmentWizardV2: originalQueueIds использует это поле
                       queue_tag: queue.specialty,
                       queue_name: queue.specialist_name || queue.specialty || 'Очередь',
                       number: entry.number,
                       status: entry.status,
                       specialty: queue.specialty,
                       source: entry.source,
-                      created_at: entry.created_at
+                      created_at: entry.created_at,
+                      service_details: entry.service_details || []  // ✅ НОВОЕ: Полные данные услуг
                     }],
                     confirmation_status: 'none',
                     confirmed_at: null,
@@ -2430,7 +2441,7 @@ const RegistrarPanel = () => {
       const queueNumberInDepartment = appointment.queue_numbers.some(qn => {
         const qnSpecialty = (qn.specialty || qn.queue_tag || '').toLowerCase().trim();
         const qnQueueTag = (qn.queue_tag || '').toLowerCase().trim();
-        
+
         // Маппинг специальностей на ключи вкладок
         const specialtyToDepartmentMapping = {
           'cardiology': 'cardio',
@@ -2450,17 +2461,17 @@ const RegistrarPanel = () => {
           'laboratory_test': 'lab',
           'procedures': 'procedures'
         };
-        
+
         const mappedSpecialty = specialtyToDepartmentMapping[qnSpecialty] || qnSpecialty;
         const mappedQueueTag = specialtyToDepartmentMapping[qnQueueTag] || qnQueueTag;
-        
+
         // Проверяем совпадение с departmentKey
-        const matches = mappedSpecialty === departmentKey || mappedQueueTag === departmentKey || 
-            qnSpecialty === departmentKey || qnQueueTag === departmentKey;
-        
+        const matches = mappedSpecialty === departmentKey || mappedQueueTag === departmentKey ||
+          qnSpecialty === departmentKey || qnQueueTag === departmentKey;
+
         // Для динамических отделений проверяем по queue_tag напрямую
         const matchesDynamic = isDynamicDepartment && (qnQueueTag === departmentKey || qnSpecialty === departmentKey);
-        
+
         if (matches || matchesDynamic) {
           // ✅ ОТЛАДКА: Логируем успешное совпадение
           if (appointment.source === 'online') {
@@ -2468,15 +2479,15 @@ const RegistrarPanel = () => {
           }
           return true;
         }
-        
+
         return false;
       });
-      
+
       if (queueNumberInDepartment) {
         return true;
       } else if (appointment.source === 'online') {
         // ✅ ОТЛАДКА: Логируем, почему QR-запись не прошла фильтр
-        logger.warn(`⚠️ QR-запись ${appointment.patient_fio} НЕ проходит фильтр ${departmentKey}. Queue_numbers:`, 
+        logger.warn(`⚠️ QR-запись ${appointment.patient_fio} НЕ проходит фильтр ${departmentKey}. Queue_numbers:`,
           appointment.queue_numbers.map(qn => ({ specialty: qn.specialty, queue_tag: qn.queue_tag })));
       }
     }
@@ -2606,8 +2617,8 @@ const RegistrarPanel = () => {
 
     // ✅ ОБНОВЛЕННАЯ СИСТЕМА: маппинг по кодам категорий (согласно новым требованиям)
     const departmentCategoryMapping = {
-      'cardio': ['K', 'ECHO'],   // Кардиология: консультации кардиолога и ЭхоКГ
-      'echokg': ['ECG'],         // 🎯 ЭКГ - отдельная категория (возвращается getServiceCategoryByCode!)
+      'cardio': ['K', 'ECHO', 'ECG'],   // Кардиология: консультации, ЭхоКГ и ЭКГ
+      'echokg': ['ECG', 'ECHO'],        // Функциональная диагностика
       'derma': ['D', 'DERM', 'DERM_PROC'],            // Дерматология: консультация и дерм. процедуры
       'dental': ['S', 'DENT', 'STOM'],           // Стоматология: консультация, рентген
       'lab': ['L'],              // Лаборатория: все лабораторные услуги
@@ -2718,7 +2729,7 @@ const RegistrarPanel = () => {
     if (departmentKey === 'cardio') {
       const hasCardiologyServices = allServiceCodes.some(code => {
         const category = getServiceCategoryByCode(code);
-        return category === 'K' || category === 'ECHO';
+        return category === 'K' || category === 'ECHO' || category === 'ECG';
       });
 
       // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть кардиологическими
@@ -3056,10 +3067,10 @@ const RegistrarPanel = () => {
 
     const getServiceCategoryByCode = (serviceCode) => {
       if (!serviceCode) return null;
-      
+
       // ✅ НОРМАЛИЗУЕМ КОД К ВЕРХНЕМУ РЕГИСТРУ для корректного распознавания
       const normalizedCode = String(serviceCode).toUpperCase();
-      
+
       if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
       if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
       if (normalizedCode.match(/^P\d+$/)) return 'P';
@@ -3168,10 +3179,10 @@ const RegistrarPanel = () => {
           'lab': ['laboratory', 'lab'],
           'procedures': ['procedures']
         };
-        
+
         // Получаем возможные queue_tag для текущей вкладки
         const possibleTags = tabToQueueTagMap[activeTab] || [activeTab];
-        
+
         // Ищем номер очереди, соответствующий текущей вкладке
         let queueNumberFromDB = null;
         if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
@@ -3180,7 +3191,7 @@ const RegistrarPanel = () => {
             const queueTag = (q.queue_tag || q.specialty || '').toString().toLowerCase().trim();
             return possibleTags.some(tag => tag.toLowerCase() === queueTag);
           });
-          
+
           if (matchingQueue) {
             queueNumberFromDB = matchingQueue.number;
             // ✅ ИСПРАВЛЕНО: Сохраняем статус из matchingQueue для правильного отображения цвета
@@ -3251,7 +3262,7 @@ const RegistrarPanel = () => {
       qrInFiltered.forEach(a => {
         logger.info(`  - ${a.patient_fio}: ${a.queue_numbers?.length || 0} queue_numbers`, a.queue_numbers);
       });
-      
+
       const aggregatedPatients = aggregatePatientsForAllDepartments(filtered);
       logger.info(`📊 После агрегации: ${aggregatedPatients.length} пациентов`);
 
@@ -3469,6 +3480,7 @@ const RegistrarPanel = () => {
         setPrintDialog({ open: true, type: 'ticket', data: row });
         break;
       case 'reschedule':
+        setRescheduleData(row);
         setShowSlotsModal(true);
         break;
       case 'cancel':
@@ -4540,6 +4552,78 @@ const RegistrarPanel = () => {
         onClose={() => setCancelDialog({ open: false, row: null, reason: '' })}
         appointment={cancelDialog.row}
         onCancel={async (appointmentId, reason) => {
+          // ✅ FIX: Call backend to cancel visit OR appointment OR queue entry
+          try {
+            const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find(a => a.id === appointmentId);
+            const recordType = data?.record_type || 'visit';
+
+            logger.info(`🔍 Отмена записи ID=${appointmentId}`, {
+              recordType,
+              source: data?.source,
+              fullData: data
+            });
+
+            const tryCancelVisit = async () => {
+              await api.post(`/visits/${appointmentId}/status`, null, {
+                params: { status_new: 'canceled' }
+              });
+            };
+
+            const tryCancelOnlineQueue = async () => {
+              await api.post(`/online-queue/entries/${appointmentId}/cancel`);
+            };
+
+            const tryCancelAppointment = async () => {
+              try {
+                await api.put(`/appointments/${appointmentId}`, { status: 'canceled' });
+              } catch (e) {
+                logger.warn('PUT failed, trying DELETE for appointment cancellation');
+                await api.delete(`/appointments/${appointmentId}`);
+              }
+            };
+
+            if (recordType === 'visit') {
+              try {
+                await tryCancelVisit();
+              } catch (visitError) {
+                if (visitError.response?.status === 404) {
+                  logger.warn(`⚠️ Попытка отмены как 'visit' вернула 404. Пробуем как 'online_queue' (ID=${appointmentId})`);
+                  await tryCancelOnlineQueue();
+                } else {
+                  throw visitError;
+                }
+              }
+            } else if (recordType === 'appointment') {
+              await tryCancelAppointment();
+            } else if (recordType === 'online_queue') {
+              await tryCancelOnlineQueue();
+            } else {
+              // Fallback default strategy
+              try {
+                await tryCancelVisit();
+              } catch (err) {
+                if (err.response?.status === 404) {
+                  logger.warn(`Fallback visit cancel failed 404, trying online_queue...`);
+                  await tryCancelOnlineQueue();
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            logger.info('✅ Запись успешно отменена на сервере');
+          } catch (error) {
+            logger.error('❌ Ошибка отмены визита на сервере:', error);
+
+            // Если это 404 после всех попыток
+            if (error.response?.status === 404) {
+              toast.error(`Ошибка: Запись ${appointmentId} не найдена в базе данных (ни как визит, ни как очередь)`);
+            } else {
+              toast.error('Не удалось обновить статус на сервере: ' + (error.message || 'Unknown error'));
+            }
+            // Don't return here, still update locally to remove from view or let the user know
+          }
+
           // Локальное обновление статуса
           setAppointments(prev => prev.map(apt =>
             apt.id === appointmentId ? {
@@ -4549,6 +4633,9 @@ const RegistrarPanel = () => {
               _cancelReason: reason
             } : apt
           ));
+
+          // Refresh data to ensure consistency
+          setTimeout(() => loadAppointments({ silent: true, source: 'cancel_complete' }), 500);
         }}
       />
 
@@ -4682,13 +4769,46 @@ const RegistrarPanel = () => {
               <button onClick={() => setShowSlotsModal(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ display: 'grid', gap: '8px' }}>
-              <button style={buttonStyle} onClick={() => {
-                setShowSlotsModal(false);
+              <button style={buttonStyle} onClick={async () => {
+                if (!rescheduleData) return;
+                try {
+                  setShowSlotsModal(false);
+                  logger.info(`Перенос визита ${rescheduleData.id} на завтра`);
+                  await api.post(`/visits/${rescheduleData.id}/reschedule/tomorrow`);
+                  toast.success('Визит успешно перенесен на завтра');
+                  setRescheduleData(null);
+                  loadAppointments({ source: 'reschedule_tomorrow' });
+                } catch (e) {
+                  logger.error('Ошибка переноса на завтра:', e);
+                  toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
+                }
               }}>
                 🌅 {t('tomorrow')}
               </button>
-              <button style={buttonSecondaryStyle} onClick={() => {
-                setShowSlotsModal(false);
+              <button style={buttonSecondaryStyle} onClick={async () => {
+                if (!rescheduleData) return;
+                const currentVal = getLocalDateString(rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date());
+                const dateStr = prompt("Введите дату переноса (YYYY-MM-DD):", currentVal);
+
+                if (dateStr) {
+                  // Simple validation YYYY-MM-DD
+                  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    toast.error('Неверный формат даты. Используйте YYYY-MM-DD');
+                    return;
+                  }
+
+                  try {
+                    setShowSlotsModal(false);
+                    logger.info(`Перенос визита ${rescheduleData.id} на ${dateStr}`);
+                    await api.post(`/visits/${rescheduleData.id}/reschedule`, null, { params: { new_date: dateStr } });
+                    toast.success(`Визит перенесен на ${dateStr}`);
+                    setRescheduleData(null);
+                    loadAppointments({ source: 'reschedule_date' });
+                  } catch (e) {
+                    logger.error('Ошибка переноса на дату:', e);
+                    toast.error('Ошибка переноса: ' + (e.response?.data?.detail || e.message));
+                  }
+                }
               }}>
                 📅 {t('select_date')}
               </button>

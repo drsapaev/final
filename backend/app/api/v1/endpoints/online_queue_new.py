@@ -27,6 +27,7 @@ from app.services.queue_service import (
     QueueNotFoundError,
     QueueValidationError,
 )
+from app.models.online_queue import OnlineQueueEntry  # Added import
 
 router = APIRouter()
 
@@ -281,3 +282,21 @@ def get_queue_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения статистики: {str(e)}",
         )
+
+
+@router.post("/online-queue/entries/{entry_id}/cancel")
+def cancel_queue_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("Admin", "Registrar")),
+):
+    """
+    Отмена записи в онлайн-очереди
+    """
+    entry = db.query(OnlineQueueEntry).filter(OnlineQueueEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Запись очереди не найдена")
+    
+    entry.status = "canceled"
+    db.commit()
+    return {"message": "Запись отменена", "status": "canceled"}

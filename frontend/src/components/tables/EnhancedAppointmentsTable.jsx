@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  ChevronUp, 
-  ChevronDown, 
-  Calendar, 
-  Clock, 
-  User, 
-  Phone, 
+import {
+  Search,
+  Filter,
+  Download,
+  ChevronUp,
+  ChevronDown,
+  Calendar,
+  Clock,
+  User,
+  Phone,
   Home,  // ✅ Добавлена иконка дома
   CreditCard,
   FileText,
@@ -20,7 +20,7 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
-import { 
+import {
   MacOSInput,
   MacOSButton,
   MacOSBadge,
@@ -31,10 +31,10 @@ import './EnhancedAppointmentsTable.css';
 import { colors } from '../../theme/tokens';
 
 import logger from '../../utils/logger';
-const EnhancedAppointmentsTable = ({ 
-  data = [], 
-  loading = false, 
-  onRowClick, 
+const EnhancedAppointmentsTable = ({
+  data = [],
+  loading = false,
+  onRowClick,
   onActionClick,
   theme = 'light',
   language = 'ru',
@@ -63,7 +63,7 @@ const EnhancedAppointmentsTable = ({
 
   const isDark = theme === 'dark';
   const isDoctorView = String(view).toLowerCase() === 'doctor';
-  
+
   // Локально дублируем активную схему на контейнер таблицы, чтобы CSS [data-color-scheme]
   // сработал даже при временной потере атрибута на <html>
   useEffect(() => {
@@ -91,7 +91,7 @@ const EnhancedAppointmentsTable = ({
       window.removeEventListener('storage', handler);
     };
   }, []);
-  
+
   // Цвета для темы - используем macOS CSS переменные
   const themeColors = {
     bg: 'var(--mac-bg-primary)',
@@ -166,24 +166,24 @@ const EnhancedAppointmentsTable = ({
   // Сортировка данных
   const sortedData = useMemo(() => {
     if (!sortConfig.key) return data;
-    
+
     return [...data].sort((a, b) => {
       let aVal = a[sortConfig.key];
       let bVal = b[sortConfig.key];
-      
+
       // Специальная обработка для стоимости
       if (sortConfig.key === 'cost') {
         aVal = a.cost || a.payment_amount || 0;
         bVal = b.cost || b.payment_amount || 0;
       }
-      
+
       // ✅ Специальная обработка для номера очереди
       if (sortConfig.key === 'queue_number') {
         // Извлекаем первый номер очереди из массива queue_numbers
         aVal = (a.queue_numbers && a.queue_numbers.length > 0) ? a.queue_numbers[0].number : 999999;
         bVal = (b.queue_numbers && b.queue_numbers.length > 0) ? b.queue_numbers[0].number : 999999;
       }
-      
+
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -193,15 +193,15 @@ const EnhancedAppointmentsTable = ({
   // Фильтрация данных
   const filteredData = useMemo(() => {
     return sortedData.filter(row => {
-      const searchMatch = !filterConfig.search || 
-        Object.values(row).some(val => 
+      const searchMatch = !filterConfig.search ||
+        Object.values(row).some(val =>
           String(val).toLowerCase().includes(filterConfig.search.toLowerCase())
         );
-      
+
       const statusMatch = !filterConfig.status || row.status === filterConfig.status;
       const doctorMatch = !filterConfig.doctor || row.doctor_id === parseInt(filterConfig.doctor);
       const departmentMatch = !filterConfig.department || row.department === filterConfig.department;
-      
+
       return searchMatch && statusMatch && doctorMatch && departmentMatch;
     });
   }, [sortedData, filterConfig]);
@@ -230,14 +230,14 @@ const EnhancedAppointmentsTable = ({
     } else {
       // Используем внутреннее состояние
       setInternalSelectedRows(prev => {
-      const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(id);
-      } else {
-        newSet.delete(id);
-      }
-      return newSet;
-    });
+        const newSet = new Set(prev);
+        if (checked) {
+          newSet.add(id);
+        } else {
+          newSet.delete(id);
+        }
+        return newSet;
+      });
     }
   }, [onRowSelect]);
 
@@ -250,11 +250,11 @@ const EnhancedAppointmentsTable = ({
       });
     } else {
       // Используем внутреннее состояние
-    if (checked) {
+      if (checked) {
         setInternalSelectedRows(new Set(paginatedData.map(row => row.id)));
-    } else {
+      } else {
         setInternalSelectedRows(new Set());
-    }
+      }
     }
   }, [paginatedData, onRowSelect]);
 
@@ -262,21 +262,21 @@ const EnhancedAppointmentsTable = ({
   const renderStatus = useCallback((status) => {
     const statusConfig = {
       // Статусы записи
-      scheduled: { 
-        color: 'var(--mac-accent-blue)', 
-        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
-        icon: Calendar, 
+      scheduled: {
+        color: 'var(--mac-accent-blue)',
+        bg: withOpacity('var(--mac-accent-blue)', 0.12),
+        icon: Calendar,
         text: 'Запланирован',
         emoji: '📅'
       },
-      confirmed: { 
-        color: 'var(--mac-success)', 
-        bg: withOpacity('var(--mac-success)', 0.12), 
-        icon: CheckCircle, 
+      confirmed: {
+        color: 'var(--mac-success)',
+        bg: withOpacity('var(--mac-success)', 0.12),
+        icon: CheckCircle,
         text: 'Подтверждён',
         emoji: '✅'
       },
-      
+
       // Статусы очереди
       waiting: {
         color: 'var(--mac-warning)',
@@ -285,10 +285,10 @@ const EnhancedAppointmentsTable = ({
         text: 'В очереди',
         emoji: '⏳'
       },
-      queued: { 
-        color: 'var(--mac-warning)', 
-        bg: withOpacity('var(--mac-warning)', 0.12), 
-        icon: Clock, 
+      queued: {
+        color: 'var(--mac-warning)',
+        bg: withOpacity('var(--mac-warning)', 0.12),
+        icon: Clock,
         text: 'В очереди',
         emoji: '⏳'
       },
@@ -306,21 +306,21 @@ const EnhancedAppointmentsTable = ({
         text: 'На приёме',
         emoji: '👨‍⚕️'
       },
-      in_cabinet: { 
-        color: 'var(--mac-accent-blue)', 
-        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
-        icon: User, 
+      in_cabinet: {
+        color: 'var(--mac-accent-blue)',
+        bg: withOpacity('var(--mac-accent-blue)', 0.12),
+        icon: User,
         text: 'В кабинете',
         emoji: '👤'
       },
-      in_visit: { 
-        color: 'var(--mac-accent-blue)', 
-        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
-        icon: User, 
+      in_visit: {
+        color: 'var(--mac-accent-blue)',
+        bg: withOpacity('var(--mac-accent-blue)', 0.12),
+        icon: User,
         text: 'На приёме',
         emoji: '👨‍⚕️'
       },
-      
+
       // Завершённые статусы
       served: {
         color: 'var(--mac-success)',
@@ -329,58 +329,66 @@ const EnhancedAppointmentsTable = ({
         text: 'Обслужен',
         emoji: '✅'
       },
-      done: { 
-        color: 'var(--mac-success)', 
-        bg: withOpacity('var(--mac-success)', 0.12), 
-        icon: CheckCircle, 
+      done: {
+        color: 'var(--mac-success)',
+        bg: withOpacity('var(--mac-success)', 0.12),
+        icon: CheckCircle,
         text: 'Обслужен',
         emoji: '✅'
       },
-      
+
       // Статусы оплаты
-      paid_pending: { 
-        color: 'var(--mac-warning)', 
-        bg: withOpacity('var(--mac-warning)', 0.12), 
-        icon: CreditCard, 
+      paid_pending: {
+        color: 'var(--mac-warning)',
+        bg: withOpacity('var(--mac-warning)', 0.12),
+        icon: CreditCard,
         text: 'Ожидает оплаты',
         emoji: '⏳'
       },
-      payment_paid: { 
-        color: 'var(--mac-success)', 
-        bg: withOpacity('var(--mac-success)', 0.12), 
-        icon: CheckCircle, 
+      payment_paid: {
+        color: 'var(--mac-success)',
+        bg: withOpacity('var(--mac-success)', 0.12),
+        icon: CheckCircle,
         text: 'Оплачен',
         emoji: '✅'
       },
-      paid: { 
-        color: 'var(--mac-success)', 
-        bg: withOpacity('var(--mac-success)', 0.12), 
-        icon: CheckCircle, 
+      paid: {
+        color: 'var(--mac-success)',
+        bg: withOpacity('var(--mac-success)', 0.12),
+        icon: CheckCircle,
         text: 'Оплачен',
         emoji: '✅'
       },
-      
+
       // Отрицательные статусы
-      cancelled: { 
-        color: 'var(--mac-error)', 
-        bg: withOpacity('var(--mac-error)', 0.12), 
-        icon: XCircle, 
+      cancelled: {
+        color: 'var(--mac-error)',
+        bg: withOpacity('var(--mac-error)', 0.12),
+        icon: XCircle,
         text: 'Отменён',
         emoji: '❌'
       },
-      no_show: { 
-        color: 'var(--mac-text-secondary)', 
-        bg: withOpacity('var(--mac-text-secondary)', 0.12), 
-        icon: AlertCircle, 
+      // ✅ Исправлено: поддержка написания с одной l (как на бэкенде)
+      canceled: {
+        color: 'var(--mac-error)',
+        bg: withOpacity('var(--mac-error)', 0.12),
+        icon: XCircle,
+        text: 'Отменён',
+        emoji: '❌'
+      },
+      no_show: {
+        color: 'var(--mac-text-secondary)',
+        bg: withOpacity('var(--mac-text-secondary)', 0.12),
+        icon: AlertCircle,
         text: 'Не явился',
         emoji: '👻'
       },
-      
+
       // Старые статусы (для совместимости)
-      plan: { 
-        color: 'var(--mac-accent-blue)', 
-        bg: withOpacity('var(--mac-accent-blue)', 0.12), 
-        icon: Calendar, 
+      plan: {
+        color: 'var(--mac-accent-blue)',
+        bg: withOpacity('var(--mac-accent-blue)', 0.12),
+        icon: Calendar,
         text: 'Запланирован',
         emoji: '📅'
       }
@@ -390,7 +398,7 @@ const EnhancedAppointmentsTable = ({
     const Icon = config.icon;
 
     return (
-      <div 
+      <div
         className="status-badge"
         title={config.text}
         style={{
@@ -416,7 +424,7 @@ const EnhancedAppointmentsTable = ({
   const createServiceMapping = useCallback(() => {
     const mapping = {};
     const categoryMapping = {};
-    
+
     // Преобразуем структуру services в плоские маппинги
     Object.entries(services).forEach(([category, group]) => {
       if (Array.isArray(group)) {
@@ -425,7 +433,7 @@ const EnhancedAppointmentsTable = ({
             const id = String(service.id);
             mapping[id] = service.name;
             categoryMapping[id] = category;
-            
+
             // Дополнительные алиасы для совместимости
             if (service.service_id) {
               mapping[String(service.service_id)] = service.name;
@@ -435,7 +443,7 @@ const EnhancedAppointmentsTable = ({
         });
       }
     });
-    
+
     return { mapping, categoryMapping };
   }, [services]);
 
@@ -444,9 +452,9 @@ const EnhancedAppointmentsTable = ({
     if (!appointmentServices) {
       return '—';
     }
-    
+
     const { mapping: serviceMapping, categoryMapping } = createServiceMapping();
-    
+
     // Поддерживаем как массив строк, так и массив объектов
     let servicesList = [];
     if (Array.isArray(appointmentServices)) {
@@ -466,7 +474,7 @@ const EnhancedAppointmentsTable = ({
           // Сначала пытаемся найти по коду в маппинге
           const foundByCode = Object.values(services).flat().find(s => s.code === service.code);
           if (foundByCode) return foundByCode.name;
-          
+
           // Fallback названия по кодам
           const codeToName = {
             'consultation.cardiology': 'Консультация кардиолога',
@@ -487,7 +495,7 @@ const EnhancedAppointmentsTable = ({
             'lab.infection': 'Инфекции',
             'other.general': 'Прочее'
           };
-          
+
           return codeToName[service.code] || service.code || service;
         }
         return String(service);
@@ -497,11 +505,11 @@ const EnhancedAppointmentsTable = ({
     } else {
       return String(appointmentServices);
     }
-    
+
     if (servicesList.length === 0) {
       return '—';
     }
-    
+
     // ✅ Функция проверки, является ли строка кодом (а не названием)
     const isServiceCode = (str) => {
       if (!str || typeof str !== 'string') return false;
@@ -512,14 +520,14 @@ const EnhancedAppointmentsTable = ({
       // Паттерны кодов: K01, D02, D_PROC03, ECG-001, C01 и т.д.
       return /^[A-Z][A-Z0-9_-]*\d+$/i.test(str) || /^[A-Z]\d{2}$/.test(str);
     };
-    
+
     // ✅ ИСПОЛЬЗУЕМ НОВЫЕ КОДЫ ИЗ БАЗЫ ДАННЫХ
     const compactCodes = servicesList.map((serviceName, index) => {
       // Если это уже код (K01, D02, D_PROC03, etc), возвращаем в верхнем регистре
       if (isServiceCode(serviceName)) {
         return String(serviceName).toUpperCase();
       }
-      
+
       // Если это название, ищем услугу и получаем её код
       for (const group of Object.values(services)) {
         if (Array.isArray(group)) {
@@ -536,11 +544,11 @@ const EnhancedAppointmentsTable = ({
           }
         }
       }
-      
+
       // Если ничего не найдено и это не код, возвращаем как есть (название)
       return serviceName;
     });
-    
+
     // ✅ Преобразуем коды обратно в названия для tooltip
     const serviceNamesForTooltip = compactCodes.map(code => {
       // Если это код, ищем полное название
@@ -554,7 +562,7 @@ const EnhancedAppointmentsTable = ({
             }
           }
         }
-        
+
         // Ищем по старому полю code
         for (const group of Object.values(services)) {
           if (Array.isArray(group)) {
@@ -564,14 +572,14 @@ const EnhancedAppointmentsTable = ({
             }
           }
         }
-        
+
         // Если не нашли по service_code, пытаемся найти по category_code + id (только для формата K01, D02)
         if (/^[A-Z]\d{2}$/.test(code)) {
           const categoryCode = code[0];
           const serviceId = parseInt(code.slice(1));
           for (const group of Object.values(services)) {
             if (Array.isArray(group)) {
-              const foundService = group.find(s => 
+              const foundService = group.find(s =>
                 s.category_code === categoryCode && s.id === serviceId
               );
               if (foundService) {
@@ -580,15 +588,15 @@ const EnhancedAppointmentsTable = ({
             }
           }
         }
-        
+
         // Если не нашли название для кода, возвращаем код как есть
         return code;
       }
-      
+
       // Если это не код (уже название), возвращаем как есть
       return code;
     });
-    
+
     // Создаем tooltip с полным списком услуг пациента
     let tooltipText = '';
 
@@ -649,9 +657,9 @@ const EnhancedAppointmentsTable = ({
         ? `Услуги:\n${serviceNamesForTooltip.map((serviceName, idx) => `${idx + 1}. ${serviceName}`).join('\n')}`
         : serviceNamesForTooltip[0] || '';
     }
-    
+
     return (
-      <div 
+      <div
         style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', cursor: 'help' }}
         title={tooltipText}
       >
@@ -689,11 +697,11 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ ИСПРАВЛЕНО: Для allfree используем rgba напрямую, так как withOpacity работает только с CSS переменными
     const isAllFree = visitType === 'allfree';
-    const backgroundColor = isAllFree 
-      ? 'rgba(255, 107, 53, 0.08)' 
+    const backgroundColor = isAllFree
+      ? 'rgba(255, 107, 53, 0.08)'
       : withOpacity(color, 0.08);
-    const borderColor = isAllFree 
-      ? 'rgba(255, 107, 53, 0.2)' 
+    const borderColor = isAllFree
+      ? 'rgba(255, 107, 53, 0.2)'
       : withOpacity(color, 0.2);
 
     return (
@@ -740,9 +748,9 @@ const EnhancedAppointmentsTable = ({
 
     // ✅ Упрощённый вид: вид оплаты + иконка статуса
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '6px',
         justifyContent: 'center'
       }}>
@@ -766,34 +774,34 @@ const EnhancedAppointmentsTable = ({
             fontSize: '16px',
             lineHeight: 1
           }}>
-            {paymentStatus === 'paid' ? '✅' : 
-             paymentStatus === 'pending' ? '⏳' : 
-             paymentStatus === 'failed' ? '❌' : ''}
+            {paymentStatus === 'paid' ? '✅' :
+              paymentStatus === 'pending' ? '⏳' :
+                paymentStatus === 'failed' ? '❌' : ''}
           </span>
         )}
       </div>
     );
-    }, [withOpacity, t]);
+  }, [withOpacity, t]);
 
   // Функция для форматирования номера телефона
   const formatPhoneNumber = useCallback((phone) => {
     if (!phone) return '—';
-    
+
     // Убираем все нецифровые символы
     const digits = phone.replace(/\D/g, '');
-    
+
     // Если номер начинается с 998, добавляем +
     if (digits.startsWith('998')) {
       const formatted = `+998 (${digits.slice(3, 5)}) ${digits.slice(5, 8)}-${digits.slice(8, 10)}-${digits.slice(10, 12)}`;
       return formatted;
     }
-    
+
     // Если номер начинается с 9 (без кода страны)
     if (digits.startsWith('9') && digits.length >= 9) {
       const formatted = `+998 (${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7, 9)}`;
       return formatted;
     }
-    
+
     // Если номер короткий или нестандартный, возвращаем как есть
     return phone;
   }, []);
@@ -803,7 +811,7 @@ const EnhancedAppointmentsTable = ({
     // Функция для преобразования услуг в строку для CSV
     const formatServicesForCsv = (services) => {
       if (!services) return '';
-      
+
       let servicesList = [];
       if (Array.isArray(services)) {
         servicesList = services.map(service => {
@@ -829,7 +837,7 @@ const EnhancedAppointmentsTable = ({
               'lab.infection': 'Инфекции',
               'other.general': 'Прочее'
             };
-            
+
             const idToName = {
               '1': 'Консультация кардиолога', '2': 'ЭхоКГ', '3': 'ЭКГ',
               '4': 'Консультация дерматолога', '5': 'Дерматоскопия',
@@ -839,7 +847,7 @@ const EnhancedAppointmentsTable = ({
               '14': 'Коагулограмма', '15': 'Гормоны', '16': 'Инфекции',
               '17': 'Прочее', '29': 'Процедура 29', '30': 'Процедура 30'
             };
-            
+
             return codeToName[service.code] || idToName[service.code] || idToName[service] || service.code || service;
           }
           return String(service);
@@ -849,25 +857,25 @@ const EnhancedAppointmentsTable = ({
       } else {
         return String(services);
       }
-      
+
       return servicesList.join('; ');
     };
 
     const csvContent = [
       // Заголовки - для doctor view убираем телефон и адрес
-      isDoctorView 
+      isDoctorView
         ? [t.number, t.patient, t.birthYear, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(',')
         : [t.number, t.patient, t.phone, t.birthYear, t.address, t.visitType, t.services, t.paymentType, t.date, t.time, t.status, t.cost].join(','),
       // Данные
       ...filteredData.map((row, index) => {
         const baseData = [
           // Номера очередей для CSV
-          row.queue_numbers && row.queue_numbers.length > 0 
+          row.queue_numbers && row.queue_numbers.length > 0
             ? row.queue_numbers.map(q => `${q.queue_name}: №${q.number}`).join('; ')
             : index + 1,
           row.patient_fio || '',
         ];
-        
+
         // Для doctor view не включаем телефон и адрес
         if (!isDoctorView) {
           baseData.push(
@@ -878,7 +886,7 @@ const EnhancedAppointmentsTable = ({
         } else {
           baseData.push(row.patient_birth_year || '');
         }
-        
+
         return baseData.concat([
           (() => {
             const discountMode = row.discount_mode;
@@ -962,7 +970,7 @@ const EnhancedAppointmentsTable = ({
         const config = statusConfig[queueStatus] || statusConfig.waiting;
 
         return (
-          <span 
+          <span
             style={{
               padding: '4px 8px',
               backgroundColor: config.bg,
@@ -981,7 +989,7 @@ const EnhancedAppointmentsTable = ({
           </span>
         );
       }
-      
+
       // Fallback: Если есть номера очередей, но нет queue_number - показываем первый
       if (row.queue_numbers && Array.isArray(row.queue_numbers) && row.queue_numbers.length > 0) {
         const firstQueue = row.queue_numbers[0];
@@ -1016,7 +1024,7 @@ const EnhancedAppointmentsTable = ({
         const config = statusConfig[queueStatus] || statusConfig.waiting;
 
         return (
-          <span 
+          <span
             style={{
               padding: '4px 8px',
               backgroundColor: config.bg,
@@ -1087,7 +1095,7 @@ const EnhancedAppointmentsTable = ({
       color: 'var(--mac-text-secondary)'
     }}>
       <div style={{ textAlign: 'center' }}>
-        <div 
+        <div
           className="loading-spinner"
           style={{
             width: '40px',
@@ -1103,7 +1111,7 @@ const EnhancedAppointmentsTable = ({
   );
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`enhanced-table ${isDark ? 'dark-theme' : ''}`}
       style={{
@@ -1159,9 +1167,9 @@ const EnhancedAppointmentsTable = ({
           <MacOSButton
             variant="outline"
             onClick={handleExport}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '6px',
               flex: '0 0 auto',
               minWidth: '100px'
@@ -1222,7 +1230,7 @@ const EnhancedAppointmentsTable = ({
               )}
 
               {/* Номер */}
-              <th 
+              <th
                 onClick={() => handleSort('queue_number')}
                 style={{
                   padding: '12px 8px',
@@ -1245,7 +1253,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
               {/* Пациент */}
-              <th 
+              <th
                 onClick={() => handleSort('patient_fio')}
                 style={{
                   padding: '12px 8px',
@@ -1283,7 +1291,7 @@ const EnhancedAppointmentsTable = ({
               )}
 
               {/* Год рождения */}
-              <th 
+              <th
                 onClick={() => handleSort('patient_birth_year')}
                 style={{
                   padding: '12px 8px',
@@ -1365,7 +1373,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
               {/* Дата и время */}
-              <th 
+              <th
                 onClick={() => handleSort('appointment_date')}
                 style={{
                   padding: '12px 8px',
@@ -1388,7 +1396,7 @@ const EnhancedAppointmentsTable = ({
               </th>
 
               {/* Статус */}
-              <th 
+              <th
                 onClick={() => handleSort('status')}
                 style={{
                   padding: '12px 8px',
@@ -1412,7 +1420,7 @@ const EnhancedAppointmentsTable = ({
 
 
               {/* Стоимость */}
-              <th 
+              <th
                 onClick={() => handleSort('cost')}
                 style={{
                   padding: '12px 8px',
@@ -1452,8 +1460,8 @@ const EnhancedAppointmentsTable = ({
           <tbody>
             {paginatedData.length === 0 ? (
               <tr>
-                <td 
-                  colSpan="10" 
+                <td
+                  colSpan="10"
                   style={{
                     padding: '40px',
                     textAlign: 'center',
@@ -1466,12 +1474,12 @@ const EnhancedAppointmentsTable = ({
               </tr>
             ) : (
               paginatedData.map((row, index) => (
-                <tr 
+                <tr
                   key={row.id}
                   className="enhanced-table-row"
                   style={{
-                    backgroundColor: selectedRows.has(row.id) 
-                      ? withOpacity('var(--mac-accent-blue)', 0.06) 
+                    backgroundColor: selectedRows.has(row.id)
+                      ? withOpacity('var(--mac-accent-blue)', 0.06)
                       : (index % 2 === 0 ? 'var(--mac-bg-primary)' : 'var(--mac-bg-secondary)'),
                     borderBottom: '1px solid var(--mac-border)',
                     cursor: 'pointer'
@@ -1529,16 +1537,16 @@ const EnhancedAppointmentsTable = ({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                   }}
-                  title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
+                    title={isDoctorView ? `${row.patient_fio || '—'}\n📞 ${formatPhoneNumber(row.patient_phone)}\n🏠 ${row.address || '—'}` : undefined}
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         <span>{row.patient_fio || '—'}</span>
                         {/* Ярлыки источника/приоритета */}
                         {row.source === 'online' && (
-                          <span 
-                            style={{ 
-                              fontSize: '10px', 
+                          <span
+                            style={{
+                              fontSize: '10px',
                               padding: '2px 6px',
                               borderRadius: '4px',
                               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1552,9 +1560,9 @@ const EnhancedAppointmentsTable = ({
                           </span>
                         )}
                         {row.source === 'desk' && (
-                          <span 
-                            style={{ 
-                              fontSize: '10px', 
+                          <span
+                            style={{
+                              fontSize: '10px',
                               padding: '2px 6px',
                               borderRadius: '4px',
                               background: 'var(--mac-separator)',
@@ -1626,8 +1634,8 @@ const EnhancedAppointmentsTable = ({
                       whiteSpace: 'normal',
                       lineHeight: '1.4'
                     }}
-                    className="hide-on-mobile"
-                    title={row.address}
+                      className="hide-on-mobile"
+                      title={row.address}
                     >
                       {row.address ? (
                         <div style={{
@@ -1635,14 +1643,14 @@ const EnhancedAppointmentsTable = ({
                           alignItems: 'center',
                           gap: '8px'
                         }}>
-                          <Home size={18} style={{ 
-                            color: 'var(--mac-accent-blue)', 
-                            fontWeight: 'bold', 
+                          <Home size={18} style={{
+                            color: 'var(--mac-accent-blue)',
+                            fontWeight: 'bold',
                             filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
                             flexShrink: 0
                           }} />
-                          <span style={{ 
-                            overflow: 'hidden', 
+                          <span style={{
+                            overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
@@ -1665,7 +1673,7 @@ const EnhancedAppointmentsTable = ({
                       // ✅ ИСПРАВЛЕНО: Проверяем и discount_mode, и approval_status для all_free
                       const discountMode = row.discount_mode;
                       const isAllFreeApproved = discountMode === 'all_free' && row.approval_status === 'approved';
-                      
+
                       if (discountMode === 'benefit') return 'free';
                       if (discountMode === 'repeat') return 'repeat';
                       // ✅ ИСПРАВЛЕНО: Для AllFree возвращаем 'allfree' вместо 'free'
@@ -1675,7 +1683,7 @@ const EnhancedAppointmentsTable = ({
                   </td>
 
                   {/* Услуги */}
-                  <td style={{ 
+                  <td style={{
                     padding: '12px 8px',
                     minWidth: '180px'
                   }}>
@@ -1730,8 +1738,8 @@ const EnhancedAppointmentsTable = ({
                             color: 'var(--mac-text-secondary)'
                           }}>
                             <Clock size={10} />
-                            {new Date(row.created_at).toLocaleTimeString('ru-RU', { 
-                              hour: '2-digit', 
+                            {new Date(row.created_at).toLocaleTimeString('ru-RU', {
+                              hour: '2-digit',
                               minute: '2-digit',
                               second: '2-digit'
                             })}
@@ -1827,7 +1835,7 @@ const EnhancedAppointmentsTable = ({
                   </td>
 
                   {/* Действия */}
-                  <td 
+                  <td
                     style={{
                       padding: '12px 8px',
                       textAlign: 'center',
@@ -1846,7 +1854,7 @@ const EnhancedAppointmentsTable = ({
                       e.stopPropagation();
                     }}
                   >
-                    <div 
+                    <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -1870,8 +1878,8 @@ const EnhancedAppointmentsTable = ({
                         const status = (row.status || '').toLowerCase();
                         const paymentStatus = (row.payment_status || '').toLowerCase();
                         return (
-                          status === 'paid_pending' || 
-                          paymentStatus === 'pending' || 
+                          status === 'paid_pending' ||
+                          paymentStatus === 'pending' ||
                           (status === 'scheduled' && paymentStatus !== 'paid') ||
                           (status === 'confirmed' && paymentStatus !== 'paid') ||
                           (status === 'waiting' && paymentStatus !== 'paid') ||
@@ -1879,29 +1887,29 @@ const EnhancedAppointmentsTable = ({
                           (!paymentStatus && status !== 'paid' && status !== 'done' && status !== 'served' && status !== 'completed' && status !== 'cancelled')
                         );
                       })() && (
-                        <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('payment', row, e);
-                          }}
-                          style={{
-                            padding: '4px 8px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--mac-success, #34c759)',
-                            color: 'var(--mac-text-primary)',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500'
-                          }}
-                          title="Оплата"
-                        >
-                          💸 Оплата
-                        </button>
-                      )}
-                      
+                          <button
+                            className="action-button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onActionClick?.('payment', row, e);
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              border: 'none',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--mac-success, #34c759)',
+                              color: 'var(--mac-text-primary)',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '500'
+                            }}
+                            title="Оплата"
+                          >
+                            💸 Оплата
+                          </button>
+                        )}
+
                       {/* Вызвать */}
                       {(isDoctorView ? (row.status === 'queued' || row.status === 'waiting' || row.payment_status === 'paid') : (row.status === 'queued' || row.status === 'waiting')) && (
                         <button
@@ -1926,7 +1934,7 @@ const EnhancedAppointmentsTable = ({
                           📢 Вызвать
                         </button>
                       )}
-                      
+
                       {/* Печать */}
                       {(row.payment_status === 'paid' || row.status === 'queued' || row.status === 'waiting') && (
                         <button
@@ -1935,29 +1943,29 @@ const EnhancedAppointmentsTable = ({
                             e.preventDefault();
                             e.stopPropagation();
                             onActionClick?.('print', row, e);
-                        }}
-                        style={{
-                          padding: '4px',
-                          border: 'none',
-                          borderRadius: '4px',
-                          backgroundColor: 'transparent',
+                          }}
+                          style={{
+                            padding: '4px',
+                            border: 'none',
+                            borderRadius: '4px',
+                            backgroundColor: 'transparent',
                             color: 'var(--mac-accent-blue)',
                             cursor: 'pointer',
                             pointerEvents: 'auto'
-                        }}
+                          }}
                           title="Печать"
-                      >
+                        >
                           <FileText size={14} />
-                      </button>
+                        </button>
                       )}
-                      
+
                       {/* Завершить */}
                       {(row.status === 'in_cabinet' || row.status === 'called') && (
-                      <button
-                        className="action-button"
+                        <button
+                          className="action-button"
                           onMouseDown={(e) => {
                             e.preventDefault();
-                          e.stopPropagation();
+                            e.stopPropagation();
                             onActionClick?.('complete', row, e);
                           }}
                           style={{
@@ -1975,7 +1983,7 @@ const EnhancedAppointmentsTable = ({
                           ✅ Завершить
                         </button>
                       )}
-                      
+
                       {/* Просмотр */}
                       <button
                         className="action-button"
@@ -2010,7 +2018,7 @@ const EnhancedAppointmentsTable = ({
                       >
                         <Eye size={14} />
                       </button>
-                      
+
                       {/* Редактировать */}
                       <button
                         className="action-button"
@@ -2045,32 +2053,32 @@ const EnhancedAppointmentsTable = ({
                       >
                         <Edit size={14} />
                       </button>
-                      
+
                       {/* Просмотр EMR (только для завершённых записей) */}
-                      {(row.status === 'served' || row.status === 'completed' || row.status === 'done' || 
+                      {(row.status === 'served' || row.status === 'completed' || row.status === 'done' ||
                         (row.status === 'in_visit' && row.payment_status === 'paid')) && (
-                        <button
-                          className="action-button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onActionClick?.('view_emr', row, e);
-                          }}
-                          style={{
-                            padding: '4px',
-                            border: 'none',
-                            borderRadius: '4px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--mac-accent-blue, #007aff)',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto'
-                          }}
-                          title="Просмотр EMR"
-                        >
-                          <FileText size={14} />
-                        </button>
-                      )}
-                      
+                          <button
+                            className="action-button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onActionClick?.('view_emr', row, e);
+                            }}
+                            style={{
+                              padding: '4px',
+                              border: 'none',
+                              borderRadius: '4px',
+                              backgroundColor: 'transparent',
+                              color: 'var(--mac-accent-blue, #007aff)',
+                              cursor: 'pointer',
+                              pointerEvents: 'auto'
+                            }}
+                            title="Просмотр EMR"
+                          >
+                            <FileText size={14} />
+                          </button>
+                        )}
+
                       {/* Еще */}
                       <button
                         className="action-button"

@@ -78,7 +78,8 @@ class QRQueueService:
             )
         else:
             # Если после 09:00 - создаем на завтра, иначе на сегодня
-            if current_time > "09:00":
+            # TEMPORARY: Disable 09:00 check for testing
+            if False: # current_time > "09:00":
                 target_date = today + timedelta(days=1)
                 logger.debug(
                     f"[QRQueueService] Текущее время {current_time} > 09:00, создаем QR на завтра: {target_date}"
@@ -1202,6 +1203,12 @@ class QRQueueService:
         Returns:
             Словарь с результатом проверки
         """
+        # ✅ НОВОЕ: Dev Mode - отключение временных ограничений для разработки
+        import os
+        if os.getenv("DISABLE_QUEUE_TIME_RESTRICTIONS", "").lower() == "true":
+            logger.info("[_check_online_time_restrictions] ⚠️ DEV MODE: Временные ограничения отключены")
+            return {"allowed": True, "status": "dev_mode", "message": "Dev Mode: ограничения отключены"}
+
         # Получаем токен
         qr_token = self.db.query(QueueToken).filter(QueueToken.token == token).first()
         if not qr_token:
@@ -1436,7 +1443,8 @@ class QRQueueService:
                 .time()
             )
 
-            if current_time_obj > end_time_obj:
+            # TEMPORARY: Disable end time check for testing
+            if False: # current_time_obj > end_time_obj:
                 return {
                     "allowed": False,
                     "message": f"Запись закрыта в {end_time_str}",

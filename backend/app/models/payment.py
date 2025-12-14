@@ -104,6 +104,24 @@ class Payment(Base):
     paid_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    
+    # Возврат средств
+    refunded_amount: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 2), nullable=True, default=None,
+        comment="Сумма возврата (может быть частичной)"
+    )
+    refund_reason: Mapped[Optional[str]] = mapped_column(
+        String(512), nullable=True,
+        comment="Причина возврата"
+    )
+    refunded_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        comment="Дата и время возврата"
+    )
+    refunded_by: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True,
+        comment="ID кассира, выполнившего возврат"
+    )
 
     # Relationships
     payment_visits: Mapped[list["PaymentVisit"]] = relationship(

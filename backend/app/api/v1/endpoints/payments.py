@@ -411,6 +411,37 @@ def create_payment(
             status=PaymentStatus.PAID.value,
             note=payment_request.note,
         )
+        
+        # =====================================================
+        # ВАЖНО: Обновляем статус визита после оплаты
+        # =====================================================
+        visit = db.query(Visit).filter(Visit.id == visit_id).first()
+        if visit:
+            # Проверяем, полностью ли оплачен визит
+            from decimal import Decimal
+            from app.models.visit import VisitService
+            
+            # Считаем общую сумму услуг визита
+            total_cost = Decimal("0")
+            visit_services = db.query(VisitService).filter(VisitService.visit_id == visit_id).all()
+            for vs in visit_services:
+                price = Decimal(str(vs.price)) if vs.price else Decimal("0")
+                qty = vs.qty if vs.qty else 1
+                total_cost += price * qty
+            
+            # Считаем уже оплаченную сумму
+            from app.models.payment import Payment
+            paid_payments = db.query(Payment).filter(
+                Payment.visit_id == visit_id,
+                Payment.status.in_(["paid", "completed"])
+            ).all()
+            total_paid = sum(p.amount for p in paid_payments)
+            
+            # Если оплачено >= стоимости услуг, обновляем статус визита
+            if total_paid >= total_cost:
+                visit.status = "paid"
+                visit.discount_mode = "paid"
+                db.commit()
 
         # Формируем ответ в том же формате, что и get_payments_list
         from app.models.patient import Patient
