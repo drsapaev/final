@@ -83,7 +83,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 if (users && Array.isArray(users)) {
                     setAllUsers(users);
                 }
-            }).catch(e => console.error("Failed to load users:", e));
+            }).catch(e => console.error('Failed to load users:', e));
         }
     }, [isOpen, conversations.length]);
 
