@@ -1366,6 +1366,12 @@ const RegistrarPanel = () => {
           const mergeAppointments = (primary, secondary) => {
             const merged = { ...primary };
 
+            // ✅ FIX: Собираем ID объединяемых записей
+            const primaryIds = primary.aggregated_ids || [primary.id];
+            const secondaryIds = secondary.aggregated_ids || [secondary.id];
+            // Используем Set для избежания дубликатов
+            merged.aggregated_ids = [...new Set([...primaryIds, ...secondaryIds])];
+
             const mergeQueues = (current = [], pending = []) => {
               const combined = [...current];
               const seenTags = new Set(current.map(qn => (qn.queue_tag || qn.specialty || '').toLowerCase().trim()));
@@ -2966,13 +2972,18 @@ const RegistrarPanel = () => {
           record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
           // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
           discount_mode: appointment.discount_mode,
+          discount_mode: appointment.discount_mode,
           approval_status: appointment.approval_status,
           // ✅ FIX: Собираем ВСЕ ID записей для групповой отмены
-          aggregated_ids: [appointment.id]
+          // Если запись уже агрегирована в loadAppointments, берем её aggregated_ids
+          aggregated_ids: appointment.aggregated_ids ? [...appointment.aggregated_ids] : [appointment.id]
         };
       } else {
         // Добавляем ID в массив агрегированных
-        patientGroups[patientKey].aggregated_ids.push(appointment.id);
+        const newIds = appointment.aggregated_ids || [appointment.id];
+        patientGroups[patientKey].aggregated_ids.push(...newIds);
+        // Убираем возможные дубликаты
+        patientGroups[patientKey].aggregated_ids = [...new Set(patientGroups[patientKey].aggregated_ids)];
 
         // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
         const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
