@@ -4772,13 +4772,34 @@ const RegistrarPanel = () => {
             // Выполняем отмену для всех ID
             // Используем Promise.allSettled или loop для попытки отмены всех
             // Для надежности используем последовательную отмену
+            const cancelResults = [];
             for (const id of idsToCancel) {
-              await cancelSingleRecord(id);
+              try {
+                await cancelSingleRecord(id);
+                cancelResults.push({ id, success: true });
+              } catch (err) {
+                // ✅ FIX: Не прерываем цикл при 404 (запись уже отменена или не существует)
+                if (err.response?.status === 404) {
+                  logger.warn(`⚠️ ID ${id} не найден (возможно уже отменён), продолжаем...`);
+                  cancelResults.push({ id, success: true, alreadyCancelled: true });
+                } else {
+                  logger.error(`❌ Ошибка отмены ID ${id}:`, err);
+                  cancelResults.push({ id, success: false, error: err });
+                }
+              }
             }
 
-            logger.info('✅ Все записи успешно отменены на сервере');
+            const successCount = cancelResults.filter(r => r.success).length;
+            const failCount = cancelResults.filter(r => !r.success).length;
+
+            if (failCount > 0) {
+              logger.warn(`⚠️ Отменено ${successCount}/${idsToCancel.length} записей, ${failCount} ошибок`);
+              toast.warning(`Отменено ${successCount} из ${idsToCancel.length} услуг`);
+            } else {
+              logger.info(`✅ Все ${successCount} записи успешно отменены на сервере`);
+            }
           } catch (error) {
-            logger.error('❌ Ошибка отмены визита на сервере:', error);
+            logger.error('❌ Критическая ошибка отмены визита на сервере:', error);
 
             // Если это 404 после всех попыток
             if (error.response?.status === 404) {
