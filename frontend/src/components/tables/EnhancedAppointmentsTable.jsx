@@ -18,7 +18,9 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Stethoscope,
+  RotateCcw
 } from 'lucide-react';
 import {
   MacOSInput,
@@ -29,6 +31,7 @@ import {
 } from '../ui/macos';
 import './EnhancedAppointmentsTable.css';
 import { colors } from '../../theme/tokens';
+import { QueueActionButtons } from '../queue/QueueManagementCard';
 
 import logger from '../../utils/logger';
 const EnhancedAppointmentsTable = ({
@@ -1982,6 +1985,23 @@ const EnhancedAppointmentsTable = ({
                         >
                           ✅ Завершить
                         </button>
+                      )}
+
+                      {/* ✅ НОВОЕ: Кнопки управления статусами очереди (для режима врача) */}
+                      {isDoctorView && (
+                        <QueueActionButtons
+                          entry={{
+                            id: row.queue_entry_id || row.id,
+                            queue_entry_id: row.queue_entry_id,
+                            status: row.status
+                          }}
+                          onStatusChange={(action, entry, result) => {
+                            logger.log(`[EnhancedAppointmentsTable] Queue action: ${action}`, entry, result);
+                            // Передаём событие наружу для обновления списка
+                            onActionClick?.(`queue_${action}`, row, null);
+                          }}
+                          compact={true}
+                        />
                       )}
 
                       {/* Просмотр */}

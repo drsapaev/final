@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import '../styles/dark-theme-visibility-fix.css';
 import AIAssistant from '../components/ai/AIAssistant';
-import { 
-  Button, 
-  Card, 
-  CardHeader, 
-  CardContent, 
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardContent,
   Badge,
   Icon,
   Sidebar,
@@ -15,28 +15,35 @@ import {
 import AnimatedTransition from '../components/ui/native/AnimatedTransition';
 import { useTheme } from '../contexts/ThemeContext';
 import '../styles/animations.css';
-import { 
-  Activity, 
-  User, 
-  Calendar, 
-  Brain, 
-  FileText, 
-  Plus, 
-  Clock, 
-  CheckCircle, 
-  Search, 
-  Edit, 
-  Eye, 
-  Trash2, 
-  XCircle, 
-  Download, 
-  Pill, 
-  Heart 
+import {
+  Activity,
+  User,
+  Users,
+  Calendar,
+  Brain,
+  FileText,
+  Plus,
+  Clock,
+  CheckCircle,
+  Search,
+  Edit,
+  Eye,
+  Trash2,
+  XCircle,
+  Download,
+  Pill,
+  Heart,
+  RotateCcw,
+  Stethoscope,
+  AlertCircle,
+  Phone
 } from 'lucide-react';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
 import { useModal } from '../hooks/useModal.jsx';
 import { useBreakpoint, useTouchDevice } from '../hooks/useEnhancedMediaQuery.js';
+import useDoctorQueue from '../hooks/useDoctorQueue.js';
+import { useAppData } from '../contexts/AppDataContext';
 import ScheduleNextModal from '../components/common/ScheduleNextModal';
 
 import logger from '../utils/logger';
@@ -44,7 +51,7 @@ const DoctorPanel = () => {
   const location = useLocation();
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const isTouch = useTouchDevice();
-  
+
   // Состояние
   const [activeTab, setActiveTab] = useState('dashboard');
   const [patients, setPatients] = useState([]);
@@ -55,20 +62,36 @@ const DoctorPanel = () => {
   const [scheduleNextModal, setScheduleNextModal] = useState({ open: false, patient: null });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  
+
+  // ✅ НОВОЕ: Получаем данные текущего пользователя и очереди
+  const { currentUser } = useAppData();
+  const {
+    queue: queueEntries,
+    stats: queueStats,
+    loading: queueLoading,
+    error: queueError,
+    loadQueue,
+    callNext,
+    markNoShow,
+    restoreToNext,
+    sendToDiagnostics,
+    markIncomplete,
+    completeVisit
+  } = useDoctorQueue(null, currentUser);
+
   // Refs
   const headerRef = useRef(null);
   const [headerHeight, setHeaderHeight] = useState(0);
 
   // Используем централизованную систему темизации
-  const { 
-    isDark, 
-    isLight, 
-    getColor, 
-    getSpacing, 
-    getFontSize, 
+  const {
+    isDark,
+    isLight,
+    getColor,
+    getSpacing,
+    getFontSize,
     getShadow,
-    designTokens 
+    designTokens
   } = useTheme();
 
   // Цвета и стили
@@ -85,7 +108,7 @@ const DoctorPanel = () => {
     try {
       // Симуляция загрузки данных
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Тестовые данные
       const mockPatients = [
         {
@@ -342,7 +365,15 @@ const DoctorPanel = () => {
       'scheduled': 'primary',
       'in_progress': 'warning',
       'completed': 'success',
-      'cancelled': 'danger'
+      'cancelled': 'danger',
+      // Статусы очереди
+      'waiting': 'warning',
+      'called': 'primary',
+      'in_service': 'info',
+      'diagnostics': 'info',
+      'served': 'success',
+      'incomplete': 'danger',
+      'no_show': 'danger'
     };
     return statusMap[status] || 'default';
   };
@@ -355,7 +386,15 @@ const DoctorPanel = () => {
       'scheduled': 'Запланирован',
       'in_progress': 'В процессе',
       'completed': 'Завершен',
-      'cancelled': 'Отменен'
+      'cancelled': 'Отменен',
+      // Статусы очереди
+      'waiting': 'Ожидает',
+      'called': 'Вызван',
+      'in_service': 'На приёме',
+      'diagnostics': 'На обследовании',
+      'served': 'Обслужен',
+      'incomplete': 'Не завершён',
+      'no_show': 'Не явился'
     };
     return statusMap[status] || status;
   };
@@ -367,7 +406,7 @@ const DoctorPanel = () => {
 
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         patient.phone.includes(searchQuery);
+      patient.phone.includes(searchQuery);
     const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -405,7 +444,7 @@ const DoctorPanel = () => {
             <Activity size={isMobile ? 16 : 20} />
             {!isMobile && <span>Панель</span>}
           </button>
-          
+
           <button
             style={activeTab === 'patients' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('patients')}
@@ -425,7 +464,7 @@ const DoctorPanel = () => {
             <User size={isMobile ? 16 : 20} />
             {!isMobile && <span>Пациенты</span>}
           </button>
-          
+
           <button
             style={activeTab === 'appointments' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('appointments')}
@@ -445,7 +484,33 @@ const DoctorPanel = () => {
             <Calendar size={isMobile ? 16 : 20} />
             {!isMobile && <span>Записи</span>}
           </button>
-          
+
+          {/* ✅ НОВОЕ: Таб очереди */}
+          <button
+            style={activeTab === 'queue' ? activeTabStyle : tabStyle}
+            onClick={() => setActiveTab('queue')}
+            onMouseEnter={(e) => {
+              if (activeTab !== 'queue') {
+                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                e.target.style.transform = 'translateY(-2px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== 'queue') {
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.transform = 'translateY(0)';
+              }
+            }}
+          >
+            <Users size={isMobile ? 16 : 20} />
+            {!isMobile && <span>Очередь</span>}
+            {queueStats.waiting > 0 && (
+              <Badge variant="warning" style={{ marginLeft: '4px', fontSize: '10px' }}>
+                {queueStats.waiting}
+              </Badge>
+            )}
+          </button>
+
           <button
             style={activeTab === 'ai' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('ai')}
@@ -465,7 +530,7 @@ const DoctorPanel = () => {
             <Brain size={isMobile ? 16 : 20} />
             {!isMobile && <span>AI Помощник</span>}
           </button>
-          
+
           <button
             style={activeTab === 'reports' ? activeTabStyle : tabStyle}
             onClick={() => setActiveTab('reports')}
@@ -642,8 +707,8 @@ const DoctorPanel = () => {
               <AnimatedTransition type="fade" delay={600}>
                 <Card style={{ marginBottom: getSpacing('xl') }}>
                   <CardHeader>
-                    <h2 style={{ 
-                      fontSize: getFontSize('xl'), 
+                    <h2 style={{
+                      fontSize: getFontSize('xl'),
                       fontWeight: '700',
                       color: getColor('secondary', 800),
                       margin: 0
@@ -686,8 +751,8 @@ const DoctorPanel = () => {
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
-                  <h2 style={{ 
-                    fontSize: getFontSize('xl'), 
+                  <h2 style={{
+                    fontSize: getFontSize('xl'),
                     fontWeight: '700',
                     color: getColor('secondary', 800),
                     margin: 0
@@ -844,8 +909,8 @@ const DoctorPanel = () => {
             <Card style={patientsTableStyle}>
               <CardHeader style={tableHeaderStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
-                  <h2 style={{ 
-                    fontSize: getFontSize('xl'), 
+                  <h2 style={{
+                    fontSize: getFontSize('xl'),
                     fontWeight: '700',
                     color: getColor('secondary', 800),
                     margin: 0
@@ -887,7 +952,7 @@ const DoctorPanel = () => {
                       <option value="completed">Завершены</option>
                       <option value="cancelled">Отменены</option>
                     </select>
-                    <Button 
+                    <Button
                       variant="primary"
                       onClick={() => setScheduleNextModal({ open: true, patient: null })}
                     >
@@ -980,12 +1045,199 @@ const DoctorPanel = () => {
           </AnimatedTransition>
         )}
 
+        {/* ✅ НОВОЕ: Контент таба очереди */}
+        {activeTab === 'queue' && (
+          <AnimatedTransition type="fade" delay={100}>
+            <Card style={patientsTableStyle}>
+              <CardHeader style={tableHeaderStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: getSpacing('md') }}>
+                  <div>
+                    <h2 style={{
+                      fontSize: getFontSize('xl'),
+                      fontWeight: '700',
+                      color: getColor('secondary', 800),
+                      margin: 0
+                    }}>
+                      Очередь пациентов
+                    </h2>
+                    <div style={{ display: 'flex', gap: getSpacing('md'), marginTop: getSpacing('sm') }}>
+                      <Badge variant="warning">Ожидают: {queueStats.waiting}</Badge>
+                      <Badge variant="primary">Вызваны: {queueStats.called}</Badge>
+                      <Badge variant="success">Обслужены: {queueStats.served}</Badge>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: getSpacing('sm') }}>
+                    <Button
+                      variant="primary"
+                      onClick={async () => {
+                        try {
+                          await callNext();
+                          logger.log('Вызван следующий пациент');
+                        } catch (err) {
+                          logger.error('Ошибка вызова:', err);
+                        }
+                      }}
+                      disabled={queueStats.waiting === 0}
+                    >
+                      <Phone size={16} />
+                      {!isMobile && <span style={{ marginLeft: '4px' }}>Вызвать следующего</span>}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={loadQueue}
+                    >
+                      <RotateCcw size={16} />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent style={{ padding: 0 }}>
+                {queueLoading ? (
+                  <div style={{ padding: getSpacing('xl'), textAlign: 'center' }}>
+                    <Skeleton height={40} count={5} />
+                  </div>
+                ) : queueError ? (
+                  <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: dangerColor }}>
+                    <AlertCircle size={32} style={{ marginBottom: getSpacing('sm') }} />
+                    <p>{queueError}</p>
+                    <Button variant="ghost" onClick={loadQueue}>Повторить</Button>
+                  </div>
+                ) : queueEntries.length === 0 ? (
+                  <div style={{ padding: getSpacing('xl'), textAlign: 'center', color: getColor('secondary', 500) }}>
+                    <Users size={48} style={{ opacity: 0.5, marginBottom: getSpacing('md') }} />
+                    <p>Очередь пуста</p>
+                  </div>
+                ) : (
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>№</th>
+                        <th style={thStyle}>Пациент</th>
+                        <th style={thStyle}>Телефон</th>
+                        <th style={thStyle}>Услуги</th>
+                        <th style={thStyle}>Статус</th>
+                        <th style={thStyle}>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {queueEntries.map((entry, index) => (
+                        <tr
+                          key={entry.id}
+                          style={{
+                            background: entry.priority > 0 ? `${warningColor}10` : 'transparent',
+                            borderLeft: entry.priority > 0 ? `3px solid ${warningColor}` : 'none'
+                          }}
+                        >
+                          <td style={tdStyle}>
+                            <Badge variant={entry.priority > 0 ? 'warning' : 'default'}>
+                              {entry.number || index + 1}
+                            </Badge>
+                          </td>
+                          <td style={tdStyle}>
+                            <strong>{entry.patient_name}</strong>
+                            {entry.priority > 0 && <span style={{ marginLeft: '4px', fontSize: '10px', color: warningColor }}>⚡ Следующий</span>}
+                          </td>
+                          <td style={tdStyle}>{entry.phone || '—'}</td>
+                          <td style={tdStyle}>
+                            {entry.service_details?.length > 0 ? (
+                              entry.service_details.slice(0, 2).map((svc, i) => (
+                                <Badge key={i} variant="default" style={{ marginRight: '4px', fontSize: '10px' }}>
+                                  {svc.name || svc.code}
+                                </Badge>
+                              ))
+                            ) : entry.services?.length > 0 ? (
+                              <span style={{ fontSize: '12px', color: getColor('secondary', 500) }}>
+                                {entry.services.slice(0, 2).join(', ')}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td style={tdStyle}>
+                            <Badge variant={getStatusVariant(entry.status)}>
+                              {getStatusText(entry.status)}
+                            </Badge>
+                          </td>
+                          <td style={tdStyle}>
+                            {/* Кнопки в зависимости от статуса */}
+                            {entry.status === 'waiting' && (
+                              <>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                                  onClick={() => markNoShow(entry.id)}
+                                  title="Отметить неявку"
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              </>
+                            )}
+                            {entry.status === 'called' && (
+                              <>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('info', 100), color: accentColor }}
+                                  onClick={() => sendToDiagnostics(entry.id)}
+                                  title="На обследование"
+                                >
+                                  <Stethoscope size={16} />
+                                </button>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                                  onClick={() => completeVisit(entry.id)}
+                                  title="Завершить приём"
+                                >
+                                  <CheckCircle size={16} />
+                                </button>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('danger', 100), color: dangerColor }}
+                                  onClick={() => markNoShow(entry.id)}
+                                  title="Не явился"
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              </>
+                            )}
+                            {entry.status === 'diagnostics' && (
+                              <>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
+                                  onClick={() => completeVisit(entry.id)}
+                                  title="Завершить приём"
+                                >
+                                  <CheckCircle size={16} />
+                                </button>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                                  onClick={() => markIncomplete(entry.id, 'Не вернулся с обследования')}
+                                  title="Не вернулся"
+                                >
+                                  <AlertCircle size={16} />
+                                </button>
+                              </>
+                            )}
+                            {entry.status === 'no_show' && (
+                              <button
+                                style={{ ...actionButtonStyle, background: getColor('warning', 100), color: warningColor }}
+                                onClick={() => restoreToNext(entry.id)}
+                                title="Восстановить следующим"
+                              >
+                                <RotateCcw size={16} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+          </AnimatedTransition>
+        )}
+
         {activeTab === 'ai' && (
           <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
-                <h2 style={{ 
-                  fontSize: getFontSize('xl'), 
+                <h2 style={{
+                  fontSize: getFontSize('xl'),
                   fontWeight: '700',
                   color: getColor('secondary', 800),
                   margin: 0
@@ -1009,8 +1261,8 @@ const DoctorPanel = () => {
           <AnimatedTransition type="fade" delay={100}>
             <Card>
               <CardHeader>
-                <h2 style={{ 
-                  fontSize: getFontSize('xl'), 
+                <h2 style={{
+                  fontSize: getFontSize('xl'),
                   fontWeight: '700',
                   color: getColor('secondary', 800),
                   margin: 0
@@ -1082,12 +1334,12 @@ const DoctorPanel = () => {
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0 }}>
                 Информация о пациенте
               </h3>
-              <button 
+              <button
                 onClick={patientModal.closeModal}
-                style={{ 
-                  color: '#9CA3AF', 
-                  cursor: 'pointer', 
-                  border: 'none', 
+                style={{
+                  color: '#9CA3AF',
+                  cursor: 'pointer',
+                  border: 'none',
                   background: 'none',
                   padding: '4px',
                   borderRadius: '4px'
@@ -1096,7 +1348,7 @@ const DoctorPanel = () => {
                 <XCircle size={24} />
               </button>
             </div>
-            
+
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <div style={{
@@ -1122,7 +1374,7 @@ const DoctorPanel = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1137,14 +1389,14 @@ const DoctorPanel = () => {
                     Статус
                   </p>
                   <p style={{ fontSize: '16px', color: '#111827', margin: 0, fontWeight: '500' }}>
-                    {patientModal.selectedItem.status === 'active' ? 'Активный' : 
-                     patientModal.selectedItem.status === 'waiting' ? 'Ожидает' : 
-                     patientModal.selectedItem.status || 'Неизвестно'}
+                    {patientModal.selectedItem.status === 'active' ? 'Активный' :
+                      patientModal.selectedItem.status === 'waiting' ? 'Ожидает' :
+                        patientModal.selectedItem.status || 'Неизвестно'}
                   </p>
                 </div>
               </div>
             </div>
-            
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
               <button
                 onClick={patientModal.closeModal}
