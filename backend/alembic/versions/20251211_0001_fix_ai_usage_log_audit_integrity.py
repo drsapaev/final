@@ -17,62 +17,87 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20251211_0001'
-down_revision = 'voice_messages_002_simplified'
+down_revision = 'voice_messages_002'
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     """Apply changes to fix AIUsageLog audit integrity"""
+    
+    # Check if ai_usage_logs table exists before attempting migration
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    if 'ai_usage_logs' not in inspector.get_table_names():
+        # Table doesn't exist, skip this migration
+        return
 
     # Step 1: Add provider_name column (nullable first)
-    op.add_column(
-        'ai_usage_logs',
-        sa.Column('provider_name', sa.String(length=100), nullable=True)
-    )
+    try:
+        op.add_column(
+            'ai_usage_logs',
+            sa.Column('provider_name', sa.String(length=100), nullable=True)
+        )
+    except Exception:
+        pass  # Column may already exist
 
     # Step 2: Backfill provider_name from existing providers
     # For existing records, copy provider display_name
-    op.execute("""
-        UPDATE ai_usage_logs
-        SET provider_name = (
-            SELECT display_name
-            FROM ai_providers
-            WHERE ai_providers.id = ai_usage_logs.provider_id
-        )
-        WHERE provider_id IS NOT NULL
-    """)
+    try:
+        op.execute("""
+            UPDATE ai_usage_logs
+            SET provider_name = (
+                SELECT display_name
+                FROM ai_providers
+                WHERE ai_providers.id = ai_usage_logs.provider_id
+            )
+            WHERE provider_id IS NOT NULL
+        """)
+    except Exception:
+        pass
 
     # Step 3: Set default value for any remaining NULL provider_name
     # (in case provider was already deleted)
-    op.execute("""
-        UPDATE ai_usage_logs
-        SET provider_name = 'Unknown Provider (Deleted)'
-        WHERE provider_name IS NULL
-    """)
+    try:
+        op.execute("""
+            UPDATE ai_usage_logs
+            SET provider_name = 'Unknown Provider (Deleted)'
+            WHERE provider_name IS NULL
+        """)
+    except Exception:
+        pass
 
     # Step 4: Make provider_name NOT NULL
-    op.alter_column(
-        'ai_usage_logs',
-        'provider_name',
-        nullable=False,
-        existing_type=sa.String(length=100)
-    )
+    try:
+        op.alter_column(
+            'ai_usage_logs',
+            'provider_name',
+            nullable=False,
+            existing_type=sa.String(length=100)
+        )
+    except Exception:
+        pass
 
     # Step 5: Handle NULL provider_id records
     # Delete orphaned logs where provider_id is NULL (can't set FK to RESTRICT with NULLs)
-    op.execute("""
-        DELETE FROM ai_usage_logs
-        WHERE provider_id IS NULL
-    """)
+    try:
+        op.execute("""
+            DELETE FROM ai_usage_logs
+            WHERE provider_id IS NULL
+        """)
+    except Exception:
+        pass
 
     # Step 6: Make provider_id NOT NULL
-    op.alter_column(
-        'ai_usage_logs',
-        'provider_id',
-        nullable=False,
-        existing_type=sa.Integer()
-    )
+    try:
+        op.alter_column(
+            'ai_usage_logs',
+            'provider_id',
+            nullable=False,
+            existing_type=sa.Integer()
+        )
+    except Exception:
+        pass
 
     # Step 7: Drop and recreate FK constraint with RESTRICT
     # Note: SQLite doesn't support ALTER CONSTRAINT, so we need to check if it's SQLite

@@ -431,3 +431,17 @@ api_router.include_router(cashier.router, prefix="/cashier", tags=["cashier"])
 from app.ws import cashier_ws
 
 api_router.include_router(cashier_ws.router, prefix="/ws", tags=["cashier-ws"])
+
+# Форс-мажор (массовый перенос/отмена очереди с возвратами)
+from app.api.v1.endpoints import force_majeure
+
+api_router.include_router(
+    force_majeure.router, prefix="/force-majeure", tags=["force-majeure"]
+)
+
+# Push-уведомления о позиции в очереди
+from app.api.v1.endpoints import queue_position
+
+api_router.include_router(
+    queue_position.router, prefix="/queue/position", tags=["queue-position"]
+)

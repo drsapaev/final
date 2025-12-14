@@ -342,12 +342,16 @@ const [step, setStep] = useState('loading'); // loading | info | select-speciali
 **Расположение**: `frontend/src/components/wizard/AppointmentWizardV2.jsx`
 
 **Режим редактирования**:
-- Определяет новые услуги путём сравнения с исходными
-- Обновляет личные данные пациента
-- Создаёт новые записи очереди для новых услуг через batch endpoint
-- Сохраняет оригинальный источник регистрации (`source`)
+- **Обычные визиты (desk/admin)**:
+  - Определяет новые услуги путём сравнения с исходными
+  - Создаёт новые записи очереди для новых услуг через batch endpoint
+- **QR-записи (online)**:
+  - Использует SSOT-метод `updateOnlineQueueEntry` (`PUT .../full-update`)
+  - Атомарно обновляет пациента и список услуг
+  - Backend сам управляет добавлением новых услуг и сохранением старых
+  - **ВАЖНО**: Не создает дубликатов визитов
 
-**Логика определения новых услуг**:
+**Логика определения новых услуг (для desk записей)**:
 ```javascript
 const existingServiceIds = initialData.services 
   ? initialData.services.map(s => s.service_id || s.id)
@@ -719,13 +723,15 @@ python -m alembic upgrade b9716387212f
   - `source` (`online`, `desk`, `morning_assignment`, `confirmation`) с метками **QR/Manual**,
   - `discount_mode`, `payment_status`, AllFree и др.  
   Использует единый маппинг услуг (`service_code`/`category_code`) для кодов (K**, D**, S**, L** и т.п.) и тултипов с полными названиями.
+  **Вкладка "Все отделения"** теперь корректно агрегирует и конвертирует услуги для мульти-QR записей (показывает список кодов, например `K01, S01`, вместо сырых названий).
 
 - [x] **`AppointmentWizardV2`** (`frontend/src/components/wizard/AppointmentWizardV2.jsx`)  
   - Новый визит (desk) → формирует `CartRequest` и вызывает `/registrar/cart`.  
   - Edit визита → восстанавливает корзину из `initialData`, отслеживает новые услуги, создаёт для них новые визиты/очереди.  
   - Edit QR‑записи → поднимает данные пациента из очереди/пациента, маппит `queue_numbers` → услуги, при завершении:
-    - создаёт/обновляет `Visit`/`VisitService`,
-    - для новых услуг создаёт отдельные `OnlineQueueEntry` c новым `queue_time`, не изменяя исходные `queue_entries`.
+    - вызывает `updateOnlineQueueEntry` (`PUT /full-update`),
+    - Backend обновляет `OnlineQueueEntry` (пациент, услуги), сохраняя `queue_time` для старых и создавая новые записи для новых услуг,
+    - **CRITICAL**: Предотвращает дублирование визитов (не вызывает `create_cart`).
 
 ### Мини‑чек‑лист для ручной проверки
 

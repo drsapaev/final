@@ -36,7 +36,8 @@ import {
   RotateCcw,
   Stethoscope,
   AlertCircle,
-  Phone
+  Phone,
+  Bell
 } from 'lucide-react';
 
 // ✅ УЛУЧШЕНИЕ: Универсальные хуки для устранения дублирования
@@ -78,6 +79,41 @@ const DoctorPanel = () => {
     markIncomplete,
     completeVisit
   } = useDoctorQueue(null, currentUser);
+
+  // ✅ Функция отправки push-уведомления "Вернуться с диагностики"
+  const callFromDiagnostics = async (entryId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`/api/v1/queue/position/notify/diagnostics-return/${entryId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        logger.log('Push-уведомление отправлено');
+      } else {
+        logger.error('Ошибка отправки уведомления');
+      }
+    } catch (err) {
+      logger.error('Ошибка:', err);
+    }
+  };
+
+  // ✅ Хелпер для отображения времени с момента события
+  const formatElapsedTime = (timestamp) => {
+    if (!timestamp) return null;
+    const start = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return '<1m';
+    if (diffMins < 60) return `${diffMins}m`;
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hours}h ${mins}m`;
+  };
 
   // Refs
   const headerRef = useRef(null);
@@ -1155,6 +1191,20 @@ const DoctorPanel = () => {
                             <Badge variant={getStatusVariant(entry.status)}>
                               {getStatusText(entry.status)}
                             </Badge>
+                            {/* ✅ Таймер для активных статусов */}
+                            {(entry.status === 'called' || entry.status === 'diagnostics') && entry.called_at && (
+                              <span style={{
+                                marginLeft: '8px',
+                                fontSize: '11px',
+                                color: getColor('secondary', 500),
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px'
+                              }}>
+                                <Clock size={12} />
+                                {formatElapsedTime(entry.called_at)}
+                              </span>
+                            )}
                           </td>
                           <td style={tdStyle}>
                             {/* Кнопки в зависимости от статуса */}
@@ -1196,6 +1246,13 @@ const DoctorPanel = () => {
                             )}
                             {entry.status === 'diagnostics' && (
                               <>
+                                <button
+                                  style={{ ...actionButtonStyle, background: getColor('primary', 100), color: primaryColor }}
+                                  onClick={() => callFromDiagnostics(entry.id)}
+                                  title="Вернуть с диагностики (Push)"
+                                >
+                                  <Bell size={16} />
+                                </button>
                                 <button
                                   style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                                   onClick={() => completeVisit(entry.id)}

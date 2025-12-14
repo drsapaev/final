@@ -64,6 +64,14 @@ from .notification import (
 )
 from .online import OnlineDay
 from .online_queue import DailyQueue, OnlineQueueEntry, QueueToken
+from .refund_deposit import (
+    RefundRequest,
+    RefundRequestStatus,
+    RefundType,
+    PatientDeposit,
+    DepositTransaction,
+    DepositTransactionType,
+)
 from .patient import Patient
 from .payment import Payment
 from .payment_invoice import PaymentInvoice, PaymentInvoiceVisit
@@ -210,4 +218,11 @@ __all__ = [
     "DepartmentService",
     "DepartmentQueueSettings",
     "DepartmentRegistrationSettings",
+    # Refund and Deposit models
+    "RefundRequest",
+    "RefundRequestStatus",
+    "RefundType",
+    "PatientDeposit",
+    "DepositTransaction",
+    "DepositTransactionType",
 ]
