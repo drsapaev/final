@@ -722,8 +722,11 @@ python -m alembic upgrade b9716387212f
   - `queue_numbers[]` (номер и очередь/вкладка),
   - `source` (`online`, `desk`, `morning_assignment`, `confirmation`) с метками **QR/Manual**,
   - `discount_mode`, `payment_status`, AllFree и др.  
+  
   Использует единый маппинг услуг (`service_code`/`category_code`) для кодов (K**, D**, S**, L** и т.п.) и тултипов с полными названиями.
-  **Вкладка "Все отделения"** теперь корректно агрегирует и конвертирует услуги для мульти-QR записей (показывает список кодов, например `K01, S01`, вместо сырых названий).
+  
+  **⚠️ ВАЖНО (см. раздел 8.9 в ONLINE_QUEUE_SYSTEM_V2.md):**  
+  Вкладка "Все отделения" **обязана** вызывать `filterServicesByDepartment(patient, null)` для корректного отображения всех услуг мульти-QR записей. Напрямую использовать `appointment.services` для QR-записей **ЗАПРЕЩЕНО**.
 
 - [x] **`AppointmentWizardV2`** (`frontend/src/components/wizard/AppointmentWizardV2.jsx`)  
   - Новый визит (desk) → формирует `CartRequest` и вызывает `/registrar/cart`.  
