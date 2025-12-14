@@ -303,8 +303,8 @@ const CashierPanel = () => {
       for (const visitId of visitIds) {
         if (remaining <= 0) break;
 
-        let debt = visitDebts[visitId] || 0;
-        let payAmount = Math.min(remaining, debt);
+        const debt = visitDebts[visitId] || 0;
+        const payAmount = Math.min(remaining, debt);
 
         if (payAmount > 0) {
           paymentsToMake.push({ visitId, amount: payAmount });
@@ -363,7 +363,7 @@ const CashierPanel = () => {
 
   // ✅ УЛУЧШЕНИЕ: Функции для работы с кнопками в истории платежей
   const confirmPayment = async (paymentId) => {
-    if (!window.confirm("Вы уверены, что хотите подтвердить этот платеж вручную?")) {
+    if (!window.confirm('Вы уверены, что хотите подтвердить этот платеж вручную?')) {
       return;
     }
 
@@ -1070,7 +1070,7 @@ const CashierPanel = () => {
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {/* TODO: Render services info properly if available in history item */}
-                                {row.service || "Услуга"}
+                                {row.service || 'Услуга'}
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {row.method}

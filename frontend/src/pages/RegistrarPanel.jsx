@@ -4603,7 +4603,7 @@ const RegistrarPanel = () => {
                 await tryCancelVisit();
               } catch (err) {
                 if (err.response?.status === 404) {
-                  logger.warn(`Fallback visit cancel failed 404, trying online_queue...`);
+                  logger.warn('Fallback visit cancel failed 404, trying online_queue...');
                   await tryCancelOnlineQueue();
                 } else {
                   throw err;
@@ -4788,7 +4788,7 @@ const RegistrarPanel = () => {
               <button style={buttonSecondaryStyle} onClick={async () => {
                 if (!rescheduleData) return;
                 const currentVal = getLocalDateString(rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date());
-                const dateStr = prompt("Введите дату переноса (YYYY-MM-DD):", currentVal);
+                const dateStr = prompt('Введите дату переноса (YYYY-MM-DD):', currentVal);
 
                 if (dateStr) {
                   // Simple validation YYYY-MM-DD

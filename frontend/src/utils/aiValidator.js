@@ -224,7 +224,7 @@ function validateField(value, rule) {
 
     // Pattern validation
     if (rule.pattern && !rule.pattern.test(value)) {
-      throw new Error(`String does not match required pattern`);
+      throw new Error('String does not match required pattern');
     }
 
     // Sanitize

@@ -50,8 +50,8 @@ export const ChatProvider = ({ children }) => {
 
     // Обработка сообщения
     const handleNewMessage = useCallback((message) => {
-        console.log('🔔 [Context] WS New Message:', message);
-        console.log('   Active conversation:', activeConversationRef.current);
+        // console.log('🔔 [Context] WS New Message:', message);
+        // console.log('   Active conversation:', activeConversationRef.current);
 
         const currentActive = activeConversationRef.current;
         const activeIdStr = currentActive ? String(currentActive) : null;
@@ -63,7 +63,7 @@ export const ChatProvider = ({ children }) => {
         const isOutgoingSync = currentUserIdStr && senderIdStr === currentUserIdStr && activeIdStr && recipientIdStr === activeIdStr;
 
         if (currentActive && (isIncoming || isOutgoingSync)) {
-            console.log('✅ [Context] Adding to active messages');
+            // console.log('✅ [Context] Adding to active messages');
             setMessages(prev => {
                 if (prev.some(m => m.id === message.id)) return prev;
                 return [message, ...prev];
@@ -112,12 +112,12 @@ export const ChatProvider = ({ children }) => {
             wsHost = wsHost || 'localhost:8001';
             const wsUrl = `${wsProtocol}//${wsHost}/ws/chat?token=${token}`;
 
-            console.log('🔌 [Context] Connecting WS...', wsUrl);
+            // console.log('🔌 [Context] Connecting WS...', wsUrl);
             const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 setIsConnected(true);
-                console.log('✅ [Context] WS Connected');
+                // console.log('✅ [Context] WS Connected');
             };
 
             ws.onmessage = (event) => {
@@ -142,10 +142,10 @@ export const ChatProvider = ({ children }) => {
                 setIsConnected(false);
                 // Если не нормальное закрытие (1000) - пробуем переподключиться
                 if (e.code !== 1000) {
-                    console.log('❌ [Context] WS Disconnected (abnormal), retrying...', e.code);
+                    // console.log('❌ [Context] WS Disconnected (abnormal), retrying...', e.code);
                     reconnectTimeoutRef.current = setTimeout(connect, 3000);
                 } else {
-                    console.log('🔒 [Context] WS Closed normally');
+                    // console.log('🔒 [Context] WS Closed normally');
                 }
             };
 
@@ -156,7 +156,7 @@ export const ChatProvider = ({ children }) => {
 
         return () => {
             if (wsRef.current) {
-                console.log('🧹 [Context] Cleaning up WS...');
+                // console.log('🧹 [Context] Cleaning up WS...');
                 wsRef.current.close(1000, "Unmount");
             }
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
