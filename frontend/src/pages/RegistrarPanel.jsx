@@ -1188,7 +1188,12 @@ const RegistrarPanel = () => {
                         queue_name: queue.specialist_name || queue.specialty || 'Очередь',
                         queue_tag: queue.specialty || queue.queue_tag || null
                       });
-                      logger.info(`🔄 Добавлен queue_number ${queueNum} (${queue.specialty}) для существующей записи ${dedupKey}`);
+                      // ✅ FIX: Собираем ID объединяемых записей для групповой отмены
+                      if (!existingAppointment.aggregated_ids) {
+                        existingAppointment.aggregated_ids = [existingAppointment.id];
+                      }
+                      existingAppointment.aggregated_ids.push(entryId);
+                      logger.info(`🔄 Добавлен queue_number ${queueNum} (${queue.specialty}) для существующей записи ${dedupKey}, добавлен ID ${entryId}`);
                     } else {
                       logger.info(`⏭️ Пропущен дубликат очереди ${queue.specialty} (номер ${queueNum}) для записи ${dedupKey}`);
                     }
@@ -1278,7 +1283,9 @@ const RegistrarPanel = () => {
                     department_key: fullEntry.department_key || null,  // ✅ ДОБАВЛЕНО: для фильтрации по динамическим отделениям
                     // ✅ SSOT: service_id и service_name на уровне appointment для wizard
                     service_id: fullEntry.service_id || null,
-                    service_name: fullEntry.service_name || queue.specialty || null
+                    service_name: fullEntry.service_name || queue.specialty || null,
+                    // ✅ FIX: Инициализируем aggregated_ids для групповой отмены
+                    aggregated_ids: [entryId]
                   };
 
                   // ✅ Сохраняем в Map для дедупликации
