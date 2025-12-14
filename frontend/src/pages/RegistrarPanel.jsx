@@ -1205,7 +1205,19 @@ const RegistrarPanel = () => {
                   const address = fullEntry.address || '';
                   const services = Array.isArray(fullEntry.services) ? fullEntry.services : [];
                   const servicesFull = Array.isArray(fullEntry.services_full) ? fullEntry.services_full : services; // ✅ НОВОЕ: Полный формат для wizard
-                  const serviceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
+                  let serviceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
+
+                  // ✅ FIX: Если кодов нет (ручная запись), пытаемся определить по специальности для SSOT отображения
+                  if (!serviceCodes || serviceCodes.length === 0) {
+                    const spec = (queue.specialty || '').toLowerCase().trim();
+                    if (spec.includes('cardio') || spec.includes('кардио')) serviceCodes = ['K01'];
+                    else if (spec.includes('derma') || spec.includes('дерма')) serviceCodes = ['D01'];
+                    else if (spec.includes('stom') || spec.includes('dent') || spec.includes('стом')) serviceCodes = ['S01'];
+                    else if (spec.includes('lab') || spec.includes('лаб')) serviceCodes = ['L01'];
+                    else if (spec.includes('echo') || spec.includes('ecg') || spec.includes('эхо') || spec.includes('экг')) serviceCodes = ['K10'];
+                    else if (spec.includes('proc') || spec.includes('physio') || spec.includes('проц') || spec.includes('физио')) serviceCodes = ['P01'];
+                    else if (spec.includes('cosmet') || spec.includes('космет')) serviceCodes = ['C01'];
+                  }
 
                   // ✅ ОТЛАДКА: Логируем каждую запись с её service_codes
                   if (queue.specialty === 'echokg' || serviceCodes.includes('K10')) {
@@ -3003,6 +3015,21 @@ const RegistrarPanel = () => {
           patientGroups[patientKey].payment_type = 'free';
           patientGroups[patientKey].discount_mode = appointment.discount_mode;
           patientGroups[patientKey].approval_status = appointment.approval_status;
+        }
+
+        // ✅ FIX: Агрегируем queue_numbers (добавляем новые очереди к существующему пациенту в таблице "Все")
+        if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
+          const existingQueueTags = new Set((patientGroups[patientKey].queue_numbers || []).map(qn =>
+            (qn.queue_tag || qn.specialty || '').toString().toLowerCase().trim()
+          ));
+
+          appointment.queue_numbers.forEach(qn => {
+            const tag = (qn.queue_tag || qn.specialty || '').toString().toLowerCase().trim();
+            if (!existingQueueTags.has(tag)) {
+              patientGroups[patientKey].queue_numbers.push(qn);
+              existingQueueTags.add(tag);
+            }
+          });
         }
       }
 
