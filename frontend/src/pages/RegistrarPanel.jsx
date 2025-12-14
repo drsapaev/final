@@ -2966,9 +2966,14 @@ const RegistrarPanel = () => {
           record_type: appointment.record_type, // ✅ ДОБАВЛЕНО: Сохраняем тип записи при агрегации
           // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
           discount_mode: appointment.discount_mode,
-          approval_status: appointment.approval_status
+          approval_status: appointment.approval_status,
+          // ✅ FIX: Собираем ВСЕ ID записей для групповой отмены
+          aggregated_ids: [appointment.id]
         };
       } else {
+        // Добавляем ID в массив агрегированных
+        patientGroups[patientKey].aggregated_ids.push(appointment.id);
+
         // ✅ ИСПРАВЛЕНО: Если уже есть запись, но новая имеет All Free — обновляем
         const isAllFree = appointment.discount_mode === 'all_free' && appointment.approval_status === 'approved';
         const existingIsAllFree = patientGroups[patientKey].discount_mode === 'all_free' &&
@@ -4680,80 +4685,98 @@ const RegistrarPanel = () => {
         appointment={cancelDialog.row}
         onCancel={async (appointmentId, reason) => {
           // ✅ FIX: Call backend to cancel visit OR appointment OR queue entry
+          // Supports cancelling multiple aggregated IDs (for multi-QR entries)
           try {
             const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find(a => a.id === appointmentId);
             const recordType = data?.record_type || 'visit';
 
-            logger.info(`🔍 Отмена записи ID=${appointmentId}`, {
+            // Определяем список ID для отмены (если это агрегированная запись - отменяем все)
+            const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
+
+            logger.info(`🔍 Отмена записи(ей). IDs: [${idsToCancel.join(', ')}]`, {
               recordType,
               source: data?.source,
-              fullData: data
+              fullData: data,
+              idsToCancel
             });
 
-            const tryCancelVisit = async () => {
-              await api.post(`/visits/${appointmentId}/status`, null, {
-                params: { status_new: 'canceled' }
-              });
-            };
+            // Функция отмены одной записи
+            const cancelSingleRecord = async (targetId) => {
+              const tryCancelVisit = async () => {
+                await api.post(`/visits/${targetId}/status`, null, {
+                  params: { status_new: 'canceled' }
+                });
+              };
 
-            const tryCancelOnlineQueue = async () => {
-              await api.post(`/online-queue/entries/${appointmentId}/cancel`);
-            };
+              const tryCancelOnlineQueue = async () => {
+                await api.post(`/online-queue/entries/${targetId}/cancel`);
+              };
 
-            const tryCancelAppointment = async () => {
-              try {
-                await api.put(`/appointments/${appointmentId}`, { status: 'canceled' });
-              } catch (e) {
-                logger.warn('PUT failed, trying DELETE for appointment cancellation');
-                await api.delete(`/appointments/${appointmentId}`);
-              }
-            };
+              const tryCancelAppointment = async () => {
+                try {
+                  await api.put(`/appointments/${targetId}`, { status: 'canceled' });
+                } catch (e) {
+                  logger.warn('PUT failed, trying DELETE for appointment cancellation');
+                  await api.delete(`/appointments/${targetId}`);
+                }
+              };
 
-            if (recordType === 'visit') {
-              try {
-                await tryCancelVisit();
-              } catch (visitError) {
-                if (visitError.response?.status === 404) {
-                  logger.warn(`⚠️ Попытка отмены как 'visit' вернула 404. Пробуем как 'online_queue' (ID=${appointmentId})`);
-                  await tryCancelOnlineQueue();
-                } else {
-                  throw visitError;
+              if (recordType === 'visit') {
+                try {
+                  await tryCancelVisit();
+                } catch (visitError) {
+                  if (visitError.response?.status === 404) {
+                    logger.warn(`⚠️ Попытка отмены как 'visit' вернула 404. Пробуем как 'online_queue' (ID=${targetId})`);
+                    await tryCancelOnlineQueue();
+                  } else {
+                    throw visitError;
+                  }
+                }
+              } else if (recordType === 'appointment') {
+                await tryCancelAppointment();
+              } else if (recordType === 'online_queue') {
+                await tryCancelOnlineQueue();
+              } else {
+                // Fallback default strategy
+                try {
+                  await tryCancelVisit();
+                } catch (err) {
+                  if (err.response?.status === 404) {
+                    logger.warn(`Fallback visit cancel failed 404, trying online_queue...`);
+                    await tryCancelOnlineQueue();
+                  } else {
+                    throw err;
+                  }
                 }
               }
-            } else if (recordType === 'appointment') {
-              await tryCancelAppointment();
-            } else if (recordType === 'online_queue') {
-              await tryCancelOnlineQueue();
-            } else {
-              // Fallback default strategy
-              try {
-                await tryCancelVisit();
-              } catch (err) {
-                if (err.response?.status === 404) {
-                  logger.warn(`Fallback visit cancel failed 404, trying online_queue...`);
-                  await tryCancelOnlineQueue();
-                } else {
-                  throw err;
-                }
-              }
+            };
+
+            // Выполняем отмену для всех ID
+            // Используем Promise.allSettled или loop для попытки отмены всех
+            // Для надежности используем последовательную отмену
+            for (const id of idsToCancel) {
+              await cancelSingleRecord(id);
             }
 
-            logger.info('✅ Запись успешно отменена на сервере');
+            logger.info('✅ Все записи успешно отменены на сервере');
           } catch (error) {
             logger.error('❌ Ошибка отмены визита на сервере:', error);
 
             // Если это 404 после всех попыток
             if (error.response?.status === 404) {
-              toast.error(`Ошибка: Запись ${appointmentId} не найдена в базе данных (ни как визит, ни как очередь)`);
+              toast.error(`Ошибка: Запись ${appointmentId} не найдена в базе данных`);
             } else {
               toast.error('Не удалось обновить статус на сервере: ' + (error.message || 'Unknown error'));
             }
             // Don't return here, still update locally to remove from view or let the user know
           }
 
-          // Локальное обновление статуса
+          // Локальное обновление статуса (для всех ID)
+          const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find(a => a.id === appointmentId);
+          const idsToCancel = data?.aggregated_ids?.length > 0 ? data.aggregated_ids : [appointmentId];
+
           setAppointments(prev => prev.map(apt =>
-            apt.id === appointmentId ? {
+            idsToCancel.includes(apt.id) ? {
               ...apt,
               status: 'canceled',
               _locallyModified: true,
