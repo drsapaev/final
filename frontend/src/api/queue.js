@@ -108,3 +108,42 @@ export async function createQueueEntriesBatch({ patientId, source, services }) {
   );
   return response.data;
 }
+
+/**
+ * Обновление существующей QR-записи (вместо создания новой)
+ * ⭐ SSOT: Этот endpoint обновляет существующую запись в очереди,
+ * предотвращая создание дубликатов при редактировании QR-записей в мастере
+ * 
+ * @param {Object} params - Параметры для обновления
+ * @param {number} params.entryId - ID записи в очереди (queue_entry.id)
+ * @param {Object} params.patientData - Данные пациента {patient_name, phone, birth_year, address}
+ * @param {string} params.visitType - Тип визита: 'paid', 'repeat', 'benefit'
+ * @param {string} params.discountMode - Режим скидки: 'none', 'repeat', 'benefit', 'all_free'
+ * @param {Array<{service_id: number, quantity: number}>} params.services - Список услуг
+ * @param {boolean} params.allFree - Все услуги бесплатны
+ * @returns {Promise<{success: boolean, entry: Object, total_amount: number}>}
+ */
+export async function updateOnlineQueueEntry({
+  entryId,
+  patientData,
+  visitType,
+  discountMode,
+  services,
+  allFree = false,
+}) {
+  const payload = {
+    patient_data: patientData,
+    visit_type: visitType,
+    discount_mode: discountMode,
+    services: services.map((service) => ({
+      service_id: Number(service.service_id),
+      quantity: Number(service.quantity || 1),
+    })),
+    all_free: allFree,
+  };
+  const response = await api.put(
+    `/queue/online-entry/${Number(entryId)}/full-update`,
+    payload
+  );
+  return response.data;
+}

@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSBadge, 
-  MacOSInput, 
-  MacOSSelect, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSInput,
+  MacOSSelect,
   MacOSTextarea,
   MacOSLoadingSkeleton,
   MacOSEmptyState,
   MacOSAlert
 } from '../ui/macos';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Send, 
-  Eye, 
-  Download, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Send,
+  Eye,
+  Download,
   DollarSign,
   CreditCard,
   FileText,
@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 const BillingManager = () => {
   const [activeTab, setActiveTab] = useState('invoices');
@@ -203,23 +204,23 @@ const BillingManager = () => {
     const Icon = config.icon;
 
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <MacOSBadge variant={config.variant} className="flex items-center gap-1">
         <Icon className="w-3 h-3" />
         {config.label}
-      </Badge>
+      </MacOSBadge>
     );
   };
 
   const renderInvoicesTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Заголовок и кнопки */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <div>
-          <h3 style={{ 
+          <h3 style={{
             margin: '0 0 4px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-lg)',
@@ -227,7 +228,7 @@ const BillingManager = () => {
           }}>
             Счета
           </h3>
-          <p style={{ 
+          <p style={{
             margin: 0,
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -235,12 +236,12 @@ const BillingManager = () => {
             Управление счетами и выставлением
           </p>
         </div>
-        <MacOSButton 
+        <MacOSButton
           onClick={() => setShowCreateInvoice(true)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
           <Plus size={16} />
@@ -265,19 +266,19 @@ const BillingManager = () => {
         ) : (
           invoices.map(invoice => (
             <MacOSCard key={invoice.id} style={{ padding: 0 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start' 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
               }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '8px',
                     marginBottom: '12px'
                   }}>
-                    <h4 style={{ 
+                    <h4 style={{
                       margin: 0,
                       color: 'var(--mac-text-primary)',
                       fontSize: 'var(--mac-font-size-md)',
@@ -288,10 +289,10 @@ const BillingManager = () => {
                     {getStatusBadge(invoice.status)}
                     <MacOSBadge variant="outline">{invoice.invoice_type}</MacOSBadge>
                   </div>
-                  
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '8px',
                     fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
@@ -304,7 +305,7 @@ const BillingManager = () => {
                   </div>
 
                   {invoice.balance > 0 && (
-                    <div style={{ 
+                    <div style={{
                       fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-error)'
                     }}>
@@ -312,12 +313,12 @@ const BillingManager = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <MacOSButton
                     variant="outline"
                     onClick={() => handleViewInvoiceHTML(invoice.id)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -333,7 +334,7 @@ const BillingManager = () => {
                   <MacOSButton
                     variant="outline"
                     onClick={() => handleSendInvoice(invoice.id)}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -352,7 +353,7 @@ const BillingManager = () => {
                       setPaymentForm({ ...paymentForm, invoice_id: invoice.id, amount: invoice.balance });
                       setShowRecordPayment(true);
                     }}
-                    style={{ 
+                    style={{
                       padding: '6px',
                       minWidth: 'auto',
                       width: '32px',
@@ -375,13 +376,13 @@ const BillingManager = () => {
       {/* Форма создания счета */}
       {showCreateInvoice && (
         <MacOSCard style={{ padding: 0 }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '16px'
           }}>
-            <h4 style={{ 
+            <h4 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-lg)',
@@ -389,10 +390,10 @@ const BillingManager = () => {
             }}>
               Создать счет
             </h4>
-            <MacOSButton 
-              variant="outline" 
+            <MacOSButton
+              variant="outline"
               onClick={() => setShowCreateInvoice(false)}
-              style={{ 
+              style={{
                 padding: '6px',
                 minWidth: 'auto',
                 width: '32px',
@@ -408,12 +409,12 @@ const BillingManager = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 ID пациента
               </label>
@@ -426,12 +427,12 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Тип счета
               </label>
@@ -448,12 +449,12 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Срок оплаты (дней)
               </label>
@@ -489,24 +490,24 @@ const BillingManager = () => {
 
           {/* Позиции счета */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
               marginBottom: '8px'
             }}>
-              <label style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
+              <label style={{
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
                 color: 'var(--mac-text-primary)'
               }}>
                 Позиции счета
               </label>
-              <MacOSButton 
+              <MacOSButton
                 onClick={addInvoiceItem}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '4px',
                   padding: '4px 8px',
                   fontSize: 'var(--mac-font-size-xs)'
@@ -518,9 +519,9 @@ const BillingManager = () => {
             </div>
 
             {invoiceForm.items.map((item, index) => (
-              <div key={index} style={{ 
-                display: 'grid', 
-                gridTemplateColumns: '2fr 1fr 1fr auto', 
+              <div key={index} style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 1fr 1fr auto',
                 gap: '8px',
                 marginBottom: '8px',
                 padding: '12px',
@@ -549,7 +550,7 @@ const BillingManager = () => {
                   variant="outline"
                   onClick={() => removeInvoiceItem(index)}
                   disabled={invoiceForm.items.length === 1}
-                  style={{ 
+                  style={{
                     padding: '6px',
                     minWidth: 'auto',
                     width: '32px',
@@ -567,12 +568,12 @@ const BillingManager = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Описание
               </label>
@@ -586,18 +587,18 @@ const BillingManager = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <MacOSButton 
-              variant="outline" 
+            <MacOSButton
+              variant="outline"
               onClick={() => setShowCreateInvoice(false)}
             >
               Отмена
             </MacOSButton>
-            <MacOSButton 
+            <MacOSButton
               onClick={handleCreateInvoice}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px' 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}
             >
               <Save size={16} />
@@ -610,13 +611,13 @@ const BillingManager = () => {
       {/* Форма записи платежа */}
       {showRecordPayment && (
         <MacOSCard style={{ padding: 0 }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: '16px'
           }}>
-            <h4 style={{ 
+            <h4 style={{
               margin: 0,
               color: 'var(--mac-text-primary)',
               fontSize: 'var(--mac-font-size-lg)',
@@ -624,10 +625,10 @@ const BillingManager = () => {
             }}>
               Записать платеж
             </h4>
-            <MacOSButton 
-              variant="outline" 
+            <MacOSButton
+              variant="outline"
               onClick={() => setShowRecordPayment(false)}
-              style={{ 
+              style={{
                 padding: '6px',
                 minWidth: 'auto',
                 width: '32px',
@@ -643,12 +644,12 @@ const BillingManager = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 ID счета
               </label>
@@ -661,12 +662,12 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Сумма платежа
               </label>
@@ -679,12 +680,12 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Способ оплаты
               </label>
@@ -703,12 +704,12 @@ const BillingManager = () => {
             </div>
 
             <div>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Номер ссылки
               </label>
@@ -720,12 +721,12 @@ const BillingManager = () => {
             </div>
 
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ 
-                display: 'block', 
-                fontSize: 'var(--mac-font-size-sm)', 
-                fontWeight: 'var(--mac-font-weight-medium)', 
-                color: 'var(--mac-text-primary)', 
-                marginBottom: '8px' 
+              <label style={{
+                display: 'block',
+                fontSize: 'var(--mac-font-size-sm)',
+                fontWeight: 'var(--mac-font-weight-medium)',
+                color: 'var(--mac-text-primary)',
+                marginBottom: '8px'
               }}>
                 Описание
               </label>
@@ -739,18 +740,18 @@ const BillingManager = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-            <MacOSButton 
-              variant="outline" 
+            <MacOSButton
+              variant="outline"
               onClick={() => setShowRecordPayment(false)}
             >
               Отмена
             </MacOSButton>
-            <MacOSButton 
+            <MacOSButton
               onClick={handleRecordPayment}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px' 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}
             >
               <Save size={16} />
@@ -771,16 +772,16 @@ const BillingManager = () => {
 
       <div className="grid gap-4">
         {payments.map(payment => (
-          <Card key={payment.id} className="p-4">
+          <MacOSCard key={payment.id} className="p-4">
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h4 className="font-medium">Платеж № {payment.payment_number}</h4>
-                  <Badge variant={payment.is_confirmed ? 'success' : 'warning'}>
+                  <MacOSBadge variant={payment.is_confirmed ? 'success' : 'warning'}>
                     {payment.is_confirmed ? 'Подтвержден' : 'Ожидает подтверждения'}
-                  </Badge>
+                  </MacOSBadge>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                   <div>Счет ID: {payment.invoice_id}</div>
                   <div>Пациент ID: {payment.patient_id}</div>
@@ -793,7 +794,7 @@ const BillingManager = () => {
                 </div>
               </div>
             </div>
-          </Card>
+          </MacOSCard>
         ))}
       </div>
     </div>
@@ -809,15 +810,15 @@ const BillingManager = () => {
       {analytics && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="p-4">
+            <MacOSCard className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="w-5 h-5 text-blue-500" />
                 <h4 className="font-medium">Всего счетов</h4>
               </div>
               <div className="text-2xl font-bold">{analytics.summary?.total_invoices || 0}</div>
-            </Card>
+            </MacOSCard>
 
-            <Card className="p-4">
+            <MacOSCard className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <DollarSign className="w-5 h-5 text-green-500" />
                 <h4 className="font-medium">Общая сумма</h4>
@@ -825,9 +826,9 @@ const BillingManager = () => {
               <div className="text-2xl font-bold text-green-600">
                 {analytics.summary?.total_amount?.toLocaleString() || 0} сум
               </div>
-            </Card>
+            </MacOSCard>
 
-            <Card className="p-4">
+            <MacOSCard className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle className="w-5 h-5 text-green-500" />
                 <h4 className="font-medium">Оплачено</h4>
@@ -835,9 +836,9 @@ const BillingManager = () => {
               <div className="text-2xl font-bold text-green-600">
                 {analytics.summary?.paid_amount?.toLocaleString() || 0} сум
               </div>
-            </Card>
+            </MacOSCard>
 
-            <Card className="p-4">
+            <MacOSCard className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <XCircle className="w-5 h-5 text-red-500" />
                 <h4 className="font-medium">Просрочено</h4>
@@ -845,11 +846,11 @@ const BillingManager = () => {
               <div className="text-2xl font-bold text-red-600">
                 {analytics.summary?.overdue_amount?.toLocaleString() || 0} сум
               </div>
-            </Card>
+            </MacOSCard>
           </div>
 
           {analytics.status_breakdown && (
-            <Card className="p-4">
+            <MacOSCard className="p-4">
               <h4 className="font-medium mb-4">Разбивка по статусам</h4>
               <div className="space-y-2">
                 {analytics.status_breakdown.map((stat, index) => (
@@ -862,7 +863,7 @@ const BillingManager = () => {
                   </div>
                 ))}
               </div>
-            </Card>
+            </MacOSCard>
           )}
         </>
       )}
@@ -878,23 +879,23 @@ const BillingManager = () => {
 
   return (
     <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '16px',
         marginBottom: '24px'
       }}>
         <DollarSign size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{ 
-            margin: 0, 
+          <h2 style={{
+            margin: 0,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-xl)',
             fontWeight: 'var(--mac-font-weight-bold)'
           }}>
             Управление биллингом
           </h2>
-          <p style={{ 
+          <p style={{
             margin: '4px 0 0 0',
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -905,8 +906,8 @@ const BillingManager = () => {
       </div>
 
       {/* Табы */}
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         borderBottom: '1px solid var(--mac-border)',
         marginBottom: '24px'
       }}>

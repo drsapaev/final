@@ -306,7 +306,7 @@ async def get_refund_requests(
         
         processed_by_name = None
         if req.processor:
-            processed_by_name = f"{req.processor.last_name} {req.processor.first_name}"
+            processed_by_name = req.processor.full_name
         
         result.append(RefundRequestResponse(
             id=req.id,
@@ -354,7 +354,7 @@ async def get_refund_request(
     
     processed_by_name = None
     if req.processor:
-        processed_by_name = f"{req.processor.last_name} {req.processor.first_name}"
+        processed_by_name = req.processor.full_name
     
     return RefundRequestResponse(
         id=req.id,
@@ -470,7 +470,7 @@ async def process_refund_request(
         bank_card_number=req.bank_card_number,
         created_at=req.created_at,
         processed_at=req.processed_at,
-        processed_by_name=f"{current_user.last_name} {current_user.first_name}"
+        processed_by_name=current_user.full_name
     )
 
 

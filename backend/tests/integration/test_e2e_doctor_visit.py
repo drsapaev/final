@@ -43,8 +43,7 @@ def doctor_with_queue(db_session):
             hashed_password=get_password_hash("doctor123"),
             role="Doctor",
             is_active=True,
-            first_name="Тест",
-            last_name="Докторов",
+            full_name="Тест Докторов",
         )
         db_session.add(doctor_user)
         db_session.commit()
@@ -56,9 +55,7 @@ def doctor_with_queue(db_session):
         doctor = Doctor(
             user_id=doctor_user.id,
             specialty="Терапия",
-            license_number="DOC_E2E_001",
-            experience_years=5,
-            is_active=True,
+            active=True,
         )
         db_session.add(doctor)
         db_session.commit()

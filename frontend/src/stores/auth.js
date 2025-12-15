@@ -33,7 +33,7 @@ function notify() {
     } catch (e) {
       // swallow subscriber errors so one bad subscriber doesn't break others
       // but log for debugging.
-      // eslint-disable-next-line no-console
+       
       logger.error('auth subscriber error:', e);
     }
   }
@@ -136,7 +136,7 @@ export async function getProfile(force = false) {
     }
   } catch (err) {
     // don't throw — return local stored profile or null
-    // eslint-disable-next-line no-console
+     
     logger.warn('getProfile: API call failed:', err);
   }
 

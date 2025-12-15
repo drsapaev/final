@@ -75,7 +75,7 @@ class Doctor(Base):
     price_default: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
     start_number_online: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     max_online_per_day: Mapped[int] = mapped_column(Integer, default=15, nullable=False)
-    auto_close_time: Mapped[Optional[time]] = mapped_column(Time, default="09:00", nullable=True)
+    auto_close_time: Mapped[Optional[time]] = mapped_column(Time, default=time(9, 0), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

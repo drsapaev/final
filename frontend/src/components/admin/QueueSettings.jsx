@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import { 
-  Clock, 
-  Users, 
-  Hash, 
-  Settings, 
-  Save, 
-  RefreshCw, 
-  AlertCircle, 
+import {
+  Clock,
+  Users,
+  Hash,
+  Settings,
+  Save,
+  RefreshCw,
+  AlertCircle,
   CheckCircle,
   TestTube,
   Heart,
@@ -16,10 +17,10 @@ import {
   QrCode,
   Play
 } from 'lucide-react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSInput, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
   MacOSSelect,
   MacOSBadge
 } from '../ui/macos';
@@ -48,26 +49,26 @@ const QueueSettings = () => {
 
   // Конфигурация специальностей
   const specialties = [
-    { 
-      key: 'cardiology', 
-      name: 'Кардиология', 
-      icon: Heart, 
+    {
+      key: 'cardiology',
+      name: 'Кардиология',
+      icon: Heart,
       color: 'text-red-600',
-      description: 'Консультации и ЭхоКГ' 
+      description: 'Консультации и ЭхоКГ'
     },
-    { 
-      key: 'dermatology', 
-      name: 'Дерматология', 
-      icon: Stethoscope, 
+    {
+      key: 'dermatology',
+      name: 'Дерматология',
+      icon: Stethoscope,
       color: 'text-orange-600',
-      description: 'Дерматология и косметология' 
+      description: 'Дерматология и косметология'
     },
-    { 
-      key: 'stomatology', 
-      name: 'Стоматология', 
-      icon: Scissors, 
+    {
+      key: 'stomatology',
+      name: 'Стоматология',
+      icon: Scissors,
       color: 'text-blue-600',
-      description: 'Стоматологические услуги' 
+      description: 'Стоматологические услуги'
     }
   ];
 
@@ -78,17 +79,8 @@ const QueueSettings = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/admin/queue/settings', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
-      }
+      const response = await api.get('/admin/queue/settings');
+      setSettings(response.data);
     } catch (error) {
       logger.error('Ошибка загрузки настроек очередей:', error);
       setMessage({ type: 'error', text: 'Ошибка загрузки настроек очередей' });
@@ -101,13 +93,13 @@ const QueueSettings = () => {
     setSettings(prev => {
       const newSettings = { ...prev };
       const keys = path.split('.');
-      
+
       if (keys.length === 1) {
         newSettings[keys[0]] = value;
       } else if (keys.length === 2) {
         newSettings[keys[0]] = { ...newSettings[keys[0]], [keys[1]]: value };
       }
-      
+
       return newSettings;
     });
   };
@@ -117,22 +109,10 @@ const QueueSettings = () => {
       setSaving(true);
       setMessage({ type: '', text: '' });
 
-      const response = await fetch('/api/v1/admin/queue/settings', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-      });
+      const response = await api.put('/admin/queue/settings', settings);
 
-      if (response.ok) {
-        const result = await response.json();
-        setMessage({ type: 'success', text: result.message });
-        setSettings(result.settings);
-      } else {
-        throw new Error('Ошибка сохранения настроек');
-      }
+      setMessage({ type: 'success', text: response.data.message });
+      setSettings(response.data.settings);
     } catch (error) {
       logger.error('Ошибка сохранения:', error);
       setMessage({ type: 'error', text: 'Ошибка сохранения настроек очередей' });
@@ -154,25 +134,13 @@ const QueueSettings = () => {
         stomatology: 3
       };
 
-      const response = await fetch('/api/v1/admin/queue/test', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          doctor_id: doctorIds[specialty] || 1,
-          date: new Date().toISOString().split('T')[0]
-        })
+      const response = await api.post('/admin/queue/test', {
+        doctor_id: doctorIds[specialty] || 1,
+        date: new Date().toISOString().split('T')[0]
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setTestResult(result.test_data);
-        setMessage({ type: 'success', text: 'Тест очереди выполнен успешно' });
-      } else {
-        throw new Error('Ошибка тестирования');
-      }
+      setTestResult(response.data.test_data);
+      setMessage({ type: 'success', text: 'Тест очереди выполнен успешно' });
     } catch (error) {
       logger.error('Ошибка тестирования:', error);
       setMessage({ type: 'error', text: 'Ошибка тестирования очереди' });
@@ -183,21 +151,21 @@ const QueueSettings = () => {
 
   if (loading) {
     return (
-      <div style={{ 
+      <div style={{
         padding: 0,
         backgroundColor: 'var(--mac-bg-primary)',
         minHeight: '100vh'
       }}>
         <MacOSCard style={{ padding: 0, textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-            <RefreshCw style={{ 
-              width: '32px', 
-              height: '32px', 
+            <RefreshCw style={{
+              width: '32px',
+              height: '32px',
               color: 'var(--mac-accent-blue)',
               animation: 'spin 1s linear infinite'
             }} />
-            <span style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
+            <span style={{
+              fontSize: 'var(--mac-font-size-lg)',
               color: 'var(--mac-text-secondary)',
               fontWeight: 'var(--mac-font-weight-medium)'
             }}>
@@ -210,25 +178,25 @@ const QueueSettings = () => {
   }
 
   return (
-    <div style={{ 
+    <div style={{
       padding: 0,
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
     }}>
       <MacOSCard style={{ padding: '24px' }}>
         {/* Заголовок */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '24px',
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)'
         }}>
           <div>
-            <h2 style={{ 
-              fontSize: 'var(--mac-font-size-2xl)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h2 style={{
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: '0 0 8px 0',
               display: 'flex',
@@ -238,7 +206,7 @@ const QueueSettings = () => {
               <Clock style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
               Настройки очередей
             </h2>
-            <p style={{ 
+            <p style={{
               color: 'var(--mac-text-secondary)',
               fontSize: 'var(--mac-font-size-sm)',
               margin: 0
@@ -246,15 +214,15 @@ const QueueSettings = () => {
               Управление онлайн-очередью и стартовыми номерами
             </p>
           </div>
-          
+
           <div style={{ display: 'flex', gap: '12px' }}>
             <MacOSButton
               variant="outline"
               onClick={loadSettings}
               disabled={loading}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '8px',
                 padding: '8px 16px'
               }}
@@ -265,9 +233,9 @@ const QueueSettings = () => {
             <MacOSButton
               onClick={saveSettings}
               disabled={saving}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '8px',
                 backgroundColor: 'var(--mac-accent-blue)',
                 border: 'none',
@@ -275,8 +243,8 @@ const QueueSettings = () => {
               }}
             >
               {saving ? (
-                <RefreshCw style={{ 
-                  width: '16px', 
+                <RefreshCw style={{
+                  width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
                 }} />
@@ -290,8 +258,8 @@ const QueueSettings = () => {
 
         {/* Сообщения */}
         {message.text && (
-          <MacOSCard style={{ 
-            padding: '16px', 
+          <MacOSCard style={{
+            padding: '16px',
             marginBottom: '24px',
             backgroundColor: message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
             border: message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
@@ -302,8 +270,8 @@ const QueueSettings = () => {
               ) : (
                 <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
               )}
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
+              <span style={{
+                fontSize: 'var(--mac-font-size-sm)',
                 color: message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
                 fontWeight: 'var(--mac-font-weight-medium)'
               }}>
@@ -313,18 +281,18 @@ const QueueSettings = () => {
           </MacOSCard>
         )}
 
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
           gap: '24px',
           marginBottom: '24px'
         }}>
           {/* Общие настройки */}
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -333,14 +301,13 @@ const QueueSettings = () => {
               <Settings style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
               Общие настройки
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
+                <label style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -358,9 +325,9 @@ const QueueSettings = () => {
                   }))}
                   style={{ width: '100%' }}
                 />
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-xs)', 
-                  color: 'var(--mac-text-tertiary)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-text-tertiary)',
                   marginTop: '4px',
                   margin: '4px 0 0 0'
                 }}>
@@ -369,12 +336,12 @@ const QueueSettings = () => {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
-                  marginBottom: '8px' 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
                 }}>
                   Время автозакрытия
                 </label>
@@ -384,9 +351,9 @@ const QueueSettings = () => {
                   onChange={(e) => handleSettingChange('auto_close_time', e.target.value)}
                   style={{ width: '100%' }}
                 />
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-xs)', 
-                  color: 'var(--mac-text-tertiary)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-text-tertiary)',
                   marginTop: '4px',
                   margin: '4px 0 0 0'
                 }}>
@@ -395,12 +362,12 @@ const QueueSettings = () => {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
-                  marginBottom: '8px' 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
                 }}>
                   Часовой пояс
                 </label>
@@ -421,10 +388,10 @@ const QueueSettings = () => {
 
           {/* Тестирование */}
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -433,10 +400,10 @@ const QueueSettings = () => {
               <TestTube style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
               Тестирование очереди
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <p style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
+              <p style={{
+                fontSize: 'var(--mac-font-size-sm)',
                 color: 'var(--mac-text-secondary)',
                 margin: 0
               }}>
@@ -444,28 +411,28 @@ const QueueSettings = () => {
               </p>
 
               {specialties.map(specialty => (
-                <div key={specialty.key} style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  padding: '12px', 
-                  border: '1px solid var(--mac-border)', 
+                <div key={specialty.key} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px',
+                  border: '1px solid var(--mac-border)',
                   borderRadius: 'var(--mac-radius-md)',
                   backgroundColor: 'var(--mac-bg-secondary)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <specialty.icon style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
                     <div>
-                      <div style={{ 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
-                        color: 'var(--mac-text-primary)' 
+                      <div style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        color: 'var(--mac-text-primary)'
                       }}>
                         {specialty.name}
                       </div>
-                      <div style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
-                        color: 'var(--mac-text-secondary)' 
+                      <div style={{
+                        fontSize: 'var(--mac-font-size-xs)',
+                        color: 'var(--mac-text-secondary)'
                       }}>
                         {specialty.description}
                       </div>
@@ -475,14 +442,14 @@ const QueueSettings = () => {
                     variant="outline"
                     onClick={() => testQueueGeneration(specialty.key)}
                     disabled={testing}
-                    style={{ 
+                    style={{
                       padding: '6px 12px',
                       minWidth: 'auto'
                     }}
                   >
                     {testing ? (
-                      <RefreshCw style={{ 
-                        width: '14px', 
+                      <RefreshCw style={{
+                        width: '14px',
                         height: '14px',
                         animation: 'spin 1s linear infinite'
                       }} />
@@ -494,29 +461,29 @@ const QueueSettings = () => {
               ))}
 
               {testResult && (
-                <MacOSCard style={{ 
-                  padding: '16px', 
-                  backgroundColor: 'var(--mac-success-bg)', 
-                  border: '1px solid var(--mac-success-border)' 
+                <MacOSCard style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--mac-success-bg)',
+                  border: '1px solid var(--mac-success-border)'
                 }}>
-                  <h4 style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-success)', 
-                    marginBottom: '8px' 
+                  <h4 style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-success)',
+                    marginBottom: '8px'
                   }}>
                     Результат тестирования:
                   </h4>
-                  <div style={{ 
-                    fontSize: 'var(--mac-font-size-xs)', 
+                  <div style={{
+                    fontSize: 'var(--mac-font-size-xs)',
                     color: 'var(--mac-success)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px'
                   }}>
-                    <div><strong>Токен:</strong> <code style={{ 
-                      backgroundColor: 'var(--mac-success-bg)', 
-                      padding: '2px 4px', 
+                    <div><strong>Токен:</strong> <code style={{
+                      backgroundColor: 'var(--mac-success-bg)',
+                      padding: '2px 4px',
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)'
                     }}>{testResult.token?.slice(0, 8)}...</code></div>
@@ -524,9 +491,9 @@ const QueueSettings = () => {
                     <div><strong>Кабинет:</strong> {testResult.doctor_cabinet}</div>
                     <div><strong>Стартовый номер:</strong> {testResult.start_number}</div>
                     <div><strong>Лимит в день:</strong> {testResult.max_per_day}</div>
-                    <div><strong>QR URL:</strong> <code style={{ 
-                      backgroundColor: 'var(--mac-success-bg)', 
-                      padding: '2px 4px', 
+                    <div><strong>QR URL:</strong> <code style={{
+                      backgroundColor: 'var(--mac-success-bg)',
+                      padding: '2px 4px',
                       borderRadius: 'var(--mac-radius-sm)',
                       fontSize: 'var(--mac-font-size-xs)'
                     }}>{testResult.qr_url}</code></div>
@@ -538,18 +505,18 @@ const QueueSettings = () => {
         </div>
 
         {/* Настройки по специальностям */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '24px',
           marginBottom: '24px'
         }}>
           {specialties.map(specialty => (
             <MacOSCard key={specialty.key} style={{ padding: '20px' }}>
-              <h3 style={{ 
-                fontSize: 'var(--mac-font-size-lg)', 
-                fontWeight: 'var(--mac-font-weight-semibold)', 
-                color: 'var(--mac-text-primary)', 
+              <h3 style={{
+                fontSize: 'var(--mac-font-size-lg)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
+                color: 'var(--mac-text-primary)',
                 marginBottom: '16px',
                 display: 'flex',
                 alignItems: 'center',
@@ -558,14 +525,13 @@ const QueueSettings = () => {
                 <specialty.icon style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
                 {specialty.name}
               </h3>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
+                  <label style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
                     marginBottom: '8px',
                     display: 'flex',
                     alignItems: 'center',
@@ -582,9 +548,9 @@ const QueueSettings = () => {
                     onChange={(e) => handleSettingChange(`start_numbers.${specialty.key}`, parseInt(e.target.value))}
                     style={{ width: '100%' }}
                   />
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-xs)', 
-                    color: 'var(--mac-text-tertiary)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
                     marginTop: '4px',
                     margin: '4px 0 0 0'
                   }}>
@@ -593,11 +559,10 @@ const QueueSettings = () => {
                 </div>
 
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
+                  <label style={{
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
                     marginBottom: '8px',
                     display: 'flex',
                     alignItems: 'center',
@@ -614,9 +579,9 @@ const QueueSettings = () => {
                     onChange={(e) => handleSettingChange(`max_per_day.${specialty.key}`, parseInt(e.target.value))}
                     style={{ width: '100%' }}
                   />
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-xs)', 
-                    color: 'var(--mac-text-tertiary)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
                     marginTop: '4px',
                     margin: '4px 0 0 0'
                   }}>
@@ -625,19 +590,19 @@ const QueueSettings = () => {
                 </div>
 
                 {/* Текущие настройки */}
-                <div style={{ 
-                  paddingTop: '16px', 
-                  borderTop: '1px solid var(--mac-border)' 
+                <div style={{
+                  paddingTop: '16px',
+                  borderTop: '1px solid var(--mac-border)'
                 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
                     fontSize: 'var(--mac-font-size-sm)'
                   }}>
                     <span style={{ color: 'var(--mac-text-secondary)' }}>Диапазон номеров:</span>
-                    <div style={{ 
-                      backgroundColor: 'var(--mac-bg-secondary)', 
+                    <div style={{
+                      backgroundColor: 'var(--mac-bg-secondary)',
                       color: 'var(--mac-text-primary)',
                       padding: '4px 8px',
                       borderRadius: 'var(--mac-radius-full)',
@@ -655,15 +620,15 @@ const QueueSettings = () => {
         </div>
 
         {/* Информационная панель */}
-        <MacOSCard style={{ 
-          padding: '24px', 
-          backgroundColor: 'var(--mac-info-bg)', 
-          border: '1px solid var(--mac-info-border)' 
+        <MacOSCard style={{
+          padding: '24px',
+          backgroundColor: 'var(--mac-info-bg)',
+          border: '1px solid var(--mac-info-border)'
         }}>
-          <h3 style={{ 
-            fontSize: 'var(--mac-font-size-lg)', 
-            fontWeight: 'var(--mac-font-weight-semibold)', 
-            color: 'var(--mac-info)', 
+          <h3 style={{
+            fontSize: 'var(--mac-font-size-lg)',
+            fontWeight: 'var(--mac-font-weight-semibold)',
+            color: 'var(--mac-info)',
             marginBottom: '12px',
             display: 'flex',
             alignItems: 'center',
@@ -672,8 +637,8 @@ const QueueSettings = () => {
             <QrCode style={{ width: '20px', height: '20px' }} />
             Как работает онлайн-очередь
           </h3>
-          <div style={{ 
-            fontSize: 'var(--mac-font-size-sm)', 
+          <div style={{
+            fontSize: 'var(--mac-font-size-sm)',
             color: 'var(--mac-info)',
             display: 'flex',
             flexDirection: 'column',
@@ -682,7 +647,7 @@ const QueueSettings = () => {
             <p style={{ margin: 0 }}>• Пациенты сканируют QR-код с {settings.queue_start_hour}:00 до открытия приема</p>
             <p style={{ margin: 0 }}>• Каждый телефон/Telegram может получить только один номер в день</p>
             <p style={{ margin: 0 }}>• При повторном запросе возвращается тот же номер</p>
-            <p style={{ margin: 0 }}>• Кнопка "Открыть прием" в регистратуре закрывает онлайн-набор</p>
+            <p style={{ margin: 0 }}>• Кнопка &quot;Открыть прием&quot; в регистратуре закрывает онлайн-набор</p>
             <p style={{ margin: 0 }}>• Стартовые номера позволяют избежать конфликтов между специалистами</p>
           </div>
         </MacOSCard>
@@ -692,4 +657,3 @@ const QueueSettings = () => {
 };
 
 export default QueueSettings;
-

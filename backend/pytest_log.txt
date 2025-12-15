@@ -1,0 +1,184 @@
+ЁЯФР ╨Р╨▓╤В╨╛╤А╨╕╨╖╨░╤Ж╨╕╤П...
+тЭМ ╨Ю╤И╨╕╨▒╨║╨░: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/auth/login (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016E7D9626D0>: Failed to establish a new connection: [WinError 10061] ╨Я╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╨╡ ╨╜╨╡ ╤Г╤Б╤В╨░╨╜╨╛╨▓╨╗╨╡╨╜╨╛, ╤В.╨║. ╨║╨╛╨╜╨╡╤З╨╜╤Л╨╣ ╨║╨╛╨╝╨┐╤М╤О╤В╨╡╤А ╨╛╤В╨▓╨╡╤А╨│ ╨╖╨░╨┐╤А╨╛╤Б ╨╜╨░ ╨┐╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╨╡'))
+mainloop: caught unexpected SystemExit!
+============================= test session starts =============================
+platform win32 -- Python 3.11.1, pytest-8.4.1, pluggy-1.6.0
+rootdir: C:\final\backend
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 47 items / 4 errors
+INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connection.py", line 198, in _new_conn
+INTERNALERROR>     sock = connection.create_connection(
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+INTERNALERROR>     raise err
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+INTERNALERROR>     sock.connect(sa)
+INTERNALERROR> ConnectionRefusedError: [WinError 10061] ╧юфъы■ўхэшх эх єёЄрэютыхэю, Є.ъ. ъюэхўэ√щ ъюья№■ЄхЁ юЄтхЁу чряЁюё эр яюфъы■ўхэшх
+INTERNALERROR> 
+INTERNALERROR> The above exception was the direct cause of the following exception:
+INTERNALERROR> 
+INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+INTERNALERROR>     response = self._make_request(
+INTERNALERROR>                ^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+INTERNALERROR>     conn.request(
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connection.py", line 494, in request
+INTERNALERROR>     self.endheaders()
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\http\client.py", line 1277, in endheaders
+INTERNALERROR>     self._send_output(message_body, encode_chunked=encode_chunked)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\http\client.py", line 1037, in _send_output
+INTERNALERROR>     self.send(msg)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\http\client.py", line 975, in send
+INTERNALERROR>     self.connect()
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connection.py", line 325, in connect
+INTERNALERROR>     self.sock = self._new_conn()
+INTERNALERROR>                 ^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connection.py", line 213, in _new_conn
+INTERNALERROR>     raise NewConnectionError(
+INTERNALERROR> urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x0000016E7D9626D0>: Failed to establish a new connection: [WinError 10061] ╧юфъы■ўхэшх эх єёЄрэютыхэю, Є.ъ. ъюэхўэ√щ ъюья№■ЄхЁ юЄтхЁу чряЁюё эр яюфъы■ўхэшх
+INTERNALERROR> 
+INTERNALERROR> The above exception was the direct cause of the following exception:
+INTERNALERROR> 
+INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\requests\adapters.py", line 486, in send
+INTERNALERROR>     resp = conn.urlopen(
+INTERNALERROR>            ^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+INTERNALERROR>     retries = retries.increment(
+INTERNALERROR>               ^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\urllib3\util\retry.py", line 519, in increment
+INTERNALERROR>     raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+INTERNALERROR>     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR> urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/auth/login (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016E7D9626D0>: Failed to establish a new connection: [WinError 10061] ╧юфъы■ўхэшх эх єёЄрэютыхэю, Є.ъ. ъюэхўэ√щ ъюья№■ЄхЁ юЄтхЁу чряЁюё эр яюфъы■ўхэшх'))
+INTERNALERROR> 
+INTERNALERROR> During handling of the above exception, another exception occurred:
+INTERNALERROR> 
+INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "C:\final\backend\test_cart_error_debug.py", line 18, in <module>
+INTERNALERROR>     response = requests.post(
+INTERNALERROR>                ^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\requests\api.py", line 115, in post
+INTERNALERROR>     return request("post", url, data=data, json=json, **kwargs)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\requests\api.py", line 59, in request
+INTERNALERROR>     return session.request(method=method, url=url, **kwargs)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\requests\sessions.py", line 589, in request
+INTERNALERROR>     resp = self.send(prep, **send_kwargs)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\requests\sessions.py", line 703, in send
+INTERNALERROR>     r = adapter.send(request, **kwargs)
+INTERNALERROR>         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\requests\adapters.py", line 519, in send
+INTERNALERROR>     raise ConnectionError(e, request=request)
+INTERNALERROR> requests.exceptions.ConnectionError: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v1/auth/login (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016E7D9626D0>: Failed to establish a new connection: [WinError 10061] ╧юфъы■ўхэшх эх єёЄрэютыхэю, Є.ъ. ъюэхўэ√щ ъюья№■ЄхЁ юЄтхЁу чряЁюё эр яюфъы■ўхэшх'))
+INTERNALERROR> 
+INTERNALERROR> During handling of the above exception, another exception occurred:
+INTERNALERROR> 
+INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 289, in wrap_session
+INTERNALERROR>     session.exitstatus = doit(config, session) or 0
+INTERNALERROR>                          ^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 342, in _main
+INTERNALERROR>     config.hook.pytest_collection(session=session)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+INTERNALERROR>     return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+INTERNALERROR>     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 167, in _multicall
+INTERNALERROR>     raise exception
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+INTERNALERROR>     teardown.throw(exception)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\logging.py", line 788, in pytest_collection
+INTERNALERROR>     return (yield)
+INTERNALERROR>             ^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+INTERNALERROR>     teardown.throw(exception)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\warnings.py", line 99, in pytest_collection
+INTERNALERROR>     return (yield)
+INTERNALERROR>             ^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+INTERNALERROR>     teardown.throw(exception)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\config\__init__.py", line 1450, in pytest_collection
+INTERNALERROR>     return (yield)
+INTERNALERROR>             ^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+INTERNALERROR>     res = hook_impl.function(*args)
+INTERNALERROR>           ^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 353, in pytest_collection
+INTERNALERROR>     session.perform_collect()
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 813, in perform_collect
+INTERNALERROR>     self.items.extend(self.genitems(node))
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 979, in genitems
+INTERNALERROR>     yield from self.genitems(subnode)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 974, in genitems
+INTERNALERROR>     rep, duplicate = self._collect_one_node(node, handle_dupes)
+INTERNALERROR>                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\main.py", line 839, in _collect_one_node
+INTERNALERROR>     rep = collect_one_node(node)
+INTERNALERROR>           ^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 567, in collect_one_node
+INTERNALERROR>     rep: CollectReport = ihook.pytest_make_collect_report(collector=collector)
+INTERNALERROR>                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+INTERNALERROR>     return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+INTERNALERROR>     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 167, in _multicall
+INTERNALERROR>     raise exception
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+INTERNALERROR>     teardown.throw(exception)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\capture.py", line 880, in pytest_make_collect_report
+INTERNALERROR>     rep = yield
+INTERNALERROR>           ^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+INTERNALERROR>     res = hook_impl.function(*args)
+INTERNALERROR>           ^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 391, in pytest_make_collect_report
+INTERNALERROR>     call = CallInfo.from_call(
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 344, in from_call
+INTERNALERROR>     result: TResult | None = func()
+INTERNALERROR>                              ^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 389, in collect
+INTERNALERROR>     return list(collector.collect())
+INTERNALERROR>                 ^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 554, in collect
+INTERNALERROR>     self._register_setup_module_fixture()
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 567, in _register_setup_module_fixture
+INTERNALERROR>     self.obj, ("setUpModule", "setup_module")
+INTERNALERROR>     ^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 280, in obj
+INTERNALERROR>     self._obj = obj = self._getobj()
+INTERNALERROR>                       ^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 551, in _getobj
+INTERNALERROR>     return importtestmodule(self.path, self.config)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 498, in importtestmodule
+INTERNALERROR>     mod = import_path(
+INTERNALERROR>           ^^^^^^^^^^^^
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\pathlib.py", line 587, in import_path
+INTERNALERROR>     importlib.import_module(module_name)
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\importlib\__init__.py", line 126, in import_module
+INTERNALERROR>     return _bootstrap._gcd_import(name[level:], package, level)
+INTERNALERROR>            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+INTERNALERROR>   File "<frozen importlib._bootstrap>", line 1206, in _gcd_import
+INTERNALERROR>   File "<frozen importlib._bootstrap>", line 1178, in _find_and_load
+INTERNALERROR>   File "<frozen importlib._bootstrap>", line 1149, in _find_and_load_unlocked
+INTERNALERROR>   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+INTERNALERROR>   File "C:\Program Files\Python311\Lib\site-packages\_pytest\assertion\rewrite.py", line 186, in exec_module
+INTERNALERROR>     exec(co, module.__dict__)
+INTERNALERROR>   File "C:\final\backend\test_cart_error_debug.py", line 31, in <module>
+INTERNALERROR>     exit(1)
+INTERNALERROR>   File "<frozen _sitebuiltins>", line 26, in __call__
+INTERNALERROR> SystemExit: 1
+
+======================= 61 warnings, 4 errors in 18.45s =======================

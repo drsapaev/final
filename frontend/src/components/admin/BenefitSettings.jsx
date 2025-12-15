@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Save, 
-  RefreshCw, 
-  Calendar, 
-  Percent, 
-  CheckCircle, 
+import {
+  Settings,
+  Save,
+  RefreshCw,
+  Calendar,
+  Percent,
+  CheckCircle,
   AlertCircle,
   Info,
   Clock,
   DollarSign,
   Shield
 } from 'lucide-react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
+import {
+  MacOSCard,
+  MacOSButton,
   MacOSInput,
   MacOSCheckbox,
   MacOSLoadingSkeleton,
@@ -114,7 +114,7 @@ const BenefitSettings = () => {
 
   if (loading) {
     return (
-      <div style={{ 
+      <div style={{
         padding: 0,
         backgroundColor: 'var(--mac-bg-primary)',
         minHeight: '100vh'
@@ -122,9 +122,9 @@ const BenefitSettings = () => {
         <MacOSCard style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
-            <h2 style={{ 
-              fontSize: 'var(--mac-font-size-2xl)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h2 style={{
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>
@@ -140,7 +140,7 @@ const BenefitSettings = () => {
   // Критическая ошибка загрузки
   if (error && !settings.updated_at) {
     return (
-      <div style={{ 
+      <div style={{
         padding: 0,
         backgroundColor: 'var(--mac-bg-primary)',
         minHeight: '100vh'
@@ -148,9 +148,9 @@ const BenefitSettings = () => {
         <MacOSCard style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
-            <h2 style={{ 
-              fontSize: 'var(--mac-font-size-2xl)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h2 style={{
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: 0
             }}>
@@ -174,7 +174,7 @@ const BenefitSettings = () => {
   }
 
   return (
-    <div style={{ 
+    <div style={{
       padding: 0,
       backgroundColor: 'var(--mac-bg-primary)',
       minHeight: '100vh'
@@ -192,9 +192,9 @@ const BenefitSettings = () => {
           )}
 
           {/* Header */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'space-between',
             paddingBottom: '24px',
             borderBottom: '1px solid var(--mac-border)',
@@ -202,9 +202,9 @@ const BenefitSettings = () => {
             gap: '16px'
           }}>
             <div>
-              <h2 style={{ 
-                fontSize: 'var(--mac-font-size-2xl)', 
-                fontWeight: 'var(--mac-font-weight-semibold)', 
+              <h2 style={{
+                fontSize: 'var(--mac-font-size-2xl)',
+                fontWeight: 'var(--mac-font-weight-semibold)',
                 color: 'var(--mac-text-primary)',
                 margin: '0 0 8px 0',
                 display: 'flex',
@@ -214,7 +214,7 @@ const BenefitSettings = () => {
                 <Settings style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
                 Настройки льгот
               </h2>
-              <p style={{ 
+              <p style={{
                 color: 'var(--mac-text-secondary)',
                 fontSize: 'var(--mac-font-size-sm)',
                 margin: 0
@@ -222,30 +222,30 @@ const BenefitSettings = () => {
                 Управление параметрами льгот и повторных визитов
               </p>
             </div>
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {lastUpdated && (
-                <div style={{ 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  color: 'var(--mac-text-tertiary)' 
+                <div style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  color: 'var(--mac-text-tertiary)'
                 }}>
                   Обновлено: {lastUpdated.toLocaleDateString('ru-RU')} в {lastUpdated.toLocaleTimeString('ru-RU')}
                 </div>
               )}
-              
+
               <MacOSButton
                 onClick={loadSettings}
                 disabled={loading}
                 variant="outline"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
                   padding: '8px 16px'
                 }}
               >
-                <RefreshCw style={{ 
-                  width: '16px', 
+                <RefreshCw style={{
+                  width: '16px',
                   height: '16px',
                   animation: loading ? 'spin 1s linear infinite' : 'none'
                 }} />
@@ -255,49 +255,49 @@ const BenefitSettings = () => {
           </div>
 
           {/* Настройки */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
-            gap: '24px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+            gap: '24px'
           }}>
             {/* Повторные визиты */}
-            <MacOSCard style={{ 
+            <MacOSCard style={{
               padding: '24px',
               transition: 'all 0.3s ease-in-out',
               transform: settings.repeat_visit_discount > 0 ? 'scale(1.02)' : 'scale(1)'
             }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '12px', 
-                marginBottom: '20px' 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '20px'
               }}>
-                <div style={{ 
-                  padding: '8px', 
-                  backgroundColor: 'var(--mac-success-bg)', 
-                  borderRadius: 'var(--mac-radius-md)' 
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: 'var(--mac-success-bg)',
+                  borderRadius: 'var(--mac-radius-md)'
                 }}>
                   <Calendar style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <h3 style={{ 
-                      fontSize: 'var(--mac-font-size-lg)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)', 
+                    <h3 style={{
+                      fontSize: 'var(--mac-font-size-lg)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
                       color: 'var(--mac-text-primary)',
                       margin: 0
                     }}>
                       Повторные визиты
                     </h3>
-                    <MacOSBadge 
+                    <MacOSBadge
                       variant={settings.repeat_visit_discount > 0 ? 'success' : 'secondary'}
                       size="sm"
                     >
                       {settings.repeat_visit_discount > 0 ? 'Активны' : 'Неактивны'}
                     </MacOSBadge>
                   </div>
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
                     margin: 0
                   }}>
@@ -309,20 +309,20 @@ const BenefitSettings = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Окно повторного визита */}
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Окно повторного визита (дней)
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ position: 'relative', flex: 1 }}>
-                      <Clock style={{ 
-                        width: '16px', 
-                        height: '16px', 
+                      <Clock style={{
+                        width: '16px',
+                        height: '16px',
                         position: 'absolute',
                         left: '12px',
                         top: '50%',
@@ -336,23 +336,23 @@ const BenefitSettings = () => {
                         value={settings.repeat_visit_days}
                         onChange={(e) => handleInputChange('repeat_visit_days', parseInt(e.target.value) || 21)}
                         placeholder="21"
-                        style={{ 
-                          width: '100%', 
+                        style={{
+                          width: '100%',
                           paddingLeft: '40px',
                           paddingRight: '12px'
                         }}
                       />
                     </div>
-                    <span style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-tertiary)' 
+                    <span style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-tertiary)'
                     }}>
                       дней
                     </span>
                   </div>
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-xs)', 
-                    color: 'var(--mac-text-tertiary)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
                     marginTop: '4px',
                     margin: '4px 0 0 0'
                   }}>
@@ -362,20 +362,20 @@ const BenefitSettings = () => {
 
                 {/* Скидка на повторный визит */}
                 <div>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: 'var(--mac-font-size-sm)', 
-                    fontWeight: 'var(--mac-font-weight-medium)', 
-                    color: 'var(--mac-text-primary)', 
-                    marginBottom: '8px' 
+                  <label style={{
+                    display: 'block',
+                    fontSize: 'var(--mac-font-size-sm)',
+                    fontWeight: 'var(--mac-font-weight-medium)',
+                    color: 'var(--mac-text-primary)',
+                    marginBottom: '8px'
                   }}>
                     Скидка на повторный визит (%)
                   </label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ position: 'relative', flex: 1 }}>
-                      <Percent style={{ 
-                        width: '16px', 
-                        height: '16px', 
+                      <Percent style={{
+                        width: '16px',
+                        height: '16px',
                         position: 'absolute',
                         left: '12px',
                         top: '50%',
@@ -389,23 +389,23 @@ const BenefitSettings = () => {
                         value={settings.repeat_visit_discount}
                         onChange={(e) => handleInputChange('repeat_visit_discount', parseInt(e.target.value) || 0)}
                         placeholder="0"
-                        style={{ 
-                          width: '100%', 
+                        style={{
+                          width: '100%',
                           paddingLeft: '40px',
                           paddingRight: '12px'
                         }}
                       />
                     </div>
-                    <span style={{ 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      color: 'var(--mac-text-tertiary)' 
+                    <span style={{
+                      fontSize: 'var(--mac-font-size-sm)',
+                      color: 'var(--mac-text-tertiary)'
                     }}>
                       %
                     </span>
                   </div>
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-xs)', 
-                    color: 'var(--mac-text-tertiary)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-xs)',
+                    color: 'var(--mac-text-tertiary)',
                     marginTop: '4px',
                     margin: '4px 0 0 0'
                   }}>
@@ -414,28 +414,28 @@ const BenefitSettings = () => {
                 </div>
 
                 {/* Информационная карточка */}
-                <MacOSCard style={{ 
-                  padding: '16px', 
-                  backgroundColor: 'var(--mac-accent-bg)', 
-                  border: '1px solid var(--mac-accent-border)' 
+                <MacOSCard style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--mac-accent-bg)',
+                  border: '1px solid var(--mac-accent-border)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <Info style={{ 
-                      width: '16px', 
-                      height: '16px', 
+                    <Info style={{
+                      width: '16px',
+                      height: '16px',
                       color: 'var(--mac-accent-blue)',
                       marginTop: '2px',
                       flexShrink: 0
                     }} />
                     <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-accent-blue)' }}>
-                      <p style={{ 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
-                        margin: '0 0 8px 0' 
+                      <p style={{
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        margin: '0 0 8px 0'
                       }}>
                         Как работают повторные визиты:
                       </p>
-                      <ul style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
+                      <ul style={{
+                        fontSize: 'var(--mac-font-size-xs)',
                         margin: 0,
                         paddingLeft: '16px',
                         display: 'flex',
@@ -453,43 +453,43 @@ const BenefitSettings = () => {
             </MacOSCard>
 
             {/* Льготные визиты */}
-            <MacOSCard style={{ 
+            <MacOSCard style={{
               padding: '24px',
               transition: 'all 0.3s ease-in-out',
               transform: settings.benefit_consultation_free ? 'scale(1.02)' : 'scale(1)'
             }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '12px', 
-                marginBottom: '20px' 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '20px'
               }}>
-                <div style={{ 
-                  padding: '8px', 
-                  backgroundColor: 'var(--mac-warning-bg)', 
-                  borderRadius: 'var(--mac-radius-md)' 
+                <div style={{
+                  padding: '8px',
+                  backgroundColor: 'var(--mac-warning-bg)',
+                  borderRadius: 'var(--mac-radius-md)'
                 }}>
                   <Shield style={{ width: '20px', height: '20px', color: 'var(--mac-warning)' }} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <h3 style={{ 
-                      fontSize: 'var(--mac-font-size-lg)', 
-                      fontWeight: 'var(--mac-font-weight-semibold)', 
+                    <h3 style={{
+                      fontSize: 'var(--mac-font-size-lg)',
+                      fontWeight: 'var(--mac-font-weight-semibold)',
                       color: 'var(--mac-text-primary)',
                       margin: 0
                     }}>
                       Льготные визиты
                     </h3>
-                    <MacOSBadge 
+                    <MacOSBadge
                       variant={settings.benefit_consultation_free ? 'success' : 'warning'}
                       size="sm"
                     >
                       {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
                     </MacOSBadge>
                   </div>
-                  <p style={{ 
-                    fontSize: 'var(--mac-font-size-sm)', 
+                  <p style={{
+                    fontSize: 'var(--mac-font-size-sm)',
                     color: 'var(--mac-text-secondary)',
                     margin: 0
                   }}>
@@ -507,17 +507,17 @@ const BenefitSettings = () => {
                       onChange={(checked) => handleInputChange('benefit_consultation_free', checked)}
                     />
                     <div>
-                      <span style={{ 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
+                      <span style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
                         color: 'var(--mac-text-primary)',
                         display: 'block',
                         marginBottom: '4px'
                       }}>
                         Льготные консультации бесплатны
                       </span>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-tertiary)',
                         margin: 0
                       }}>
@@ -535,17 +535,17 @@ const BenefitSettings = () => {
                       onChange={(checked) => handleInputChange('all_free_auto_approve', checked)}
                     />
                     <div>
-                      <span style={{ 
-                        fontSize: 'var(--mac-font-size-sm)', 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
+                      <span style={{
+                        fontSize: 'var(--mac-font-size-sm)',
+                        fontWeight: 'var(--mac-font-weight-medium)',
                         color: 'var(--mac-text-primary)',
                         display: 'block',
                         marginBottom: '4px'
                       }}>
-                        Автоодобрение заявок "All Free"
+                        Автоодобрение заявок &quot;All Free&quot;
                       </span>
-                      <p style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
+                      <p style={{
+                        fontSize: 'var(--mac-font-size-xs)',
                         color: 'var(--mac-text-tertiary)',
                         margin: 0
                       }}>
@@ -557,31 +557,31 @@ const BenefitSettings = () => {
 
                 {/* Предупреждение об автоодобрении */}
                 {settings.all_free_auto_approve && (
-                  <MacOSCard style={{ 
-                    padding: '16px', 
-                    backgroundColor: 'var(--mac-warning-bg)', 
-                    border: '1px solid var(--mac-warning-border)' 
+                  <MacOSCard style={{
+                    padding: '16px',
+                    backgroundColor: 'var(--mac-warning-bg)',
+                    border: '1px solid var(--mac-warning-border)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                      <AlertCircle style={{ 
-                        width: '16px', 
-                        height: '16px', 
+                      <AlertCircle style={{
+                        width: '16px',
+                        height: '16px',
                         color: 'var(--mac-warning)',
                         marginTop: '2px',
                         flexShrink: 0
                       }} />
                       <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-warning)' }}>
-                        <p style={{ 
-                          fontWeight: 'var(--mac-font-weight-medium)', 
-                          margin: '0 0 4px 0' 
+                        <p style={{
+                          fontWeight: 'var(--mac-font-weight-medium)',
+                          margin: '0 0 4px 0'
                         }}>
                           Внимание!
                         </p>
-                        <p style={{ 
-                          fontSize: 'var(--mac-font-size-xs)', 
-                          margin: 0 
+                        <p style={{
+                          fontSize: 'var(--mac-font-size-xs)',
+                          margin: 0
                         }}>
-                          При включении автоодобрения все заявки "All Free" будут одобряться без проверки администратора.
+                          При включении автоодобрения все заявки &quot;All Free&quot; будут одобряться без проверки администратора.
                         </p>
                       </div>
                     </div>
@@ -589,28 +589,28 @@ const BenefitSettings = () => {
                 )}
 
                 {/* Информационная карточка */}
-                <MacOSCard style={{ 
-                  padding: '16px', 
-                  backgroundColor: 'var(--mac-warning-bg)', 
-                  border: '1px solid var(--mac-warning-border)' 
+                <MacOSCard style={{
+                  padding: '16px',
+                  backgroundColor: 'var(--mac-warning-bg)',
+                  border: '1px solid var(--mac-warning-border)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <Info style={{ 
-                      width: '16px', 
-                      height: '16px', 
+                    <Info style={{
+                      width: '16px',
+                      height: '16px',
                       color: 'var(--mac-warning)',
                       marginTop: '2px',
                       flexShrink: 0
                     }} />
                     <div style={{ fontSize: 'var(--mac-font-size-sm)', color: 'var(--mac-warning)' }}>
-                      <p style={{ 
-                        fontWeight: 'var(--mac-font-weight-medium)', 
-                        margin: '0 0 8px 0' 
+                      <p style={{
+                        fontWeight: 'var(--mac-font-weight-medium)',
+                        margin: '0 0 8px 0'
                       }}>
                         Типы льгот:
                       </p>
-                      <ul style={{ 
-                        fontSize: 'var(--mac-font-size-xs)', 
+                      <ul style={{
+                        fontSize: 'var(--mac-font-size-xs)',
                         margin: 0,
                         paddingLeft: '16px',
                         display: 'flex',
@@ -628,20 +628,20 @@ const BenefitSettings = () => {
           </div>
 
           {/* Действия */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            paddingTop: '24px', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: '24px',
             borderTop: '1px solid var(--mac-border)',
             flexWrap: 'wrap',
             gap: '16px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {hasChanges() && (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
                   padding: '6px 12px',
                   backgroundColor: 'var(--mac-warning-bg)',
@@ -656,16 +656,16 @@ const BenefitSettings = () => {
                 </div>
               )}
             </div>
-            
+
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               {hasChanges() && (
                 <MacOSButton
                   onClick={resetSettings}
                   variant="outline"
                   disabled={saving}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '8px',
                     padding: '8px 16px'
                   }}
@@ -673,13 +673,13 @@ const BenefitSettings = () => {
                   Отменить
                 </MacOSButton>
               )}
-              
+
               <MacOSButton
                 onClick={saveSettings}
                 disabled={saving || !hasChanges()}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
                   backgroundColor: 'var(--mac-accent-blue)',
                   border: 'none',
@@ -687,8 +687,8 @@ const BenefitSettings = () => {
                 }}
               >
                 {saving ? (
-                  <RefreshCw style={{ 
-                    width: '16px', 
+                  <RefreshCw style={{
+                    width: '16px',
                     height: '16px',
                     animation: 'spin 1s linear infinite'
                   }} />
@@ -701,10 +701,10 @@ const BenefitSettings = () => {
           </div>
 
           {/* Статистика настроек */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '16px' 
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px'
           }}>
             <MacOSStatCard
               title="Окно повторных визитов"
@@ -714,7 +714,7 @@ const BenefitSettings = () => {
               trend={settings.repeat_visit_discount > 0 ? 'Скидка активна' : 'Скидка неактивна'}
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-text-secondary)'}
             />
-            
+
             <MacOSStatCard
               title="Скидка на повторные визиты"
               value={`${settings.repeat_visit_discount}%`}
@@ -723,7 +723,7 @@ const BenefitSettings = () => {
               trend={settings.repeat_visit_discount > 0 ? 'Применяется' : 'Не применяется'}
               trendColor={settings.repeat_visit_discount > 0 ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
-            
+
             <MacOSStatCard
               title="Льготные консультации"
               value={settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
@@ -732,7 +732,7 @@ const BenefitSettings = () => {
               trend={settings.benefit_consultation_free ? 'Активны' : 'Неактивны'}
               trendColor={settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-warning)'}
             />
-            
+
             <MacOSStatCard
               title="Автоодобрение All Free"
               value={settings.all_free_auto_approve ? 'Включено' : 'Выключено'}
@@ -744,21 +744,21 @@ const BenefitSettings = () => {
           </div>
 
           {/* Предварительный просмотр */}
-          <MacOSCard style={{ 
-            padding: '20px', 
-            backgroundColor: 'var(--mac-bg-secondary)' 
+          <MacOSCard style={{
+            padding: '20px',
+            backgroundColor: 'var(--mac-bg-secondary)'
           }}>
-            <h4 style={{ 
-              fontSize: 'var(--mac-font-size-sm)', 
-              fontWeight: 'var(--mac-font-weight-medium)', 
+            <h4 style={{
+              fontSize: 'var(--mac-font-size-sm)',
+              fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
               margin: '0 0 16px 0'
             }}>
               Текущие настройки:
             </h4>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: '16px',
               fontSize: 'var(--mac-font-size-sm)'
             }}>
@@ -775,20 +775,20 @@ const BenefitSettings = () => {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle style={{ 
-                  width: '14px', 
-                  height: '14px', 
-                  color: settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-text-tertiary)' 
+                <CheckCircle style={{
+                  width: '14px',
+                  height: '14px',
+                  color: settings.benefit_consultation_free ? 'var(--mac-success)' : 'var(--mac-text-tertiary)'
                 }} />
                 <span style={{ color: 'var(--mac-text-secondary)' }}>
                   Льготы: {settings.benefit_consultation_free ? 'Бесплатно' : 'Платно'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Shield style={{ 
-                  width: '14px', 
-                  height: '14px', 
-                  color: settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)' 
+                <Shield style={{
+                  width: '14px',
+                  height: '14px',
+                  color: settings.all_free_auto_approve ? 'var(--mac-warning)' : 'var(--mac-text-tertiary)'
                 }} />
                 <span style={{ color: 'var(--mac-text-secondary)' }}>
                   All Free: {settings.all_free_auto_approve ? 'Автоодобрение' : 'Ручное одобрение'}
@@ -807,20 +807,20 @@ const BenefitSettings = () => {
         size="sm"
       >
         <div style={{ padding: '24px' }}>
-          <p style={{ 
-            fontSize: 'var(--mac-font-size-base)', 
+          <p style={{
+            fontSize: 'var(--mac-font-size-base)',
             color: 'var(--mac-text-primary)',
             marginBottom: '24px',
             lineHeight: '1.5'
           }}>
-            Вы собираетесь сохранить изменения в настройках льгот. 
+            Вы собираетесь сохранить изменения в настройках льгот.
             Это повлияет на всех пользователей системы.
           </p>
-          
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
-            gap: '12px' 
+
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '12px'
           }}>
             <MacOSButton
               variant="outline"
@@ -832,15 +832,15 @@ const BenefitSettings = () => {
             <MacOSButton
               onClick={confirmSave}
               disabled={saving}
-              style={{ 
+              style={{
                 backgroundColor: 'var(--mac-accent-blue)',
                 border: 'none'
               }}
             >
               {saving ? (
                 <>
-                  <RefreshCw style={{ 
-                    width: '16px', 
+                  <RefreshCw style={{
+                    width: '16px',
                     height: '16px',
                     animation: 'spin 1s linear infinite',
                     marginRight: '8px'

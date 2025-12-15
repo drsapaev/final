@@ -9,6 +9,7 @@ dispatched either by awaiting (async) or via run_in_threadpool (sync).
 from __future__ import annotations
 
 import inspect
+import logging
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -31,6 +32,7 @@ from app.db.session import get_db
 from app.models.user import User
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login")
@@ -50,7 +52,7 @@ async def login(
     Works with both async and sync SQLAlchemy sessions returned by get_db().
     """
     # DEBUG: Add logging
-    print(f"DEBUG: Login attempt for username: {form_data.username}")
+    logger.info(f"Login attempt for username: {form_data.username}")
 
     # build select statement
     stmt = select(User).where(User.username == form_data.username)
@@ -77,17 +79,15 @@ async def login(
 
     # DEBUG: Log user info
     if user:
-        print(f"DEBUG: User found: {user.username}, active: {user.is_active}")
-        print(f"DEBUG: Hashed password: {user.hashed_password[:50]}...")
-        password_valid = verify_password(form_data.password, user.hashed_password)
-        print(f"DEBUG: Password valid: {password_valid}")
+        logger.debug(f"User found: {user.username}, active: {user.is_active}")
+        # Secure: Do not log hashed password
     else:
-        print(f"DEBUG: User not found for username: {form_data.username}")
+        logger.warning(f"User not found for username: {form_data.username}")
 
     if not user or not verify_password(
         form_data.password, getattr(user, "hashed_password", "")
     ):
-        print(f"DEBUG: Authentication failed for {form_data.username}")
+        logger.warning(f"Authentication failed for {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -142,7 +142,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
       {"access_token": "<jwt>", "token_type": "bearer", "user": {...}}
     """
     try:
-        print(f"DEBUG: JSON login called with username={request_data.username}")
+        logger.info(f"JSON login called with username={request_data.username}")
 
         # Определяем тип сессии БД
         is_async = inspect.iscoroutinefunction(
@@ -171,16 +171,16 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
             )
 
         if not user:
-            print(f"DEBUG: User not found")
+            logger.warning(f"User not found")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные",
             )
 
-        print(f"DEBUG: User found: {user.username}")
+        logger.debug(f"User found: {user.username}")
 
         if not user.is_active:
-            print(f"DEBUG: User is inactive")
+            logger.warning(f"User is inactive")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Пользователь деактивирован",
@@ -188,10 +188,10 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
 
         # Проверяем пароль
         password_valid = verify_password(request_data.password, user.hashed_password)
-        print(f"DEBUG: Password valid: {password_valid}")
+        # logger.debug(f"Password valid: {password_valid}")
 
         if not password_valid:
-            print(f"DEBUG: Invalid password")
+            logger.warning(f"Invalid password")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Неверные учетные данные",
@@ -200,7 +200,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
         # Создаем токен
         access_token = create_access_token(data={"sub": str(user.id)})
 
-        print(f"DEBUG: Token created successfully")
+        logger.info(f"Token created successfully")
 
         return JSONLoginResponse(
             access_token=access_token,
@@ -219,7 +219,7 @@ async def json_login(request_data: JSONLoginRequest, db=Depends(get_db)) -> Any:
     except HTTPException:
         raise
     except Exception as e:
-        print(f"DEBUG: Exception in JSON login: {e}")
+        logger.error(f"Exception in JSON login: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка входа: {str(e)}",

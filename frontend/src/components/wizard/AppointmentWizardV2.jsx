@@ -25,7 +25,7 @@ import { MacOSInput, MacOSButton, MacOSSelect, MacOSCheckbox } from '../ui/macos
 import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { formatDateDisplay } from '../../utils/dateUtils';
-import { createQueueEntriesBatch, getDoctorUserId } from '../../api/queue';
+import { createQueueEntriesBatch, getDoctorUserId, updateOnlineQueueEntry } from '../../api/queue';
 import logger from '../../utils/logger';
 import './AppointmentWizardV2.css';
 
@@ -269,29 +269,32 @@ const AppointmentWizardV2 = ({
               else if (Array.isArray(initialData.queue_numbers)) {
                 logger.log('📦 Восстановление услуг из queue_numbers:', initialData.queue_numbers);
                 initialData.queue_numbers.forEach(q => {
-                  // Пропускаем записи без конкретной услуги (просто очередь)
-                  if (!q || !q.service_name) {
-                    logger.warn('⚠️ Queue entry has no service_name, skipping:', q);
-                    return;
-                  }
+                  // ✅ ИСПРАВЛЕНО: Fallback на specialty если нет service_name
+                  const serviceName = q.service_name || q.specialty || 'Консультация';
+                  // ✅ SSOT: Приоритет service_id из initialData (backend), затем из queue_numbers
+                  const serviceId = initialData.service_id || q.service_id || null;
 
                   items.push({
                     id: Date.now() + Math.random(),
-                    service_id: q.service_id || null,
-                    service_name: q.service_name,
+                    service_id: serviceId,
+                    service_name: initialData.service_name || serviceName,
                     service_price: q.service_price || 0,
                     quantity: q.quantity || 1,
                     doctor_id: q.doctor_id || null,
                     visit_date: q.date || initialData.date || new Date().toISOString().split('T')[0],
                     visit_time: q.visit_time || null,
                     original_queue_id: q.id, // ✅ Сохраняем ID записи очереди для отслеживания удалений
-                    _temp_name: q.service_name
+                    _temp_name: serviceName
                   });
                 });
               }
 
               logger.log('📦 Initialized cart with items:', items);
               logger.log('📦 InitialData full structure:', initialData);
+              // ✅ SSOT: Логируем источник service_id
+              if (initialData.service_id) {
+                logger.log(`✅ SSOT: Используем service_id=${initialData.service_id} из backend`);
+              }
               return items;
             })(),
             discount_mode: initialData.discount_mode || 'none', // ✅ ИСПРАВЛЕНО: Восстанавливаем скидки
@@ -1499,6 +1502,64 @@ const AppointmentWizardV2 = ({
           services: Array.isArray(initialData.services) ? initialData.services.length : 0
         });
 
+        // ⭐ SSOT: Для чистых QR-записей (online_queue) обновляем существующую запись вместо создания новой
+        const isOnlineQueueEntry = initialData.record_type === 'online_queue' && effectiveSource === 'online';
+        const queueEntryId = initialData.queue_numbers?.[0]?.id || initialData.id;
+
+        if (isOnlineQueueEntry && queueEntryId) {
+          logger.log(`⭐ SSOT: QR-запись ID=${queueEntryId}, обновляем через full-update endpoint...`);
+
+          try {
+            // Подготавливаем данные пациента
+            const patientData = {
+              patient_name: wizardData.patient.fio || wizardData.patient.name,
+              phone: wizardData.patient.phone,
+              birth_year: wizardData.patient.birth_date
+                ? parseInt(wizardData.patient.birth_date.split('-')[0])
+                : null,
+              address: wizardData.patient.address || null
+            };
+
+            // Подготавливаем услуги из корзины
+            const cartServices = wizardData.cart.items.map(item => ({
+              service_id: item.service_id,
+              quantity: item.quantity || 1
+            })).filter(s => s.service_id);
+
+            // Определяем visit_type и discount_mode
+            const visitType = wizardData.cart.discount_mode === 'repeat' ? 'repeat' :
+              wizardData.cart.discount_mode === 'benefit' ? 'benefit' : 'paid';
+            const discountMode = wizardData.cart.discount_mode || 'none';
+            const allFree = discountMode === 'all_free';
+
+            // logger.log('📤 Вызов updateOnlineQueueEntry:', { ... }); // Removed to reduce noise
+
+            const updateResult = await updateOnlineQueueEntry({
+              entryId: queueEntryId,
+              patientData,
+              visitType,
+              discountMode,
+              services: cartServices,
+              allFree
+            });
+
+            logger.log('✅ QR-запись успешно обновлена:', updateResult);
+            toast.success('Запись успешно обновлена');
+
+            // Завершаем без создания новых записей
+            if (!editMode) {
+              localStorage.removeItem(DRAFT_KEY);
+            }
+            onComplete?.(updateResult);
+            onClose();
+            return; // ⭐ ВАЖНО: Завершаем handleComplete, не продолжаем с cart endpoint
+          } catch (updateError) {
+            logger.error('❌ Ошибка обновления QR-записи:', updateError);
+            // Продолжаем с обычной логикой как fallback
+            logger.log('ℹ️ Продолжаем с обычной логикой как fallback...');
+          }
+        }
+
         // Определяем исходные услуги из initialData
         const originalServiceCodes = new Set();
         const originalServiceNames = new Set();
@@ -1997,6 +2058,20 @@ const AppointmentWizardV2 = ({
           toast.error(`Ошибка обновления данных пациента: ${patientError.message || 'Неизвестная ошибка'}`);
           // Продолжаем с обычным flow (хотя visits пустой, это не должно произойти)
         }
+      }
+
+      // ✅ ИСПРАВЛЕНО Bug 2: Предотвращаем отправку пустой корзины, если визитов нет
+      // Это может произойти в режиме редактирования, если мы пытались обновить пациента и произошла ошибка,
+      // или если все новые услуги были обработаны через batch endpoint.
+      if (visits.length === 0) {
+        logger.warn('⚠️ Нет визитов для создания в корзине (visits is empty). Пропускаем вызов /registrar/cart.');
+        if (editMode) {
+          // Ошибка (если была) уже обработана в блоках выше, просто выходим
+          return;
+        }
+        // В режиме создания, если визитов нет, показываем предупреждение
+        toast.warning('Корзина пуста. Добавьте услуги для создания записи.');
+        return;
       }
 
       const cartData = {

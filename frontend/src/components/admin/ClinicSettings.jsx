@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import logger from '../../utils/logger';
-import { 
-  Building2, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Clock, 
-  Globe, 
+import {
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
+  Globe,
   Upload,
-  Save, 
+  Save,
   RefreshCw,
   AlertCircle,
   CheckCircle,
   Image
 } from 'lucide-react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSInput, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSInput,
   MacOSSelect,
   MacOSTextarea
 } from '../ui/macos';
@@ -60,13 +60,13 @@ const ClinicSettings = () => {
 
       const data = response.data;
       const settingsObj = {};
-      
+
       if (Array.isArray(data)) {
         data.forEach(setting => {
           settingsObj[setting.key] = setting.value;
         });
       }
-      
+
       setSettings(prev => ({ ...prev, ...settingsObj }));
     } catch (error) {
       logger.error('Ошибка загрузки настроек:', error);
@@ -96,7 +96,7 @@ const ClinicSettings = () => {
       }
 
       setLogoFile(file);
-      
+
       // Создаем превью
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -150,7 +150,7 @@ const ClinicSettings = () => {
       setMessage({ type: 'success', text: 'Настройки успешно сохранены' });
       setLogoFile(null);
       setLogoPreview(null);
-      
+
       // Обновляем логотип в настройках
       if (logoUrl !== settings.logo_url) {
         setSettings(prev => ({ ...prev, logo_url: logoUrl }));
@@ -170,20 +170,20 @@ const ClinicSettings = () => {
 
   if (loading) {
     return (
-      <div style={{ 
+      <div style={{
         padding: 0,
         backgroundColor: 'var(--mac-bg-primary)'
       }}>
         <MacOSCard style={{ padding: '24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-            <RefreshCw style={{ 
-              width: '32px', 
-              height: '32px', 
+            <RefreshCw style={{
+              width: '32px',
+              height: '32px',
               color: 'var(--mac-accent-blue)',
               animation: 'spin 1s linear infinite'
             }} />
-            <span style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
+            <span style={{
+              fontSize: 'var(--mac-font-size-lg)',
               color: 'var(--mac-text-secondary)',
               fontWeight: 'var(--mac-font-weight-medium)'
             }}>
@@ -196,24 +196,24 @@ const ClinicSettings = () => {
   }
 
   return (
-    <div style={{ 
+    <div style={{
       padding: 0,
       backgroundColor: 'var(--mac-bg-primary)'
     }}>
       <MacOSCard style={{ padding: '24px' }}>
         {/* Заголовок */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '24px',
           paddingBottom: '24px',
           borderBottom: '1px solid var(--mac-border)'
         }}>
           <div>
-            <h2 style={{ 
-              fontSize: 'var(--mac-font-size-2xl)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
+            <h2 style={{
+              fontSize: 'var(--mac-font-size-2xl)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
               color: 'var(--mac-text-primary)',
               margin: '0 0 8px 0',
               display: 'flex',
@@ -223,7 +223,7 @@ const ClinicSettings = () => {
               <Building2 style={{ width: '32px', height: '32px', color: 'var(--mac-accent-blue)' }} />
               Настройки клиники
             </h2>
-            <p style={{ 
+            <p style={{
               color: 'var(--mac-text-secondary)',
               fontSize: 'var(--mac-font-size-sm)',
               margin: 0
@@ -237,9 +237,9 @@ const ClinicSettings = () => {
               variant="outline"
               onClick={loadSettings}
               disabled={loading}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '8px',
                 padding: '8px 16px'
               }}
@@ -250,9 +250,9 @@ const ClinicSettings = () => {
             <MacOSButton
               onClick={saveSettings}
               disabled={saving}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '8px',
                 backgroundColor: 'var(--mac-accent-blue)',
                 border: 'none',
@@ -260,8 +260,8 @@ const ClinicSettings = () => {
               }}
             >
               {saving ? (
-                <RefreshCw style={{ 
-                  width: '16px', 
+                <RefreshCw style={{
+                  width: '16px',
                   height: '16px',
                   animation: 'spin 1s linear infinite'
                 }} />
@@ -275,8 +275,8 @@ const ClinicSettings = () => {
 
         {/* Сообщения */}
         {message.text && (
-          <MacOSCard style={{ 
-            padding: '16px', 
+          <MacOSCard style={{
+            padding: '16px',
             marginBottom: '24px',
             backgroundColor: message.type === 'success' ? 'var(--mac-success-bg)' : 'var(--mac-error-bg)',
             border: message.type === 'success' ? '1px solid var(--mac-success-border)' : '1px solid var(--mac-error-border)'
@@ -287,8 +287,8 @@ const ClinicSettings = () => {
               ) : (
                 <AlertCircle style={{ width: '20px', height: '20px', color: 'var(--mac-error)' }} />
               )}
-              <span style={{ 
-                fontSize: 'var(--mac-font-size-sm)', 
+              <span style={{
+                fontSize: 'var(--mac-font-size-sm)',
                 color: message.type === 'success' ? 'var(--mac-success)' : 'var(--mac-error)',
                 fontWeight: 'var(--mac-font-weight-medium)'
               }}>
@@ -298,18 +298,18 @@ const ClinicSettings = () => {
           </MacOSCard>
         )}
 
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
           gap: '24px',
           marginBottom: '24px'
         }}>
           {/* Основная информация */}
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -318,15 +318,15 @@ const ClinicSettings = () => {
               <Building2 style={{ width: '20px', height: '20px', color: 'var(--mac-accent-blue)' }} />
               Основная информация
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
-                  marginBottom: '8px' 
+                <label style={{
+                  display: 'block',
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
+                  marginBottom: '8px'
                 }}>
                   Название клиники
                 </label>
@@ -340,11 +340,10 @@ const ClinicSettings = () => {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
+                <label style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -363,11 +362,10 @@ const ClinicSettings = () => {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
+                <label style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -386,11 +384,10 @@ const ClinicSettings = () => {
               </div>
 
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
+                <label style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -412,10 +409,10 @@ const ClinicSettings = () => {
 
           {/* Системные настройки */}
           <MacOSCard style={{ padding: '24px' }}>
-            <h3 style={{ 
-              fontSize: 'var(--mac-font-size-lg)', 
-              fontWeight: 'var(--mac-font-weight-semibold)', 
-              color: 'var(--mac-text-primary)', 
+            <h3 style={{
+              fontSize: 'var(--mac-font-size-lg)',
+              fontWeight: 'var(--mac-font-weight-semibold)',
+              color: 'var(--mac-text-primary)',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -424,14 +421,13 @@ const ClinicSettings = () => {
               <Globe style={{ width: '20px', height: '20px', color: 'var(--mac-success)' }} />
               Системные настройки
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
+                <label style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -446,9 +442,9 @@ const ClinicSettings = () => {
                   options={timezones}
                   style={{ width: '100%' }}
                 />
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-xs)', 
-                  color: 'var(--mac-text-tertiary)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-text-tertiary)',
                   marginTop: '4px',
                   margin: '4px 0 0 0'
                 }}>
@@ -458,11 +454,10 @@ const ClinicSettings = () => {
 
               {/* Логотип */}
               <div>
-                <label style={{ 
-                  display: 'block', 
-                  fontSize: 'var(--mac-font-size-sm)', 
-                  fontWeight: 'var(--mac-font-weight-medium)', 
-                  color: 'var(--mac-text-primary)', 
+                <label style={{
+                  fontSize: 'var(--mac-font-size-sm)',
+                  fontWeight: 'var(--mac-font-weight-medium)',
+                  color: 'var(--mac-text-primary)',
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -471,36 +466,36 @@ const ClinicSettings = () => {
                   <Image style={{ width: '16px', height: '16px' }} />
                   Логотип клиники
                 </label>
-                
+
                 {/* Текущий логотип */}
                 {(settings.logo_url || logoPreview) && (
                   <div style={{ marginBottom: '12px' }}>
-                    <div style={{ 
-                      width: '128px', 
-                      height: '80px', 
-                      border: '2px dashed var(--mac-border)', 
-                      borderRadius: 'var(--mac-radius-md)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
+                    <div style={{
+                      width: '128px',
+                      height: '80px',
+                      border: '2px dashed var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-md)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       backgroundColor: 'var(--mac-bg-secondary)',
                       padding: '8px'
                     }}>
                       <img
                         src={logoPreview || settings.logo_url}
                         alt="Логотип клиники"
-                        style={{ 
-                          maxWidth: '100%', 
-                          maxHeight: '100%', 
-                          objectFit: 'contain' 
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          objectFit: 'contain'
                         }}
                       />
                     </div>
                     {logoPreview && (
-                      <MacOSButton 
-                        variant="outline" 
+                      <MacOSButton
+                        variant="outline"
                         onClick={resetLogo}
-                        style={{ 
+                        style={{
                           marginTop: '8px',
                           padding: '4px 8px',
                           fontSize: 'var(--mac-font-size-xs)'
@@ -511,7 +506,7 @@ const ClinicSettings = () => {
                     )}
                   </div>
                 )}
-                
+
                 {/* Загрузка логотипа */}
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <input
@@ -523,16 +518,16 @@ const ClinicSettings = () => {
                   />
                   <label
                     htmlFor="logo-upload"
-                    style={{ 
-                      cursor: 'pointer', 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      padding: '8px 16px', 
-                      border: '1px solid var(--mac-border)', 
-                      borderRadius: 'var(--mac-radius-md)', 
-                      fontSize: 'var(--mac-font-size-sm)', 
-                      fontWeight: 'var(--mac-font-weight-medium)', 
-                      color: 'var(--mac-text-primary)', 
+                    style={{
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '8px 16px',
+                      border: '1px solid var(--mac-border)',
+                      borderRadius: 'var(--mac-radius-md)',
+                      fontSize: 'var(--mac-font-size-sm)',
+                      fontWeight: 'var(--mac-font-weight-medium)',
+                      color: 'var(--mac-text-primary)',
                       backgroundColor: 'var(--mac-bg-secondary)',
                       transition: 'all var(--mac-duration-normal) var(--mac-ease)'
                     }}
@@ -549,9 +544,9 @@ const ClinicSettings = () => {
                     Выбрать файл
                   </label>
                 </div>
-                <p style={{ 
-                  fontSize: 'var(--mac-font-size-xs)', 
-                  color: 'var(--mac-text-tertiary)', 
+                <p style={{
+                  fontSize: 'var(--mac-font-size-xs)',
+                  color: 'var(--mac-text-tertiary)',
                   marginTop: '4px',
                   margin: '4px 0 0 0'
                 }}>

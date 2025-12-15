@@ -44,6 +44,15 @@ import {
   XCircle,
   AlertTriangle,
 } from 'lucide-react';
+import {
+  TableContainer,
+  IconButton,
+  TextField,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  FormControlLabel
+} from '@mui/material';
 
 const TelegramManager = () => {
   const [botStatus, setBotStatus] = useState(null);
@@ -67,7 +76,7 @@ const TelegramManager = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('access_token');
-      
+
       const [statusRes, templatesRes] = await Promise.all([
         fetch('/api/v1/telegram/bot-status', {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -171,10 +180,10 @@ const TelegramManager = () => {
               <List>
                 <ListItem>
                   <ListItemIcon>
-                    <MessageSquare 
-                      style={{ 
-                        color: botStatus?.bot_active ? 'var(--mac-success, #28a745)' : 'var(--mac-error, #dc3545)' 
-                      }} 
+                    <MessageSquare
+                      style={{
+                        color: botStatus?.bot_active ? 'var(--mac-success, #28a745)' : 'var(--mac-error, #dc3545)'
+                      }}
                     />
                   </ListItemIcon>
                   <ListItemText
@@ -243,7 +252,7 @@ const TelegramManager = () => {
                 <Button
                   fullWidth
                   variant="outlined"
-                  startIcon={<Add />}
+                  startIcon={<Plus />}
                   onClick={() => setShowTemplateDialog(true)}
                   sx={{ py: 1.5 }}
                 >
@@ -295,7 +304,7 @@ const TelegramManager = () => {
                             <Edit />
                           </IconButton>
                           <IconButton>
-                            <Delete />
+                            <Trash2 />
                           </IconButton>
                         </TableCell>
                       </TableRow>

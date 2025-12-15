@@ -34,7 +34,7 @@ router = APIRouter()
 
 
 class PaymentInvoiceCreateRequest(BaseModel):
-    amount: Decimal = Field(..., gt=0, description="Сумма к оплате")
+    amount: float = Field(..., gt=0, description="Сумма к оплате")
     currency: str = Field(default="UZS", description="Валюта")
     provider: str = Field(
         ..., pattern="^(click|payme)$", description="Платежный провайдер"
@@ -47,7 +47,7 @@ class PaymentInvoiceCreateRequest(BaseModel):
 
 class PaymentInvoiceResponse(BaseModel):
     invoice_id: int
-    amount: Decimal
+    amount: float
     currency: str
     provider: str
     status: str
@@ -116,7 +116,7 @@ class PaymentInitRequest(BaseModel):
 
     visit_id: int = Field(..., description="ID визита")
     provider: str = Field(..., description="Провайдер платежа (click, payme, kaspi)")
-    amount: Decimal = Field(..., gt=0, description="Сумма платежа")
+    amount: float = Field(..., gt=0, description="Сумма платежа")
     currency: str = Field(default="UZS", description="Валюта платежа")
     description: Optional[str] = Field(None, description="Описание платежа")
     return_url: Optional[str] = Field(None, description="URL возврата при успехе")
@@ -139,7 +139,7 @@ class PaymentStatusResponse(BaseModel):
 
     payment_id: int
     status: str
-    amount: Decimal
+    amount: float
     currency: str
     provider: Optional[str] = None
     provider_payment_id: Optional[str] = None
@@ -352,7 +352,7 @@ class PaymentCreateRequest(BaseModel):
 
     visit_id: Optional[int] = Field(None, description="ID визита")
     appointment_id: Optional[int] = Field(None, description="ID записи (appointment)")
-    amount: Decimal = Field(..., gt=0, description="Сумма платежа")
+    amount: float = Field(..., gt=0, description="Сумма платежа")
     currency: str = Field(default="UZS", description="Валюта платежа")
     method: str = Field(default="cash", description="Метод оплаты (cash, card)")
     note: Optional[str] = Field(None, description="Примечание")
@@ -769,7 +769,7 @@ def test_init_payment(
         )
 
 
-@router.post("/{payment_id}/receipt")
+@router.get("/{payment_id}/receipt")
 def generate_receipt(
     payment_id: int,
     format_type: str = "pdf",

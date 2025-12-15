@@ -1,0 +1,878 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.1, pytest-8.4.1, pluggy-1.6.0
+rootdir: C:\final\backend
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 12 items
+
+tests\integration\test_e2e_doctor_visit.py EEEEEEEEEEEE                  [100%]
+
+=================================== ERRORS ====================================
+______ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_view_queue _______
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000236827667D0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x000002368320E2D0>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+___ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_call_next_patient ___
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000236827E1910>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829D8350>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+______ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_start_visit ______
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000002368270D050>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829E4090>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+_______ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_fill_emr ________
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000023684435BD0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829DA810>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+___ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_use_emr_template ____
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000236829E4E10>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829E5A50>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+_ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_add_diagnosis_with_ai_suggestion _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000023682989990>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x0000023682987290>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+_ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_generate_prescription_pdf _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000002368275B290>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x0000023684553350>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+____ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_complete_visit _____
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000236829A2350>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829D3990>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+__ ERROR at setup of TestDoctorQueueManagement.test_doctor_can_skip_patient ___
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000023684523650>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829E4190>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+_ ERROR at setup of TestDoctorQueueManagement.test_doctor_can_get_patient_history _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000023684550D90>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236829E42D0>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+_ ERROR at setup of TestDoctorSecurity.test_doctor_cannot_access_admin_routes _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000023684551A10>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236843AFC90>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+_ ERROR at setup of TestDoctorSecurity.test_doctor_cannot_view_other_doctor_queue _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000236829D9190>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+>           doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                license_number="DOC_E2E_001",
+                experience_years=5,
+                is_active=True,
+            )
+
+tests\integration\test_e2e_doctor_visit.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.clinic.Doctor object at 0x00000236843ACED0>
+kwargs = {'experience_years': 5, 'is_active': True, 'license_number': 'DOC_E2E_001', 'specialty': '╥хЁряш ', ...}
+cls_ = <class 'app.models.clinic.Doctor'>, k = 'license_number'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'license_number' is an invalid keyword argument for Doctor
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+============================== warnings summary ===============================
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: 51 warnings
+  C:\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+tests\integration\test_e2e_doctor_visit.py:154
+  C:\final\backend\tests\integration\test_e2e_doctor_visit.py:154: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_doctor_visit.py:314
+  C:\final\backend\tests\integration\test_e2e_doctor_visit.py:314: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_doctor_visit.py:352
+  C:\final\backend\tests\integration\test_e2e_doctor_visit.py:352: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_view_queue
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_call_next_patient
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_start_visit
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_fill_emr
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_use_emr_template
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_add_diagnosis_with_ai_suggestion
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_complete_visit
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorQueueManagement::test_doctor_can_skip_patient
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorQueueManagement::test_doctor_can_get_patient_history
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_access_admin_routes
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_view_other_doctor_queue
+======================= 64 warnings, 12 errors in 3.71s =======================

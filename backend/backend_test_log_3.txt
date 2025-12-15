@@ -1,0 +1,2169 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.1, pytest-8.4.1, pluggy-1.6.0
+rootdir: C:\final\backend
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 19 items
+
+tests\integration\test_e2e_patient_flow.py EEEEEEEEFF                    [ 52%]
+tests\integration\test_e2e_payment_flow.py E..EE...F                     [100%]
+
+=================================== ERRORS ====================================
+____ ERROR at setup of TestPatientFlow.test_patient_can_view_appointments _____
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E27A39D0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E348CDD0>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_can_view_single_appointment __
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E0DFEFD0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E2D9DBB0>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_can_cancel_future_appointment _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E2D5B9D0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E2D5FE90>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_cannot_cancel_soon_appointment _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E2EE5590>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E2F18290>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+__ ERROR at setup of TestPatientFlow.test_patient_can_reschedule_appointment __
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E371E010>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E32E9670>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+___ ERROR at setup of TestPatientFlow.test_patient_can_get_available_slots ____
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E2D345D0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E4D6FAD0>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_______ ERROR at setup of TestPatientFlow.test_patient_can_view_results _______
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E2CA04D0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E324C710>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_cannot_view_others_appointments _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E2BED250>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+        future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+        db_session.add(future_apt)
+    
+        # 2. ╟ряшё№ ўхЁхч 12 ўрёют (эхы№ч  юЄьхэшЄ№ - ьхэ№°х 24ў)
+>       tomorrow_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,
+            department="therapy",
+            appointment_date=date.today() + timedelta(days=1),
+            appointment_time="08:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ЄхЁряхтЄр"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:76: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x000001D6E2C229F0>
+child = 'therapy', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x000001D6E2D5AD40>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_______ ERROR at setup of TestPaymentFlow.test_create_payment_for_visit _______
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E33B0950>
+
+    @pytest.fixture
+    def payment_test_data(db_session):
+        """╤ючфрхЄ ЄхёЄют√х фрээ√х фы  яюЄюър юяырЄ√"""
+        # ╧рЎшхэЄ
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901234999").first()
+        if not patient:
+            patient = Patient(
+                first_name="╬яырЄр",
+                last_name="╥хёЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901234999",
+                birth_date=date(1995, 3, 20),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╙ёыєур
+        service = db_session.query(Service).filter(Service.code == "PAY_TEST_SVC").first()
+        if not service:
+>           service = Service(
+                code="PAY_TEST_SVC",
+                name="╥хёЄютр  єёыєур фы  юяырЄ√",
+                description="╙ёыєур фы  E2E ЄхёЄют юяырЄ√",
+                price=150000.00,  # 150,000 ёєь
+                duration_minutes=30,
+                is_active=True,
+                requires_doctor=False,
+            )
+
+tests\integration\test_e2e_payment_flow.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.service.Service object at 0x000001D6E3A40E10>
+kwargs = {'code': 'PAY_TEST_SVC', 'description': '╙ёыєур фы  E2E ЄхёЄют юяырЄ√', 'duration_minutes': 30, 'is_active': True, ...}
+cls_ = <class 'app.models.service.Service'>, k = 'description'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'description' is an invalid keyword argument for Service
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+---------------------------- Captured stdout setup ----------------------------
+DEBUG: Login endpoint called with username=test_admin
+DEBUG: IP=testclient, UserAgent=testclient
+DEBUG: Service obtained: <app.services.authentication_service.AuthenticationService object at 0x000001D6BAB320D0>
+DEBUG: login_user result: {'success': True, 'message': '╙ёях°э√щ тїюф', 'user': {'id': 2, 'username': 'test_admin', 'full_name': 'Test Admin', 'email': 'admin@test.com', 'role': 'Admin', 'is_active': True, 'is_superuser': True}, 'tokens': {'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ0ZXN0X2FkbWluIiwicm9sZSI6IkFkbWluIiwiaXNfYWN0aXZlIjp0cnVlLCJpc19zdXBlcnVzZXIiOnRydWUsImV4cCI6MTc2NTc3NDI3OCwidHlwZSI6ImFjY2VzcyJ9.isLnZvc2jFR-yh1JVrpvyiUvTaoLuBQUQw6b6wsdOsI', 'refresh_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJqdGkiOiI1N2NkODVmMy0xOTE0LTQ3YjctYmY5MS1hNmI2ZjQ2MTZmMDEiLCJ0eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2ODM2NDQ3OH0.2__X7OHamGFC7bEmzB_tmyoieJebgkdd7sqGm1SDJpA', 'token_type': 'bearer', 'expires_in': 1800}, 'requires_2fa': False, 'two_factor_method': None}
+__________ ERROR at setup of TestPaymentFlow.test_get_payment_status __________
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E3AAFD10>
+
+    @pytest.fixture
+    def payment_test_data(db_session):
+        """╤ючфрхЄ ЄхёЄют√х фрээ√х фы  яюЄюър юяырЄ√"""
+        # ╧рЎшхэЄ
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901234999").first()
+        if not patient:
+            patient = Patient(
+                first_name="╬яырЄр",
+                last_name="╥хёЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901234999",
+                birth_date=date(1995, 3, 20),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╙ёыєур
+        service = db_session.query(Service).filter(Service.code == "PAY_TEST_SVC").first()
+        if not service:
+>           service = Service(
+                code="PAY_TEST_SVC",
+                name="╥хёЄютр  єёыєур фы  юяырЄ√",
+                description="╙ёыєур фы  E2E ЄхёЄют юяырЄ√",
+                price=150000.00,  # 150,000 ёєь
+                duration_minutes=30,
+                is_active=True,
+                requires_doctor=False,
+            )
+
+tests\integration\test_e2e_payment_flow.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.service.Service object at 0x000001D6E2C47ED0>
+kwargs = {'code': 'PAY_TEST_SVC', 'description': '╙ёыєур фы  E2E ЄхёЄют юяырЄ√', 'duration_minutes': 30, 'is_active': True, ...}
+cls_ = <class 'app.models.service.Service'>, k = 'description'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'description' is an invalid keyword argument for Service
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+---------------------------- Captured stdout setup ----------------------------
+DEBUG: Login endpoint called with username=test_admin
+DEBUG: IP=testclient, UserAgent=testclient
+DEBUG: Service obtained: <app.services.authentication_service.AuthenticationService object at 0x000001D6BAB320D0>
+DEBUG: login_user result: {'success': True, 'message': '╙ёях°э√щ тїюф', 'user': {'id': 2, 'username': 'test_admin', 'full_name': 'Test Admin', 'email': 'admin@test.com', 'role': 'Admin', 'is_active': True, 'is_superuser': True}, 'tokens': {'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ0ZXN0X2FkbWluIiwicm9sZSI6IkFkbWluIiwiaXNfYWN0aXZlIjp0cnVlLCJpc19zdXBlcnVzZXIiOnRydWUsImV4cCI6MTc2NTc3NDI3OSwidHlwZSI6ImFjY2VzcyJ9.EeyJ82Vq0EGNZnv1eSU0UDHPjS-Bc_E4Tls-dFXOjw8', 'refresh_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJqdGkiOiIxNzYzODY5Zi01N2E5LTQwNTYtYWVlYi01NzA3ZTgzMWJmOGQiLCJ0eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2ODM2NDQ3OX0.NF_tYMbTczMez1yVdj0bDmMUOKLwBtpnP4yZNvQBPho', 'token_type': 'bearer', 'expires_in': 1800}, 'requires_2fa': False, 'two_factor_method': None}
+______ ERROR at setup of TestPaymentFlow.test_payment_receipt_generation ______
+
+db_session = <sqlalchemy.orm.session.Session object at 0x000001D6E3AAF8D0>
+
+    @pytest.fixture
+    def payment_test_data(db_session):
+        """╤ючфрхЄ ЄхёЄют√х фрээ√х фы  яюЄюър юяырЄ√"""
+        # ╧рЎшхэЄ
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901234999").first()
+        if not patient:
+            patient = Patient(
+                first_name="╬яырЄр",
+                last_name="╥хёЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901234999",
+                birth_date=date(1995, 3, 20),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╙ёыєур
+        service = db_session.query(Service).filter(Service.code == "PAY_TEST_SVC").first()
+        if not service:
+>           service = Service(
+                code="PAY_TEST_SVC",
+                name="╥хёЄютр  єёыєур фы  юяырЄ√",
+                description="╙ёыєур фы  E2E ЄхёЄют юяырЄ√",
+                price=150000.00,  # 150,000 ёєь
+                duration_minutes=30,
+                is_active=True,
+                requires_doctor=False,
+            )
+
+tests\integration\test_e2e_payment_flow.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <app.models.service.Service object at 0x000001D6E2CABF10>
+kwargs = {'code': 'PAY_TEST_SVC', 'description': '╙ёыєур фы  E2E ЄхёЄют юяырЄ√', 'duration_minutes': 30, 'is_active': True, ...}
+cls_ = <class 'app.models.service.Service'>, k = 'description'
+
+    def _declarative_constructor(self: Any, **kwargs: Any) -> None:
+        """A simple constructor that allows initialization from kwargs.
+    
+        Sets attributes on the constructed instance using the names and
+        values in ``kwargs``.
+    
+        Only keys that are present as
+        attributes of the instance's class are allowed. These could be,
+        for example, any mapped columns or relationships.
+        """
+        cls_ = type(self)
+        for k in kwargs:
+            if not hasattr(cls_, k):
+>               raise TypeError(
+                    "%r is an invalid keyword argument for %s" % (k, cls_.__name__)
+                )
+E               TypeError: 'description' is an invalid keyword argument for Service
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2179: TypeError
+---------------------------- Captured stdout setup ----------------------------
+DEBUG: Login endpoint called with username=test_admin
+DEBUG: IP=testclient, UserAgent=testclient
+DEBUG: Service obtained: <app.services.authentication_service.AuthenticationService object at 0x000001D6BAB320D0>
+DEBUG: login_user result: {'success': True, 'message': '╙ёях°э√щ тїюф', 'user': {'id': 2, 'username': 'test_admin', 'full_name': 'Test Admin', 'email': 'admin@test.com', 'role': 'Admin', 'is_active': True, 'is_superuser': True}, 'tokens': {'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ0ZXN0X2FkbWluIiwicm9sZSI6IkFkbWluIiwiaXNfYWN0aXZlIjp0cnVlLCJpc19zdXBlcnVzZXIiOnRydWUsImV4cCI6MTc2NTc3NDI3OSwidHlwZSI6ImFjY2VzcyJ9.EeyJ82Vq0EGNZnv1eSU0UDHPjS-Bc_E4Tls-dFXOjw8', 'refresh_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJqdGkiOiJhNGMwYjBjZi1mN2VhLTQ4YTktOTFiZi00YmEzYzJmYWFiNzAiLCJ0eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2ODM2NDQ3OX0.PcJUOhHq1S8Gn6Xf0P9elKkE0g6-vZCnXhJaDtqY05w', 'token_type': 'bearer', 'expires_in': 1800}, 'requires_2fa': False, 'two_factor_method': None}
+================================== FAILURES ===================================
+____________ TestPatientAuthFlow.test_unauthorized_access_rejected ____________
+
+self = <test_e2e_patient_flow.TestPatientAuthFlow object at 0x000001D6E2D5A290>
+client = <starlette.testclient.TestClient object at 0x000001D6E2C713D0>
+
+    def test_unauthorized_access_rejected(self, client: TestClient):
+        """═хртЄюЁшчютрээ√щ фюёЄєя юЄъыюэ хЄё """
+        response = client.get("/api/v1/patient/appointments")
+>       assert response.status_code == 401
+E       assert 404 == 401
+E        +  where 404 = <Response [404 Not Found]>.status_code
+
+tests\integration\test_e2e_patient_flow.py:310: AssertionError
+_______________ TestPatientAuthFlow.test_invalid_token_rejected _______________
+
+self = <test_e2e_patient_flow.TestPatientAuthFlow object at 0x000001D6E2D5A590>
+client = <starlette.testclient.TestClient object at 0x000001D6E2BDAE90>
+
+    def test_invalid_token_rejected(self, client: TestClient):
+        """═хтрышфэ√щ Єюъхэ юЄъыюэ хЄё """
+        response = client.get(
+            "/api/v1/patient/appointments",
+            headers={"Authorization": "Bearer invalid_token_here"},
+        )
+>       assert response.status_code in [401, 403]
+E       assert 404 in [401, 403]
+E        +  where 404 = <Response [404 Not Found]>.status_code
+
+tests\integration\test_e2e_patient_flow.py:318: AssertionError
+______________ TestPaymentSecurity.test_invalid_amount_rejected _______________
+  + Exception Group Traceback (most recent call last):
+  |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 76, in collapse_excgroups
+  |     yield
+  |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 177, in __call__
+  |     async with anyio.create_task_group() as task_group:
+  |   File "C:\Program Files\Python311\Lib\site-packages\anyio\_backends\_asyncio.py", line 772, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 344, in from_call
+    |     result: TResult | None = func()
+    |                              ^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 246, in <lambda>
+    |     lambda: runtest_hook(item=item, **kwds), when=when, reraise=reraise
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+    |     return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+    |     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 167, in _multicall
+    |     raise exception
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    |     teardown.throw(exception)
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\logging.py", line 850, in pytest_runtest_call
+    |     yield
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    |     teardown.throw(exception)
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\capture.py", line 900, in pytest_runtest_call
+    |     return (yield)
+    |             ^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    |     teardown.throw(exception)
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\skipping.py", line 263, in pytest_runtest_call
+    |     return (yield)
+    |             ^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+    |     res = hook_impl.function(*args)
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\runner.py", line 178, in pytest_runtest_call
+    |     item.runtest()
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 1671, in runtest
+    |     self.ihook.pytest_pyfunc_call(pyfuncitem=self)
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_hooks.py", line 512, in __call__
+    |     return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_manager.py", line 120, in _hookexec
+    |     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 167, in _multicall
+    |     raise exception
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 139, in _multicall
+    |     teardown.throw(exception)
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 53, in run_old_style_hookwrapper
+    |     return result.get_result()
+    |            ^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_result.py", line 103, in get_result
+    |     raise exc.with_traceback(tb)
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 38, in run_old_style_hookwrapper
+    |     res = yield
+    |           ^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\pluggy\_callers.py", line 121, in _multicall
+    |     res = hook_impl.function(*args)
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\_pytest\python.py", line 157, in pytest_pyfunc_call
+    |     result = testfunction(**testargs)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\tests\integration\test_e2e_payment_flow.py", line 257, in test_invalid_amount_rejected
+    |     response = client.post(
+    |                ^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 538, in post
+    |     return super().post(
+    |            ^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 1157, in post
+    |     return self.request(
+    |            ^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 437, in request
+    |     return super().request(
+    |            ^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 837, in request
+    |     return self.send(request, auth=auth, follow_redirects=follow_redirects)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 926, in send
+    |     response = self._send_handling_auth(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 954, in _send_handling_auth
+    |     response = self._send_handling_redirects(
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 991, in _send_handling_redirects
+    |     response = self._send_single_request(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 1027, in _send_single_request
+    |     response = transport.handle_request(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 340, in handle_request
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 337, in handle_request
+    |     portal.call(self.app, scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\anyio\from_thread.py", line 291, in call
+    |     return cast(T_Retval, self.start_task_soon(func, *args).result())
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\concurrent\futures\_base.py", line 456, in result
+    |     return self.__get_result()
+    |            ^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    |     raise self._exception
+    |   File "C:\Program Files\Python311\Lib\site-packages\anyio\from_thread.py", line 222, in _call_func
+    |     retval = await retval_or_awaitable
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    |     await super().__call__(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\applications.py", line 112, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 187, in __call__
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    |     await self.app(scope, receive, _send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |   File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    |     self.gen.throw(typ, value, traceback)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\middleware\security_middleware.py", line 241, in dispatch
+    |     return await call_next(request)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    |     raise app_exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |   File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    |     self.gen.throw(typ, value, traceback)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\middleware\audit_middleware.py", line 41, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    |     raise app_exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 734, in app
+    |     await route.handle(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 288, in handle
+    |     await self.app(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 76, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 59, in wrapped_app
+    |     response = await handler(conn, exc)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\core\exception_handlers.py", line 221, in validation_exception_handler
+    |     return JSONResponse(
+    |            ^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 182, in __init__
+    |     super().__init__(content, status_code, headers, media_type, background)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    |     self.body = self.render(content)
+    |                 ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 185, in render
+    |     return json.dumps(
+    |            ^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\__init__.py", line 238, in dumps
+    |     **kw).encode(obj)
+    |           ^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 200, in encode
+    |     chunks = self.iterencode(o, _one_shot=True)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 258, in iterencode
+    |     return _iterencode(o, 0)
+    |            ^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 180, in default
+    |     raise TypeError(f'Object of type {o.__class__.__name__} '
+    | TypeError: Object of type Decimal is not JSON serializable
+    +------------------------------------
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\final\backend\tests\integration\test_e2e_payment_flow.py", line 257, in test_invalid_amount_rejected
+    response = client.post(
+               ^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 538, in post
+    return super().post(
+           ^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 1157, in post
+    return self.request(
+           ^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 437, in request
+    return super().request(
+           ^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 837, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 926, in send
+    response = self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 954, in _send_handling_auth
+    response = self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 991, in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\httpx\_client.py", line 1027, in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 340, in handle_request
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py", line 337, in handle_request
+    portal.call(self.app, scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\anyio\from_thread.py", line 291, in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\concurrent\futures\_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Program Files\Python311\Lib\site-packages\anyio\from_thread.py", line 222, in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\fastapi\applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 187, in __call__
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\middleware\security_middleware.py", line 241, in dispatch
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    raise app_exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\middleware\audit_middleware.py", line 41, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    raise app_exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 59, in wrapped_app
+    response = await handler(conn, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\core\exception_handlers.py", line 221, in validation_exception_handler
+    return JSONResponse(
+           ^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 182, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 185, in render
+    return json.dumps(
+           ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Decimal is not JSON serializable
+
+During handling of the above exception, another exception occurred:
+
+self = <test_e2e_payment_flow.TestPaymentSecurity object at 0x000001D6E2D35850>
+client = <starlette.testclient.TestClient object at 0x000001D6E3A01510>
+auth_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ0ZXN0X2FkbWluIiwicm9sZSI...lLCJpc19zdXBlcnVzZXIiOnRydWUsImV4cCI6MTc2NTc3NDI3OSwidHlwZSI6ImFjY2VzcyJ9.EeyJ82Vq0EGNZnv1eSU0UDHPjS-Bc_E4Tls-dFXOjw8'}
+
+    def test_invalid_amount_rejected(self, client: TestClient, auth_headers):
+        """═хъюЁЁхъЄэр  ёєььр юЄъыюэ хЄё """
+>       response = client.post(
+            "/api/v1/payments/init",
+            headers=auth_headers,
+            json={
+                "amount": -100,  # ╬ЄЁшЎрЄхы№эр  ёєььр
+                "currency": "UZS",
+                "provider": "click",
+            },
+        )
+
+tests\integration\test_e2e_payment_flow.py:257: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py:538: in post
+    return super().post(
+C:\Program Files\Python311\Lib\site-packages\httpx\_client.py:1157: in post
+    return self.request(
+C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py:437: in request
+    return super().request(
+C:\Program Files\Python311\Lib\site-packages\httpx\_client.py:837: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\httpx\_client.py:926: in send
+    response = self._send_handling_auth(
+C:\Program Files\Python311\Lib\site-packages\httpx\_client.py:954: in _send_handling_auth
+    response = self._send_handling_redirects(
+C:\Program Files\Python311\Lib\site-packages\httpx\_client.py:991: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\httpx\_client.py:1027: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py:340: in handle_request
+    raise exc
+C:\Program Files\Python311\Lib\site-packages\starlette\testclient.py:337: in handle_request
+    portal.call(self.app, scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\anyio\from_thread.py:291: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\concurrent\futures\_base.py:456: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\concurrent\futures\_base.py:401: in __get_result
+    raise self._exception
+C:\Program Files\Python311\Lib\site-packages\anyio\from_thread.py:222: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\fastapi\applications.py:1054: in __call__
+    await super().__call__(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\applications.py:112: in __call__
+    await self.middleware_stack(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py:187: in __call__
+    raise exc
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py:165: in __call__
+    await self.app(scope, receive, _send)
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py:85: in __call__
+    await self.app(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:176: in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+C:\Program Files\Python311\Lib\contextlib.py:155: in __exit__
+    self.gen.throw(typ, value, traceback)
+C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py:82: in collapse_excgroups
+    raise exc
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:178: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\middleware\security_middleware.py:241: in dispatch
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:156: in call_next
+    raise app_exc
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:141: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:176: in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+C:\Program Files\Python311\Lib\contextlib.py:155: in __exit__
+    self.gen.throw(typ, value, traceback)
+C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py:82: in collapse_excgroups
+    raise exc
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:178: in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\middleware\audit_middleware.py:41: in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:156: in call_next
+    raise app_exc
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py:141: in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py:62: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+C:\Program Files\Python311\Lib\site-packages\starlette\routing.py:714: in __call__
+    await self.middleware_stack(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\routing.py:734: in app
+    await route.handle(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\routing.py:288: in handle
+    await self.app(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\routing.py:76: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py:59: in wrapped_app
+    response = await handler(conn, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+app\core\exception_handlers.py:221: in validation_exception_handler
+    return JSONResponse(
+C:\Program Files\Python311\Lib\site-packages\starlette\responses.py:182: in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+C:\Program Files\Python311\Lib\site-packages\starlette\responses.py:45: in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\starlette\responses.py:185: in render
+    return json.dumps(
+C:\Program Files\Python311\Lib\json\__init__.py:238: in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+C:\Program Files\Python311\Lib\json\encoder.py:200: in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\json\encoder.py:258: in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <json.encoder.JSONEncoder object at 0x000001D6E3950A50>, o = Decimal('0')
+
+    def default(self, o):
+        """Implement this method in a subclass such that it returns
+        a serializable object for ``o``, or calls the base implementation
+        (to raise a ``TypeError``).
+    
+        For example, to support arbitrary iterators, you could
+        implement default like this::
+    
+            def default(self, o):
+                try:
+                    iterable = iter(o)
+                except TypeError:
+                    pass
+                else:
+                    return list(iterable)
+                # Let the base class default method raise the TypeError
+                return JSONEncoder.default(self, o)
+    
+        """
+>       raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+E       TypeError: Object of type Decimal is not JSON serializable
+
+C:\Program Files\Python311\Lib\json\encoder.py:180: TypeError
+---------------------------- Captured stdout setup ----------------------------
+DEBUG: Login endpoint called with username=test_admin
+DEBUG: IP=testclient, UserAgent=testclient
+DEBUG: Service obtained: <app.services.authentication_service.AuthenticationService object at 0x000001D6BAB320D0>
+DEBUG: login_user result: {'success': True, 'message': '╙ёях°э√щ тїюф', 'user': {'id': 2, 'username': 'test_admin', 'full_name': 'Test Admin', 'email': 'admin@test.com', 'role': 'Admin', 'is_active': True, 'is_superuser': True}, 'tokens': {'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ0ZXN0X2FkbWluIiwicm9sZSI6IkFkbWluIiwiaXNfYWN0aXZlIjp0cnVlLCJpc19zdXBlcnVzZXIiOnRydWUsImV4cCI6MTc2NTc3NDI3OSwidHlwZSI6ImFjY2VzcyJ9.EeyJ82Vq0EGNZnv1eSU0UDHPjS-Bc_E4Tls-dFXOjw8', 'refresh_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJqdGkiOiIyNTMxZThmYS04NjljLTRhYjYtYWQwNS0wYTcxZDVjNjYyMTQiLCJ0eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2ODM2NDQ3OX0.kBK0gQVuRebfpPTmho80j4QtUOrrSdPqkM1HPLtkv-E', 'token_type': 'bearer', 'expires_in': 1800}, 'requires_2fa': False, 'two_factor_method': None}
+---------------------------- Captured stderr call -----------------------------
+WARNING:app.core.exception_handlers:RequestValidationError: [{'type': 'missing', 'loc': ('body', 'visit_id'), 'msg': 'Field required', 'input': {'amount': -100, 'currency': 'UZS', 'provider': 'click'}}, {'type': 'greater_than', 'loc': ('body', 'amount'), 'msg': 'Input should be greater than 0', 'input': -100, 'ctx': {'gt': Decimal('0')}}] (path: /api/v1/payments/init)
+ERROR:app.core.exception_handlers:Unhandled exception: TypeError: Object of type Decimal is not JSON serializable (path: /api/v1/payments/init)
+  + Exception Group Traceback (most recent call last):
+  |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 76, in collapse_excgroups
+  |     yield
+  |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 177, in __call__
+  |     async with anyio.create_task_group() as task_group:
+  |   File "C:\Program Files\Python311\Lib\site-packages\anyio\_backends\_asyncio.py", line 772, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    |     await self.app(scope, receive, _send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |   File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    |     self.gen.throw(typ, value, traceback)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\middleware\security_middleware.py", line 241, in dispatch
+    |     return await call_next(request)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    |     raise app_exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |   File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    |     self.gen.throw(typ, value, traceback)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\middleware\audit_middleware.py", line 41, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    |     raise app_exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 734, in app
+    |     await route.handle(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 288, in handle
+    |     await self.app(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 76, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 59, in wrapped_app
+    |     response = await handler(conn, exc)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\core\exception_handlers.py", line 221, in validation_exception_handler
+    |     return JSONResponse(
+    |            ^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 182, in __init__
+    |     super().__init__(content, status_code, headers, media_type, background)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    |     self.body = self.render(content)
+    |                 ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 185, in render
+    |     return json.dumps(
+    |            ^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\__init__.py", line 238, in dumps
+    |     **kw).encode(obj)
+    |           ^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 200, in encode
+    |     chunks = self.iterencode(o, _one_shot=True)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 258, in iterencode
+    |     return _iterencode(o, 0)
+    |            ^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 180, in default
+    |     raise TypeError(f'Object of type {o.__class__.__name__} '
+    | TypeError: Object of type Decimal is not JSON serializable
+    +------------------------------------
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\middleware\security_middleware.py", line 241, in dispatch
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    raise app_exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\middleware\audit_middleware.py", line 41, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    raise app_exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 59, in wrapped_app
+    response = await handler(conn, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\core\exception_handlers.py", line 221, in validation_exception_handler
+    return JSONResponse(
+           ^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 182, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 185, in render
+    return json.dumps(
+           ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Decimal is not JSON serializable
+------------------------------ Captured log call ------------------------------
+WARNING  app.core.exception_handlers:exception_handlers.py:216 RequestValidationError: [{'type': 'missing', 'loc': ('body', 'visit_id'), 'msg': 'Field required', 'input': {'amount': -100, 'currency': 'UZS', 'provider': 'click'}}, {'type': 'greater_than', 'loc': ('body', 'amount'), 'msg': 'Input should be greater than 0', 'input': -100, 'ctx': {'gt': Decimal('0')}}] (path: /api/v1/payments/init)
+ERROR    app.core.exception_handlers:exception_handlers.py:237 Unhandled exception: TypeError: Object of type Decimal is not JSON serializable (path: /api/v1/payments/init)
+  + Exception Group Traceback (most recent call last):
+  |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 76, in collapse_excgroups
+  |     yield
+  |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 177, in __call__
+  |     async with anyio.create_task_group() as task_group:
+  |   File "C:\Program Files\Python311\Lib\site-packages\anyio\_backends\_asyncio.py", line 772, in __aexit__
+  |     raise BaseExceptionGroup(
+  | ExceptionGroup: unhandled errors in a TaskGroup (1 sub-exception)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    |     await self.app(scope, receive, _send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    |     await self.app(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |   File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    |     self.gen.throw(typ, value, traceback)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\middleware\security_middleware.py", line 241, in dispatch
+    |     return await call_next(request)
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    |     raise app_exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    |     with recv_stream, send_stream, collapse_excgroups():
+    |   File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    |     self.gen.throw(typ, value, traceback)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    |     response = await self.dispatch_func(request, call_next)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\middleware\audit_middleware.py", line 41, in dispatch
+    |     response = await call_next(request)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    |     raise app_exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    |     await self.app(scope, receive_or_disconnect, send_no_error)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    |     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    |     raise exc
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    |     await app(scope, receive, sender)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    |     await self.middleware_stack(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 734, in app
+    |     await route.handle(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 288, in handle
+    |     await self.app(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 76, in app
+    |     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 59, in wrapped_app
+    |     response = await handler(conn, exc)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\final\backend\app\core\exception_handlers.py", line 221, in validation_exception_handler
+    |     return JSONResponse(
+    |            ^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 182, in __init__
+    |     super().__init__(content, status_code, headers, media_type, background)
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    |     self.body = self.render(content)
+    |                 ^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 185, in render
+    |     return json.dumps(
+    |            ^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\__init__.py", line 238, in dumps
+    |     **kw).encode(obj)
+    |           ^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 200, in encode
+    |     chunks = self.iterencode(o, _one_shot=True)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 258, in iterencode
+    |     return _iterencode(o, 0)
+    |            ^^^^^^^^^^^^^^^^^
+    |   File "C:\Program Files\Python311\Lib\json\encoder.py", line 180, in default
+    |     raise TypeError(f'Object of type {o.__class__.__name__} '
+    | TypeError: Object of type Decimal is not JSON serializable
+    +------------------------------------
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\middleware\security_middleware.py", line 241, in dispatch
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    raise app_exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 176, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "C:\Program Files\Python311\Lib\contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_utils.py", line 82, in collapse_excgroups
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 178, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\middleware\audit_middleware.py", line 41, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 156, in call_next
+    raise app_exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\base.py", line 141, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\_exception_handler.py", line 59, in wrapped_app
+    response = await handler(conn, exc)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\final\backend\app\core\exception_handlers.py", line 221, in validation_exception_handler
+    return JSONResponse(
+           ^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 182, in __init__
+    super().__init__(content, status_code, headers, media_type, background)
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 45, in __init__
+    self.body = self.render(content)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\site-packages\starlette\responses.py", line 185, in render
+    return json.dumps(
+           ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 258, in iterencode
+    return _iterencode(o, 0)
+           ^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\json\encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Decimal is not JSON serializable
+============================== warnings summary ===============================
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: 51 warnings
+  C:\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+tests\integration\test_e2e_patient_flow.py:138
+  C:\final\backend\tests\integration\test_e2e_patient_flow.py:138: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_patient_flow.py:303
+  C:\final\backend\tests\integration\test_e2e_patient_flow.py:303: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_payment_flow.py:91
+  C:\final\backend\tests\integration\test_e2e_payment_flow.py:91: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_payment_flow.py:211
+  C:\final\backend\tests\integration\test_e2e_payment_flow.py:211: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_payment_flow.py:246
+  C:\final\backend\tests\integration\test_e2e_payment_flow.py:246: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_e2e_patient_flow.py::TestPatientAuthFlow::test_unauthorized_access_rejected
+FAILED tests/integration/test_e2e_patient_flow.py::TestPatientAuthFlow::test_invalid_token_rejected
+FAILED tests/integration/test_e2e_payment_flow.py::TestPaymentSecurity::test_invalid_amount_rejected
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_view_appointments
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_view_single_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_cancel_future_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_cannot_cancel_soon_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_reschedule_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_get_available_slots
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_view_results
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_cannot_view_others_appointments
+ERROR tests/integration/test_e2e_payment_flow.py::TestPaymentFlow::test_create_payment_for_visit
+ERROR tests/integration/test_e2e_payment_flow.py::TestPaymentFlow::test_get_payment_status
+ERROR tests/integration/test_e2e_payment_flow.py::TestPaymentFlow::test_payment_receipt_generation
+============= 3 failed, 5 passed, 66 warnings, 11 errors in 4.65s =============

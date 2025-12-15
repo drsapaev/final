@@ -83,7 +83,7 @@ const ChatWindow = ({ isOpen, onClose }) => {
                 if (users && Array.isArray(users)) {
                     setAllUsers(users);
                 }
-            }).catch(e => console.error("Failed to load users:", e));
+            }).catch(e => console.error('Failed to load users:', e));
         }
     }, [isOpen, conversations.length]);
 
@@ -133,7 +133,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
 
     // Отправка голосового сообщения
     const handleSendVoice = async (audioBlob, duration) => {
-        console.log('📤 handleSendVoice called. activeConversation:', activeConversation);
+        // console.log('📤 handleSendVoice called. activeConversation:', activeConversation);
+
 
         if (!activeConversation || isSending) {
             console.warn('⚠️ Cannot send voice: activeConversation=', activeConversation, 'isSending=', isSending);
@@ -163,7 +164,8 @@ const ChatWindow = ({ isOpen, onClose }) => {
             }
 
             const messageData = await response.json();
-            console.log('✅ Voice message sent successfully, response:', messageData);
+            // console.log('✅ Voice message sent successfully, response:', messageData);
+
 
             // Обновляем только список бесед - сообщение придет через WebSocket
             loadConversations();

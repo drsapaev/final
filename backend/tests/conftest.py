@@ -232,10 +232,7 @@ def test_doctor(db_session, cardio_user):
     doctor = Doctor(
         user_id=cardio_user.id,
         specialty="Кардиология",
-        license_number="TEST123",
-        experience_years=10,
-        bio="Тестовый кардиолог",
-        is_active=True,
+        active=True,
     )
     db_session.add(doctor)
     db_session.commit()
@@ -249,10 +246,9 @@ def test_service(db_session):
     service = Service(
         code="TEST_CONS",
         name="Тестовая консультация",
-        description="Тестовая консультация кардиолога",
         price=100000.00,
         duration_minutes=30,
-        is_active=True,
+        active=True,
         requires_doctor=True,
         queue_tag="cardiology_common",
         is_consultation=True,
@@ -396,6 +392,7 @@ def registrar_auth_headers(client, registrar_user):
 # Маркеры для pytest
 def pytest_configure(config):
     """Конфигурация pytest"""
+    os.environ["DISABLE_2FA_REQUIREMENT"] = "true"  # Disable 2FA for tests
     config.addinivalue_line("markers", "unit: Юнит тесты")
     config.addinivalue_line("markers", "integration: Интеграционные тесты")
     config.addinivalue_line("markers", "slow: Медленные тесты")

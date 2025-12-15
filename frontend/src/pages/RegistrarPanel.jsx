@@ -1005,7 +1005,7 @@ const RegistrarPanel = () => {
 
   // Улучшенная загрузка записей с поддержкой тихого режима
   const loadAppointments = useCallback(async (options = {}) => {
-    console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
+    // console.log('📥 loadAppointments called at:', new Date().toISOString(), options);
     const { silent = false, source: callSource = 'unknown' } = options || {};
     try {
       if (!silent) {
@@ -1015,7 +1015,7 @@ const RegistrarPanel = () => {
 
       // Проверяем наличие токена
       const token = localStorage.getItem('auth_token');
-      console.log('🔍 loadAppointments: token exists:', !!token);
+      // console.log('🔍 loadAppointments: token exists:', !!token);
       if (!token) {
         console.warn('Токен аутентификации отсутствует, показываем пустое состояние');
         startTransition(() => {
@@ -1025,24 +1025,28 @@ const RegistrarPanel = () => {
         return;
       }
 
-      console.log('🔍 loadAppointments: making request');
+
+      // console.log('🔍 loadAppointments: making request');
+
 
       // Используем новый эндпоинт для получения очередей на указанную дату
       // Если календарь открыт, используем historyDate, иначе сегодня
       const dateParam = showCalendar && historyDate ? historyDate : getLocalDateString();
-      console.log('📅 Параметры для loadAppointments:', {
+      /* console.log('📅 Параметры для loadAppointments:', {
         source: callSource,
         showCalendar,
         historyDate,
         dateParam,
         activeTab
-      });
+      }); */
 
       const params = new URLSearchParams();
       params.append('target_date', dateParam);
 
 
-      console.log('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
+
+      // console.log('🔍 loadAppointments: requesting with params:', { target_date: dateParam });
+
 
       const response = await api.get('/registrar/queues/today', { params: { target_date: dateParam } });
 
@@ -1055,11 +1059,12 @@ const RegistrarPanel = () => {
       if (data && typeof data === 'object') {
         // Временно отключено логирование больших объектов для диагностики
         // logger.info('📊 Получены данные от сервера:', data);
-        console.log('📊 Получены данные от сервера (count):', data.queues?.length || 0);
+        // console.log('📊 Получены данные от сервера (count):', data.queues?.length || 0);
+
 
         // Обрабатываем формат от эндпоинта registrar_integration.py
         if (data.queues && Array.isArray(data.queues)) {
-          console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
+          // console.log('📊 Обрабатываем формат очередей:', data.queues.length, 'очередей');
           // ✅ ОТЛАДКА: Логируем структуру данных от сервера
           /*data.queues.forEach((q, idx) => {
             logger.info(`  Очередь ${idx + 1}: specialty=${q.specialty}, entries=${q.entries?.length || 0}`);
@@ -1074,7 +1079,8 @@ const RegistrarPanel = () => {
           // Ранее здесь был фильтр по activeTab. Убираем серверную фильтрацию —
           // всегда объединяем все очереди, вкладки фильтруют на клиенте.
           // Объединяем все очереди
-          console.log('📊 Объединяем все очереди');
+          // console.log('📊 Объединяем все очереди');
+
 
           // ✅ ИСПРАВЛЕНО: Используем Map для дедупликации по patient_id + date (для online_queue) или по ID записи (для других типов)
           const appointmentsMap = new Map(); // key -> appointment object
@@ -1138,7 +1144,12 @@ const RegistrarPanel = () => {
                     }
 
                     if (dedupKeyPart) {
-                      dedupKey = `online_${dedupKeyPart}_${dateParam}`;
+                      // ✅ FIX: Добавляем специальность в ключ дедупликации, чтобы разделить записи разных отделений
+                      // Это позволяет корректно отображать время и статус каждой услуги в соответствующем табе.
+                      // Агрегация для вкладки "Все отделения" происходит позже в aggregatePatientsForAllDepartments.
+                      const specialtyPart = (queue.specialty || queue.queue_tag || 'general').toLowerCase().trim();
+                      dedupKey = `online_${dedupKeyPart}_${dateParam}_${specialtyPart}`;
+
                       /* logger.info(
                         `🔑 QR-запись: используем ключ дедупликации ${dedupKey} (patientId=${patientId}, phone=${normalizedPhone}, fio=${rawFio}, entryId=${entryId}, type=${entryType})`
                       ); */
@@ -1197,7 +1208,34 @@ const RegistrarPanel = () => {
                     } else {
                       logger.info(`⏭️ Пропущен дубликат очереди ${queue.specialty} (номер ${queueNum}) для записи ${dedupKey}`);
                     }
-                    return; // Пропускаем добавление дубликата
+
+                    // ✅ FIX: Определяем коды услуг для текущей записи (включая fallback logic), так как мы делаем return
+                    let currentServiceCodes = Array.isArray(fullEntry.service_codes) ? fullEntry.service_codes : [];
+                    if (!currentServiceCodes || currentServiceCodes.length === 0) {
+                      const spec = (queue.specialty || '').toLowerCase().trim();
+                      if (spec.includes('cardio') || spec.includes('кардио')) currentServiceCodes = ['K01'];
+                      else if (spec.includes('derma') || spec.includes('дерма')) currentServiceCodes = ['D01'];
+                      else if (spec.includes('stom') || spec.includes('dent') || spec.includes('стом')) currentServiceCodes = ['S01'];
+                      else if (spec.includes('lab') || spec.includes('лаб')) currentServiceCodes = ['L01'];
+                      else if (spec.includes('echo') || spec.includes('ecg') || spec.includes('эхо') || spec.includes('экг')) currentServiceCodes = ['K10'];
+                      else if (spec.includes('proc') || spec.includes('physio') || spec.includes('проц') || spec.includes('физио')) currentServiceCodes = ['P01'];
+                      else if (spec.includes('cosmet') || spec.includes('космет')) currentServiceCodes = ['C01'];
+                    }
+
+                    // ✅ FIX: Объединяем услуги в существующую запись
+                    if (Array.isArray(fullEntry.services)) {
+                      existingAppointment.services = [...new Set([...(existingAppointment.services || []), ...fullEntry.services])];
+                    }
+                    if (currentServiceCodes.length > 0) {
+                      existingAppointment.service_codes = [...new Set([...(existingAppointment.service_codes || []), ...currentServiceCodes])];
+                    }
+                    if (Array.isArray(fullEntry.services_full)) {
+                      const existingIds = new Set((existingAppointment.services_full || []).map(s => s.id || s.service_id));
+                      const newUnique = fullEntry.services_full.filter(s => !existingIds.has(s.id || s.service_id));
+                      existingAppointment.services_full = [...(existingAppointment.services_full || []), ...newUnique];
+                    }
+
+                    return; // Пропускаем добавление дубликата, но данные обновлены
                   }
 
                   const patientBirthYear = fullEntry.patient_birth_year || fullEntry.birth_year || null;
@@ -3050,6 +3088,16 @@ const RegistrarPanel = () => {
         });
       }
 
+      // ✅ FIX: Агрегируем service_codes для корректной работы Wizard
+      if (appointment.service_codes && Array.isArray(appointment.service_codes)) {
+        if (!patientGroups[patientKey].service_codes) patientGroups[patientKey].service_codes = [];
+        appointment.service_codes.forEach(code => {
+          if (!patientGroups[patientKey].service_codes.includes(code)) {
+            patientGroups[patientKey].service_codes.push(code);
+          }
+        });
+      }
+
       // Добавляем информацию об отделении
       if (appointment.department) {
         patientGroups[patientKey].departments.add(appointment.department);
@@ -4788,7 +4836,7 @@ const RegistrarPanel = () => {
                   await tryCancelVisit();
                 } catch (err) {
                   if (err.response?.status === 404) {
-                    logger.warn(`Fallback visit cancel failed 404, trying online_queue...`);
+                    logger.warn('Fallback visit cancel failed 404, trying online_queue...');
                     await tryCancelOnlineQueue();
                   } else {
                     throw err;
@@ -5005,7 +5053,7 @@ const RegistrarPanel = () => {
               <button style={buttonSecondaryStyle} onClick={async () => {
                 if (!rescheduleData) return;
                 const currentVal = getLocalDateString(rescheduleData.appointment_date || rescheduleData.visit_date || rescheduleData.date || new Date());
-                const dateStr = prompt("Введите дату переноса (YYYY-MM-DD):", currentVal);
+                const dateStr = prompt('Введите дату переноса (YYYY-MM-DD):', currentVal);
 
                 if (dateStr) {
                   // Simple validation YYYY-MM-DD

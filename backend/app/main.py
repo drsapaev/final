@@ -130,21 +130,27 @@ log.info("Included GraphQL router at /api/graphql")
 # DEV fallback для аутентификации — регистрируем ТОЛЬКО если импорты auth упали
 # -----------------------------------------------------------------------------
 if _USE_DEV_AUTH_FALLBACK:
-    log.warning("Using DEV auth fallback endpoints at %s/auth", API_V1_STR)
+    enable_dev = os.getenv("ENABLE_DEV_AUTH", "false").lower() == "true"
+    is_prod = os.getenv("ENV", "dev").lower() in ("prod", "production")
 
-    def create_access_token(sub: str) -> str:  # type: ignore[no-redef]
-        # простой dev-токен
-        return f"dev.{sub}"
+    if is_prod or not enable_dev:
+        log.warning("DEV auth fallback DISABLED (ENV=%s, ENABLE_DEV_AUTH=%s)", os.getenv("ENV"), enable_dev)
+    else:
+        log.warning("Using DEV auth fallback endpoints at %s/auth", API_V1_STR)
 
-    @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
-    async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
-        log.info("Using DEV fallback login for user: %s", form.username)
-        token = create_access_token(form.username)
-        return {"access_token": token, "token_type": "bearer"}
+        def create_access_token(sub: str) -> str:  # type: ignore[no-redef]
+            # простой dev-токен
+            return f"dev.{sub}"
 
-    @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
-    async def _fallback_me():
-        return {"username": "dev", "role": "Admin", "is_active": True}
+        @app.post(f"{API_V1_STR}/auth/login", tags=["auth"], summary="DEV fallback login")
+        async def _fallback_login(form: OAuth2PasswordRequestForm = Depends()):
+            log.info("Using DEV fallback login for user: %s", form.username)
+            token = create_access_token(form.username)
+            return {"access_token": token, "token_type": "bearer"}
+
+        @app.get(f"{API_V1_STR}/auth/me", tags=["auth"], summary="DEV fallback me")
+        async def _fallback_me():
+            return {"username": "dev", "role": "Admin", "is_active": True}
 
 
 # -----------------------------------------------------------------------------

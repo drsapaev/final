@@ -2001,8 +2001,47 @@ def get_today_queues(
                                             "code"
                                         ):
                                             service_codes.append(service["code"])
-                            except:
+                            except Exception:
                                 pass
+
+                    # ✅ ИСПРАВЛЕНО: Определяем service_name для отображения в таблице и мастере
+                    # Приоритет: 1. Имя из первой услуги 2. Fallback на специальность
+                    service_name = None
+                    if services and len(services) > 0:
+                        first = services[0]
+                        if isinstance(first, dict):
+                            service_name = first.get("name") or first.get(
+                                "service_name"
+                            )
+                        elif isinstance(first, str):
+                            service_name = first
+
+                    if not service_name:
+                        # ✅ SSOT: Используем единственный источник истины для маппинга
+                        from app.services.service_mapping import get_default_service_by_specialty
+                        
+                        default_service = get_default_service_by_specialty(db, specialty)
+                        if default_service:
+                            service_name = default_service["name"]
+                            # ✅ ВАЖНО: Добавляем service_id для правильной работы визарда
+                            entry_wrapper["service_id"] = default_service["id"]
+                            entry_wrapper["service_code"] = default_service["service_code"]
+                        else:
+                            # Fallback если услуга не найдена в БД
+                            service_name = f"Консультация ({specialty})"
+
+                    entry_wrapper["service_name"] = service_name
+                    # Добавляем также в data для надежности (frontend может читать из data)
+                    if isinstance(entry_data, dict):
+                         entry_data["service_name"] = service_name
+                    elif hasattr(entry_data, "__dict__"):
+                         try:
+                             # Не можем менять объект модели SQLAlchemy, но можем попробовать
+                             # setattr(entry_data, "service_name", service_name)
+                             # Лучше не трогать модель, а полагаться на entry_wrapper
+                             pass
+                         except:
+                             pass
 
                     # Также проверяем service_codes (legacy поле)
                     if online_entry.service_codes:
@@ -2230,6 +2269,8 @@ def get_today_queues(
                         "services": services,
                         "service_codes": service_codes,
                         "service_details": service_details,  # ✅ НОВОЕ: Полные данные услуг для редактирования
+                        "service_name": entry_wrapper.get("service_name"),  # ✅ НОВОЕ: Название услуги для отображения
+                        "service_id": entry_wrapper.get("service_id"),  # ✅ SSOT: ID услуги из БД
                         "cost": total_cost,
                         "payment_status": (
                             "paid" if discount_mode == "paid" else "pending"

@@ -42,7 +42,6 @@ def payment_test_data(db_session):
             last_name="Тестов",
             middle_name="Тестович",
             phone="+998901234999",
-            email="payment_test@test.com",
             birth_date=date(1995, 3, 20),
         )
         db_session.add(patient)
@@ -55,10 +54,9 @@ def payment_test_data(db_session):
         service = Service(
             code="PAY_TEST_SVC",
             name="Тестовая услуга для оплаты",
-            description="Услуга для E2E тестов оплаты",
             price=150000.00,  # 150,000 сум
             duration_minutes=30,
-            is_active=True,
+            active=True,
             requires_doctor=False,
         )
         db_session.add(service)
@@ -163,11 +161,12 @@ class TestPaymentFlow:
         """Можно проверить статус платежа"""
         # Создаем тестовый платёж напрямую в БД
         payment = Payment(
+            visit_id=payment_test_data["visit"].id,
             amount=Decimal("150000.00"),
             currency="UZS",
             status="pending",
             provider="click",
-            transaction_id="test_tx_123",
+            provider_payment_id="test_tx_123",
         )
         db_session.add(payment)
         db_session.commit()
@@ -188,11 +187,12 @@ class TestPaymentFlow:
         """Можно сгенерировать чек после оплаты"""
         # Создаем завершенный платёж
         payment = Payment(
+            visit_id=payment_test_data["visit"].id,
             amount=Decimal("150000.00"),
             currency="UZS",
             status="completed",
             provider="click",
-            transaction_id="test_tx_receipt_123",
+            provider_payment_id="test_tx_receipt_123",
         )
         db_session.add(payment)
         db_session.commit()

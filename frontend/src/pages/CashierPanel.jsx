@@ -24,6 +24,9 @@ import {
   Skeleton
 } from '../components/ui/macos';
 
+// ✅ Компоненты для возвратов
+import RefundRequestsTable from '../components/cashier/RefundRequestsTable';
+
 // Функция для получения даты в формате YYYY-MM-DD
 const getLocalDateString = (date = new Date()) => {
   const d = new Date(date);
@@ -303,8 +306,8 @@ const CashierPanel = () => {
       for (const visitId of visitIds) {
         if (remaining <= 0) break;
 
-        let debt = visitDebts[visitId] || 0;
-        let payAmount = Math.min(remaining, debt);
+        const debt = visitDebts[visitId] || 0;
+        const payAmount = Math.min(remaining, debt);
 
         if (payAmount > 0) {
           paymentsToMake.push({ visitId, amount: payAmount });
@@ -363,7 +366,7 @@ const CashierPanel = () => {
 
   // ✅ УЛУЧШЕНИЕ: Функции для работы с кнопками в истории платежей
   const confirmPayment = async (paymentId) => {
-    if (!window.confirm("Вы уверены, что хотите подтвердить этот платеж вручную?")) {
+    if (!window.confirm('Вы уверены, что хотите подтвердить этот платеж вручную?')) {
       return;
     }
 
@@ -862,6 +865,16 @@ const CashierPanel = () => {
                   id: 'history',
                   label: 'История платежей',
                   icon: CreditCard
+                },
+                {
+                  id: 'refunds',
+                  label: 'Возвраты',
+                  icon: RefreshCw
+                },
+                {
+                  id: 'deposits',
+                  label: 'Депозиты',
+                  icon: User
                 }
               ]}
               activeTab={activeTab}
@@ -1070,7 +1083,7 @@ const CashierPanel = () => {
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {/* TODO: Render services info properly if available in history item */}
-                                {row.service || "Услуга"}
+                                {row.service || 'Услуга'}
                               </td>
                               <td style={{ padding: '12px 16px', color: 'var(--mac-text-primary)', fontSize: '14px' }}>
                                 {row.method}
@@ -1174,6 +1187,22 @@ const CashierPanel = () => {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Вкладка Возвраты */}
+            {activeTab === 'refunds' && (
+              <div style={{ marginTop: '24px' }}>
+                <RefundRequestsTable onRefresh={handleRefresh} />
+              </div>
+            )}
+
+            {/* Вкладка Депозиты */}
+            {activeTab === 'deposits' && (
+              <div style={{ marginTop: '24px', padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+                <User size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                <h3>Управление депозитами</h3>
+                <p>Раздел находится в разработке</p>
               </div>
             )}
           </Card>

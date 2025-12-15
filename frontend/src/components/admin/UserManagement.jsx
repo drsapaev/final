@@ -21,6 +21,28 @@ import {
   CircularProgress,
 } from '../ui/macos';
 import {
+  Grid,
+  TextField,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Avatar,
+  Chip,
+  IconButton,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  FormControlLabel
+} from '@mui/material';
+import {
   Plus,
   Edit,
   Trash2,
@@ -39,6 +61,7 @@ import {
   UserCheck,
   Settings,
   UserPlus,
+  Ban
 } from 'lucide-react';
 
 const UserManagement = () => {
@@ -184,13 +207,13 @@ const UserManagement = () => {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && user.is_active) ||
-                         (statusFilter === 'inactive' && !user.is_active);
-    
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'active' && user.is_active) ||
+      (statusFilter === 'inactive' && !user.is_active);
+
     return matchesSearch && matchesRole && matchesStatus;
   });
 
@@ -294,7 +317,7 @@ const UserManagement = () => {
               <Button
                 fullWidth
                 variant="outlined"
-                startIcon={<Refresh />}
+                startIcon={<RefreshCw />}
                 onClick={loadUsers}
               >
                 Обновить
@@ -325,7 +348,7 @@ const UserManagement = () => {
                   <TableCell>
                     <Box display="flex" alignItems="center">
                       <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                        <Person />
+                        <User />
                       </Avatar>
                       <Box>
                         <Typography variant="subtitle2">
@@ -363,7 +386,7 @@ const UserManagement = () => {
                         setSelectedUser(user);
                       }}
                     >
-                      <MoreVert />
+                      <MoreVertical />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -383,23 +406,23 @@ const UserManagement = () => {
           <ListItemIcon><Edit /></ListItemIcon>
           <ListItemText>Редактировать</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => { 
+        <MenuItem onClick={() => {
           handleToggleUserStatus(selectedUser.id, selectedUser.is_active);
           setAnchorEl(null);
         }}>
           <ListItemIcon>
-            {selectedUser?.is_active ? <Block /> : <CheckCircleOutline />}
+            {selectedUser?.is_active ? <Ban /> : <CheckCircle />}
           </ListItemIcon>
           <ListItemText>
             {selectedUser?.is_active ? 'Деактивировать' : 'Активировать'}
           </ListItemText>
         </MenuItem>
         <Divider />
-        <MenuItem onClick={() => { 
-          setShowDeleteDialog(true); 
+        <MenuItem onClick={() => {
+          setShowDeleteDialog(true);
           setAnchorEl(null);
         }}>
-          <ListItemIcon><Delete color="error" /></ListItemIcon>
+          <ListItemIcon><Trash2 color="error" /></ListItemIcon>
           <ListItemText>Удалить</ListItemText>
         </MenuItem>
       </Menu>
@@ -517,4 +540,3 @@ const UserManagement = () => {
 };
 
 export default UserManagement;
-

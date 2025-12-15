@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Bell, 
-  Activity, 
-  Phone, 
+import {
+  Calendar,
+  Clock,
+  User,
+  Bell,
+  Activity,
+  Phone,
   MapPin,
   Heart,
   Stethoscope,
@@ -17,8 +17,10 @@ import { Card, Button, Badge } from '../components/ui/macos';
 import { usePWA } from '../hooks/usePWA';
 import MobileNotifications from '../components/mobile/MobileNotifications';
 import OfflineIndicator from '../components/mobile/OfflineIndicator';
+import QueuePositionCard from '../components/mobile/QueuePositionCard';
 
 import logger from '../utils/logger';
+
 /**
  * Мобильная панель пациента для PWA
  */
@@ -27,7 +29,7 @@ const MobilePatientDashboard = () => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  
+
   const { isOnline, getConnectionDetails } = usePWA();
 
   useEffect(() => {
@@ -37,31 +39,31 @@ const MobilePatientDashboard = () => {
   const loadPatientData = async () => {
     try {
       setLoading(true);
-      
+
       // Загружаем данные пациента
       const response = await fetch('/api/v1/mobile/auth/profile', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setPatientData(data);
       }
-      
+
       // Загружаем записи
       const appointmentsResponse = await fetch('/api/v1/mobile/appointments', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
-      
+
       if (appointmentsResponse.ok) {
         const appointmentsData = await appointmentsResponse.json();
         setAppointments(appointmentsData);
       }
-      
+
     } catch (error) {
       logger.error('Ошибка загрузки данных:', error);
     } finally {
@@ -71,14 +73,14 @@ const MobilePatientDashboard = () => {
 
   const getUpcomingAppointments = () => {
     const now = new Date();
-    return appointments.filter(apt => 
+    return appointments.filter(apt =>
       new Date(apt.appointment_date) > now && apt.status === 'scheduled'
     ).slice(0, 3);
   };
 
   const getRecentAppointments = () => {
     const now = new Date();
-    return appointments.filter(apt => 
+    return appointments.filter(apt =>
       new Date(apt.appointment_date) < now
     ).slice(0, 3);
   };
@@ -110,6 +112,12 @@ const MobilePatientDashboard = () => {
       default: return status;
     }
   };
+
+  // Найти первую активную запись в очереди (на сегодня)
+  const activeQueueEntry = appointments.find(a =>
+    (a.status === 'waiting' || a.status === 'called') &&
+    new Date(a.appointment_date).toDateString() === new Date().toDateString()
+  );
 
   if (loading) {
     return (
@@ -157,11 +165,10 @@ const MobilePatientDashboard = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                activeTab === tab.id
+              className={`flex-1 flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${activeTab === tab.id
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <tab.icon className="w-5 h-5 mb-1" />
               <span className="text-xs font-medium">{tab.label}</span>
@@ -174,6 +181,25 @@ const MobilePatientDashboard = () => {
       <div className="p-4 space-y-4">
         {activeTab === 'dashboard' && (
           <>
+            {/* ✅ Карточка позиции в очереди */}
+            {activeQueueEntry && (
+              <div className="mb-2">
+                <QueuePositionCard
+                  queueEntry={{
+                    id: activeQueueEntry.id,
+                    number: activeQueueEntry.queue_number || activeQueueEntry.id,
+                    status: activeQueueEntry.status,
+                    peopleBefore: activeQueueEntry.people_before,
+                    estimatedWaitTime: activeQueueEntry.estimated_wait_time,
+                    doctorName: activeQueueEntry.doctor_name,
+                    specialty: activeQueueEntry.specialty || 'Приём врача',
+                    cabinet: activeQueueEntry.cabinet
+                  }}
+                  onRefresh={loadPatientData}
+                />
+              </div>
+            )}
+
             {/* Быстрые действия */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Быстрые действия</h3>

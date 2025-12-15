@@ -12,7 +12,76 @@ from app.core.audit import log_critical_change, extract_model_changes
 
 logger = logging.getLogger(__name__)
 
+from app.models.appointment import Appointment
+from app.models.lab import LabOrder
+from app.schemas import appointment as appointment_schemas
+from app.schemas import lab as lab_schemas
+
 router = APIRouter()
+
+
+@router.get("/appointments", response_model=List[appointment_schemas.Appointment])
+def get_my_appointments(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles("Patient")),
+):
+    """
+    Получить записи текущего пациента
+    """
+    if not current_user.patient:
+        return []
+
+    appointments = patient_crud.get_patient_appointments(db, patient_id=current_user.patient.id)
+    return appointments
+
+
+@router.get("/appointments/{appointment_id}", response_model=appointment_schemas.Appointment)
+def get_my_appointment_details(
+    appointment_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles("Patient")),
+):
+    """
+    Получить детали записи текущего пациента
+    """
+    if not current_user.patient:
+        raise HTTPException(status_code=404, detail="Пациент не найден")
+
+    # Ищем запись, которая принадлежит этому пациенту
+    appointment = (
+        db.query(Appointment)
+        .filter(
+            Appointment.id == appointment_id,
+            Appointment.patient_id == current_user.patient.id
+        )
+        .first()
+    )
+    
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+
+    return appointment
+
+
+@router.get("/results", response_model=List[lab_schemas.LabOrderOut])
+def get_my_results(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_roles("Patient")),
+):
+    """
+    Получить результаты анализов текущего пациента
+    """
+    if not current_user.patient:
+        return []
+
+    # Получаем результаты (LabOrder) для пациента
+    results = (
+        db.query(LabOrder)
+        .filter(LabOrder.patient_id == current_user.patient.id)
+        .all()
+    )
+    
+    return results
 
 
 @router.get("/", response_model=List[patient_schemas.Patient])

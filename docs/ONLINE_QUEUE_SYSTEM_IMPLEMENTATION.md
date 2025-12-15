@@ -611,7 +611,7 @@ python -m alembic upgrade b9716387212f
    - `frontend/src/components/wizard/AppointmentWizardV2.jsx` - гибридное редактирование
    - `frontend/src/components/queue/ModernQueueManager.jsx` - метки источника, эффекты кнопки
    - `frontend/src/components/tables/EnhancedAppointmentsTable.jsx` - метки источника
-   - `frontend/src/pages/RegistrarPanel.jsx` - ⭐ **ДОБАВЛЕНО**: маппинг queue_tag → вкладки
+   - `frontend/src/pages/RegistrarPanel.jsx` - ⭐ **ДОБАВЛЕНО**: маппинг queue_tag → вкладки. **Дедупликация**: Online Queue разделяется по специальностям (`online_phone_date_specialty`), чтобы обеспечить корректное время в табах отделений. Вкладка "Все отделения" использует агрегацию `aggregatePatientsForAllDepartments`.
 
 ---
 

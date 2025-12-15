@@ -54,7 +54,6 @@ def patient_user_with_data(db_session):
             last_name="Пациентов",
             middle_name="Тестович",
             phone="+998901112233",
-            email="e2e_patient@test.com",
             birth_date=date(1990, 5, 15),
         )
         db_session.add(patient)
@@ -66,7 +65,6 @@ def patient_user_with_data(db_session):
     future_apt = Appointment(
         patient_id=patient.id,
         doctor_id=1,  # Предполагаем, что врач есть
-        department="cardiology",
         appointment_date=date.today() + timedelta(days=5),
         appointment_time="10:00",
         status="scheduled",
@@ -78,7 +76,6 @@ def patient_user_with_data(db_session):
     tomorrow_apt = Appointment(
         patient_id=patient.id,
         doctor_id=1,
-        department="therapy",
         appointment_date=date.today() + timedelta(days=1),
         appointment_time="08:00",
         status="scheduled",
@@ -90,7 +87,6 @@ def patient_user_with_data(db_session):
     past_apt = Appointment(
         patient_id=patient.id,
         doctor_id=1,
-        department="dermatology",
         appointment_date=date.today() - timedelta(days=7),
         appointment_time="14:00",
         status="completed",
@@ -146,7 +142,7 @@ class TestPatientFlow:
     ):
         """Пациент может просматривать свои записи"""
         response = client.get(
-            "/api/v1/patient/appointments",
+            "/api/v1/patients/appointments",
             headers=patient_auth_headers,
         )
         
@@ -165,7 +161,7 @@ class TestPatientFlow:
         apt = patient_user_with_data["future_appointment"]
         
         response = client.get(
-            f"/api/v1/patient/appointments/{apt.id}",
+            f"/api/v1/patients/appointments/{apt.id}",
             headers=patient_auth_headers,
         )
         
@@ -184,7 +180,7 @@ class TestPatientFlow:
         apt = patient_user_with_data["future_appointment"]
         
         response = client.post(
-            f"/api/v1/patient/appointments/{apt.id}/cancel",
+            f"/api/v1/patients/appointments/{apt.id}/cancel",
             headers=patient_auth_headers,
         )
         
@@ -205,7 +201,7 @@ class TestPatientFlow:
         apt = patient_user_with_data["tomorrow_appointment"]
         
         response = client.post(
-            f"/api/v1/patient/appointments/{apt.id}/cancel",
+            f"/api/v1/patients/appointments/{apt.id}/cancel",
             headers=patient_auth_headers,
         )
         
@@ -223,7 +219,7 @@ class TestPatientFlow:
         new_date = (date.today() + timedelta(days=10)).isoformat()
         
         response = client.post(
-            f"/api/v1/patient/appointments/{apt.id}/reschedule",
+            f"/api/v1/patients/appointments/{apt.id}/reschedule",
             headers=patient_auth_headers,
             json={"new_date": new_date, "new_time": "14:00"},
         )
@@ -242,7 +238,7 @@ class TestPatientFlow:
         date_from = (date.today() + timedelta(days=1)).isoformat()
         
         response = client.get(
-            f"/api/v1/patient/appointments/{apt.id}/available-slots",
+            f"/api/v1/patients/appointments/{apt.id}/available-slots",
             params={"date_from": date_from},
             headers=patient_auth_headers,
         )
@@ -259,7 +255,7 @@ class TestPatientFlow:
     ):
         """Пациент может просматривать свои результаты анализов"""
         response = client.get(
-            "/api/v1/patient/results",
+            "/api/v1/patients/results",
             headers=patient_auth_headers,
         )
         
@@ -283,7 +279,7 @@ class TestPatientFlow:
         
         other_apt = Appointment(
             patient_id=other_patient.id,
-            department="therapy",
+            # department="therapy",  # Removed
             appointment_date=date.today() + timedelta(days=3),
             appointment_time="11:00",
             status="scheduled",
@@ -293,7 +289,7 @@ class TestPatientFlow:
         
         # Пытаемся получить чужую запись
         response = client.get(
-            f"/api/v1/patient/appointments/{other_apt.id}",
+            f"/api/v1/patients/appointments/{other_apt.id}",
             headers=patient_auth_headers,
         )
         
@@ -308,13 +304,13 @@ class TestPatientAuthFlow:
 
     def test_unauthorized_access_rejected(self, client: TestClient):
         """Неавторизованный доступ отклоняется"""
-        response = client.get("/api/v1/patient/appointments")
+        response = client.get("/api/v1/patients/appointments")
         assert response.status_code == 401
     
     def test_invalid_token_rejected(self, client: TestClient):
         """Невалидный токен отклоняется"""
         response = client.get(
-            "/api/v1/patient/appointments",
+            "/api/v1/patients/appointments",
             headers={"Authorization": "Bearer invalid_token_here"},
         )
         assert response.status_code in [401, 403]

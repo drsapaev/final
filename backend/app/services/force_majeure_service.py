@@ -376,7 +376,7 @@ class ForceMajeureService:
         
         return self.db.query(Payment).filter(
             Payment.visit_id == entry.visit_id,
-            Payment.status.in_(["paid", "completed"])
+            Payment.status == "paid"
         ).first()
     
     def _add_to_deposit(

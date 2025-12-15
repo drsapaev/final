@@ -10,7 +10,8 @@ import {
     Stethoscope,
     CheckCircle,
     AlertCircle,
-    Clock
+    Clock,
+    Bell
 } from 'lucide-react';
 import api from '../../services/api';
 import logger from '../../utils/logger';
@@ -74,6 +75,10 @@ export const QueueActionButtons = ({
                     break;
                 case 'diagnostics':
                     response = await api.post(`/queue/entry/${entryId}/diagnostics`);
+                    break;
+                case 'call-from-diagnostics':
+                    // Используем endpoint для возврата с діагностики
+                    response = await api.post(`/queue/position/notify/diagnostics-return/${entryId}`);
                     break;
                 case 'incomplete':
                     response = await api.post(`/queue/entry/${entryId}/incomplete`, payload);
@@ -152,6 +157,14 @@ export const QueueActionButtons = ({
             case 'diagnostics':
                 return (
                     <>
+                        <button
+                            style={{ ...actionButtonStyle, background: getColor('info', 100), color: infoColor }}
+                            onClick={() => handleAction('call-from-diagnostics')}
+                            disabled={loading}
+                            title="Вернуть с диагностики (Вызвать повторно)"
+                        >
+                            <Bell size={iconSize} />
+                        </button>
                         <button
                             style={{ ...actionButtonStyle, background: getColor('success', 100), color: successColor }}
                             onClick={() => handleAction('complete')}

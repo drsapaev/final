@@ -1,0 +1,1014 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.1, pytest-8.4.1, pluggy-1.6.0
+rootdir: C:\final\backend
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 10 items
+
+tests\integration\test_e2e_patient_flow.py EEEEEEEEFF                    [100%]
+
+=================================== ERRORS ====================================
+____ ERROR at setup of TestPatientFlow.test_patient_can_view_appointments _____
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C6115690>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C6CD3C50>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_can_view_single_appointment __
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C69FC710>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C6CD0BF0>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_can_cancel_future_appointment _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C683E0D0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C6CD3D10>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_cannot_cancel_soon_appointment _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C6B54D10>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C6B8CAD0>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+__ ERROR at setup of TestPatientFlow.test_patient_can_reschedule_appointment __
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C604F3D0>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C70D2990>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+___ ERROR at setup of TestPatientFlow.test_patient_can_get_available_slots ____
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C7359410>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C89C33B0>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_______ ERROR at setup of TestPatientFlow.test_patient_can_view_results _______
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C735B950>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C89C32F0>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+_ ERROR at setup of TestPatientFlow.test_patient_cannot_view_others_appointments _
+
+db_session = <sqlalchemy.orm.session.Session object at 0x00000267C694C950>
+
+    @pytest.fixture
+    def patient_user_with_data(db_session):
+        """╤ючфрхЄ ярЎшхэЄр ё чряшё ьш ш Ёхчєы№ЄрЄрьш"""
+        # ╤ючфрхь яюы№чютрЄхы -ярЎшхэЄр (phone эх эєцхэ т User)
+        user = db_session.query(User).filter(User.username == "e2e_patient").first()
+        if not user:
+            user = User(
+                username="e2e_patient",
+                email="e2e_patient@test.com",
+                full_name="╥хёЄ ╧рЎшхэЄют",
+                hashed_password=get_password_hash("patient123"),
+                role="Patient",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.commit()
+            db_session.refresh(user)
+    
+        # ╤ючфрхь чряшё№ ярЎшхэЄр
+        patient = db_session.query(Patient).filter(Patient.phone == "+998901112233").first()
+        if not patient:
+            patient = Patient(
+                first_name="╥хёЄ",
+                last_name="╧рЎшхэЄют",
+                middle_name="╥хёЄютшў",
+                phone="+998901112233",
+                birth_date=date(1990, 5, 15),
+            )
+            db_session.add(patient)
+            db_session.commit()
+            db_session.refresh(patient)
+    
+        # ╤ючфрхь чряшёш эр яЁш╕ь
+        # 1. ╟ряшё№ т сєфє∙хь (ьюцэю юЄьхэшЄ№/яхЁхэхёЄш)
+>       future_apt = Appointment(
+            patient_id=patient.id,
+            doctor_id=1,  # ╧Ёхфяюырурхь, ўЄю тЁрў хёЄ№
+            department="cardiology",
+            appointment_date=date.today() + timedelta(days=5),
+            appointment_time="10:00",
+            status="scheduled",
+            services=["╩юэёєы№ЄрЎш  ърЁфшюыюур"],
+        )
+
+tests\integration\test_e2e_patient_flow.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+<string>:4: in __init__
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:571: in _initialize_instance
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state.py:569: in _initialize_instance
+    manager.original_init(*mixed[1:], **kwargs)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\decl_base.py:2182: in _declarative_constructor
+    setattr(self, k, kwargs[k])
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:540: in __set__
+    self.impl.set(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1477: in set
+    value = self.fire_replace_event(state, dict_, value, old, initiator)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:1516: in fire_replace_event
+    value = fn(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = <sqlalchemy.orm.state.InstanceState object at 0x00000267C702C530>
+child = 'cardiology', oldchild = <LoaderCallableStatus.NO_VALUE: 4>
+initiator = <sqlalchemy.orm.attributes.AttributeEventToken object at 0x00000267C68EC840>
+kw = {}
+
+    def emit_backref_from_scalar_set_event(
+        state, child, oldchild, initiator, **kw
+    ):
+        if oldchild is child:
+            return child
+        if (
+            oldchild is not None
+            and oldchild is not PASSIVE_NO_RESULT
+            and oldchild is not NO_VALUE
+        ):
+            # With lazy=None, there's no guarantee that the full collection is
+            # present when updating via a backref.
+            old_state, old_dict = (
+                instance_state(oldchild),
+                instance_dict(oldchild),
+            )
+            impl = old_state.manager[key].impl
+    
+            # tokens to test for a recursive loop.
+            if not impl.collection and not impl.dynamic:
+                check_recursive_token = impl._replace_token
+            else:
+                check_recursive_token = impl._remove_token
+    
+            if initiator is not check_recursive_token:
+                impl.pop(
+                    old_state,
+                    old_dict,
+                    state.obj(),
+                    parent_impl._append_token,
+                    passive=PASSIVE_NO_FETCH,
+                )
+    
+        if child is not None:
+            child_state, child_dict = (
+>               instance_state(child),
+                ^^^^^^^^^^^^^^^^^^^^^
+                instance_dict(child),
+            )
+E           AttributeError: 'str' object has no attribute '_sa_instance_state'
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\attributes.py:2171: AttributeError
+================================== FAILURES ===================================
+____________ TestPatientAuthFlow.test_unauthorized_access_rejected ____________
+
+self = <test_e2e_patient_flow.TestPatientAuthFlow object at 0x00000267C694C150>
+client = <starlette.testclient.TestClient object at 0x00000267C68EC310>
+
+    def test_unauthorized_access_rejected(self, client: TestClient):
+        """═хртЄюЁшчютрээ√щ фюёЄєя юЄъыюэ хЄё """
+        response = client.get("/api/v1/patient/appointments")
+>       assert response.status_code == 401
+E       assert 404 == 401
+E        +  where 404 = <Response [404 Not Found]>.status_code
+
+tests\integration\test_e2e_patient_flow.py:311: AssertionError
+_______________ TestPatientAuthFlow.test_invalid_token_rejected _______________
+
+self = <test_e2e_patient_flow.TestPatientAuthFlow object at 0x00000267C687D450>
+client = <starlette.testclient.TestClient object at 0x00000267C687D850>
+
+    def test_invalid_token_rejected(self, client: TestClient):
+        """═хтрышфэ√щ Єюъхэ юЄъыюэ хЄё """
+        response = client.get(
+            "/api/v1/patient/appointments",
+            headers={"Authorization": "Bearer invalid_token_here"},
+        )
+>       assert response.status_code in [401, 403]
+E       assert 404 in [401, 403]
+E        +  where 404 = <Response [404 Not Found]>.status_code
+
+tests\integration\test_e2e_patient_flow.py:319: AssertionError
+============================== warnings summary ===============================
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: 51 warnings
+  C:\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+tests\integration\test_e2e_patient_flow.py:139
+  C:\final\backend\tests\integration\test_e2e_patient_flow.py:139: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_patient_flow.py:304
+  C:\final\backend\tests\integration\test_e2e_patient_flow.py:304: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_e2e_patient_flow.py::TestPatientAuthFlow::test_unauthorized_access_rejected
+FAILED tests/integration/test_e2e_patient_flow.py::TestPatientAuthFlow::test_invalid_token_rejected
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_view_appointments
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_view_single_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_cancel_future_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_cannot_cancel_soon_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_reschedule_appointment
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_get_available_slots
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_can_view_results
+ERROR tests/integration/test_e2e_patient_flow.py::TestPatientFlow::test_patient_cannot_view_others_appointments
+================== 2 failed, 63 warnings, 8 errors in 3.00s ===================

@@ -2,24 +2,24 @@
  * Компонент для управления системой скидок и льгот
  */
 import React, { useState, useEffect } from 'react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSBadge, 
-  MacOSInput, 
-  MacOSSelect, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSInput,
+  MacOSSelect,
   MacOSTextarea,
   MacOSLoadingSkeleton,
   MacOSEmptyState,
   MacOSAlert
 } from '../ui/macos';
-import { 
-  Percent, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Save, 
-  X, 
+import {
+  Percent,
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
   TrendingUp,
   Users,
   Calendar,
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 const DiscountBenefitsManager = () => {
   const [activeTab, setActiveTab] = useState('discounts');
@@ -248,27 +249,24 @@ const DiscountBenefitsManager = () => {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>Название скидки</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Название скидки</label>
+          <MacOSInput
             value={discountForm.name}
             onChange={(e) => setDiscountForm({ ...discountForm, name: e.target.value })}
             placeholder="Введите название скидки"
           />
         </div>
         <div>
-          <Label>Тип скидки</Label>
-          <Select
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Тип скидки</label>
+          <MacOSSelect
             value={discountForm.discount_type}
             onChange={(e) => setDiscountForm({ ...discountForm, discount_type: e.target.value })}
-          >
-            {Object.entries(discountTypes).map(([key, value]) => (
-              <option key={key} value={key}>{value}</option>
-            ))}
-          </Select>
+            options={Object.entries(discountTypes).map(([key, value]) => ({ value: key, label: value }))}
+          />
         </div>
         <div>
-          <Label>Значение скидки</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Значение скидки</label>
+          <MacOSInput
             type="number"
             value={discountForm.value}
             onChange={(e) => setDiscountForm({ ...discountForm, value: e.target.value })}
@@ -276,8 +274,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Минимальная сумма</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Минимальная сумма</label>
+          <MacOSInput
             type="number"
             value={discountForm.min_amount}
             onChange={(e) => setDiscountForm({ ...discountForm, min_amount: e.target.value })}
@@ -285,8 +283,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Максимальная скидка</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Максимальная скидка</label>
+          <MacOSInput
             type="number"
             value={discountForm.max_discount}
             onChange={(e) => setDiscountForm({ ...discountForm, max_discount: e.target.value })}
@@ -294,8 +292,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Лимит использований</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Лимит использований</label>
+          <MacOSInput
             type="number"
             value={discountForm.usage_limit}
             onChange={(e) => setDiscountForm({ ...discountForm, usage_limit: e.target.value })}
@@ -303,16 +301,16 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Дата начала</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата начала</label>
+          <MacOSInput
             type="datetime-local"
             value={discountForm.start_date}
             onChange={(e) => setDiscountForm({ ...discountForm, start_date: e.target.value })}
           />
         </div>
         <div>
-          <Label>Дата окончания</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата окончания</label>
+          <MacOSInput
             type="datetime-local"
             value={discountForm.end_date}
             onChange={(e) => setDiscountForm({ ...discountForm, end_date: e.target.value })}
@@ -320,8 +318,8 @@ const DiscountBenefitsManager = () => {
         </div>
       </div>
       <div>
-        <Label>Описание</Label>
-        <Textarea
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание</label>
+        <MacOSTextarea
           value={discountForm.description}
           onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
           placeholder="Введите описание скидки"
@@ -358,12 +356,12 @@ const DiscountBenefitsManager = () => {
         </label>
       </div>
       <div className="flex gap-2">
-        <Button onClick={createDiscount} className="bg-blue-500 text-white">
+        <MacOSButton onClick={createDiscount} className="bg-blue-500 text-white">
           Создать скидку
-        </Button>
-        <Button onClick={() => setShowCreateForm(false)} className="bg-gray-500 text-white">
+        </MacOSButton>
+        <MacOSButton onClick={() => setShowCreateForm(false)} className="bg-gray-500 text-white">
           Отмена
-        </Button>
+        </MacOSButton>
       </div>
     </div>
   );
@@ -373,27 +371,24 @@ const DiscountBenefitsManager = () => {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>Название льготы</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Название льготы</label>
+          <MacOSInput
             value={benefitForm.name}
             onChange={(e) => setBenefitForm({ ...benefitForm, name: e.target.value })}
             placeholder="Введите название льготы"
           />
         </div>
         <div>
-          <Label>Тип льготы</Label>
-          <Select
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Тип льготы</label>
+          <MacOSSelect
             value={benefitForm.benefit_type}
             onChange={(e) => setBenefitForm({ ...benefitForm, benefit_type: e.target.value })}
-          >
-            {Object.entries(benefitTypes).map(([key, value]) => (
-              <option key={key} value={key}>{value}</option>
-            ))}
-          </Select>
+            options={Object.entries(benefitTypes).map(([key, value]) => ({ value: key, label: value }))}
+          />
         </div>
         <div>
-          <Label>Процент скидки</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Процент скидки</label>
+          <MacOSInput
             type="number"
             value={benefitForm.discount_percentage}
             onChange={(e) => setBenefitForm({ ...benefitForm, discount_percentage: e.target.value })}
@@ -402,8 +397,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Максимальная сумма льготы</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Максимальная сумма льготы</label>
+          <MacOSInput
             type="number"
             value={benefitForm.max_discount_amount}
             onChange={(e) => setBenefitForm({ ...benefitForm, max_discount_amount: e.target.value })}
@@ -411,8 +406,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Минимальный возраст</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Минимальный возраст</label>
+          <MacOSInput
             type="number"
             value={benefitForm.age_min}
             onChange={(e) => setBenefitForm({ ...benefitForm, age_min: e.target.value })}
@@ -420,8 +415,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Максимальный возраст</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Максимальный возраст</label>
+          <MacOSInput
             type="number"
             value={benefitForm.age_max}
             onChange={(e) => setBenefitForm({ ...benefitForm, age_max: e.target.value })}
@@ -429,8 +424,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Месячный лимит</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Месячный лимит</label>
+          <MacOSInput
             type="number"
             value={benefitForm.monthly_limit}
             onChange={(e) => setBenefitForm({ ...benefitForm, monthly_limit: e.target.value })}
@@ -438,8 +433,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Годовой лимит</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Годовой лимит</label>
+          <MacOSInput
             type="number"
             value={benefitForm.yearly_limit}
             onChange={(e) => setBenefitForm({ ...benefitForm, yearly_limit: e.target.value })}
@@ -448,8 +443,8 @@ const DiscountBenefitsManager = () => {
         </div>
       </div>
       <div>
-        <Label>Описание</Label>
-        <Textarea
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание</label>
+        <MacOSTextarea
           value={benefitForm.description}
           onChange={(e) => setBenefitForm({ ...benefitForm, description: e.target.value })}
           placeholder="Введите описание льготы"
@@ -457,8 +452,8 @@ const DiscountBenefitsManager = () => {
         />
       </div>
       <div>
-        <Label>Типы документов (JSON)</Label>
-        <Input
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Типы документов (JSON)</label>
+        <MacOSInput
           value={benefitForm.document_types}
           onChange={(e) => setBenefitForm({ ...benefitForm, document_types: e.target.value })}
           placeholder='["passport", "certificate"]'
@@ -494,12 +489,12 @@ const DiscountBenefitsManager = () => {
         </label>
       </div>
       <div className="flex gap-2">
-        <Button onClick={createBenefit} className="bg-blue-500 text-white">
+        <MacOSButton onClick={createBenefit} className="bg-blue-500 text-white">
           Создать льготу
-        </Button>
-        <Button onClick={() => setShowCreateForm(false)} className="bg-gray-500 text-white">
+        </MacOSButton>
+        <MacOSButton onClick={() => setShowCreateForm(false)} className="bg-gray-500 text-white">
           Отмена
-        </Button>
+        </MacOSButton>
       </div>
     </div>
   );
@@ -509,16 +504,16 @@ const DiscountBenefitsManager = () => {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>Название программы</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Название программы</label>
+          <MacOSInput
             value={loyaltyForm.name}
             onChange={(e) => setLoyaltyForm({ ...loyaltyForm, name: e.target.value })}
             placeholder="Введите название программы"
           />
         </div>
         <div>
-          <Label>Баллов за рубль</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Баллов за рубль</label>
+          <MacOSInput
             type="number"
             step="0.1"
             value={loyaltyForm.points_per_ruble}
@@ -527,8 +522,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Рублей за балл</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Рублей за балл</label>
+          <MacOSInput
             type="number"
             step="0.1"
             value={loyaltyForm.ruble_per_point}
@@ -537,8 +532,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Минимум баллов для списания</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Минимум баллов для списания</label>
+          <MacOSInput
             type="number"
             value={loyaltyForm.min_points_to_redeem}
             onChange={(e) => setLoyaltyForm({ ...loyaltyForm, min_points_to_redeem: e.target.value })}
@@ -546,8 +541,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Минимальная покупка для начисления</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Минимальная покупка для начисления</label>
+          <MacOSInput
             type="number"
             value={loyaltyForm.min_purchase_for_points}
             onChange={(e) => setLoyaltyForm({ ...loyaltyForm, min_purchase_for_points: e.target.value })}
@@ -555,8 +550,8 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Максимум баллов за покупку</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Максимум баллов за покупку</label>
+          <MacOSInput
             type="number"
             value={loyaltyForm.max_points_per_purchase}
             onChange={(e) => setLoyaltyForm({ ...loyaltyForm, max_points_per_purchase: e.target.value })}
@@ -564,16 +559,16 @@ const DiscountBenefitsManager = () => {
           />
         </div>
         <div>
-          <Label>Дата начала</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата начала</label>
+          <MacOSInput
             type="datetime-local"
             value={loyaltyForm.start_date}
             onChange={(e) => setLoyaltyForm({ ...loyaltyForm, start_date: e.target.value })}
           />
         </div>
         <div>
-          <Label>Дата окончания</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Дата окончания</label>
+          <MacOSInput
             type="datetime-local"
             value={loyaltyForm.end_date}
             onChange={(e) => setLoyaltyForm({ ...loyaltyForm, end_date: e.target.value })}
@@ -581,8 +576,8 @@ const DiscountBenefitsManager = () => {
         </div>
       </div>
       <div>
-        <Label>Описание</Label>
-        <Textarea
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Описание</label>
+        <MacOSTextarea
           value={loyaltyForm.description}
           onChange={(e) => setLoyaltyForm({ ...loyaltyForm, description: e.target.value })}
           placeholder="Введите описание программы"
@@ -590,12 +585,12 @@ const DiscountBenefitsManager = () => {
         />
       </div>
       <div className="flex gap-2">
-        <Button onClick={createLoyaltyProgram} className="bg-blue-500 text-white">
+        <MacOSButton onClick={createLoyaltyProgram} className="bg-blue-500 text-white">
           Создать программу
-        </Button>
-        <Button onClick={() => setShowCreateForm(false)} className="bg-gray-500 text-white">
+        </MacOSButton>
+        <MacOSButton onClick={() => setShowCreateForm(false)} className="bg-gray-500 text-white">
           Отмена
-        </Button>
+        </MacOSButton>
       </div>
     </div>
   );
@@ -603,12 +598,12 @@ const DiscountBenefitsManager = () => {
   // Рендер списка скидок
   const renderDiscountsList = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <h3 style={{ 
+        <h3 style={{
           margin: 0,
           color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-lg)',
@@ -616,22 +611,22 @@ const DiscountBenefitsManager = () => {
         }}>
           Скидки
         </h3>
-        <MacOSButton 
+        <MacOSButton
           onClick={() => setShowCreateForm(true)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
           <Plus size={16} />
           Создать скидку
         </MacOSButton>
       </div>
-      
+
       {showCreateForm && (
         <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -659,13 +654,13 @@ const DiscountBenefitsManager = () => {
         ) : (
           discounts.map((discount) => (
             <MacOSCard key={discount.id} style={{ padding: 0 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start' 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
               }}>
                 <div>
-                  <h4 style={{ 
+                  <h4 style={{
                     margin: '0 0 8px 0',
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-md)',
@@ -673,7 +668,7 @@ const DiscountBenefitsManager = () => {
                   }}>
                     {discount.name}
                   </h4>
-                  <p style={{ 
+                  <p style={{
                     margin: '0 0 12px 0',
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
@@ -692,7 +687,7 @@ const DiscountBenefitsManager = () => {
                     </MacOSBadge>
                   </div>
                 </div>
-                <div style={{ 
+                <div style={{
                   textAlign: 'right',
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
@@ -711,12 +706,12 @@ const DiscountBenefitsManager = () => {
   // Рендер списка льгот
   const renderBenefitsList = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <h3 style={{ 
+        <h3 style={{
           margin: 0,
           color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-lg)',
@@ -724,22 +719,22 @@ const DiscountBenefitsManager = () => {
         }}>
           Льготы
         </h3>
-        <MacOSButton 
+        <MacOSButton
           onClick={() => setShowCreateForm(true)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
           <Plus size={16} />
           Создать льготу
         </MacOSButton>
       </div>
-      
+
       {showCreateForm && (
         <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -767,13 +762,13 @@ const DiscountBenefitsManager = () => {
         ) : (
           benefits.map((benefit) => (
             <MacOSCard key={benefit.id} style={{ padding: 0 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start' 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
               }}>
                 <div>
-                  <h4 style={{ 
+                  <h4 style={{
                     margin: '0 0 8px 0',
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-md)',
@@ -781,7 +776,7 @@ const DiscountBenefitsManager = () => {
                   }}>
                     {benefit.name}
                   </h4>
-                  <p style={{ 
+                  <p style={{
                     margin: '0 0 12px 0',
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
@@ -805,7 +800,7 @@ const DiscountBenefitsManager = () => {
                     )}
                   </div>
                 </div>
-                <div style={{ 
+                <div style={{
                   textAlign: 'right',
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
@@ -825,12 +820,12 @@ const DiscountBenefitsManager = () => {
   // Рендер списка программ лояльности
   const renderLoyaltyList = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <h3 style={{ 
+        <h3 style={{
           margin: 0,
           color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-lg)',
@@ -838,22 +833,22 @@ const DiscountBenefitsManager = () => {
         }}>
           Программы лояльности
         </h3>
-        <MacOSButton 
+        <MacOSButton
           onClick={() => setShowCreateForm(true)}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
           <Plus size={16} />
           Создать программу
         </MacOSButton>
       </div>
-      
+
       {showCreateForm && (
         <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -881,13 +876,13 @@ const DiscountBenefitsManager = () => {
         ) : (
           loyaltyPrograms.map((program) => (
             <MacOSCard key={program.id} style={{ padding: 0 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start' 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
               }}>
                 <div>
-                  <h4 style={{ 
+                  <h4 style={{
                     margin: '0 0 8px 0',
                     color: 'var(--mac-text-primary)',
                     fontSize: 'var(--mac-font-size-md)',
@@ -895,7 +890,7 @@ const DiscountBenefitsManager = () => {
                   }}>
                     {program.name}
                   </h4>
-                  <p style={{ 
+                  <p style={{
                     margin: '0 0 12px 0',
                     color: 'var(--mac-text-secondary)',
                     fontSize: 'var(--mac-font-size-sm)'
@@ -914,7 +909,7 @@ const DiscountBenefitsManager = () => {
                     </MacOSBadge>
                   </div>
                 </div>
-                <div style={{ 
+                <div style={{
                   textAlign: 'right',
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
@@ -932,7 +927,7 @@ const DiscountBenefitsManager = () => {
   // Рендер аналитики
   const renderAnalytics = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <h3 style={{ 
+      <h3 style={{
         margin: 0,
         color: 'var(--mac-text-primary)',
         fontSize: 'var(--mac-font-size-lg)',
@@ -940,13 +935,13 @@ const DiscountBenefitsManager = () => {
       }}>
         Аналитика
       </h3>
-      
+
       {analytics ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
           {/* Аналитика скидок */}
           {analytics.discounts && (
             <MacOSCard style={{ padding: 0 }}>
-              <h4 style={{ 
+              <h4 style={{
                 margin: '0 0 12px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-md)',
@@ -959,19 +954,19 @@ const DiscountBenefitsManager = () => {
                 Скидки
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Всего применений: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.discounts.total_applications}</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Общая сумма скидок: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.discounts.total_discount_amount?.toFixed(2)} руб.</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
@@ -984,7 +979,7 @@ const DiscountBenefitsManager = () => {
           {/* Аналитика льгот */}
           {analytics.benefits && (
             <MacOSCard style={{ padding: 0 }}>
-              <h4 style={{ 
+              <h4 style={{
                 margin: '0 0 12px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-md)',
@@ -997,19 +992,19 @@ const DiscountBenefitsManager = () => {
                 Льготы
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Всего применений: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.benefits.total_applications}</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Общая сумма льгот: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.benefits.total_benefit_amount?.toFixed(2)} руб.</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
@@ -1022,7 +1017,7 @@ const DiscountBenefitsManager = () => {
           {/* Аналитика лояльности */}
           {analytics.loyalty && (
             <MacOSCard style={{ padding: 0 }}>
-              <h4 style={{ 
+              <h4 style={{
                 margin: '0 0 12px 0',
                 color: 'var(--mac-text-primary)',
                 fontSize: 'var(--mac-font-size-md)',
@@ -1035,25 +1030,25 @@ const DiscountBenefitsManager = () => {
                 Лояльность
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Всего участников: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.total_patients}</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Активных участников: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.active_patients}</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
                   Всего баллов начислено: <span style={{ color: 'var(--mac-text-primary)', fontWeight: 'var(--mac-font-weight-medium)' }}>{analytics.loyalty.total_points_earned}</span>
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: 'var(--mac-font-size-sm)',
                   color: 'var(--mac-text-secondary)'
                 }}>
@@ -1082,23 +1077,23 @@ const DiscountBenefitsManager = () => {
 
   return (
     <div style={{ padding: 0 }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '16px',
         marginBottom: '24px'
       }}>
         <Percent size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{ 
-            margin: 0, 
+          <h2 style={{
+            margin: 0,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-xl)',
             fontWeight: 'var(--mac-font-weight-bold)'
           }}>
             Система скидок и льгот
           </h2>
-          <p style={{ 
+          <p style={{
             margin: '4px 0 0 0',
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -1109,8 +1104,8 @@ const DiscountBenefitsManager = () => {
       </div>
 
       {/* Навигация по вкладкам */}
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         borderBottom: '1px solid var(--mac-border)',
         marginBottom: '24px'
       }}>

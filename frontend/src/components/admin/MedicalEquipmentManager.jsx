@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  MacOSCard, 
-  MacOSButton, 
-  MacOSBadge, 
-  MacOSInput, 
-  MacOSSelect, 
+import {
+  MacOSCard,
+  MacOSButton,
+  MacOSBadge,
+  MacOSInput,
+  MacOSSelect,
   MacOSLoadingSkeleton,
   MacOSEmptyState,
   MacOSAlert
 } from '../ui/macos';
-import { 
-  Activity, 
-  Wifi, 
-  WifiOff, 
-  AlertTriangle, 
-  Settings, 
-  Play, 
-  Square, 
-  Wrench, 
+import {
+  Activity,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
+  Settings,
+  Play,
+  Square,
+  Wrench,
   BarChart3,
   Download,
   RefreshCw,
@@ -28,8 +28,9 @@ import {
   Zap
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-
+import api from '../../api/client';
 import logger from '../../utils/logger';
+
 const MedicalEquipmentManager = () => {
   const [activeTab, setActiveTab] = useState('devices');
   const [devices, setDevices] = useState([]);
@@ -65,46 +66,11 @@ const MedicalEquipmentManager = () => {
   const loadDevices = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/devices`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDevices(data.devices || []);
-      } else {
-        logger.error('Ошибка загрузки устройств:', response.status);
-        // Fallback данные для демонстрации
-        setDevices([
-          {
-            id: 1,
-            name: 'Тонометр Omron M3',
-            device_type: 'blood_pressure',
-            manufacturer: 'Omron',
-            model: 'M3',
-            serial_number: 'OMR001',
-            status: 'online',
-            location: 'Кабинет 1'
-          },
-          {
-            id: 2,
-            name: 'Термометр Braun',
-            device_type: 'thermometer',
-            manufacturer: 'Braun',
-            model: 'ThermoScan 7',
-            serial_number: 'BRN002',
-            status: 'offline',
-            location: 'Кабинет 2'
-          }
-        ]);
-      }
+      const response = await api.get('/medical-equipment/devices');
+      setDevices(response.data.devices || []);
     } catch (error) {
       logger.error('Ошибка загрузки устройств:', error);
-      // Fallback данные при ошибке сети
+      // Fallback данные для демонстрации
       setDevices([
         {
           id: 1,
@@ -134,31 +100,8 @@ const MedicalEquipmentManager = () => {
 
   const loadOverview = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/statistics/overview`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setOverview(data.overview);
-      } else {
-        logger.error('Ошибка загрузки обзора:', response.status);
-        // Fallback данные для обзора
-        setOverview({
-          total_devices: 2,
-          online_devices: 1,
-          offline_devices: 1,
-          total_measurements: 15,
-          device_types: {
-            blood_pressure: 1,
-            thermometer: 1
-          }
-        });
-      }
+      const response = await api.get('/medical-equipment/statistics/overview');
+      setOverview(response.data.overview);
     } catch (error) {
       logger.error('Ошибка загрузки обзора:', error);
       // Fallback данные при ошибке сети
@@ -178,44 +121,11 @@ const MedicalEquipmentManager = () => {
   const loadMeasurements = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token');
-      const params = new URLSearchParams();
-      if (filters.device_type) params.append('device_type', filters.device_type);
-      
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/measurements?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const params = {};
+      if (filters.device_type) params.device_type = filters.device_type;
 
-      if (response.ok) {
-        const data = await response.json();
-        setMeasurements(data.measurements || []);
-      } else {
-        logger.error('Ошибка загрузки измерений:', response.status);
-        // Fallback данные для измерений
-        setMeasurements([
-          {
-            id: 1,
-            device_type: 'blood_pressure',
-            patient_id: 'P001',
-            systolic: 120,
-            diastolic: 80,
-            pulse: 72,
-            timestamp: new Date().toISOString(),
-            device_name: 'Тонометр Omron M3'
-          },
-          {
-            id: 2,
-            device_type: 'thermometer',
-            patient_id: 'P002',
-            temperature: 36.6,
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            device_name: 'Термометр Braun'
-          }
-        ]);
-      }
+      const response = await api.get('/medical-equipment/measurements', { params });
+      setMeasurements(response.data.measurements || []);
     } catch (error) {
       logger.error('Ошибка загрузки измерений:', error);
       // Fallback данные при ошибке сети
@@ -246,16 +156,8 @@ const MedicalEquipmentManager = () => {
 
   const connectDevice = async (deviceId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/devices/${deviceId}/connect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/connect`);
+      const data = response.data;
       if (data.success) {
         toast.success('Устройство подключено');
         loadDevices();
@@ -270,16 +172,8 @@ const MedicalEquipmentManager = () => {
 
   const disconnectDevice = async (deviceId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/devices/${deviceId}/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/disconnect`);
+      const data = response.data;
       if (data.success) {
         toast.success('Устройство отключено');
         loadDevices();
@@ -299,45 +193,26 @@ const MedicalEquipmentManager = () => {
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/measurements`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(measurementForm)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        toast.success('Измерение выполнено');
-        setMeasurementForm({ device_id: '', patient_id: '' });
-        if (activeTab === 'measurements') {
-          loadMeasurements();
-        }
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.detail || 'Ошибка измерения');
+      const response = await api.post('/medical-equipment/measurements', measurementForm);
+      toast.success('Измерение выполнено');
+      setMeasurementForm({ device_id: '', patient_id: '' });
+      if (activeTab === 'measurements') {
+        loadMeasurements();
       }
     } catch (error) {
       logger.error('Ошибка измерения:', error);
-      toast.error('Ошибка измерения');
+      if (error.response && error.response.data) {
+        toast.error(error.response.data.detail || 'Ошибка измерения');
+      } else {
+        toast.error('Ошибка измерения');
+      }
     }
   };
 
   const calibrateDevice = async (deviceId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/devices/${deviceId}/calibrate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = await response.json();
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/calibrate`);
+      const data = response.data;
       if (data.success) {
         toast.success('Калибровка завершена');
         loadDevices();
@@ -352,22 +227,10 @@ const MedicalEquipmentManager = () => {
 
   const runDiagnostics = async (deviceId) => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/medical-equipment/devices/${deviceId}/diagnostics`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedDevice({ ...selectedDevice, diagnostics: data });
-        toast.success('Диагностика завершена');
-      } else {
-        toast.error('Ошибка диагностики');
-      }
+      const response = await api.post(`/medical-equipment/devices/${deviceId}/diagnostics`);
+      const data = response.data;
+      setSelectedDevice({ ...selectedDevice, diagnostics: data });
+      toast.success('Диагностика завершена');
     } catch (error) {
       logger.error('Ошибка диагностики:', error);
       toast.error('Ошибка диагностики');
@@ -436,12 +299,12 @@ const MedicalEquipmentManager = () => {
 
   const renderOverviewTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <h3 style={{ 
+        <h3 style={{
           margin: 0,
           color: 'var(--mac-text-primary)',
           fontSize: 'var(--mac-font-size-lg)',
@@ -449,13 +312,13 @@ const MedicalEquipmentManager = () => {
         }}>
           Обзор оборудования
         </h3>
-        <MacOSButton 
-          onClick={() => { loadDevices(); loadOverview(); }} 
+        <MacOSButton
+          onClick={() => { loadDevices(); loadOverview(); }}
           disabled={loading}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px' 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}
         >
           <RefreshCw size={16} />
@@ -466,7 +329,7 @@ const MedicalEquipmentManager = () => {
       {overview ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-accent)',
@@ -474,7 +337,7 @@ const MedicalEquipmentManager = () => {
             }}>
               {overview.total_devices}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -482,7 +345,7 @@ const MedicalEquipmentManager = () => {
             </div>
           </MacOSCard>
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-success)',
@@ -490,7 +353,7 @@ const MedicalEquipmentManager = () => {
             }}>
               {overview.online_devices}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -498,7 +361,7 @@ const MedicalEquipmentManager = () => {
             </div>
           </MacOSCard>
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-error)',
@@ -506,7 +369,7 @@ const MedicalEquipmentManager = () => {
             }}>
               {overview.offline_devices}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -514,7 +377,7 @@ const MedicalEquipmentManager = () => {
             </div>
           </MacOSCard>
           <MacOSCard style={{ padding: 0 }}>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-2xl)',
               fontWeight: 'var(--mac-font-weight-bold)',
               color: 'var(--mac-purple)',
@@ -522,7 +385,7 @@ const MedicalEquipmentManager = () => {
             }}>
               {overview.total_measurements}
             </div>
-            <div style={{ 
+            <div style={{
               fontSize: 'var(--mac-font-size-sm)',
               color: 'var(--mac-text-secondary)'
             }}>
@@ -536,7 +399,7 @@ const MedicalEquipmentManager = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -546,14 +409,14 @@ const MedicalEquipmentManager = () => {
           </h4>
           {overview?.device_types ? (
             Object.entries(overview.device_types).map(([type, stats]) => (
-              <div key={type} style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div key={type} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: '8px 0',
                 borderBottom: '1px solid var(--mac-border)'
               }}>
-                <span style={{ 
+                <span style={{
                   color: 'var(--mac-text-primary)',
                   fontSize: 'var(--mac-font-size-sm)'
                 }}>
@@ -571,7 +434,7 @@ const MedicalEquipmentManager = () => {
         </MacOSCard>
 
         <MacOSCard style={{ padding: 0 }}>
-          <h4 style={{ 
+          <h4 style={{
             margin: '0 0 16px 0',
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-md)',
@@ -580,24 +443,24 @@ const MedicalEquipmentManager = () => {
             Быстрые действия
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <MacOSButton 
-              onClick={() => setActiveTab('devices')} 
+            <MacOSButton
+              onClick={() => setActiveTab('devices')}
               variant="outline"
               style={{ justifyContent: 'flex-start' }}
             >
               <Settings size={16} style={{ marginRight: '8px' }} />
               Управление устройствами
             </MacOSButton>
-            <MacOSButton 
-              onClick={() => setActiveTab('measurements')} 
+            <MacOSButton
+              onClick={() => setActiveTab('measurements')}
               variant="outline"
               style={{ justifyContent: 'flex-start' }}
             >
               <BarChart3 size={16} style={{ marginRight: '8px' }} />
               Просмотр измерений
             </MacOSButton>
-            <MacOSButton 
-              onClick={() => setActiveTab('measurement')} 
+            <MacOSButton
+              onClick={() => setActiveTab('measurement')}
               variant="outline"
               style={{ justifyContent: 'flex-start' }}
             >
@@ -613,7 +476,7 @@ const MedicalEquipmentManager = () => {
   const renderDevicesTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ 
+        <h3 style={{
           fontSize: 'var(--mac-font-size-lg)',
           fontWeight: 'var(--mac-font-weight-semibold)',
           color: 'var(--mac-text-primary)',
@@ -629,7 +492,7 @@ const MedicalEquipmentManager = () => {
       <MacOSCard style={{ padding: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           <div>
-            <label htmlFor="device-type-filter" style={{ 
+            <label htmlFor="device-type-filter" style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -652,7 +515,7 @@ const MedicalEquipmentManager = () => {
             />
           </div>
           <div>
-            <label htmlFor="status-filter" style={{ 
+            <label htmlFor="status-filter" style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -673,7 +536,7 @@ const MedicalEquipmentManager = () => {
             />
           </div>
           <div>
-            <label htmlFor="location-filter" style={{ 
+            <label htmlFor="location-filter" style={{
               display: 'block',
               fontSize: 'var(--mac-font-size-sm)',
               fontWeight: 'var(--mac-font-weight-medium)',
@@ -700,13 +563,13 @@ const MedicalEquipmentManager = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <DeviceIcon size={20} style={{ color: 'var(--mac-blue)' }} />
                   <div>
-                    <h4 style={{ 
+                    <h4 style={{
                       fontSize: 'var(--mac-font-size-base)',
                       fontWeight: 'var(--mac-font-weight-semibold)',
                       color: 'var(--mac-text-primary)',
                       margin: 0
                     }}>{device.name}</h4>
-                    <p style={{ 
+                    <p style={{
                       fontSize: 'var(--mac-font-size-sm)',
                       color: 'var(--mac-text-secondary)',
                       margin: 0
@@ -717,7 +580,7 @@ const MedicalEquipmentManager = () => {
                   {getStatusText(device.status)}
                 </MacOSBadge>
               </div>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: 'var(--mac-font-size-sm)', marginBottom: '16px' }}>
                 <div><strong>Производитель:</strong> {device.manufacturer}</div>
                 <div><strong>Модель:</strong> {device.model}</div>
@@ -746,7 +609,7 @@ const MedicalEquipmentManager = () => {
                     Отключить
                   </MacOSButton>
                 )}
-                
+
                 <MacOSButton
                   size="sm"
                   variant="outline"
@@ -756,7 +619,7 @@ const MedicalEquipmentManager = () => {
                   <Wrench size={16} style={{ marginRight: '4px' }} />
                   Калибровка
                 </MacOSButton>
-                
+
                 <MacOSButton
                   size="sm"
                   variant="outline"
@@ -783,18 +646,18 @@ const MedicalEquipmentManager = () => {
 
   const renderMeasurementTab = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <h3 style={{ 
+      <h3 style={{
         fontSize: 'var(--mac-font-size-lg)',
         fontWeight: 'var(--mac-font-weight-semibold)',
         color: 'var(--mac-text-primary)',
         margin: 0
       }}>Выполнить измерение</h3>
-      
+
       <MacOSCard style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label htmlFor="measurement-device" style={{ 
+              <label htmlFor="measurement-device" style={{
                 display: 'block',
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -818,7 +681,7 @@ const MedicalEquipmentManager = () => {
             </div>
 
             <div>
-              <label htmlFor="measurement-patient" style={{ 
+              <label htmlFor="measurement-patient" style={{
                 display: 'block',
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -833,7 +696,7 @@ const MedicalEquipmentManager = () => {
               />
             </div>
 
-            <MacOSButton 
+            <MacOSButton
               onClick={takeMeasurement}
               disabled={!measurementForm.device_id}
               style={{ width: '100%' }}
@@ -844,7 +707,7 @@ const MedicalEquipmentManager = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ 
+            <h4 style={{
               fontSize: 'var(--mac-font-size-base)',
               fontWeight: 'var(--mac-font-weight-medium)',
               color: 'var(--mac-text-primary)',
@@ -856,12 +719,12 @@ const MedicalEquipmentManager = () => {
                 .map(device => {
                   const DeviceIcon = getDeviceIcon(device.device_type);
                   return (
-                    <div key={device.id} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between', 
-                      padding: '8px', 
-                      border: '1px solid var(--mac-border)', 
+                    <div key={device.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px',
+                      border: '1px solid var(--mac-border)',
                       borderRadius: 'var(--mac-border-radius)',
                       backgroundColor: 'var(--mac-background-secondary)'
                     }}>
@@ -874,7 +737,7 @@ const MedicalEquipmentManager = () => {
                   );
                 })}
             </div>
-            
+
             {devices.filter(d => d.status === 'online').length === 0 && (
               <MacOSEmptyState
                 icon={WifiOff}
@@ -892,7 +755,7 @@ const MedicalEquipmentManager = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ 
+          <h3 style={{
             fontSize: 'var(--mac-font-size-lg)',
             fontWeight: 'var(--mac-font-weight-semibold)',
             color: 'var(--mac-text-primary)',
@@ -914,7 +777,7 @@ const MedicalEquipmentManager = () => {
         <MacOSCard style={{ padding: 0 }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="measurements-device-type" style={{ 
+              <label htmlFor="measurements-device-type" style={{
                 display: 'block',
                 fontSize: 'var(--mac-font-size-sm)',
                 fontWeight: 'var(--mac-font-weight-medium)',
@@ -960,7 +823,7 @@ const MedicalEquipmentManager = () => {
                       </MacOSBadge>
                     )}
                   </div>
-                  
+
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div>
                       <strong>Устройство:</strong> {measurement.device_id}
@@ -1003,23 +866,23 @@ const MedicalEquipmentManager = () => {
 
   return (
     <div style={{ padding: 0, maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         gap: '16px',
         marginBottom: '24px'
       }}>
         <Stethoscope size={24} color="var(--mac-accent)" />
         <div>
-          <h2 style={{ 
-            margin: 0, 
+          <h2 style={{
+            margin: 0,
             color: 'var(--mac-text-primary)',
             fontSize: 'var(--mac-font-size-xl)',
             fontWeight: 'var(--mac-font-weight-bold)'
           }}>
             Медицинское оборудование
           </h2>
-          <p style={{ 
+          <p style={{
             margin: '4px 0 0 0',
             color: 'var(--mac-text-secondary)',
             fontSize: 'var(--mac-font-size-sm)'
@@ -1030,8 +893,8 @@ const MedicalEquipmentManager = () => {
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ 
-          display: 'flex', 
+        <div style={{
+          display: 'flex',
           borderBottom: '1px solid var(--mac-border)'
         }}>
           <button
@@ -1111,7 +974,7 @@ const MedicalEquipmentManager = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Подробности устройства</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="space-y-3">
                 <div><strong>Название:</strong> {selectedDevice.name}</div>
@@ -1121,10 +984,10 @@ const MedicalEquipmentManager = () => {
                 <div><strong>Серийный номер:</strong> {selectedDevice.serial_number}</div>
                 <div><strong>Версия ПО:</strong> {selectedDevice.firmware_version}</div>
               </div>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <strong>Статус:</strong> 
+                  <strong>Статус:</strong>
                   <MacOSBadge variant={getStatusBadgeVariant(selectedDevice.status)} style={{ marginLeft: '8px' }}>
                     {getStatusText(selectedDevice.status)}
                   </MacOSBadge>
@@ -1147,9 +1010,9 @@ const MedicalEquipmentManager = () => {
                   {Object.entries(selectedDevice.diagnostics.tests).map(([test, result]) => (
                     <div key={test} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span>{test}</span>
-                      <Badge variant={result.passed ? 'success' : 'destructive'}>
+                      <MacOSBadge variant={result.passed ? 'success' : 'destructive'}>
                         {result.passed ? 'Пройден' : 'Ошибка'}
-                      </Badge>
+                      </MacOSBadge>
                     </div>
                   ))}
                 </div>
@@ -1187,4 +1050,3 @@ const MedicalEquipmentManager = () => {
 };
 
 export default MedicalEquipmentManager;
-

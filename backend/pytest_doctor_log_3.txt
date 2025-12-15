@@ -1,0 +1,2174 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.1, pytest-8.4.1, pluggy-1.6.0
+rootdir: C:\final\backend
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 12 items
+
+tests\integration\test_e2e_doctor_visit.py EEEEEEEEEEEE                  [100%]
+
+=================================== ERRORS ====================================
+______ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_view_queue _______
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCDFEBA10>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCE004890>, [])
+kw = {'cache_hit': <CacheStats.CACHE_MISS: 1>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCD767050>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD6FDD90>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+___ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_call_next_patient ___
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCD40ED10>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCD584610>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCDA20DD0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD657BD0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+______ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_start_visit ______
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCF664790>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCF6657D0>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCD673D10>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD5ADFD0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+_______ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_fill_emr ________
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCF8E47D0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCE34C110>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCFB939B0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD55A3D0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+___ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_use_emr_template ____
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCFA27510>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCFA263D0>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCDEA0650>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCF9BA290>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+_ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_add_diagnosis_with_ai_suggestion _
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BD05D95D0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BD05DAB50>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCFECFA70>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD7D4B90>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+_ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_generate_prescription_pdf _
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCFB0D6D0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCFB0DB90>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCDD4DD30>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD561090>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+____ ERROR at setup of TestDoctorVisitFlow.test_doctor_can_complete_visit _____
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BD00043D0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BD0005990>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCDC2FAD0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD561790>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+__ ERROR at setup of TestDoctorQueueManagement.test_doctor_can_skip_patient ___
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCFDE0BD0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCF4367D0>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCDBBB0B0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCF9247D0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+_ ERROR at setup of TestDoctorQueueManagement.test_doctor_can_get_patient_history _
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCFE32D10>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCFE30250>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCD9C15B0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD60ACD0>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+_ ERROR at setup of TestDoctorSecurity.test_doctor_cannot_access_admin_routes _
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCFF067D0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCF4407D0>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCE1EEDB0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCE34FA50>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+_ ERROR at setup of TestDoctorSecurity.test_doctor_cannot_view_other_doctor_queue _
+
+self = <sqlalchemy.engine.base.Connection object at 0x0000021BCD536A90>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x0000021BCD660F90>
+constructor = <bound method DefaultExecutionContext._init_compiled of <class 'sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext'>>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>
+parameters = [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}]
+execution_options = immutabledict({'compiled_cache': <sqlalchemy.util._collections.LRUCache object at 0x0000021BCDAE8810>})
+args = (<sqlalchemy.dialects.sqlite.base.SQLiteCompiler object at 0x0000021BCE004C90>, [{'active': True, 'branch_id': None, 'cabinet': None, 'department_id': None, ...}], <sqlalchemy.sql.dml.Insert object at 0x0000021BCFF43D90>, [])
+kw = {'cache_hit': <CacheStats.CACHE_HIT: 0>}, yp = None
+conn = <sqlalchemy.pool.base._ConnectionFairy object at 0x0000021BCE1EC6B0>
+
+    def _execute_context(
+        self,
+        dialect: Dialect,
+        constructor: Callable[..., ExecutionContext],
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+        execution_options: _ExecuteOptions,
+        *args: Any,
+        **kw: Any,
+    ) -> CursorResult[Any]:
+        """Create an :class:`.ExecutionContext` and execute, returning
+        a :class:`_engine.CursorResult`."""
+    
+        if execution_options:
+            yp = execution_options.get("yield_per", None)
+            if yp:
+                execution_options = execution_options.union(
+                    {"stream_results": True, "max_row_buffer": yp}
+                )
+        try:
+            conn = self._dbapi_connection
+            if conn is None:
+                conn = self._revalidate_connection()
+    
+>           context = constructor(
+                dialect, self, conn, execution_options, *args, **kw
+            )
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           TypeError: SQLite Time type only accepts Python time objects as input.
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: TypeError
+
+The above exception was the direct cause of the following exception:
+
+db_session = <sqlalchemy.orm.session.Session object at 0x0000021BCD7BEA10>
+
+    @pytest.fixture
+    def doctor_with_queue(db_session):
+        """╤ючфрхЄ тЁрўр ё юўхЁхф№■ ярЎшхэЄют"""
+        # ╤ючфрхь тЁрўр-яюы№чютрЄхы 
+        doctor_user = db_session.query(User).filter(User.username == "e2e_doctor").first()
+        if not doctor_user:
+            doctor_user = User(
+                username="e2e_doctor",
+                email="e2e_doctor@test.com",
+                hashed_password=get_password_hash("doctor123"),
+                role="Doctor",
+                is_active=True,
+                full_name="╥хёЄ ─юъЄюЁют",
+            )
+            db_session.add(doctor_user)
+            db_session.commit()
+            db_session.refresh(doctor_user)
+    
+        # ╤ючфрхь яЁюЇшы№ тЁрўр
+        doctor = db_session.query(Doctor).filter(Doctor.user_id == doctor_user.id).first()
+        if not doctor:
+            doctor = Doctor(
+                user_id=doctor_user.id,
+                specialty="╥хЁряш ",
+                active=True,
+            )
+            db_session.add(doctor)
+>           db_session.commit()
+
+tests\integration\test_e2e_doctor_visit.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\state_changes.py:137: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4345: in flush
+    self._flush(objects)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4480: in _flush
+    with util.safe_reraise():
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\util\langhelpers.py:224: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\session.py:4441: in _flush
+    flush_context.execute()
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1419: in execute
+    return meth(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\sql\elements.py:526: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1641: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1821: in _execute_context
+    self._handle_dbapi_exception(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:2355: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\base.py:1815: in _execute_context
+    context = constructor(
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1491: in _init_compiled
+    l_param: List[Any] = [
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\engine\default.py:1493: in <listcomp>
+    flattened_processors[key](compiled_params[key])
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = '09:00'
+
+    def process(value):
+        if value is None:
+            return None
+        elif isinstance(value, datetime_time):
+            return format_ % {
+                "hour": value.hour,
+                "minute": value.minute,
+                "second": value.second,
+                "microsecond": value.microsecond,
+            }
+        else:
+>           raise TypeError(
+                "SQLite Time type only accepts Python "
+                "time objects as input."
+            )
+E           sqlalchemy.exc.StatementError: (builtins.TypeError) SQLite Time type only accepts Python time objects as input.
+E           [SQL: INSERT INTO doctors (user_id, department_id, specialty, cabinet, price_default, start_number_online, max_online_per_day, auto_close_time, active, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at]
+E           [parameters: [{'specialty': '╥хЁряш ', 'active': True, 'user_id': 1, 'branch_id': None, 'cabinet': None, 'department_id': None, 'price_default': None}]]
+
+C:\Program Files\Python311\Lib\site-packages\sqlalchemy\dialects\sqlite\base.py:1364: StatementError
+============================== warnings summary ===============================
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'env'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: 51 warnings
+  C:\Program Files\Python311\Lib\site-packages\pydantic\_internal\_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+..\..\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062
+  C:\Program Files\Python311\Lib\site-packages\pydantic\fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+tests\integration\test_e2e_doctor_visit.py:152
+  C:\final\backend\tests\integration\test_e2e_doctor_visit.py:152: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_doctor_visit.py:312
+  C:\final\backend\tests\integration\test_e2e_doctor_visit.py:312: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests\integration\test_e2e_doctor_visit.py:350
+  C:\final\backend\tests\integration\test_e2e_doctor_visit.py:350: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_view_queue
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_call_next_patient
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_start_visit
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_fill_emr
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_use_emr_template
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_add_diagnosis_with_ai_suggestion
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_generate_prescription_pdf
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorVisitFlow::test_doctor_can_complete_visit
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorQueueManagement::test_doctor_can_skip_patient
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorQueueManagement::test_doctor_can_get_patient_history
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_access_admin_routes
+ERROR tests/integration/test_e2e_doctor_visit.py::TestDoctorSecurity::test_doctor_cannot_view_other_doctor_queue
+======================= 64 warnings, 12 errors in 8.02s =======================

@@ -1,8 +1,167 @@
 """
-Service code normalization utilities
+Service code normalization utilities (SSOT - Single Source of Truth)
+
+Этот модуль является ЕДИНСТВЕННЫМ источником истины для:
+1. Нормализации кодов услуг
+2. Маппинга specialty (queue_tag) -> service_id
+3. Получения дефолтной услуги для QR-записей
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, TYPE_CHECKING
+import logging
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# SSOT: Маппинг specialty -> service lookup parameters
+# Используется когда нужно найти услугу по специальности (для QR-записей)
+# ============================================================================
+SPECIALTY_ALIASES = {
+    # Кардиология
+    "cardio": "cardiology",
+    "heart": "cardiology",
+    # Дерматология
+    "derma": "dermatology",
+    "skin": "dermatology",
+    # Стоматология
+    "dentist": "stomatology",
+    "dental": "stomatology",
+    "teeth": "stomatology",
+    # Лаборатория
+    "lab": "laboratory",
+    "labs": "laboratory",
+    # Процедуры
+    "proc": "procedures",
+    "physio": "procedures",
+}
+
+def normalize_specialty(specialty: str) -> str:
+    """
+    Нормализует specialty к каноническому виду.
+    
+    Args:
+        specialty: Входная специальность (может быть алиасом)
+        
+    Returns:
+        Каноническое название specialty
+        
+    Examples:
+        >>> normalize_specialty("derma")
+        'dermatology'
+        >>> normalize_specialty("cardiology")
+        'cardiology'
+    """
+    if not specialty:
+        return ""
+    normalized = specialty.lower().strip()
+    return SPECIALTY_ALIASES.get(normalized, normalized)
+
+
+def get_default_service_by_specialty(db: "Session", specialty: str) -> Optional[Dict[str, Any]]:
+    """
+    SSOT: Получает дефолтную консультационную услугу по specialty.
+    
+    Это ЕДИНСТВЕННЫЙ правильный способ найти услугу для QR-записи.
+    Ищет по queue_tag с приоритетом is_consultation=True.
+    
+    Args:
+        db: Сессия БД
+        specialty: Specialty (queue_tag) из QR-записи (например "dermatology", "cardiology")
+        
+    Returns:
+        Dict с данными услуги или None:
+        {
+            "id": int,
+            "name": str,
+            "service_code": str,
+            "price": Decimal,
+            "category_code": str,
+            "queue_tag": str
+        }
+        
+    Examples:
+        >>> service = get_default_service_by_specialty(db, "dermatology")
+        >>> service["id"]
+        1
+        >>> service["name"]
+        'Консультация дерматолога'
+    """
+    from app.models.service import Service
+    
+    # Нормализуем specialty
+    normalized = normalize_specialty(specialty)
+    if not normalized:
+        logger.warning("get_default_service_by_specialty: пустой specialty")
+        return None
+    
+    # Ищем консультацию по queue_tag
+    service = (
+        db.query(Service)
+        .filter(
+            Service.queue_tag == normalized,
+            Service.is_consultation == True,
+            Service.active == True
+        )
+        .first()
+    )
+    
+    # Fallback: ищем любую активную услугу с этим queue_tag
+    if not service:
+        service = (
+            db.query(Service)
+            .filter(
+                Service.queue_tag == normalized,
+                Service.active == True
+            )
+            .first()
+        )
+    
+    # Fallback 2: ищем по category_code (K, D, L, S, C)
+    if not service:
+        category_mapping = {
+            "cardiology": "K",
+            "dermatology": "D",
+            "laboratory": "L",
+            "stomatology": "S",
+            "cosmetology": "C",
+            "procedures": "P",
+        }
+        category_code = category_mapping.get(normalized)
+        if category_code:
+            service = (
+                db.query(Service)
+                .filter(
+                    Service.category_code == category_code,
+                    Service.is_consultation == True,
+                    Service.active == True
+                )
+                .first()
+            )
+            if not service:
+                service = (
+                    db.query(Service)
+                    .filter(
+                        Service.category_code == category_code,
+                        Service.active == True
+                    )
+                    .first()
+                )
+    
+    if not service:
+        logger.warning(f"get_default_service_by_specialty: услуга не найдена для specialty={specialty}")
+        return None
+    
+    return {
+        "id": service.id,
+        "name": service.name,
+        "service_code": service.service_code,
+        "price": service.price,
+        "category_code": service.category_code,
+        "queue_tag": service.queue_tag,
+    }
 
 
 def normalize_service_code(code: str) -> str:

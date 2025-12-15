@@ -1690,7 +1690,29 @@ const EnhancedAppointmentsTable = ({
                     padding: '12px 8px',
                     minWidth: '180px'
                   }}>
-                    {renderServices(row.services, row.all_patient_services)}
+                    {/* ✅ ИСПРАВЛЕНО: Fallback для QR-записей (через service_name или queue_numbers) */}
+                    {renderServices(
+                      (() => {
+                        // Если есть services, используем их
+                        if (row.services && (Array.isArray(row.services) ? row.services.length > 0 : true)) {
+                          return row.services;
+                        }
+                        // Fallback 1: service_name из записи
+                        if (row.service_name) {
+                          return [row.service_name];
+                        }
+                        // Fallback 2: service_name из queue_numbers
+                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].service_name) {
+                          return [row.queue_numbers[0].service_name];
+                        }
+                        // Fallback 3: specialty из queue_numbers (для совместимости)
+                        if (row.queue_numbers && row.queue_numbers.length > 0 && row.queue_numbers[0].specialty) {
+                          return [row.queue_numbers[0].specialty];
+                        }
+                        return row.services;
+                      })(),
+                      row.all_patient_services
+                    )}
                   </td>
 
                   {/* Вид оплаты */}
