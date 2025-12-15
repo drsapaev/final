@@ -463,7 +463,7 @@ jobs:
         fi
     
     - name: 📊 Загрузка отчета покрытия
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       if: always()
       with:
         name: coverage-report
@@ -937,7 +937,7 @@ jobs:
         fi
     
     - name: 📤 Загрузка документации
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: api-docs
         path: backend/openapi.json
