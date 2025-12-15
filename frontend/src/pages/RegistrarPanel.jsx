@@ -3030,7 +3030,6 @@ const RegistrarPanel = () => {
           source: appointment.source, // ✅ FIX: Сохраняем источник (online/desk) для Wizard'а
           // ✅ ДОБАВЛЕНО: Сохраняем discount_mode и approval_status для корректного отображения
           discount_mode: appointment.discount_mode,
-          discount_mode: appointment.discount_mode,
           approval_status: appointment.approval_status,
           // ✅ FIX: Собираем ВСЕ ID записей для групповой отмены
           // Если запись уже агрегирована в loadAppointments, берем её aggregated_ids

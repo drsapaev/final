@@ -28,7 +28,7 @@ import {
   Zap
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import api from '../../api/client';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
 
 const MedicalEquipmentManager = () => {
