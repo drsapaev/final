@@ -38,7 +38,6 @@ jobs:
         cd backend
         python - << 'PY'
         import sys
-        import time
         sys.path.insert(0, '.')
 
         from app.db.base import Base
@@ -50,92 +49,47 @@ jobs:
         # Create tables
         Base.metadata.create_all(bind=engine)
 
-        # Create critical users
+        # Users to create/update
+        users_data = [
+            ("admin", "Administrator", "Admin", "admin123"),
+            ("registrar", "Registrar", "Registrar", "registrar123"),
+            ("doctor", "Doctor", "Doctor", "doctor123"),
+            ("cashier", "Cashier", "Cashier", "cashier123"),
+            ("lab", "Lab Technician", "Lab", "lab123"),
+            ("cardio", "Cardiologist", "cardio", "cardio123"),
+            ("derma", "Dermatologist", "derma", "derma123"),
+            ("dentist", "Dentist", "dentist", "dentist123"),
+        ]
+
         db = SessionLocal()
         try:
-            # Admin user
-            admin = User(
-                username="admin",
-                full_name="Administrator",
-                role="Admin",
-                hashed_password=get_password_hash("admin123"),
-                is_active=True
-            )
-            db.add(admin)
-
-            # Registrar user
-            registrar = User(
-                username="registrar",
-                full_name="Registrar",
-                role="Registrar",
-                hashed_password=get_password_hash("registrar123"),
-                is_active=True
-            )
-            db.add(registrar)
-
-            # Doctor user
-            doctor = User(
-                username="doctor",
-                full_name="Doctor",
-                role="Doctor",
-                hashed_password=get_password_hash("doctor123"),
-                is_active=True
-            )
-            db.add(doctor)
-
-            # Cashier user
-            cashier = User(
-                username="cashier",
-                full_name="Cashier",
-                role="Cashier",
-                hashed_password=get_password_hash("cashier123"),
-                is_active=True
-            )
-            db.add(cashier)
-
-            # Lab user
-            lab = User(
-                username="lab",
-                full_name="Lab Technician",
-                role="Lab",
-                hashed_password=get_password_hash("lab123"),
-                is_active=True
-            )
-            db.add(lab)
-
-            # Specialized doctors
-            cardio = User(
-                username="cardio",
-                full_name="Cardiologist",
-                role="cardio",
-                hashed_password=get_password_hash("cardio123"),
-                is_active=True
-            )
-            db.add(cardio)
-
-            derma = User(
-                username="derma",
-                full_name="Dermatologist",
-                role="derma",
-                hashed_password=get_password_hash("derma123"),
-                is_active=True
-            )
-            db.add(derma)
-
-            dentist = User(
-                username="dentist",
-                full_name="Dentist",
-                role="dentist",
-                hashed_password=get_password_hash("dentist123"),
-                is_active=True
-            )
-            db.add(dentist)
+            for username, full_name, role, password in users_data:
+                # Check if user exists
+                existing = db.query(User).filter(User.username == username).first()
+                if existing:
+                    # Update password and role
+                    existing.hashed_password = get_password_hash(password)
+                    existing.role = role
+                    existing.is_active = True
+                    print(f"✅ Updated user: {username}")
+                else:
+                    # Create new user
+                    user = User(
+                        username=username,
+                        full_name=full_name,
+                        role=role,
+                        hashed_password=get_password_hash(password),
+                        is_active=True
+                    )
+                    db.add(user)
+                    print(f"✅ Created user: {username}")
 
             db.commit()
-            print("✅ Test database created with critical users")
+            print("✅ Test database ready with all users")
         except Exception as e:
-            print(f"❌ Error creating test database: {e}")
+            print(f"❌ Error: {e}")
             db.rollback()
+            raise
         finally:
             db.close()
         PY
