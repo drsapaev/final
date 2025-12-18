@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -298,6 +298,92 @@ async def list_services(
         raise HTTPException(status_code=500, detail=f"Ошибка получения услуг: {str(e)}")
 
 
+# ==================== QUEUE GROUPS (SSOT) - MUST BE BEFORE /{service_id} ====================
+
+
+class QueueGroupInfo(BaseModel):
+    """Schema for a single queue group"""
+    display_name: str
+    display_name_uz: Optional[str] = None
+    service_codes: List[str] = []
+    service_prefixes: List[str] = []
+    exclude_codes: List[str] = []
+    queue_tag: str
+    tab_key: str
+
+
+class QueueGroupsResponse(BaseModel):
+    """Response schema for queue-groups endpoint"""
+    groups: Dict[str, QueueGroupInfo] = {}
+    code_to_group: Dict[str, str] = {}
+    tab_to_group: Dict[str, str] = {}
+
+
+@router.get(
+    "/queue-groups",
+    response_model=QueueGroupsResponse,
+    summary="Получить группы очередей (SSOT)",
+)
+async def get_queue_groups(
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ SSOT: Возвращает структуру групп очередей для синхронизации frontend.
+    
+    Используется для:
+    - Определения какие услуги относятся к какой вкладке регистратуры
+    - Фильтрации записей по отделениям
+    - Группировки услуг в одну очередь (Shared Queues)
+    
+    Returns:
+        - groups: Словарь групп очередей с их настройками
+        - code_to_group: Маппинг service_code -> group_key (K01 -> cardiology)
+        - tab_to_group: Маппинг tab_key -> group_key (cardio -> cardiology)
+    """
+    from app.services.service_mapping import QUEUE_GROUPS, get_queue_group_for_service
+    
+    # Build groups from SSOT
+    groups = {}
+    for key, data in QUEUE_GROUPS.items():
+        groups[key] = QueueGroupInfo(
+            display_name=data["display_name"],
+            display_name_uz=data.get("display_name_uz"),
+            service_codes=data.get("service_codes", []),
+            service_prefixes=data.get("service_prefixes", []),
+            exclude_codes=data.get("exclude_codes", []),
+            queue_tag=data["queue_tag"],
+            tab_key=data["tab_key"],
+        )
+    
+    # Build code_to_group mapping
+    code_to_group = {}
+    
+    # Add explicit service codes
+    for key, data in QUEUE_GROUPS.items():
+        for code in data.get("service_codes", []):
+            code_to_group[code] = key
+    
+    # Enrich with actual DB data
+    try:
+        services = db.query(Service).filter(Service.active == True).all()
+        for service in services:
+            if service.service_code:
+                group = get_queue_group_for_service(service.service_code)
+                if group:
+                    code_to_group[service.service_code] = group
+    except Exception:
+        pass  # Use static mappings if DB query fails
+    
+    # Build tab_to_group mapping
+    tab_to_group = {data["tab_key"]: key for key, data in QUEUE_GROUPS.items()}
+    
+    return QueueGroupsResponse(
+        groups=groups,
+        code_to_group=code_to_group,
+        tab_to_group=tab_to_group,
+    )
+
+
 @router.get("/{service_id}", response_model=ServiceOut, summary="Получить услугу по ID")
 async def get_service(
     service_id: int,
@@ -589,4 +675,5 @@ async def get_service_code_mappings(
         category_mapping=category_mapping,
         specialty_aliases=SPECIALTY_ALIASES,
     )
+
 

@@ -38,6 +38,131 @@ SPECIALTY_ALIASES = {
     "physio": "procedures",
 }
 
+# ============================================================================
+# SSOT: Группировка услуг по очередям (Shared Queues)
+# Определяет какие услуги относятся к какому отделению/вкладке регистратуры
+# ============================================================================
+QUEUE_GROUPS = {
+    "cardiology": {
+        "display_name": "Кардиология",
+        "display_name_uz": "Kardiologiya",
+        "service_codes": ["K01", "K11"],  # Консультация + ЭхоКГ
+        "service_prefixes": ["K"],  # Все K-коды кроме K10
+        "exclude_codes": ["K10"],  # K10 = ЭКГ - отдельная вкладка
+        "queue_tag": "cardiology",
+        "tab_key": "cardio",
+    },
+    "ecg": {
+        "display_name": "ЭКГ",
+        "display_name_uz": "EKG",
+        "service_codes": ["K10", "ECG01"],
+        "service_prefixes": ["ECG"],
+        "exclude_codes": [],
+        "queue_tag": "echokg",
+        "tab_key": "echokg",
+    },
+    "dermatology": {
+        "display_name": "Дерматология",
+        "display_name_uz": "Dermatologiya",
+        "service_codes": ["D01"],  # Только консультация
+        "service_prefixes": ["D"],
+        "exclude_codes": ["D_PROC"],  # D_PROC = процедуры
+        "queue_tag": "dermatology",
+        "tab_key": "derma",
+    },
+    "dental": {
+        "display_name": "Стоматология",
+        "display_name_uz": "Stomatologiya",
+        "service_codes": ["S01", "S10"],  # Консультация + рентген зубов
+        "service_prefixes": ["S"],
+        "exclude_codes": [],
+        "queue_tag": "stomatology",
+        "tab_key": "dental",
+    },
+    "laboratory": {
+        "display_name": "Лаборатория",
+        "display_name_uz": "Laboratoriya",
+        "service_codes": ["L00", "L01", "L02", "L11", "L20", "L23", "L65"],
+        "service_prefixes": ["L"],
+        "exclude_codes": [],
+        "queue_tag": "laboratory",
+        "tab_key": "lab",
+    },
+    "procedures": {
+        "display_name": "Процедуры",
+        "display_name_uz": "Protseduralar",
+        "service_codes": ["P01", "P02", "P05", "C01", "C03", "C05", "C12", "D_PROC01", "D_PROC02"],
+        "service_prefixes": ["P", "C", "D_PROC"],
+        "exclude_codes": [],
+        "queue_tag": "procedures",
+        "tab_key": "procedures",
+    },
+}
+
+
+def get_queue_group_for_service(code: str) -> Optional[str]:
+    """
+    SSOT: Определяет к какой группе очереди относится услуга.
+    
+    Args:
+        code: Код услуги (K01, D01, L02, D_PROC02 и т.д.)
+        
+    Returns:
+        Ключ группы очереди (cardiology, dermatology, laboratory и т.д.) или None
+        
+    Examples:
+        >>> get_queue_group_for_service("K01")
+        'cardiology'
+        >>> get_queue_group_for_service("K10")
+        'ecg'
+        >>> get_queue_group_for_service("D_PROC02")
+        'procedures'
+    """
+    if not code:
+        return None
+    
+    code_upper = code.upper()
+    
+    for group_key, group_data in QUEUE_GROUPS.items():
+        # Проверяем точное совпадение с service_codes
+        if code_upper in [c.upper() for c in group_data.get("service_codes", [])]:
+            return group_key
+        
+        # Проверяем по префиксам (но исключаем exclude_codes)
+        exclude_codes = [c.upper() for c in group_data.get("exclude_codes", [])]
+        if code_upper in exclude_codes:
+            continue
+            
+        for prefix in group_data.get("service_prefixes", []):
+            if code_upper.startswith(prefix.upper()):
+                # Проверяем что код не в списке исключений
+                is_excluded = any(code_upper.startswith(exc.upper()) for exc in exclude_codes)
+                if not is_excluded:
+                    return group_key
+    
+    return None
+
+
+def get_services_for_department(department_key: str) -> Dict[str, Any]:
+    """
+    SSOT: Получает информацию о группе услуг для отделения.
+    
+    Args:
+        department_key: Ключ отделения (cardio, derma, lab, dental, echokg, procedures)
+        
+    Returns:
+        Словарь с информацией о группе или пустой словарь
+        
+    Examples:
+        >>> get_services_for_department("cardio")
+        {'display_name': 'Кардиология', 'service_codes': ['K01', 'K11'], ...}
+    """
+    # Маппинг tab_key -> group_key
+    tab_to_group = {group["tab_key"]: key for key, group in QUEUE_GROUPS.items()}
+    
+    group_key = tab_to_group.get(department_key, department_key)
+    return QUEUE_GROUPS.get(group_key, {})
+
 def normalize_specialty(specialty: str) -> str:
     """
     Нормализует specialty к каноническому виду.
