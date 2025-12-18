@@ -34,6 +34,10 @@ import { colors } from '../../theme/tokens';
 import { QueueActionButtons } from '../queue/QueueManagementCard';
 
 import logger from '../../utils/logger';
+
+// ⭐ SSOT: Centralized service code resolver
+import { CODE_TO_NAME, LEGACY_CODE_TO_NAME, ID_TO_NAME, getServiceDisplayName, isServiceCode as checkIsServiceCode } from '../../utils/serviceCodeResolver';
+
 const EnhancedAppointmentsTable = ({
   data = [],
   loading = false,
@@ -472,35 +476,12 @@ const EnhancedAppointmentsTable = ({
         }
         // Потом обычные строки
         if (typeof service === 'string') return service;
-        if (typeof service === 'object' && service.name) return service.name;
+        // ⭐ ИСПРАВЛЕНО: Если объект имеет code - возвращаем код напрямую (не name!)
+        // Это важно, чтобы K11 не превратился в K01 при поиске по name
         if (typeof service === 'object' && service.code) {
-          // Сначала пытаемся найти по коду в маппинге
-          const foundByCode = Object.values(services).flat().find(s => s.code === service.code);
-          if (foundByCode) return foundByCode.name;
-
-          // Fallback названия по кодам
-          const codeToName = {
-            'consultation.cardiology': 'Консультация кардиолога',
-            'echo.cardiography': 'ЭхоКГ',
-            'ecg': 'ЭКГ',
-            'consultation.dermatology': 'Консультация дерматолога',
-            'derm.skin_diagnostics': 'Дерматоскопия',
-            'cosmetology.botox': 'Ботулотоксин',
-            'cosmetology.mesotherapy': 'Мезотерапия',
-            'cosmetology.peel': 'Пилинг',
-            'cosmetology.laser': 'Лазерные процедуры',
-            'consultation.dentistry': 'Консультация стоматолога',
-            'lab.cbc': 'ОАК',
-            'lab.biochem': 'Биохимия',
-            'lab.urine': 'ОАМ',
-            'lab.coag': 'Коагулограмма',
-            'lab.hormones': 'Гормоны',
-            'lab.infection': 'Инфекции',
-            'other.general': 'Прочее'
-          };
-
-          return codeToName[service.code] || service.code || service;
+          return String(service.code).toUpperCase();
         }
+        if (typeof service === 'object' && service.name) return service.name;
         return String(service);
       });
     } else if (typeof appointmentServices === 'string') {
@@ -553,41 +534,25 @@ const EnhancedAppointmentsTable = ({
     });
 
     // ✅ Преобразуем коды обратно в названия для tooltip
+    // ⭐ SSOT: Используем централизованную функцию getServiceDisplayName
     const serviceNamesForTooltip = compactCodes.map(code => {
-      // Если это код, ищем полное название
+      // Если это код, ищем полное название через SSOT
       if (isServiceCode(code)) {
-        // Ищем по service_code (точное совпадение)
-        for (const group of Object.values(services)) {
-          if (Array.isArray(group)) {
-            const foundService = group.find(s => s.service_code === code);
-            if (foundService) {
-              return foundService.name;
-            }
-          }
+        // ⭐ SSOT: Сначала используем централизованный маппинг
+        const ssotName = getServiceDisplayName(code);
+        if (ssotName && ssotName !== code) {
+          return ssotName;
         }
 
-        // Ищем по старому полю code
+        // Fallback: Ищем в services prop по service_code (точное совпадение)
         for (const group of Object.values(services)) {
           if (Array.isArray(group)) {
-            const foundService = group.find(s => s.code === code);
+            const foundService = group.find(s =>
+              (s.service_code || '').toUpperCase() === code ||
+              (s.code || '').toUpperCase() === code
+            );
             if (foundService) {
               return foundService.name;
-            }
-          }
-        }
-
-        // Если не нашли по service_code, пытаемся найти по category_code + id (только для формата K01, D02)
-        if (/^[A-Z]\d{2}$/.test(code)) {
-          const categoryCode = code[0];
-          const serviceId = parseInt(code.slice(1));
-          for (const group of Object.values(services)) {
-            if (Array.isArray(group)) {
-              const foundService = group.find(s =>
-                s.category_code === categoryCode && s.id === serviceId
-              );
-              if (foundService) {
-                return foundService.name;
-              }
             }
           }
         }
@@ -821,37 +786,8 @@ const EnhancedAppointmentsTable = ({
           if (typeof service === 'string') return service;
           if (typeof service === 'object' && service.name) return service.name;
           if (typeof service === 'object' && service.code) {
-            const codeToName = {
-              'consultation.cardiology': 'Консультация кардиолога',
-              'echo.cardiography': 'ЭхоКГ',
-              'ecg': 'ЭКГ',
-              'consultation.dermatology': 'Консультация дерматолога',
-              'derm.skin_diagnostics': 'Дерматоскопия',
-              'cosmetology.botox': 'Ботулотоксин',
-              'cosmetology.mesotherapy': 'Мезотерапия',
-              'cosmetology.peel': 'Пилинг',
-              'cosmetology.laser': 'Лазерные процедуры',
-              'consultation.dentistry': 'Консультация стоматолога',
-              'lab.cbc': 'ОАК',
-              'lab.biochem': 'Биохимия',
-              'lab.urine': 'ОАМ',
-              'lab.coag': 'Коагулограмма',
-              'lab.hormones': 'Гормоны',
-              'lab.infection': 'Инфекции',
-              'other.general': 'Прочее'
-            };
-
-            const idToName = {
-              '1': 'Консультация кардиолога', '2': 'ЭхоКГ', '3': 'ЭКГ',
-              '4': 'Консультация дерматолога', '5': 'Дерматоскопия',
-              '6': 'Ботулотоксин', '7': 'Мезотерапия', '8': 'Пилинг',
-              '9': 'Лазерные процедуры', '10': 'Консультация стоматолога',
-              '11': 'ОАК', '12': 'Биохимия', '13': 'ОАМ',
-              '14': 'Коагулограмма', '15': 'Гормоны', '16': 'Инфекции',
-              '17': 'Прочее', '29': 'Процедура 29', '30': 'Процедура 30'
-            };
-
-            return codeToName[service.code] || idToName[service.code] || idToName[service] || service.code || service;
+            // ⭐ SSOT: Используем централизованный маппинг из serviceCodeResolver
+            return LEGACY_CODE_TO_NAME[service.code] || ID_TO_NAME[service.code] || ID_TO_NAME[service] || service.code || service;
           }
           return String(service);
         });

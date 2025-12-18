@@ -46,3 +46,11 @@ backend/quality-reports/*.md
 !backend/quality-reports/.gitkeep.secret_key
 backend/.secret_key
 *.db.backup*
+
+# Database files (local development)
+*.db
+!backend/clinic.db.example
+
+# Test logs
+pytest_*.txt
+*_log*.txt

@@ -203,23 +203,63 @@ def confirm_visit_by_telegram(
 
 
 @router.post("/patient/visits/confirm", response_model=ConfirmationResponse)
-def confirm_visit_by_pwa(request: PWAConfirmRequest, db: Session = Depends(get_db)):
+def confirm_visit_by_pwa(
+    request_body: PWAConfirmRequest, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Подтверждение визита через PWA приложение по токену
     Публичный эндпоинт без авторизации
     """
+    security_service = ConfirmationSecurityService(db)
+    
     try:
+        # ✅ FIX: Get client info from Request for audit
+        source_ip = request.client.host if request.client else request_body.ip_address
+        user_agent = request.headers.get("user-agent") or request_body.user_agent
+        
+        # Проверяем безопасность запроса
+        security_check = security_service.validate_confirmation_request(
+            token=request_body.token,
+            source_ip=source_ip,
+            user_agent=user_agent,
+            channel="pwa",
+        )
+
+        if not security_check.allowed:
+            security_service.record_confirmation_attempt(
+                visit_id=0,
+                success=False,
+                channel="pwa",
+                error_reason=security_check.reason,
+            )
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_429_TOO_MANY_REQUESTS
+                    if security_check.retry_after
+                    else status.HTTP_400_BAD_REQUEST
+                ),
+                detail=security_check.reason,
+            )
+        
         # Находим визит по токену
         visit = (
             db.query(Visit)
             .filter(
-                Visit.confirmation_token == request.token,
+                Visit.confirmation_token == request_body.token,
                 Visit.status == "pending_confirmation",
             )
             .first()
         )
 
         if not visit:
+            security_service.record_confirmation_attempt(
+                visit_id=0,
+                success=False,
+                channel="pwa",
+                error_reason="Visit not found",
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Визит не найден или уже подтвержден",
@@ -244,7 +284,7 @@ def confirm_visit_by_pwa(request: PWAConfirmRequest, db: Session = Depends(get_d
 
         # Подтверждаем визит
         visit.confirmed_at = datetime.utcnow()
-        visit.confirmed_by = f"pwa_{request.ip_address or 'unknown'}"
+        visit.confirmed_by = f"pwa_{source_ip or 'unknown'}"
         visit.status = "confirmed"
 
         queue_numbers = {}
@@ -259,6 +299,11 @@ def confirm_visit_by_pwa(request: PWAConfirmRequest, db: Session = Depends(get_d
 
         db.commit()
         db.refresh(visit)
+        
+        # Записываем успешную попытку
+        security_service.record_confirmation_attempt(
+            visit_id=visit.id, success=True, channel="pwa"
+        )
 
         # Получаем данные пациента
         patient = db.query(Patient).filter(Patient.id == visit.patient_id).first()

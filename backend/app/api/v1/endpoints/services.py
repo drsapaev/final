@@ -503,3 +503,90 @@ async def resolve_service_endpoint(
     result = resolve_service(service_id=service_id, code=code, db=db)
 
     return ServiceResolveResponse(**result)
+
+
+# ==================== SERVICE CODE MAPPINGS (SSOT) ====================
+
+
+class ServiceCodeMappingsResponse(BaseModel):
+    """Response schema for service code mappings endpoint"""
+    
+    specialty_to_code: dict = {}
+    code_to_name: dict = {}
+    category_mapping: dict = {}
+    specialty_aliases: dict = {}
+
+
+@router.get(
+    "/code-mappings",
+    response_model=ServiceCodeMappingsResponse,
+    summary="Получить маппинги кодов услуг (SSOT)",
+)
+async def get_service_code_mappings(
+    db: Session = Depends(get_db),
+):
+    """
+    ⭐ SSOT: Возвращает все маппинги кодов услуг для синхронизации frontend.
+    
+    Используется для централизации service code resolution на frontend.
+    
+    Returns:
+        - specialty_to_code: Маппинг specialty -> default service code (K01, D01, etc.)
+        - code_to_name: Маппинг service code -> display name
+        - category_mapping: Маппинг specialty -> category code (K, D, L, etc.)
+        - specialty_aliases: Алиасы для specialty (derma -> dermatology)
+    """
+    from app.services.service_mapping import SPECIALTY_ALIASES
+    
+    # Static mappings from SSOT
+    specialty_to_code = {
+        "cardiology": "K01",
+        "cardio": "K01",
+        "dermatology": "D01",
+        "derma": "D01",
+        "stomatology": "S01",
+        "dental": "S01",
+        "laboratory": "L01",
+        "lab": "L01",
+        "echokg": "K10",
+        "procedures": "P01",
+        "cosmetology": "C01",
+    }
+    
+    code_to_name = {
+        "K01": "Консультация кардиолога",
+        "K10": "ЭхоКГ",
+        "D01": "Консультация дерматолога",
+        "S01": "Консультация стоматолога",
+        "L01": "Лабораторные анализы",
+        "P01": "Процедуры",
+        "C01": "Косметология",
+    }
+    
+    category_mapping = {
+        "cardiology": "K",
+        "dermatology": "D",
+        "laboratory": "L",
+        "stomatology": "S",
+        "cosmetology": "C",
+        "procedures": "P",
+    }
+    
+    # Try to enrich with actual DB data
+    try:
+        services = db.query(Service).filter(Service.active == True).all()
+        for service in services:
+            if service.service_code and service.name:
+                code_to_name[service.service_code] = service.name
+            if service.queue_tag and service.service_code:
+                specialty_to_code[service.queue_tag] = service.service_code
+    except Exception:
+        pass  # Use static mappings if DB query fails
+    
+    return ServiceCodeMappingsResponse(
+        specialty_to_code=specialty_to_code,
+        code_to_name=code_to_name,
+        category_mapping=category_mapping,
+        specialty_aliases=SPECIALTY_ALIASES,
+    )
+

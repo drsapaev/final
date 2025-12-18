@@ -382,7 +382,45 @@ class MorningAssignmentService:
         timezone = ZoneInfo(queue_settings.get("timezone", "Asia/Tashkent"))
         queue_time = datetime.now(timezone)
 
-        # ✅ ИСПРАВЛЕНО: Используем SSOT метод для создания записи
+        # ⭐ ИСПРАВЛЕНО: Получаем услуги визита для данного queue_tag
+        visit_services = (
+            self.db.query(VisitService).filter(VisitService.visit_id == visit.id).all()
+        )
+        
+        # Фильтруем услуги по queue_tag и формируем services/service_codes
+        services_for_entry = []
+        service_codes_for_entry = []
+        
+        for vs in visit_services:
+            service = self.db.query(Service).filter(Service.id == vs.service_id).first()
+            if service and service.queue_tag == queue_tag:
+                # ⭐ Используем service_code если есть, иначе code
+                code = service.service_code or service.code
+                if code:
+                    service_codes_for_entry.append(code.upper() if code else None)
+                    services_for_entry.append({
+                        "id": service.id,
+                        "code": code.upper() if code else None,
+                        "name": service.name,
+                        "price": float(vs.price) if vs.price else 0,
+                    })
+        
+        # Если не нашли услуги с matching queue_tag, добавляем все услуги визита
+        if not services_for_entry:
+            for vs in visit_services:
+                service = self.db.query(Service).filter(Service.id == vs.service_id).first()
+                if service:
+                    code = service.service_code or service.code
+                    if code:
+                        service_codes_for_entry.append(code.upper() if code else None)
+                        services_for_entry.append({
+                            "id": service.id,
+                            "code": code.upper() if code else None,
+                            "name": service.name,
+                            "price": float(vs.price) if vs.price else 0,
+                        })
+
+        # ✅ ИСПРАВЛЕНО: Используем SSOT метод для создания записи С услугами
         queue_entry = queue_service.create_queue_entry(
             self.db,
             daily_queue=daily_queue,
@@ -393,12 +431,14 @@ class MorningAssignmentService:
             source=source,  # Источник: зависит от сценария (desk / morning_assignment / confirmation)
             status="waiting",
             queue_time=queue_time,  # Бизнес-время регистрации
+            services=services_for_entry,  # ⭐ ДОБАВЛЕНО: услуги с кодами
+            service_codes=service_codes_for_entry,  # ⭐ ДОБАВЛЕНО: коды услуг
             auto_number=True,  # Автоматически присваиваем номер
             commit=False,  # Не коммитим сразу, коммит будет в run_morning_assignment
         )
 
         logger.info(
-            f"Присвоен номер {queue_entry.number} в очереди {queue_tag} для пациента {visit.patient_id} (через SSOT)"
+            f"Присвоен номер {queue_entry.number} в очереди {queue_tag} для пациента {visit.patient_id} (через SSOT), услуги: {service_codes_for_entry}"
         )
 
         return {

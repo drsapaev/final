@@ -1273,6 +1273,33 @@ def get_today_queues(
         from app.models.online_queue import DailyQueue, OnlineQueueEntry
 
         for online_entry in online_entries:
+            # ⭐ ИСПРАВЛЕНО: Пропускаем OnlineQueueEntry если его visit_id уже обработан как Visit
+            # Это предотвращает дублирование записей (Visit + OnlineQueueEntry для одного визита)
+            if online_entry.visit_id and online_entry.visit_id in seen_visit_ids:
+                logger.debug(
+                    "get_today_queues: Пропуск OnlineQueueEntry %d - visit_id %d уже обработан как Visit",
+                    online_entry.id,
+                    online_entry.visit_id,
+                )
+                continue
+            
+            # ⭐ ДОПОЛНИТЕЛЬНО: Пропускаем "сиротские" OnlineQueueEntry (без visit_id) 
+            # если для этого пациента уже есть Visit на сегодня
+            # Это важно для устранения дубликатов от старых записей
+            if not online_entry.visit_id and online_entry.patient_id:
+                # Проверяем есть ли Visit для этого пациента на сегодня
+                patient_has_visit = any(
+                    v.patient_id == online_entry.patient_id 
+                    for v in visits
+                )
+                if patient_has_visit:
+                    logger.debug(
+                        "get_today_queues: Пропуск OnlineQueueEntry %d - пациент %d уже имеет Visit на сегодня",
+                        online_entry.id,
+                        online_entry.patient_id,
+                    )
+                    continue
+            
             daily_queue = (
                 db.query(DailyQueue)
                 .filter(DailyQueue.id == online_entry.queue_id)

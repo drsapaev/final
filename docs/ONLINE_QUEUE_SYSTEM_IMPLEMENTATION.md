@@ -769,3 +769,93 @@ python -m alembic upgrade b9716387212f
   - Edit визита с добавлением/удалением услуг.  
   - Edit QR‑записи с добавлением услуг в разные отделения (проверить, что новые очереди создаются отдельно, а старые не меняются).
 
+---
+
+## 📜 История изменений
+
+### Декабрь 2024 — Рефакторинг архитектуры
+
+#### 1. SSOT для Service Code Mappings
+
+**Проблема:** Дублирование маппингов `codeToName`, `idToName`, `specialtyToCode` в 5+ файлах.
+
+**Решение:** Создан централизованный модуль `frontend/src/utils/serviceCodeResolver.js`:
+
+```javascript
+// Экспортирует:
+export const SPECIALTY_TO_CODE = { ... };
+export const CODE_TO_NAME = { ... };
+export const LEGACY_CODE_TO_NAME = { ... };
+export const ID_TO_NAME = { ... };
+
+export function toServiceCode(value) { ... }
+export function getServiceDisplayName(code) { ... }
+export function normalizeServicesFromInitialData(initialData) { ... }
+```
+
+**Миграция:**
+- `RegistrarPanel.jsx` → импортирует из SSOT
+- `EnhancedAppointmentsTable.jsx` → импортирует из SSOT
+- `AppointmentWizardV2.jsx` → использует `normalizeServicesFromInitialData()`
+
+#### 2. Batch API для записей пациента
+
+**Проблема:** UI Row ↔ API Entry mismatch — одна строка таблицы = несколько API records.
+
+**Решение:** Новый batch API:
+
+```
+GET    /api/v1/registrar/batch/patients/{patient_id}/entries/{date}
+PATCH  /api/v1/registrar/batch/patients/{patient_id}/entries/{date}
+DELETE /api/v1/registrar/batch/patients/{patient_id}/entries/{date}
+```
+
+**Файлы:**
+- `backend/app/services/batch_patient_service.py`
+- `backend/app/api/v1/endpoints/registrar_batch.py`
+- `frontend/src/api/registrarBatch.js`
+
+**Документация:** `docs/BATCH_UPDATE_ARCHITECTURE.md`
+
+#### 3. Исправление расчёта длины очереди
+
+**Проблема:** `qr_queue_service.py` смешивал `Visit` + `Appointment` + `OnlineQueueEntry`.
+
+**Решение:** Методы `_get_queue_length()` и `get_qr_token_info()` теперь используют только `OnlineQueueEntry` для консистентности с `queue_position_notifications.py`.
+
+#### 4. Исправление агрегации пациентов
+
+**Проблема:** В `RegistrarPanel.jsx` функция `aggregatePatientsForAllDepartments` дедуплицировала по specialty вместо ID.
+
+**Решение:** Дедупликация по уникальному `entry.id` — все queue entries теперь сохраняются.
+
+#### 5. Visit Confirmation Audit
+
+**Проблема:** PWA endpoint не извлекал `source_ip`/`user_agent` из Request.
+
+**Решение:** Добавлен параметр `Request` и полная интеграция с `ConfirmationSecurityService`.
+
+#### 6. Исправление отображения кодов услуг (2024-12-18)
+
+**Проблема:** В таблице отображались fallback-коды K01/L01 вместо реальных K11/L02 из API.
+
+**Причина:** Функция `filterServicesByDepartment()` генерировала коды из `specialty` вместо использования `appointment.services`.
+
+**Решение:**
+1. `filterServicesByDepartment()` теперь использует `appointment.services` напрямую
+2. `isInDepartment()` — ECG (K10) отделён от Cardiology (K01, K11)
+3. Добавлены коды: D_PROC для процедур, S10 для стоматологии
+
+**Маппинг вкладок:**
+| Вкладка | Коды |
+|---------|------|
+| Кардиолог | K (кроме K10) |
+| ЭКГ | K10, ECG* |
+| Дерматолог | D |
+| Стоматолог | S |
+| Лаборатория | L |
+| Процедуры | P, C, D_PROC |
+
+---
+
+*Последнее обновление: 2024-12-18*

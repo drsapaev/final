@@ -32,8 +32,8 @@ Most TODO comments are in the following categories:
 # Line 73: source_ip=None,  # TODO: получить из request
 # Line 74: user_agent=None,  # TODO: получить из request
 ```
-**Status**: ⚠️ Should be implemented for audit
-**Action**: Can be implemented using FastAPI Request object
+**Status**: ✅ RESOLVED (2024-12-17)
+**Action**: Both Telegram and PWA endpoints now extract source_ip and user_agent from Request object
 
 ### 3. User Permissions (`user_permissions.py`)
 ```python

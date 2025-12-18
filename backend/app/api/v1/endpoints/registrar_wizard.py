@@ -596,9 +596,11 @@ def create_cart_appointments(
                 services_data.append(
                     {
                         "service_id": service.id,
+                        # ⭐ ИСПРАВЛЕНО: Используем service_code (K11) с fallback на code
                         "code": (
-                            normalize_service_code(service.code)
-                            if service.code
+                            service.service_code
+                            or normalize_service_code(service.code)
+                            if (service.service_code or service.code)
                             else None
                         ),
                         "name": service.name,

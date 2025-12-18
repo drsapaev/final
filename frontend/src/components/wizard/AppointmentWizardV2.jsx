@@ -26,7 +26,10 @@ import { useRoleAccess } from '../common/RoleGuard';
 import { normalizeCategoryCode } from '../../utils/serviceCodeUtils';
 import { formatDateDisplay } from '../../utils/dateUtils';
 import { createQueueEntriesBatch, getDoctorUserId, updateOnlineQueueEntry } from '../../api/queue';
+import { api } from '../../api/client';
 import logger from '../../utils/logger';
+// ⭐ SSOT: Unified service extraction
+import { normalizeServicesFromInitialData } from '../../utils/serviceCodeResolver';
 import './AppointmentWizardV2.css';
 
 const API_BASE = '/api/v1';
@@ -163,137 +166,16 @@ const AppointmentWizardV2 = ({
             })()
           },
           cart: {
+            // ⭐ SSOT: Используем унифицированную функцию вместо 5 разных источников
             items: (() => {
-              // 🛒 ВОССТАНОВЛЕНИЕ КОРЗИНЫ УСЛУГ
-              // Пытаемся восстановить услуги из initialData
-              // Поддерживаем разные форматы: services (массив строк), queue_numbers (массив объектов)
-
-              const items = [];
-
-              // ✅ ИСПРАВЛЕНО: Приоритет восстановления услуг
-              // Получаем doctor_id из initialData (может быть в разных полях)
-              // ⚠️ ВАЖНО: Для записей типа visit, doctor_id может быть в queue.specialist_id
-              // Но для отдельных услуг нужен doctor_id из самой услуги или из initialData
-              const doctorId = initialData.doctor_id ||
-                initialData.specialist_id ||
-                (initialData.queue_numbers && Array.isArray(initialData.queue_numbers) && initialData.queue_numbers[0]?.specialist_id) ||
-                null;
-
-              logger.log('🔍 Извлечение doctor_id из initialData:', {
-                doctor_id: initialData.doctor_id,
-                specialist_id: initialData.specialist_id,
-                queue_numbers_specialist: initialData.queue_numbers?.[0]?.specialist_id,
-                result: doctorId
-              });
-
-              // ✅ НОВОЕ: Приоритет 0 - из service_details (полные данные услуг)
-              if (Array.isArray(initialData.service_details) && initialData.service_details.length > 0) {
-                logger.log('📦 Восстановление услуг из service_details:', initialData.service_details);
-                initialData.service_details.forEach(svc => {
-                  if (svc) {
-                    items.push({
-                      id: Date.now() + Math.random(),
-                      service_id: svc.id || null,
-                      service_name: svc.name || svc.code || 'Услуга',
-                      service_price: svc.price || 0,
-                      quantity: 1,
-                      doctor_id: doctorId,
-                      visit_date: initialData.date || new Date().toISOString().split('T')[0],
-                      visit_time: null,
-                      _temp_name: svc.name || svc.code
-                    });
-                  }
-                });
-              }
-              // 1. Затем пробуем из services (массив строк или кодов)
-              else if (Array.isArray(initialData.services) && initialData.services.length > 0) {
-                logger.log('📦 Восстановление услуг из services:', initialData.services);
-                initialData.services.forEach(serviceName => {
-                  if (serviceName) { // Проверка существования
-                    items.push({
-                      id: Date.now() + Math.random(),
-                      service_id: null,
-                      service_name: serviceName,
-                      service_price: 0,
-                      quantity: 1,
-                      doctor_id: doctorId, // ✅ ИСПРАВЛЕНО: Устанавливаем doctor_id из initialData
-                      visit_date: initialData.date || new Date().toISOString().split('T')[0],
-                      visit_time: null,
-                      _temp_name: serviceName
-                    });
-                  }
-                });
-              }
-              // 2. Если services нет, пробуем из service_codes
-              else if (Array.isArray(initialData.service_codes) && initialData.service_codes.length > 0) {
-                logger.log('📦 Восстановление услуг из service_codes:', initialData.service_codes);
-                initialData.service_codes.forEach(serviceCode => {
-                  if (serviceCode) {
-                    items.push({
-                      id: Date.now() + Math.random(),
-                      service_id: null,
-                      service_name: serviceCode, // Будет резолвиться позже
-                      service_price: 0,
-                      quantity: 1,
-                      doctor_id: doctorId, // ✅ ИСПРАВЛЕНО: Устанавливаем doctor_id из initialData
-                      visit_date: initialData.date || new Date().toISOString().split('T')[0],
-                      visit_time: null,
-                      _temp_name: serviceCode
-                    });
-                  }
-                });
-              }
-              // 3. Пробуем из queue_numbers.service_details (новый формат)
-              else if (Array.isArray(initialData.queue_numbers) &&
-                initialData.queue_numbers[0]?.service_details?.length > 0) {
-                const qServiceDetails = initialData.queue_numbers[0].service_details;
-                logger.log('📦 Восстановление услуг из queue_numbers.service_details:', qServiceDetails);
-                qServiceDetails.forEach(svc => {
-                  if (svc) {
-                    items.push({
-                      id: Date.now() + Math.random(),
-                      service_id: svc.id || null,
-                      service_name: svc.name || svc.code || 'Услуга',
-                      service_price: svc.price || 0,
-                      quantity: 1,
-                      doctor_id: doctorId,
-                      visit_date: initialData.date || new Date().toISOString().split('T')[0],
-                      visit_time: null,
-                      original_queue_id: initialData.queue_numbers[0].id,
-                      _temp_name: svc.name || svc.code
-                    });
-                  }
-                });
-              }
-              // 4. Последний вариант - из queue_numbers (только если есть service_name)
-              else if (Array.isArray(initialData.queue_numbers)) {
-                logger.log('📦 Восстановление услуг из queue_numbers:', initialData.queue_numbers);
-                initialData.queue_numbers.forEach(q => {
-                  // ✅ ИСПРАВЛЕНО: Fallback на specialty если нет service_name
-                  const serviceName = q.service_name || q.specialty || 'Консультация';
-                  // ✅ SSOT: Приоритет service_id из initialData (backend), затем из queue_numbers
-                  const serviceId = initialData.service_id || q.service_id || null;
-
-                  items.push({
-                    id: Date.now() + Math.random(),
-                    service_id: serviceId,
-                    service_name: initialData.service_name || serviceName,
-                    service_price: q.service_price || 0,
-                    quantity: q.quantity || 1,
-                    doctor_id: q.doctor_id || null,
-                    visit_date: q.date || initialData.date || new Date().toISOString().split('T')[0],
-                    visit_time: q.visit_time || null,
-                    original_queue_id: q.id, // ✅ Сохраняем ID записи очереди для отслеживания удалений
-                    _temp_name: serviceName
-                  });
-                });
-              }
-
+              logger.log('📦 AppointmentWizardV2: Using SSOT normalizeServicesFromInitialData');
+              const items = normalizeServicesFromInitialData(initialData, []);
               logger.log('📦 Initialized cart with items:', items);
               logger.log('📦 InitialData full structure:', initialData);
-              // ✅ SSOT: Логируем источник service_id
-              if (initialData.service_id) {
-                logger.log(`✅ SSOT: Используем service_id=${initialData.service_id} из backend`);
+
+              // ✅ SSOT: Логируем источник
+              if (items.length > 0) {
+                logger.log(`✅ SSOT: Услуги извлечены из источника: ${items[0]._source}`);
               }
               return items;
             })(),
@@ -1534,13 +1416,18 @@ const AppointmentWizardV2 = ({
 
             // logger.log('📤 Вызов updateOnlineQueueEntry:', { ... }); // Removed to reduce noise
 
+            // ⭐ FIX: Собираем все ID из объединённой строки для проверки дубликатов
+            const aggregatedIds = initialData.aggregated_ids ||
+              (initialData.queue_numbers || []).map(qn => qn.id).filter(Boolean);
+
             const updateResult = await updateOnlineQueueEntry({
               entryId: queueEntryId,
               patientData,
               visitType,
               discountMode,
               services: cartServices,
-              allFree
+              allFree,
+              aggregatedIds  // ⭐ FIX: Передаём все ID для проверки дубликатов
             });
 
             logger.log('✅ QR-запись успешно обновлена:', updateResult);
@@ -1554,9 +1441,12 @@ const AppointmentWizardV2 = ({
             onClose();
             return; // ⭐ ВАЖНО: Завершаем handleComplete, не продолжаем с cart endpoint
           } catch (updateError) {
+            // ⭐ FIX: Не продолжаем с fallback - это создавало дубликаты!
             logger.error('❌ Ошибка обновления QR-записи:', updateError);
-            // Продолжаем с обычной логикой как fallback
-            logger.log('ℹ️ Продолжаем с обычной логикой как fallback...');
+            const errorMessage = updateError?.response?.data?.detail || updateError?.message || 'Неизвестная ошибка';
+            toast.error(`Ошибка обновления записи: ${errorMessage}`);
+            setIsProcessing?.(false);
+            return; // ⭐ CRITICAL: Не создаём дубликаты через cart endpoint
           }
         }
 

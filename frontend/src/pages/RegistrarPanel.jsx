@@ -39,8 +39,13 @@ import ModernStatistics from '../components/statistics/ModernStatistics';
 // Утилиты для работы с датами
 import { getLocalDateString, getYesterdayDateString } from '../utils/dateUtils';
 
+// ⭐ SSOT: Centralized service code resolver
+import { SPECIALTY_TO_CODE, toServiceCode as ssotToServiceCode } from '../utils/serviceCodeResolver';
+
 // API client
 import { api } from '../api/client';
+// ⭐ BATCH API: Для атомарных операций с записями пациента (см. BATCH_UPDATE_ARCHITECTURE.md)
+import { cancelAllPatientEntries, formatDateForAPI } from '../api/registrarBatch';
 
 // ✅ Форс-мажор модальное окно
 import ForceMajeureModal from '../components/registrar/ForceMajeureModal';
@@ -1268,6 +1273,7 @@ const RegistrarPanel = () => {
                       fullEntry
                     });
                   }
+
                   const cost = fullEntry.cost || 0;
                   const paymentStatus = fullEntry.payment_status || 'pending';
                   const source = fullEntry.source || 'desk';
@@ -2802,7 +2808,8 @@ const RegistrarPanel = () => {
     if (departmentKey === 'cardio') {
       const hasCardiologyServices = allServiceCodes.some(code => {
         const category = getServiceCategoryByCode(code);
-        return category === 'K' || category === 'ECHO' || category === 'ECG';
+        // ✅ ИСПРАВЛЕНО: ECG (K10) НЕ относится к кардиологии, он относится к вкладке echokg
+        return category === 'K' || category === 'ECHO';
       });
 
       // ✅ ИСПРАВЛЕНО: Если есть услуги, они должны быть кардиологическими
@@ -2921,7 +2928,7 @@ const RegistrarPanel = () => {
       'cardio': 'cardio',
       'general': 'cardio',  // Общие очереди попадают в кардиологию (только если нет услуг)
       'ecg': 'echokg',
-      'echokg': 'cardio', // ЭхоКГ относится к кардиологии (вкладка echokg - это ЭКГ)
+      'echokg': 'echokg', // ✅ ИСПРАВЛЕНО: вкладка echokg - это ЭКГ (K10)
       'lab': 'lab',
       'laboratory': 'lab',
       'procedures': 'procedures',
@@ -3056,16 +3063,18 @@ const RegistrarPanel = () => {
         }
 
         // ✅ FIX: Агрегируем queue_numbers (добавляем новые очереди к существующему пациенту в таблице "Все")
+        // ⭐ ИСПРАВЛЕНО: Дедупликация по ID записи, а не по specialty
+        // Это позволяет сохранить несколько записей с одинаковой specialty (например, 2 консультации кардиолога)
         if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers)) {
-          const existingQueueTags = new Set((patientGroups[patientKey].queue_numbers || []).map(qn =>
-            (qn.queue_tag || qn.specialty || '').toString().toLowerCase().trim()
+          const existingQueueIds = new Set((patientGroups[patientKey].queue_numbers || []).map(qn =>
+            qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`
           ));
 
           appointment.queue_numbers.forEach(qn => {
-            const tag = (qn.queue_tag || qn.specialty || '').toString().toLowerCase().trim();
-            if (!existingQueueTags.has(tag)) {
+            const queueId = qn.id?.toString() || `${qn.queue_tag}_${qn.service_id}`;
+            if (!existingQueueIds.has(queueId)) {
               patientGroups[patientKey].queue_numbers.push(qn);
-              existingQueueTags.add(tag);
+              existingQueueIds.add(queueId);
             }
           });
         }
@@ -3079,6 +3088,9 @@ const RegistrarPanel = () => {
       }
 
       // Добавляем услуги если их еще нет
+      // ⭐ DEBUG: Логируем что приходит в агрегацию
+      // console.log(`🔄 Aggregating ${appointment.patient_fio}: appointment.services=${JSON.stringify(appointment.services)}, current patientGroups[${patientKey}].services=${JSON.stringify(patientGroups[patientKey].services)}`);
+
       if (appointment.services && Array.isArray(appointment.services)) {
         appointment.services.forEach(service => {
           if (!patientGroups[patientKey].services.includes(service)) {
@@ -3118,59 +3130,24 @@ const RegistrarPanel = () => {
   // ✅ Функция фильтрации услуг по вкладке
   // ⭐ ИСПРАВЛЕНО: Для QR-записей с несколькими специалистами используем queue_numbers
   const filterServicesByDepartment = useCallback((appointment, departmentKey) => {
-    // ⭐ SSOT: Маппинг specialty/service_name -> service code
-    // Всегда конвертируем в код, никогда не показываем сырые названия
-    const nameToServiceCode = {
-      // Specialty names
-      'cardiology': 'K01',
-      'cardio': 'K01',
-      'cardiolog': 'K01',
-      'dermatology': 'D01',
-      'derma': 'D01',
-      'dermatolog': 'D01',
-      'stomatology': 'S01',
-      'dental': 'S01',
-      'dentist': 'S01',
-      'stom': 'S01',
-      'laboratory': 'L01',
-      'lab': 'L01',
-      'echokg': 'K10',
-      'ecg': 'K10',
-      'echo': 'K10',
-      'procedures': 'P01',
-      'procedure': 'P01',
-      'cosmetology': 'C01',
-      'physio': 'P01',
-      // Russian names
-      'кардиология': 'K01',
-      'кардиолог': 'K01',
-      'дерматология': 'D01',
-      'дерматолог': 'D01',
-      'стоматология': 'S01',
-      'стоматолог': 'S01',
-      'лаборатория': 'L01',
-      'эхокг': 'K10',
-      'экг': 'K10'
-    };
-
-    // Функция конвертации любого значения в service code
+    // ⭐ SSOT: Используем централизованную функцию toServiceCode
+    // Расширяем её для обратной совместимости с fuzzy matching
     const toServiceCode = (value) => {
       if (!value) return null;
+
+      // Сначала пробуем SSOT резолвер
+      const ssotResult = ssotToServiceCode(value);
+      if (ssotResult) return ssotResult;
+
+      // Fallback для fuzzy matching (legacy support)
       const normalized = String(value).toLowerCase().trim();
-
-      // Если уже код (например K01, D01, S01) - возвращаем в верхнем регистре
-      if (/^[KDSLPCO]\d{1,2}$/i.test(normalized)) {
-        return normalized.toUpperCase();
-      }
-
-      // Ищем в маппинге
-      for (const [key, code] of Object.entries(nameToServiceCode)) {
+      for (const [key, code] of Object.entries(SPECIALTY_TO_CODE)) {
         if (normalized.includes(key) || key.includes(normalized)) {
           return code;
         }
       }
 
-      // Fallback: первая буква + 01
+      // Ultimate fallback: первая буква + 01
       const firstLetter = normalized.charAt(0).toUpperCase();
       if (/[A-ZА-Я]/i.test(firstLetter)) {
         const ruToEn = { 'К': 'K', 'Д': 'D', 'С': 'S', 'Л': 'L', 'П': 'P' };
@@ -3184,8 +3161,15 @@ const RegistrarPanel = () => {
     // ⭐ Для QR-записей с queue_numbers - собираем услуги из всех queue_numbers
     if (appointment.queue_numbers && Array.isArray(appointment.queue_numbers) && appointment.queue_numbers.length > 0) {
 
-      // ⭐ Если НЕТ departmentKey (вкладка "Все отделения") - собираем ВСЕ услуги
+      // ⭐ Если НЕТ departmentKey (вкладка "Все отделения") - используем уже имеющиеся services
       if (!departmentKey) {
+        // ✅ ИСПРАВЛЕНО: Используем appointment.services напрямую, т.к. они уже содержат правильные коды (K11, L02 и т.д.)
+        // Раньше мы генерировали коды из specialty/service_name, что приводило к fallback на K01/L01
+        if (appointment.services && Array.isArray(appointment.services) && appointment.services.length > 0) {
+          return appointment.services;
+        }
+
+        // Fallback: только если services пустой, генерируем из queue_numbers
         const allCodes = [];
         const seenCodes = new Set();
 
@@ -3206,10 +3190,47 @@ const RegistrarPanel = () => {
           }
         });
 
-        return allCodes.length > 0 ? allCodes : appointment.services;
+        return allCodes.length > 0 ? allCodes : [];
       }
 
-      // ⭐ Для конкретной вкладки - ищем соответствующий queue_number
+      // ⭐ Для конкретной вкладки - фильтруем из существующих services по категории
+      // ✅ ИСПРАВЛЕНО: Используем appointment.services напрямую, фильтруя по категории отделения
+      const departmentCodePrefixes = {
+        'cardio': ['K'],  // K01, K11 и т.д. - все кардиоуслуги кроме ECG
+        'echokg': ['K10', 'ECG'],  // Только ЭКГ (K10, ECG01)
+        'derma': ['D'],  // D01 и т.д. (только консультации, не D_PROC)
+        'dental': ['S'],  // S01, S10 и т.д.
+        'lab': ['L'],  // L01, L02, L11 и т.д.
+        'procedures': ['P', 'C', 'D_PROC']  // P01, P02, C01, C05, D_PROC02 и т.д.
+      };
+
+      const allowedPrefixes = departmentCodePrefixes[departmentKey] || [];
+
+      // ✅ Фильтруем существующие services по категории
+      if (appointment.services && Array.isArray(appointment.services) && appointment.services.length > 0) {
+        const filteredByDepartment = appointment.services.filter(serviceCode => {
+          const code = String(serviceCode).toUpperCase();
+
+          // Специальная логика для echokg: только K10 и ECG коды
+          if (departmentKey === 'echokg') {
+            return code === 'K10' || code.startsWith('ECG');
+          }
+
+          // Специальная логика для cardio: все K-коды КРОМЕ K10 (ЭКГ)
+          if (departmentKey === 'cardio') {
+            return code.startsWith('K') && code !== 'K10';
+          }
+
+          // Для остальных отделений - проверяем по префиксу
+          return allowedPrefixes.some(prefix => code.startsWith(prefix));
+        });
+
+        if (filteredByDepartment.length > 0) {
+          return filteredByDepartment;
+        }
+      }
+
+      // Fallback: если в services нет подходящих кодов, генерируем из queue_numbers (для старых записей)
       const tabToSpecialtyMap = {
         'cardio': ['cardiology', 'cardio', 'cardiolog'],
         'echokg': ['echokg', 'ecg', 'echo'],
@@ -4779,6 +4800,17 @@ const RegistrarPanel = () => {
         onCancel={async (appointmentId, reason) => {
           // ✅ FIX: Call backend to cancel visit OR appointment OR queue entry
           // Supports cancelling multiple aggregated IDs (for multi-QR entries)
+
+          // ⭐ TODO: BATCH API MIGRATION
+          // После тестирования batch API замените текущую логику на:
+          // const patientId = data?.patient_id;
+          // const date = formatDateForAPI(data?.date);
+          // if (patientId && date) {
+          //   const result = await cancelAllPatientEntries(patientId, date, reason);
+          //   if (result.success) { ... }
+          // }
+          // См. docs/BATCH_UPDATE_ARCHITECTURE.md
+
           try {
             const data = appointmentId === cancelDialog.row?.id ? cancelDialog.row : appointments.find(a => a.id === appointmentId);
             const recordType = data?.record_type || 'visit';

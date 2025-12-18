@@ -130,6 +130,7 @@ export async function updateOnlineQueueEntry({
   discountMode,
   services,
   allFree = false,
+  aggregatedIds = null,  // ⭐ FIX: IDs of all merged entries for dedup check
 }) {
   const payload = {
     patient_data: patientData,
@@ -140,6 +141,7 @@ export async function updateOnlineQueueEntry({
       quantity: Number(service.quantity || 1),
     })),
     all_free: allFree,
+    aggregated_ids: aggregatedIds,  // ⭐ FIX: Pass to backend for dedup
   };
   const response = await api.put(
     `/queue/online-entry/${Number(entryId)}/full-update`,

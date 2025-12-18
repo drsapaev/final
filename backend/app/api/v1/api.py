@@ -445,3 +445,10 @@ from app.api.v1.endpoints import queue_position
 api_router.include_router(
     queue_position.router, prefix="/queue/position", tags=["queue-position"]
 )
+
+# Batch операции с записями пациентов (UI Row ↔ API Entry)
+from app.api.v1.endpoints import registrar_batch
+
+api_router.include_router(
+    registrar_batch.router, prefix="/registrar", tags=["registrar-batch"]
+)

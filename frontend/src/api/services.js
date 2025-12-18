@@ -471,6 +471,14 @@ export const servicesService = {
   async getPricing(params = {}) {
     const queryString = buildQueryString(params);
     return apiRequest('GET', `${API_ENDPOINTS.SERVICES.PRICING}?${queryString}`);
+  },
+
+  /**
+   * ⭐ SSOT: Получение маппингов кодов услуг
+   * Используется для синхронизации frontend с backend SSOT
+   */
+  async getCodeMappings() {
+    return apiRequest('GET', '/services/code-mappings');
   }
 };
 
@@ -640,7 +648,7 @@ export const filesService = {
   async uploadFile(file, metadata = {}) {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     Object.entries(metadata).forEach(([key, value]) => {
       formData.append(key, value);
     });

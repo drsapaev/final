@@ -1120,6 +1120,7 @@ class FullUpdateOnlineEntryRequest(BaseModel):
     discount_mode: str  # none/repeat/benefit
     services: List[dict]  # [{service_id, quantity}]
     all_free: bool = False
+    aggregated_ids: Optional[List[int]] = None  # ⭐ FIX: IDs of all merged entries for dedup check
 
 
 @router.put("/online-entry/{entry_id}/full-update")
@@ -1217,24 +1218,59 @@ def full_update_online_entry(
         service_codes_list = []  # Сохраняем для обратной совместимости
         total_amount = 0
 
-        # ⭐ Определяем существующие услуги для дальнейшего сравнения
+        # ⭐ FIX: Определяем существующие услуги из ВСЕХ записей пациента за день (не только текущей entry)
         from datetime import datetime, timezone
+        from app.models.online_queue import DailyQueue
 
         existing_service_ids = set()
-        if entry.services:
-            try:
-                existing_services = json.loads(entry.services)
-                existing_service_ids = {
-                    svc.get('service_id')
-                    for svc in existing_services
-                    if svc.get('service_id')
-                }
-                logger.info(
-                    "[full_update_online_entry] Существующие услуги: %s",
-                    existing_service_ids,
+        
+        # Получаем очередь для определения даты
+        queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+        
+        if entry.patient_id and queue:
+            # ⭐ Запрашиваем ВСЕ записи этого пациента за этот день
+            all_patient_entries = (
+                db.query(OnlineQueueEntry)
+                .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                .filter(
+                    OnlineQueueEntry.patient_id == entry.patient_id,
+                    DailyQueue.day == queue.day
                 )
-            except:
-                pass
+                .all()
+            )
+            
+            logger.info(
+                "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента за %s",
+                len(all_patient_entries),
+                queue.day,
+            )
+            
+            for patient_entry in all_patient_entries:
+                if patient_entry.services:
+                    try:
+                        entry_services = json.loads(patient_entry.services)
+                        for svc in entry_services:
+                            if svc.get('service_id'):
+                                existing_service_ids.add(svc.get('service_id'))
+                    except:
+                        pass
+        else:
+            # Fallback: только текущая entry (как было раньше)
+            if entry.services:
+                try:
+                    existing_services = json.loads(entry.services)
+                    existing_service_ids = {
+                        svc.get('service_id')
+                        for svc in existing_services
+                        if svc.get('service_id')
+                    }
+                except:
+                    pass
+        
+        logger.info(
+            "[full_update_online_entry] Существующие услуги (из всех entries): %s",
+            existing_service_ids,
+        )
 
         # Определяем новые услуги (которые не были в entry.services)
         new_service_ids = []

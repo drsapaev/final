@@ -347,52 +347,39 @@ class QRQueueService:
                         self._get_department_name(qr_token.department),
                     )
 
-                # ✅ Подсчитываем текущую длину очереди из реальных записей (Visit + Appointment)
+                # ⭐ ИСПРАВЛЕНО: Считаем длину онлайн-очереди через OnlineQueueEntry
+                # Для консистентности с queue_position_notifications.py
                 try:
-                    from app.models.appointment import Appointment
-                    from app.models.visit import Visit
-
                     # Используем target_date из токена
                     target_date = qr_token.day
-
-                    # Считаем Visit записи на target_date для этого врача
-                    visit_count = (
-                        self.db.query(Visit)
+                    
+                    # Находим DailyQueue для этого специалиста и дня
+                    daily_queue = (
+                        self.db.query(DailyQueue)
                         .filter(
-                            Visit.visit_date == target_date,
-                            Visit.doctor_id == specialist.id,
+                            DailyQueue.specialist_id == specialist.id,
+                            DailyQueue.day == target_date
                         )
-                        .count()
+                        .first()
                     )
-
-                    # ✅ Защита от None
-                    if visit_count is None:
-                        visit_count = 0
-                    logger.debug(f"[QRQueueService] visit_count: {visit_count}")
-
-                    # Считаем Appointment записи на target_date для этого врача
-                    appointment_count = (
-                        self.db.query(Appointment)
-                        .filter(
-                            Appointment.appointment_date == target_date,
-                            Appointment.doctor_id == specialist.id,
-                        )
-                        .count()
-                    )
-
-                    # ✅ Защита от None
-                    if appointment_count is None:
-                        appointment_count = 0
-                    logger.debug(
-                        f"[QRQueueService] appointment_count: {appointment_count}"
-                    )
-
-                    queue_length = visit_count + appointment_count
-                    logger.debug(f"[QRQueueService] queue_length: {queue_length}")
+                    
+                    if daily_queue:
+                        # Считаем OnlineQueueEntry записи в этой очереди (waiting/called)
+                        queue_length = (
+                            self.db.query(OnlineQueueEntry)
+                            .filter(
+                                OnlineQueueEntry.queue_id == daily_queue.id,
+                                OnlineQueueEntry.status.in_(["waiting", "called"]),
+                            )
+                            .count()
+                        ) or 0
+                    else:
+                        queue_length = 0
+                        
+                    logger.debug(f"[QRQueueService] online_queue_length: {queue_length}")
                 except Exception as e:
                     logger.debug(f"[QRQueueService] Ошибка подсчета очереди: {e}")
                     import traceback
-
                     traceback.print_exc()
                     queue_length = 0
         except Exception as e:
@@ -1058,49 +1045,15 @@ class QRQueueService:
         return f"data:image/png;base64,{img_str}"
 
     def _get_queue_length(self, queue_id: int) -> int:
-        """Получает текущую длину очереди (все типы записей)"""
+        """
+        Получает текущую длину очереди (только OnlineQueueEntry).
+        
+        ⭐ ИСПРАВЛЕНО: Для онлайн-очереди считаем только записи OnlineQueueEntry,
+        а не Visit/Appointment. Это обеспечивает консистентность с логикой
+        позиционирования в queue_position_notifications.py.
+        """
         try:
-            # Получаем информацию о очереди
-            daily_queue = (
-                self.db.query(DailyQueue).filter(DailyQueue.id == queue_id).first()
-            )
-
-            if not daily_queue:
-                return 0
-
-            # Получаем дату очереди
-            target_date = daily_queue.day
-            specialist_id = daily_queue.specialist_id
-
-            # Считаем все типы записей:
-            # 1. Visit (визиты через регистратора)
-            # 2. Appointment (предварительные записи)
-            # 3. OnlineQueueEntry (онлайн записи через QR)
-            from app.models.appointment import Appointment
-            from app.models.visit import Visit
-
-            visit_count = (
-                self.db.query(Visit)
-                .filter(
-                    Visit.visit_date == target_date, Visit.doctor_id == specialist_id
-                )
-                .count()
-            )
-            if visit_count is None:
-                visit_count = 0
-
-            appointment_count = (
-                self.db.query(Appointment)
-                .filter(
-                    Appointment.appointment_date == target_date,
-                    Appointment.doctor_id == specialist_id,
-                )
-                .count()
-            )
-            if appointment_count is None:
-                appointment_count = 0
-
-            # Считаем онлайн записи в этой очереди (только waiting/called)
+            # Считаем только онлайн записи в этой очереди (waiting/called)
             online_count = (
                 self.db.query(OnlineQueueEntry)
                 .filter(
@@ -1109,22 +1062,16 @@ class QRQueueService:
                 )
                 .count()
             )
-            if online_count is None:
-                online_count = 0
-
-            total = visit_count + appointment_count + online_count
+            
             logger.debug(
-                f"[_get_queue_length] queue_id={queue_id}, date={target_date}, specialist={specialist_id}"
+                f"[_get_queue_length] queue_id={queue_id}, online_count={online_count}"
             )
-            logger.debug(
-                f"[_get_queue_length] visit={visit_count}, appointment={appointment_count}, online={online_count}, total={total}"
-            )
-
-            return total
+            
+            return online_count or 0
+            
         except Exception as e:
             logger.error(f"[_get_queue_length] Ошибка: {e}")
             import traceback
-
             traceback.print_exc()
             return 0
 
