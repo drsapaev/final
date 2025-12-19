@@ -858,4 +858,4 @@ DELETE /api/v1/registrar/batch/patients/{patient_id}/entries/{date}
 
 ---
 
-*Последнее обновление: 2024-12-18*
+*Последнее обновление: 2025-12-19*

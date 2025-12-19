@@ -1460,6 +1460,46 @@ def full_update_online_entry(
                 "[full_update_online_entry] ⭐ Все услуги помечены как существующие (первое заполнение QR): %s",
                 list(existing_service_queue_times.keys()),
             )
+            
+            # ⭐ FIX 2: Создаём Visit для QR-записи при первом заполнении
+            if entry.patient_id and entry.visit_id is None and request.services:
+                try:
+                    from app.services.qr_queue_service import QRQueueService
+                    
+                    qr_service = QRQueueService(db)
+                    
+                    # Подготавливаем услуги для Visit
+                    services_for_visit = []
+                    for svc_item in request.services:
+                        svc = db.query(Service).filter(Service.id == svc_item['service_id']).first()
+                        if svc:
+                            services_for_visit.append({
+                                'service_id': svc.id,
+                                'name': svc.name,
+                                'code': svc.code,
+                                'price': float(svc.price) if svc.price else 0,
+                                'quantity': svc_item.get('quantity', 1),
+                            })
+                    
+                    if services_for_visit:
+                        visit = qr_service._create_visit_for_qr(
+                            patient_id=entry.patient_id,
+                            visit_date=date.today(),
+                            services=services_for_visit,
+                            visit_type=entry.visit_type or "paid",
+                            discount_mode=request.discount_mode or "none",
+                            notes=f"QR-регистрация: {entry.patient_name}",
+                        )
+                        entry.visit_id = visit.id
+                        logger.info(
+                            "[full_update_online_entry] ⭐ FIX 2: Создан Visit ID=%d для QR-записи ID=%d",
+                            visit.id, entry.id,
+                        )
+                except Exception as visit_err:
+                    logger.warning(
+                        "[full_update_online_entry] ⚠️ Не удалось создать Visit для QR-записи: %s",
+                        str(visit_err),
+                    )
 
         else:
             # Редактирование - обновляем текущую entry ТОЛЬКО со старыми услугами

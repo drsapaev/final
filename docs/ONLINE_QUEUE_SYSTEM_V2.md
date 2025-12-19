@@ -616,12 +616,15 @@ class QueueToken(Base):
 - `complete_join_session()` — завершение (одиночная)
 - `complete_join_session_multiple()` — завершение (множественная)
 - `_check_online_time_restrictions()` — проверка временных ограничений
+- `_find_or_create_patient()` — **[NEW 2025-12]** создание Patient при QR-регистрации
+- `_create_visit_for_qr()` — **[NEW 2025-12]** создание Visit при первом заполнении QR
 
 ### `MorningAssignmentService` (morning_assignment.py)
 
 **Основные методы:**
 - `run()` — запуск утреннего распределения
 - `_assign_queues_for_visit()` — присвоение очередей для визита
+
 
 ---
 
