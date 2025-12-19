@@ -5,13 +5,14 @@
 import base64
 import io
 import logging
+import re
 import secrets
 import socket
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import qrcode
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,78 @@ class QRQueueService:
 
     def __init__(self, db: Session):
         self.db = db
+
+    def _find_or_create_patient(
+        self,
+        patient_name: str,
+        phone: str,
+        birth_year: Optional[int] = None,
+        address: Optional[str] = None,
+    ) -> Patient:
+        """
+        ⭐ FIX: Находит или создаёт пациента по телефону.
+        
+        SSOT для создания пациентов при QR-регистрации.
+        Гарантирует, что patient_id ВСЕГДА будет заполнен.
+        
+        Args:
+            patient_name: ФИО пациента
+            phone: Номер телефона
+            birth_year: Год рождения (опционально)
+            address: Адрес (опционально)
+            
+        Returns:
+            Patient instance (существующий или новый)
+        """
+        # Нормализуем телефон для поиска
+        clean_phone = re.sub(r'\D', '', phone or '')
+        
+        if not clean_phone:
+            logger.warning(
+                "[QRQueueService._find_or_create_patient] ⚠️ Пустой телефон, невозможно найти/создать пациента"
+            )
+            return None
+        
+        # Ищем по телефону (с нормализацией)
+        patient = (
+            self.db.query(Patient)
+            .filter(
+                func.replace(func.replace(Patient.phone, '+', ''), ' ', '') == clean_phone
+            )
+            .first()
+        )
+        
+        if patient:
+            logger.info(
+                "[QRQueueService._find_or_create_patient] ✅ Найден существующий пациент ID=%d по телефону %s",
+                patient.id, phone
+            )
+            return patient
+        
+        # Создаём нового пациента
+        # Парсим ФИО
+        name_parts = patient_name.strip().split() if patient_name else []
+        last_name = name_parts[0] if len(name_parts) > 0 else "Неизвестный"
+        first_name = name_parts[1] if len(name_parts) > 1 else "Пациент"
+        middle_name = name_parts[2] if len(name_parts) > 2 else None
+        
+        patient = Patient(
+            last_name=last_name,
+            first_name=first_name,
+            middle_name=middle_name,
+            phone=phone,
+            birth_date=date(birth_year, 1, 1) if birth_year else None,
+            address=address,
+        )
+        self.db.add(patient)
+        self.db.flush()
+        
+        logger.info(
+            "[QRQueueService._find_or_create_patient] ✅ Создан новый пациент ID=%d для QR-регистрации: %s, %s",
+            patient.id, patient_name, phone
+        )
+        
+        return patient
 
     def generate_qr_token(
         self,
@@ -595,7 +668,15 @@ class QRQueueService:
         if not qr_token:
             raise ValueError("QR токен не найден")
 
-        patient = self.db.query(Patient).filter(Patient.phone == phone).first()
+        # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
+        patient = self._find_or_create_patient(patient_name, phone)
+        patient_id = patient.id if patient else None
+        
+        if not patient_id:
+            logger.warning(
+                "[complete_join_session] ⚠️ Не удалось создать/найти пациента для %s, %s",
+                patient_name, phone
+            )
 
         try:
             join_result = queue_service.join_queue_with_token(
@@ -604,7 +685,7 @@ class QRQueueService:
                 patient_name=patient_name,
                 phone=phone,
                 telegram_id=telegram_id,
-                patient_id=patient.id if patient else None,
+                patient_id=patient_id,  # ⭐ Теперь ВСЕГДА заполнен
                 source="online",
             )
         except (QueueValidationError, QueueConflictError, QueueNotFoundError) as exc:
@@ -680,7 +761,15 @@ class QRQueueService:
         if not qr_token:
             raise ValueError("QR токен не найден")
 
-        patient = self.db.query(Patient).filter(Patient.phone == phone).first()
+        # ⭐ FIX: Создаём или находим пациента (patient_id ВСЕГДА заполняется)
+        patient = self._find_or_create_patient(patient_name, phone)
+        patient_id = patient.id if patient else None
+        
+        if not patient_id:
+            logger.warning(
+                "[complete_join_session_multiple] ⚠️ Не удалось создать/найти пациента для %s, %s",
+                patient_name, phone
+            )
 
         entries: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
@@ -693,7 +782,7 @@ class QRQueueService:
                     patient_name=patient_name,
                     phone=phone,
                     telegram_id=telegram_id,
-                    patient_id=patient.id if patient else None,
+                    patient_id=patient_id,  # ⭐ Теперь ВСЕГДА заполнен
                     specialist_id_override=specialist_id,
                     source="online",
                 )

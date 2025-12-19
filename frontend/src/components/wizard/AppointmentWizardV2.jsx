@@ -621,16 +621,29 @@ const AppointmentWizardV2 = ({
     }
 
     // Приоритет 2: Если service_name уже является полным названием (не код), используем его
-    const serviceName = item.service_name;
-    if (serviceName && serviceName.length > 3 && !/^[A-Z]\d+$/i.test(serviceName)) {
+    let serviceName = item.service_name;
+
+    // ⭐ DEFENSIVE FIX: Если service_name это объект (например, из-за ошибки в данных), пытаемся достать строку
+    if (typeof serviceName === 'object' && serviceName !== null) {
+      logger.warn('⚠️ getServiceName encountered an object for service_name:', serviceName);
+      serviceName = serviceName.name || serviceName.display_name || serviceName.displayName || String(serviceName);
+    }
+
+    if (serviceName && typeof serviceName === 'string' && serviceName.length > 3 && !/^[A-Z]\d+$/i.test(serviceName)) {
       // Если это не код (не формат "K01", "p09" и т.д.), а реальное название
       const foundByName = servicesData.find(s => s.name === serviceName);
       if (foundByName) return foundByName.name;
     }
 
     // Приоритет 3: Пытаемся найти по коду
-    const searchName = item._temp_name || item.service_name;
-    if (searchName && servicesData.length > 0) {
+    let searchName = item._temp_name || item.service_name || item.code;
+
+    // ⭐ DEFENSIVE FIX: Если searchName это объект
+    if (typeof searchName === 'object' && searchName !== null) {
+      searchName = searchName.code || searchName.service_code || searchName.name || String(searchName);
+    }
+
+    if (searchName && typeof searchName === 'string' && servicesData.length > 0) {
       const searchNameUpper = String(searchName).toUpperCase().trim();
       const searchNameNoZero = searchNameUpper.replace(/^([A-Z])0+(\d+)$/, '$1$2');
 
@@ -659,7 +672,9 @@ const AppointmentWizardV2 = ({
     }
 
     // Fallback: возвращаем service_name (если это название) или код
-    return serviceName || searchName || 'Неизвестная услуга';
+    // ⭐ FINAL DEFENSIVE: Убеждаемся, что возвращаем строку
+    const fallback = serviceName || searchName || 'Неизвестная услуга';
+    return (typeof fallback === 'string') ? fallback : JSON.stringify(fallback);
   }, [servicesData]);
 
   // Эффект для обогащения данных корзины реальными ID и ценами после загрузки servicesData

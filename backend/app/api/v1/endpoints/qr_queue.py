@@ -1223,53 +1223,168 @@ def full_update_online_entry(
         from app.models.online_queue import DailyQueue
 
         existing_service_ids = set()
+        # ⭐ FIX PHASE 2: Сохраняем оригинальные queue_times для существующих услуг
+        existing_service_queue_times = {}
         
-        # Получаем очередь для определения даты
+        # ⭐ FIX 3: Backend САМ вычисляет aggregated_ids по patient_id + дате или phone + дате
+        # Frontend aggregated_ids используем только как fallback
+        computed_aggregated_ids = []
+        today = date.today()
+        
         queue = db.query(DailyQueue).filter(DailyQueue.id == entry.queue_id).first()
+        queue_day = queue.day if queue else today
         
-        if entry.patient_id and queue:
-            # ⭐ Запрашиваем ВСЕ записи этого пациента за этот день
-            all_patient_entries = (
+        if entry.patient_id:
+            # Лучший вариант: находим все entries пациента за день по patient_id
+            patient_entries = (
                 db.query(OnlineQueueEntry)
                 .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
                 .filter(
                     OnlineQueueEntry.patient_id == entry.patient_id,
-                    DailyQueue.day == queue.day
+                    DailyQueue.day == queue_day,
+                    OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
                 )
                 .all()
             )
-            
+            computed_aggregated_ids = [e.id for e in patient_entries]
             logger.info(
-                "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента за %s",
-                len(all_patient_entries),
-                queue.day,
+                "[full_update_online_entry] ⭐ FIX 3: Вычислены aggregated_ids по patient_id=%d: %s",
+                entry.patient_id, computed_aggregated_ids
+            )
+        elif entry.phone:
+            # Fallback: по телефону (для старых QR-записей без patient_id)
+            phone_entries = (
+                db.query(OnlineQueueEntry)
+                .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                .filter(
+                    OnlineQueueEntry.phone == entry.phone,
+                    DailyQueue.day == queue_day,
+                    OnlineQueueEntry.status.in_(["waiting", "called", "in_service"]),
+                )
+                .all()
+            )
+            computed_aggregated_ids = [e.id for e in phone_entries]
+            logger.info(
+                "[full_update_online_entry] ⭐ FIX 3: Вычислены aggregated_ids по phone=%s: %s",
+                entry.phone, computed_aggregated_ids
+            )
+        
+        # Используем computed_aggregated_ids, frontend's aggregated_ids только как fallback
+        final_aggregated_ids = computed_aggregated_ids if computed_aggregated_ids else (request.aggregated_ids or [])
+        if not computed_aggregated_ids and request.aggregated_ids:
+            logger.warning(
+                "[full_update_online_entry] ⚠️ Используем aggregated_ids из frontend (fallback): %s",
+                request.aggregated_ids
+            )
+        
+        # ⭐ DEBUG: Логируем начальное состояние
+        logger.info(
+            "[full_update_online_entry] ⭐ DEBUG: entry.patient_id=%s, final_aggregated_ids=%s, entry.services=%s",
+            entry.patient_id,
+            final_aggregated_ids,
+            entry.services[:200] if entry.services else None,
+        )
+        
+        # ⭐ FIX: Используем final_aggregated_ids для получения всех записей пациента
+        if final_aggregated_ids and len(final_aggregated_ids) > 0:
+            logger.info(
+                "[full_update_online_entry] ⭐ FIX: Используем aggregated_ids для поиска существующих услуг: %s",
+                final_aggregated_ids,
+            )
+            all_entries = (
+                db.query(OnlineQueueEntry)
+                .filter(OnlineQueueEntry.id.in_(final_aggregated_ids))
+                .all()
             )
             
-            for patient_entry in all_patient_entries:
-                if patient_entry.services:
+            for agg_entry in all_entries:
+                if agg_entry.services:
                     try:
-                        entry_services = json.loads(patient_entry.services)
-                        for svc in entry_services:
-                            if svc.get('service_id'):
-                                existing_service_ids.add(svc.get('service_id'))
-                    except:
-                        pass
-        else:
-            # Fallback: только текущая entry (как было раньше)
-            if entry.services:
-                try:
-                    existing_services = json.loads(entry.services)
-                    existing_service_ids = {
-                        svc.get('service_id')
-                        for svc in existing_services
-                        if svc.get('service_id')
-                    }
-                except:
-                    pass
+                        agg_services = json.loads(agg_entry.services)
+                        for svc in agg_services:
+                            svc_id = svc.get('service_id')
+                            if svc_id:
+                                existing_service_ids.add(svc_id)
+                                # ⭐ FIX: Сохраняем оригинальное queue_time
+                                if svc.get('queue_time') and svc_id not in existing_service_queue_times:
+                                    existing_service_queue_times[svc_id] = svc.get('queue_time')
+                    except Exception as e:
+                        logger.warning(
+                            "[full_update_online_entry] Ошибка парсинга services для entry %d: %s",
+                            agg_entry.id, e,
+                        )
+            
+            logger.info(
+                "[full_update_online_entry] ⭐ FIX: Найдено %d существующих услуг из aggregated_ids: %s",
+                len(existing_service_ids),
+            )
+        
+        # Используем queue из FIX 3 блока выше (queue_day уже вычислен)
+        
+        # ⭐ FIX: Если aggregated_ids не предоставлен или пустой, используем старую логику
+        # Но ТОЛЬКО если мы ещё не нашли услуги через aggregated_ids
+        if len(existing_service_ids) == 0:
+            if entry.patient_id and queue:
+                # ⭐ Запрашиваем ВСЕ записи этого пациента за этот день
+                all_patient_entries = (
+                    db.query(OnlineQueueEntry)
+                    .join(DailyQueue, OnlineQueueEntry.queue_id == DailyQueue.id)
+                    .filter(
+                        OnlineQueueEntry.patient_id == entry.patient_id,
+                        DailyQueue.day == queue.day
+                    )
+                    .all()
+                )
+                
+                logger.info(
+                    "[full_update_online_entry] ⭐ FIX: Найдено %d записей пациента за %s",
+                    len(all_patient_entries),
+                    queue.day,
+                )
+                
+                for patient_entry in all_patient_entries:
+                    if patient_entry.services:
+                        try:
+                            entry_services = json.loads(patient_entry.services)
+                            for svc in entry_services:
+                                svc_id = svc.get('service_id')
+                                if svc_id:
+                                    existing_service_ids.add(svc_id)
+                                    # ⭐ FIX: Сохраняем оригинальное queue_time
+                                    if svc.get('queue_time') and svc_id not in existing_service_queue_times:
+                                        existing_service_queue_times[svc_id] = svc.get('queue_time')
+                        except:
+                            pass
+            else:
+                # Fallback: только текущая entry (как было раньше)
+                logger.info(
+                    "[full_update_online_entry] ⭐ DEBUG: Fallback - patient_id is None or no queue, using entry.services only"
+                )
+                if entry.services:
+                    try:
+                        existing_services = json.loads(entry.services)
+                        logger.info(
+                            "[full_update_online_entry] ⭐ DEBUG: Найдено %d услуг в entry.services: %s",
+                            len(existing_services),
+                            [s.get('service_id') for s in existing_services],
+                        )
+                        for svc in existing_services:
+                            svc_id = svc.get('service_id')
+                            if svc_id:
+                                existing_service_ids.add(svc_id)
+                                # ⭐ FIX: Сохраняем оригинальное queue_time
+                                if svc.get('queue_time') and svc_id not in existing_service_queue_times:
+                                    existing_service_queue_times[svc_id] = svc.get('queue_time')
+                    except Exception as parse_err:
+                        logger.error(
+                            "[full_update_online_entry] ⭐ DEBUG: Ошибка парсинга entry.services: %s",
+                            parse_err,
+                        )
         
         logger.info(
-            "[full_update_online_entry] Существующие услуги (из всех entries): %s",
+            "[full_update_online_entry] Существующие услуги: %s, сохранённые queue_times: %s",
             existing_service_ids,
+            list(existing_service_queue_times.keys()),
         )
 
         # Определяем новые услуги (которые не были в entry.services)
@@ -1284,7 +1399,39 @@ def full_update_online_entry(
         )
 
         # Определяем: это первичная регистрация или редактирование?
-        is_initial_registration = entry.queue_time is None or not entry.services
+        # ⭐ DEBUG: Добавляем логирование для отладки
+        logger.info(
+            "[full_update_online_entry] DEBUG: entry.queue_time=%s, entry.services=%s (type=%s, len=%s)",
+            entry.queue_time,
+            entry.services[:100] if entry.services else None,
+            type(entry.services).__name__,
+            len(entry.services) if entry.services else 0,
+        )
+        
+        # ⭐ FIX: Улучшенная логика определения первичной регистрации
+        # Считаем "первичной регистрацией" ТОЛЬКО если queue_time = None
+        # Если есть entry.services (даже пустой JSON []), но queue_time есть - это редактирование
+        has_services = False
+        if entry.services:
+            try:
+                parsed = json.loads(entry.services) if isinstance(entry.services, str) else entry.services
+                has_services = len(parsed) > 0
+            except (json.JSONDecodeError, TypeError):
+                has_services = False
+        
+        # ⭐ FIX CRITICAL: Улучшенная логика определения первичной регистрации
+        # Для QR-записей: если entry.services пустой — это "первое заполнение"
+        # и все услуги должны получить ОРИГИНАЛЬНОЕ queue_time!
+        is_first_fill_qr = not has_services and entry.queue_time is not None and entry.source == "online"
+        is_initial_registration = entry.queue_time is None
+        
+        logger.info(
+            "[full_update_online_entry] DEBUG: has_services=%s, is_initial_registration=%s, is_first_fill_qr=%s, source=%s",
+            has_services,
+            is_initial_registration,
+            is_first_fill_qr,
+            entry.source,
+        )
 
         if is_initial_registration:
             # Первичная регистрация - обновляем текущую entry со всеми услугами
@@ -1293,6 +1440,27 @@ def full_update_online_entry(
                 "[full_update_online_entry] Первичная регистрация, queue_time: %s",
                 queue_time,
             )
+
+        elif is_first_fill_qr:
+            # ⭐ КРИТИЧЕСКИЙ ФИКС: Первое заполнение QR-записи!
+            # Все услуги получают ОРИГИНАЛЬНОЕ queue_time из entry (время QR-регистрации)
+            queue_time = entry.queue_time
+            logger.info(
+                "[full_update_online_entry] ⭐ Первое заполнение QR-записи, все услуги получают оригинальное queue_time: %s",
+                queue_time,
+            )
+            # Помечаем ВСЕ услуги как "существующие" (они должны идти в эту entry, не в новые)
+            for service_item in request.services:
+                svc_id = service_item['service_id']
+                if svc_id not in existing_service_queue_times:
+                    existing_service_queue_times[svc_id] = queue_time.isoformat() if hasattr(queue_time, 'isoformat') else str(queue_time)
+            # Очищаем new_service_ids — для первого заполнения QR ВСЕ услуги идут в текущую entry
+            new_service_ids = []
+            logger.info(
+                "[full_update_online_entry] ⭐ Все услуги помечены как существующие (первое заполнение QR): %s",
+                list(existing_service_queue_times.keys()),
+            )
+
         else:
             # Редактирование - обновляем текущую entry ТОЛЬКО со старыми услугами
             # Новые услуги будут добавлены как отдельные entries ПОСЛЕ обновления Visit
@@ -1344,6 +1512,22 @@ def full_update_online_entry(
 
                 total_amount += item_price
 
+                # ⭐ FIX PHASE 2: Для существующих услуг используем оригинальное queue_time
+                if service_id in existing_service_queue_times:
+                    service_queue_time = existing_service_queue_times[service_id]
+                    logger.info(
+                        "[full_update_online_entry] ⭐ Сохраняем оригинальное queue_time для %s: %s",
+                        service.name,
+                        service_queue_time,
+                    )
+                else:
+                    # Новая услуга или первичная регистрация — текущее время
+                    service_queue_time = (
+                        queue_time.isoformat()
+                        if hasattr(queue_time, 'isoformat')
+                        else str(queue_time)
+                    )
+
                 # ✅ НОВОЕ: Создаем полный объект услуги
                 service_obj = {
                     "service_id": service.id,
@@ -1351,11 +1535,7 @@ def full_update_online_entry(
                     "code": service.code or "UNKNOWN",
                     "quantity": service_item.get('quantity', 1),
                     "price": int(item_price),
-                    "queue_time": (
-                        queue_time.isoformat()
-                        if hasattr(queue_time, 'isoformat')
-                        else str(queue_time)
-                    ),
+                    "queue_time": service_queue_time,  # ⭐ FIX: Используем правильное время
                     "cancelled": False,
                     "cancel_reason": None,
                     "cancelled_by": None,
@@ -1371,6 +1551,17 @@ def full_update_online_entry(
         entry.total_amount = int(
             total_amount
         )  # ✅ СОХРАНЯЕМ СУММУ (конвертируем в int)
+
+        # ⭐ FIX: При первичной регистрации устанавливаем queue_time на entry
+        # Это критически важно! Без этого entry.queue_time остается None,
+        # и при следующем редактировании система думает, что это первичная регистрация,
+        # перезаписывая queue_time существующих услуг.
+        if is_initial_registration and entry.queue_time is None:
+            entry.queue_time = queue_time
+            logger.info(
+                "[full_update_online_entry] ⭐ Установлен queue_time на entry: %s",
+                queue_time,
+            )
 
         logger.info(
             "[full_update_online_entry] Услуги обновлены (новый формат): %d услуг(и), Итоговая сумма: %s",
@@ -1834,55 +2025,79 @@ def full_update_online_entry(
                         len(other_entries),
                     )
 
-        # ⭐ FIX #4 (ПЕРЕРАБОТАН): СОЗДАНИЕ НОВЫХ QUEUE_ENTRIES ДЛЯ НОВЫХ УСЛУГ
-        # Выполняется ПОСЛЕ обновления Visit, чтобы получить актуальные услуги
-        if entry.visit_id and len(new_service_ids) > 0:
+        # ⭐ FIX #5 (PHASE 2 BUG FIX): СОЗДАНИЕ НОВЫХ QUEUE_ENTRIES ДЛЯ НОВЫХ УСЛУГ
+        # Выполняется даже для QR-записей без visit_id
+        # Условие: есть новые услуги И это редактирование (не первичная регистрация)
+        if len(new_service_ids) > 0 and not is_initial_registration:
             logger.info(
-                "[full_update_online_entry] ⭐ Создание %d новых queue_entries для новых услуг",
+                "[full_update_online_entry] ⭐ Создание %d новых queue_entries для новых услуг (visit_id=%s)",
                 len(new_service_ids),
+                entry.visit_id,
             )
 
             from datetime import datetime, timezone
 
             current_time = datetime.now(timezone.utc)
 
-            # Получаем все услуги из обновленного Visit
-            visit_services_all = (
-                db.query(VisitService)
-                .filter(VisitService.visit_id == entry.visit_id)
-                .all()
-            )
-
-            # Группируем услуги по категориям
+            # ⭐ FIX: Получаем услуги из request.services (работает и без visit_id)
             services_by_category = {}
-            for vs in visit_services_all:
-                service_code = vs.code or ""
-                category = service_code[0] if service_code else "G"
+            
+            for service_item in request.services:
+                service_id = service_item['service_id']
+                
+                # Только новые услуги
+                if service_id not in new_service_ids:
+                    continue
+                    
+                service = db.query(Service).filter(Service.id == service_id).first()
+                if not service:
+                    continue
+                
+                # Получаем код услуги (⭐ FIX: используем service_code, не code)
+                service_code = service.service_code or service.code or ""
+                category = service_code[0].upper() if service_code else "G"
 
                 # Маппинг категории -> queue_tag
+                # ⭐ SSOT: K10 (ЭКГ) должен идти в очередь 'echokg', не 'cardiology'
                 category_to_queue_tag = {
                     'K': 'cardiology',
                     'D': 'dermatology',
                     'S': 'stomatology',
                     'L': 'laboratory',
                     'P': 'procedures',
-                    'E': 'ecg',  # ⭐ ECG отдельная очередь
+                    'C': 'procedures',  # Капельницы
+                    'E': 'ecg',
                     'G': 'general',
                 }
-                queue_tag = category_to_queue_tag.get(category, 'general')
+                
+                # ⭐ SPECIAL CASE: K10 = ЭКГ -> echokg queue
+                if service_code.upper() == 'K10' or service_code.upper().startswith('ECG'):
+                    queue_tag = 'echokg'
+                else:
+                    queue_tag = category_to_queue_tag.get(category, 'general')
 
-                # Проверяем: это новая услуга?
-                is_new_service = vs.service_id in new_service_ids
-
-                if is_new_service:
-                    if queue_tag not in services_by_category:
-                        services_by_category[queue_tag] = []
-                    services_by_category[queue_tag].append(vs)
+                if queue_tag not in services_by_category:
+                    services_by_category[queue_tag] = []
+                services_by_category[queue_tag].append({
+                    'service_id': service_id,
+                    'service': service,
+                    'quantity': service_item.get('quantity', 1),
+                })
+                
+                # ⭐ DEBUG: Логируем присвоение queue_tag для каждой услуги
+                logger.info(
+                    "[full_update_online_entry] ⭐ Услуга %s (code=%s, id=%d) -> queue_tag=%s",
+                    service.name,
+                    service_code,
+                    service_id,
+                    queue_tag,
+                )
 
             logger.info(
                 "[full_update_online_entry] Новые услуги распределены по категориям: %s",
                 list(services_by_category.keys()),
             )
+
 
             # Создаем queue_entry для каждой категории с новыми услугами
             for queue_tag, services in services_by_category.items():
@@ -1940,17 +2155,19 @@ def full_update_online_entry(
                 services_list_new = []
                 total_amount_new = 0
 
-                for vs in services:
-                    vs_price = float(vs.price) if vs.price else 0
-                    vs_qty = vs.qty or 1
-                    total_amount_new += vs_price * vs_qty
+                for svc_data in services:
+                    # ⭐ FIX: Используем новую структуру данных
+                    service = svc_data['service']
+                    svc_quantity = svc_data.get('quantity', 1)
+                    svc_price = float(service.price) if service.price else 0
+                    total_amount_new += svc_price * svc_quantity
 
                     service_obj = {
-                        'service_id': vs.service_id,
-                        'name': vs.name,
-                        'code': vs.code,
-                        'quantity': vs_qty,
-                        'price': int(vs_price),
+                        'service_id': svc_data['service_id'],
+                        'name': service.name,
+                        'code': service.service_code or service.code,
+                        'quantity': svc_quantity,
+                        'price': int(svc_price),
                         'queue_time': current_time.isoformat(),  # ⭐ ТЕКУЩЕЕ ВРЕМЯ
                         'cancelled': False,
                         'cancel_reason': None,
@@ -1958,6 +2175,14 @@ def full_update_online_entry(
                         'was_paid_before_cancel': False,
                     }
                     services_list_new.append(service_obj)
+
+                # ⭐ FIX 4: Не создаём entry если список услуг пустой
+                if not services_list_new:
+                    logger.warning(
+                        "[full_update_online_entry] ⚠️ Пропуск создания entry для %s — нет услуг (services_list_new пустой)",
+                        queue_tag
+                    )
+                    continue
 
                 # Создаем новую OnlineQueueEntry
                 new_queue_entry = OnlineQueueEntry(
@@ -1968,7 +2193,7 @@ def full_update_online_entry(
                     phone=entry.phone,
                     birth_year=entry.birth_year,
                     address=entry.address,
-                    visit_id=entry.visit_id,  # ⭐ Сохраняем visit_id
+                    visit_id=entry.visit_id,  # ⭐ Сохраняем visit_id (может быть None для QR)
                     source=entry.source or "desk",
                     queue_time=current_time,  # ⭐ ТЕКУЩЕЕ ВРЕМЯ
                     services=json.dumps(services_list_new, ensure_ascii=False),
@@ -1983,7 +2208,7 @@ def full_update_online_entry(
                 db.add(new_queue_entry)
                 db.flush()
 
-                service_names = [vs.name for vs in services]
+                service_names = [svc_data['service'].name for svc_data in services]
                 logger.info(
                     "[full_update_online_entry] ⭐ Создана queue_entry #%d для %s: %s, queue_time=%s",
                     next_number,
@@ -1991,6 +2216,7 @@ def full_update_online_entry(
                     service_names,
                     current_time,
                 )
+
 
             db.flush()  # Сохраняем новые entries
             logger.info(

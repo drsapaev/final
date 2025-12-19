@@ -2715,10 +2715,10 @@ const RegistrarPanel = () => {
       const normalizedCode = String(serviceCode).toUpperCase();
 
       // ЭКГ - отдельная категория (только ЭКГ) - ВАЖНО: K10 это ЭКГ!
-      if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
+      if (normalizedCode === 'K10' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
 
-      // ЭхоКГ - кардиология (консультации кардиолога и ЭхоКГ)
-      if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
+      // ЭhоКГ - только для кодов ECHO/ЭХОКГ (K11 идёт в Кардиологию!)
+      if (normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
 
       // Физиотерапия (дерматологическая) - коды P01-P05
       if (normalizedCode.match(/^P\d+$/)) return 'P';
@@ -3197,7 +3197,7 @@ const RegistrarPanel = () => {
       // ✅ ИСПРАВЛЕНО: Используем appointment.services напрямую, фильтруя по категории отделения
       const departmentCodePrefixes = {
         'cardio': ['K'],  // K01, K11 и т.д. - все кардиоуслуги кроме ECG
-        'echokg': ['K10', 'ECG'],  // Только ЭКГ (K10, ECG01)
+        'echokg': ['K10', 'ECG'],  // Только ЭКГ (K10)
         'derma': ['D'],  // D01 и т.д. (только консультации, не D_PROC)
         'dental': ['S'],  // S01, S10 и т.д.
         'lab': ['L'],  // L01, L02, L11 и т.д.
@@ -3318,8 +3318,8 @@ const RegistrarPanel = () => {
       if (!serviceCode) return null;
       const normalizedCode = String(serviceCode).toUpperCase();
 
-      if (normalizedCode === 'K10' || normalizedCode === 'ECG01' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
-      if (normalizedCode === 'K11' || normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
+      if (normalizedCode === 'K10' || normalizedCode === 'CARD_ECG' || normalizedCode.includes('ECG') || normalizedCode.includes('ЭКГ')) return 'ECG';
+      if (normalizedCode === 'CARD_ECHO' || normalizedCode.includes('ECHO') || normalizedCode.includes('ЭХОКГ')) return 'ECHO';
       if (normalizedCode.match(/^P\d+$/)) return 'P';
       if (normalizedCode.match(/^D_PROC\d+$/)) return 'D_PROC';
       if (normalizedCode.match(/^C\d+$/)) return 'C';

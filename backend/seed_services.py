@@ -119,8 +119,8 @@ def seed_services():
             'currency': 'UZS',
             'duration_minutes': 15,
             'active': True,
-            'category_code': 'ECG',
-            'service_code': 'ECG01'
+            'category_code': 'K',
+            'service_code': 'K10'
         },
         
         # Дерматология

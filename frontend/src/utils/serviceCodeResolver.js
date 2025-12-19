@@ -56,9 +56,9 @@ export const SPECIALTY_TO_CODE = {
     echo: 'K11',
     'эхокг': 'K11',
 
-    // ECG - separate queue
-    ecg: 'ECG01',
-    'экг': 'ECG01',
+    // ECG - separate queue (K10 is the actual service code)
+    ecg: 'K10',
+    'экг': 'K10',
 
     // Procedures
     procedures: 'P01',
@@ -83,8 +83,8 @@ export const CODE_TO_NAME = {
     K01: 'Консультация кардиолога',
     K11: 'ЭхоКГ',
 
-    // ECG (separate queue)
-    ECG01: 'ЭКГ',
+    // ECG (separate queue) - K10 is actual code
+    K10: 'ЭКГ',
 
     // Dermatology
     D01: 'Консультация дерматолога',
@@ -390,11 +390,32 @@ export function normalizeServicesFromInitialData(initialData, servicesData = [])
         return items;
     }
 
-    // ⭐ Приоритет 2: services (массив строк/кодов)
+    // ⭐ Приоритет 2: services (массив строк/кодов ИЛИ объектов)
     if (Array.isArray(initialData.services) && initialData.services.length > 0) {
-        initialData.services.forEach(serviceName => {
-            if (serviceName) {
-                // Пробуем резолвить код в полные данные
+        initialData.services.forEach(serviceItem => {
+            if (!serviceItem) return;
+
+            // ⭐ FIX: Обрабатываем как объекты (новый формат), так и строки (legacy)
+            if (typeof serviceItem === 'object' && serviceItem !== null) {
+                // Объект с service_id, name, code, price, queue_time, etc.
+                const foundService = servicesData.find(s =>
+                    s.id === serviceItem.service_id ||
+                    s.service_code === serviceItem.code ||
+                    s.code === serviceItem.code
+                );
+
+                items.push(createCartItem({
+                    id: serviceItem.service_id || foundService?.id || null,
+                    service_id: serviceItem.service_id || foundService?.id || null,
+                    name: serviceItem.name || foundService?.name || 'Услуга',
+                    code: serviceItem.code || foundService?.service_code || null,
+                    price: serviceItem.price || foundService?.price || 0,
+                    quantity: serviceItem.quantity || 1,
+                    _source: 'services_array',
+                }));
+            } else {
+                // Строка - legacy формат (код или название услуги)
+                const serviceName = serviceItem;
                 const serviceCode = toServiceCode(serviceName);
                 const foundService = servicesData.find(s =>
                     s.service_code === serviceCode ||

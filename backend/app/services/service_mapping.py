@@ -55,8 +55,8 @@ QUEUE_GROUPS = {
     "ecg": {
         "display_name": "ЭКГ",
         "display_name_uz": "EKG",
-        "service_codes": ["K10", "ECG01"],
-        "service_prefixes": ["ECG"],
+        "service_codes": ["K10"],  # K10 is the standard code for ЭКГ
+        "service_prefixes": [],
         "exclude_codes": [],
         "queue_tag": "echokg",
         "tab_key": "echokg",
